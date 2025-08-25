@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import type { LucideIcon } from "lucide-react"
 import { 
   BarChart3, 
   Users, 
@@ -12,7 +13,8 @@ import {
   School,
   X
 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 
 interface SidebarProps {
   isOpen: boolean
@@ -23,6 +25,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const checkMobile = () => {
@@ -35,14 +38,20 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const navItems = [
-    { icon: BarChart3, label: "Tableau de bord", href: "#", active: true },
-    { icon: Users, label: "Utilisateurs", href: "#users" },
-    { icon: GraduationCap, label: "Classes & Filières", href: "#classes" },
-    { icon: BookOpen, label: "Matières", href: "#subjects" },
-    { icon: ClipboardCheck, label: "Présences", href: "#attendance" },
-    { icon: GraduationCap, label: "Notes & Bulletins", href: "#grades" },
+  type NavItem = { icon: LucideIcon; label: string; href: string }
+  const navItems: NavItem[] = [
+    { icon: BarChart3, label: "Tableau de bord", href: "/admin" },
+    { icon: Users, label: "Utilisateurs", href: "/admin/users" },
+    { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
+    { icon: BookOpen, label: "Matières", href: "/admin/subjects" },
+    { icon: ClipboardCheck, label: "Présences", href: "/admin/attendance" },
+    { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades" },
   ]
+
+  const isActive = (href: string) => {
+    if (href === "/admin") return pathname === "/admin"
+    return pathname?.startsWith(href)
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -50,8 +59,11 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     router.push("/login")
   }
 
-  const adminItems = [
-    { icon: Settings, label: "Paramètres", href: "#" },
+  type AdminItem =
+    | { icon: LucideIcon; label: string; href: string }
+    | { icon: LucideIcon; label: string; key: "logout" }
+  const adminItems: AdminItem[] = [
+    { icon: Settings, label: "Paramètres", href: "/admin/settings" },
     { icon: LogOut, label: "Déconnexion", key: "logout" },
   ]
 
@@ -94,19 +106,20 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <ul className="space-y-2">
                 {navItems.map((item, index) => (
                   <li key={index}>
-                    <a 
+                    <Link 
                       href={item.href}
                       className={`
                         flex items-center px-4 py-3 rounded-lg transition-colors
-                        ${item.active 
+                        ${isActive(item.href) 
                           ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
                           : 'text-gray-600 hover:bg-gray-100'
                         }
                       `}
+                      onClick={onToggle}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
                       <span>{item.label}</span>
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -115,8 +128,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
               <ul className="space-y-2">
                 {adminItems.map((item, index) => (
-                  <li key={item.key || index}>
-                    {item.key === "logout" ? (
+                  <li key={index}>
+                    {"key" in item && item.key === "logout" ? (
                       <button
                         type="button"
                         onClick={() => setShowLogoutModal(true)}
@@ -126,13 +139,14 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         <span>{item.label}</span>
                       </button>
                     ) : (
-                      <a 
-                        href={item.href}
+                      <Link 
+                        href={(item as { href: string }).href}
                         className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        onClick={onToggle}
                       >
                         <item.icon className="w-5 h-5 mr-3" />
                         <span>{item.label}</span>
-                      </a>
+                      </Link>
                     )}
                   </li>
                 ))}
@@ -187,11 +201,11 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <ul className="space-y-2">
               {navItems.map((item, index) => (
                 <li key={index}>
-                  <a 
+                  <Link 
                     href={item.href}
                     className={`
                       flex items-center px-4 py-3 rounded-lg transition-colors group
-                      ${item.active 
+                      ${isActive(item.href) 
                         ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
                         : 'text-gray-600 hover:bg-gray-100'
                       }
@@ -207,7 +221,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         {item.label}
                       </div>
                     )}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -218,8 +232,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             )}
             <ul className="space-y-2">
               {adminItems.map((item, index) => (
-                <li key={item.key || index}>
-                  {item.key === "logout" ? (
+                <li key={index}>
+                  {"key" in item && item.key === "logout" ? (
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
@@ -234,8 +248,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                       )}
                     </button>
                   ) : (
-                    <a 
-                      href={item.href}
+                    <Link 
+                      href={(item as { href: string }).href}
                       className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors group"
                       title={!isOpen ? item.label : undefined}
                     >
@@ -246,7 +260,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                           {item.label}
                         </div>
                       )}
-                    </a>
+                    </Link>
                   )}
                 </li>
               ))}
