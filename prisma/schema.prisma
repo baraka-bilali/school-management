@@ -16,6 +16,10 @@ model User {
   role      Role      @default(ELEVE)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  // Relations
+  student   Student?
+  teacher   Teacher?
 }
 
 enum Role {
@@ -24,4 +28,71 @@ enum Role {
   COMPTABLE
   PROFESSEUR
   DIRECTEUR_DISCIPLINE
+}
+
+model AcademicYear {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  current   Boolean   @default(false)
+  startDate DateTime?
+  endDate   DateTime?
+
+  enrollments Enrollment[]
+}
+
+model Class {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  level     String?
+  createdAt DateTime  @default(now())
+
+  enrollments Enrollment[]
+}
+
+model Student {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  code        String   @unique
+  lastName    String
+  middleName  String
+  firstName   String
+  gender      String
+  birthDate   DateTime
+
+  user        User     @relation(fields: [userId], references: [id])
+  enrollments Enrollment[]
+}
+
+model Teacher {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  lastName   String
+  middleName String
+  firstName  String
+  gender     String
+  birthDate  DateTime
+  specialty  String?
+  phone      String?
+  hiredAt    DateTime? @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Enrollment {
+  id         Int          @id @default(autoincrement())
+  studentId  Int
+  classId    Int
+  yearId     Int
+  status     EnrollmentStatus @default(ACTIVE)
+
+  student    Student      @relation(fields: [studentId], references: [id])
+  class      Class        @relation(fields: [classId], references: [id])
+  year       AcademicYear @relation(fields: [yearId], references: [id])
+
+  @@unique([studentId, classId, yearId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  INACTIVE
 }
