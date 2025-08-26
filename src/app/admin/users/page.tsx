@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
+import React from "react"
 
 type TabKey = "students" | "teachers"
 
@@ -353,8 +354,8 @@ function StudentsSection() {
                 const enr = s.enrollments?.[0]
                 const isOpen = expandedId === s.id
                 return (
-                  <>
-                    <tr key={s.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isOpen ? null : s.id)}>
+                  <React.Fragment key={s.id}>
+                    <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isOpen ? null : s.id)}>
                       <td className="px-3 py-2">{s.code}</td>
                       <td className="px-3 py-2">{s.lastName}</td>
                       <td className="px-3 py-2">{s.middleName}</td>
@@ -368,7 +369,7 @@ function StudentsSection() {
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr className="bg-gray-50">
+                      <tr key={`${s.id}-expanded`} className="bg-gray-50">
                         <td colSpan={9} className="px-3 py-3">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div><span className="text-gray-500">Nom</span><div className="font-medium">{s.lastName}</div></div>
@@ -382,7 +383,7 @@ function StudentsSection() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 )
               })}
               {items.length === 0 && (

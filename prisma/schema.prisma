@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider          = "mysql"
-  url               = env("DATABASE_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -13,16 +12,15 @@ model User {
   name      String
   email     String    @unique
   password  String
-  role      Role      @default(ELEVE)
+  role      User_role @default(ELEVE)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  // Relations
   student   Student?
   teacher   Teacher?
 }
 
-enum Role {
+enum User_role {
   ADMIN
   ELEVE
   COMPTABLE
@@ -43,7 +41,10 @@ model AcademicYear {
 model Class {
   id        Int       @id @default(autoincrement())
   name      String    @unique
-  level     String?
+  level     String
+  section   String
+  letter    String
+  stream    String?
   createdAt DateTime  @default(now())
 
   enrollments Enrollment[]
@@ -84,6 +85,7 @@ model Enrollment {
   classId    Int
   yearId     Int
   status     EnrollmentStatus @default(ACTIVE)
+  exitReason String?
 
   student    Student      @relation(fields: [studentId], references: [id])
   class      Class        @relation(fields: [classId], references: [id])
@@ -95,4 +97,7 @@ model Enrollment {
 enum EnrollmentStatus {
   ACTIVE
   INACTIVE
+  GRADUATED
+  DROPPED_OUT
+  EXPELLED
 }

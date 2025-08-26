@@ -1,66 +1,102 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { buildStudentEmail, generatePassword, normalize } from "@/lib/generateCredentials"
 import bcrypt from "bcryptjs"
+import { randomBytes } from "crypto"
+import { buildStudentEmail, generatePassword } from "@/lib/generateCredentials"
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const q = searchParams.get("q") || undefined
-  const classId = searchParams.get("classId")
-  const yearId = searchParams.get("yearId")
-  const sort = searchParams.get("sort") || "name_asc"
-  const page = Number(searchParams.get("page") || 1)
-  const pageSize = Number(searchParams.get("pageSize") || 10)
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const q = searchParams.get('q') || ''
+    const classId = searchParams.get('classId')
+    const yearId = searchParams.get('yearId')
+    const sort = searchParams.get('sort') || 'name_asc'
+    const page = parseInt(searchParams.get('page') || '1')
+    const pageSize = parseInt(searchParams.get('pageSize') || '10')
 
-  const where: any = {}
-  if (q) {
-    const qn = normalize(q)
-    where.OR = [
-      { lastName: { contains: qn, mode: "insensitive" } },
-      { middleName: { contains: qn, mode: "insensitive" } },
-      { code: { contains: qn, mode: "insensitive" } },
-    ]
-  }
-
-  if (classId || yearId) {
-    where.enrollments = {
-      some: {
-        ...(classId ? { classId: Number(classId) } : {}),
-        ...(yearId ? { yearId: Number(yearId) } : {}),
-      },
+    // Construire les filtres
+    const where: any = {}
+    
+    if (q) {
+      where.OR = [
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { middleName: { contains: q, mode: 'insensitive' } },
+        { code: { contains: q, mode: 'insensitive' } }
+      ]
     }
-  }
 
-  const orderBy =
-    sort === "name_desc"
-      ? [{ lastName: "desc" }, { middleName: "desc" }, { firstName: "desc" }]
-      : sort === "class"
-      ? [{ enrollments: { _count: "desc" } }]
-      : [{ lastName: "asc" }, { middleName: "asc" }, { firstName: "asc" }]
+    // Filtre par classe
+    if (classId) {
+      where.enrollments = {
+        some: {
+          classId: parseInt(classId)
+        }
+      }
+    }
 
-  const [total, items] = await prisma.$transaction([
-    prisma.student.count({ where }),
-    prisma.student.findMany({
+    // Filtre par année académique
+    if (yearId) {
+      where.enrollments = {
+        some: {
+          yearId: parseInt(yearId)
+        }
+      }
+    }
+
+    // Construire le tri
+    let orderBy: any = {}
+    switch (sort) {
+      case 'name_asc':
+        orderBy = { lastName: 'asc' }
+        break
+      case 'name_desc':
+        orderBy = { lastName: 'desc' }
+        break
+      case 'class':
+        orderBy = { enrollments: { class: { name: 'asc' } } }
+        break
+      default:
+        orderBy = { lastName: 'asc' }
+    }
+
+    // Compter le total
+    const total = await prisma.student.count({ where })
+
+    // Récupérer les étudiants avec pagination
+    const students = await prisma.student.findMany({
       where,
       orderBy,
-      include: {
-        enrollments: {
-          include: { class: true, year: true },
-          orderBy: { id: "desc" },
-          take: 1,
-        },
-      },
       skip: (page - 1) * pageSize,
       take: pageSize,
-    }),
-  ])
+      include: {
+        enrollments: {
+          include: {
+            class: true,
+            year: true
+          }
+        }
+      }
+    })
 
-  return NextResponse.json({ total, items, page, pageSize })
+    return NextResponse.json({
+      items: students,
+      total,
+      page,
+      pageSize
+    })
+  } catch (error) {
+    console.error('Erreur lors de la récupération des étudiants:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json()
+    const body = await req.json()
+
     const {
       lastName,
       middleName,
@@ -72,79 +108,79 @@ export async function POST(request: Request) {
       academicYearId,
     } = body
 
-    if (!lastName || !middleName || !firstName || !gender || !birthDate || !code || !classId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    // Vérifier que l'année académique existe
+    let yearId = academicYearId
+    if (!yearId) {
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { current: true }
+      })
+      if (!currentYear) {
+        return NextResponse.json(
+          { error: 'Aucune année académique courante configurée' },
+          { status: 400 }
+        )
+      }
+      yearId = currentYear.id
     }
 
-    // Validate unique student code early
-    const existingCode = await prisma.student.findUnique({ where: { code } })
-    if (existingCode) {
-      return NextResponse.json(
-        { error: "Code élève déjà utilisé." },
-        { status: 400 }
-      )
-    }
+    // Générer email et mot de passe
+    const email = buildStudentEmail({ lastName, middleName, code })
+    const plaintextPassword = generatePassword()
+    const hashedPassword = await bcrypt.hash(plaintextPassword, 10)
 
-    const year = academicYearId
-      ? await prisma.academicYear.findUnique({ where: { id: Number(academicYearId) } })
-      : await prisma.academicYear.findFirst({ where: { current: true } })
-
-    if (!year) {
-      return NextResponse.json(
-        { error: "Aucune année académique courante configurée." },
-        { status: 400 }
-      )
-    }
-
-    const baseEmail = buildStudentEmail({ lastName, middleName, code })
-
-    // ensure unique email
-    let email = baseEmail
-    let counter = 1
-    while (await prisma.user.findUnique({ where: { email } })) {
-      const [local, domain] = baseEmail.split("@")
-      email = `${local}${counter}@${domain}`
-      counter += 1
-    }
-
-    const password = generatePassword()
-    const hashed = await bcrypt.hash(password, 10)
-
+    // Créer l'utilisateur et l'étudiant dans une transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Créer l'utilisateur
       const user = await tx.user.create({
-        data: { name: `${firstName} ${lastName}`.trim(), email, password: hashed, role: "ELEVE" },
+        data: {
+          name: `${lastName} ${firstName}`,
+          email,
+          password: hashedPassword,
+          role: "ELEVE",
+        },
       })
 
+      // Créer l'étudiant
       const student = await tx.student.create({
         data: {
-          userId: user.id,
-          code,
           lastName,
           middleName,
           firstName,
           gender,
           birthDate: new Date(birthDate),
+          code,
+          userId: user.id,
         },
       })
 
-      const enrollment = await tx.enrollment.create({
+      // Créer l'inscription
+      await tx.enrollment.create({
         data: {
           studentId: student.id,
-          classId: Number(classId),
-          yearId: year.id,
+          classId: parseInt(classId),
+          yearId: parseInt(yearId),
           status: "ACTIVE",
         },
-        include: { class: true, year: true },
       })
 
-      return { user, student, enrollment }
+      return { user, student }
     })
 
-    return NextResponse.json({ ...result, plaintextPassword: password })
-  } catch (e) {
+    return NextResponse.json({ 
+      ...result, 
+      plaintextPassword 
+    })
+  } catch (e: any) {
     console.error(e)
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+    if (e.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Email ou code déjà utilisé' },
+        { status: 400 }
+      )
+    }
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    )
   }
 }
-
-

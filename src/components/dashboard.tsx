@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { 
   Users, 
   School, 
@@ -15,6 +18,51 @@ import {
 } from "lucide-react"
 
 export default function Dashboard() {
+  const [stats, setStats] = useState({
+    students: "...",
+    teachers: "...",
+    classes: "...",
+    attendance: "..."
+  })
+
+  const fetchStats = async () => {
+    try {
+      // Récupérer les statistiques des étudiants
+      const studentsRes = await fetch('/api/admin/students?pageSize=1')
+      const studentsText = await studentsRes.text()
+      const studentsData = studentsText ? JSON.parse(studentsText) : { total: 0 }
+      
+      // Récupérer les statistiques des enseignants
+      const teachersRes = await fetch('/api/admin/teachers?pageSize=1')
+      const teachersText = await teachersRes.text()
+      const teachersData = teachersText ? JSON.parse(teachersText) : { total: 0 }
+      
+      // Récupérer les métadonnées (classes)
+      const metaRes = await fetch('/api/admin/meta')
+      const metaText = await metaRes.text()
+      const metaData = metaText ? JSON.parse(metaText) : { classes: [] }
+
+      setStats({
+        students: studentsData.total || 0,
+        teachers: teachersData.total || 0,
+        classes: metaData.classes?.length || 0,
+        attendance: "94%" // Placeholder pour l'instant
+      })
+    } catch (error) {
+      console.error('Erreur lors de la récupération des statistiques:', error)
+      setStats({
+        students: "Erreur",
+        teachers: "Erreur", 
+        classes: "Erreur",
+        attendance: "Erreur"
+      })
+    }
+  }
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
   return (
     <div>
       {/* Dashboard Content */}
@@ -27,7 +75,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500">Élèves</p>
-                <h3 className="text-2xl font-bold text-gray-800">1,248</h3>
+                <h3 className="text-2xl font-bold text-gray-800">{stats.students}</h3>
                 <p className="text-green-500 text-sm mt-1 flex items-center">
                   <TrendingUp className="w-3 h-3 mr-1" /> 12% vs mois dernier
                 </p>
@@ -42,7 +90,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500">Enseignants</p>
-                <h3 className="text-2xl font-bold text-gray-800">48</h3>
+                <h3 className="text-2xl font-bold text-gray-800">{stats.teachers}</h3>
                 <p className="text-green-500 text-sm mt-1 flex items-center">
                   <TrendingUp className="w-3 h-3 mr-1" /> 5% vs mois dernier
                 </p>
@@ -57,7 +105,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500">Classes</p>
-                <h3 className="text-2xl font-bold text-gray-800">24</h3>
+                <h3 className="text-2xl font-bold text-gray-800">{stats.classes}</h3>
                 <p className="text-red-500 text-sm mt-1 flex items-center">
                   <TrendingDown className="w-3 h-3 mr-1" /> 2% vs mois dernier
                 </p>
@@ -72,7 +120,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500">Taux de présence</p>
-                <h3 className="text-2xl font-bold text-gray-800">94%</h3>
+                <h3 className="text-2xl font-bold text-gray-800">{stats.attendance}</h3>
                 <p className="text-green-500 text-sm mt-1 flex items-center">
                   <TrendingUp className="w-3 h-3 mr-1" /> 3% vs mois dernier
                 </p>
