@@ -434,14 +434,31 @@ function StudentsSection() {
               onClose={() => setBanner(null)}
             />
           )}
-        <Toolbar
-          placeholder="Search by last name, middle name or code"
-          onCreate={() => setShowCreate(true)}
-          onSearch={(q) => setFilters((f) => ({ ...f, q }))}
-          rightContent={
-            <div className="flex items-center gap-2">
+        {/* Barre de recherche par mots clés */}
+        <div className="flex gap-4 items-center">
+          <div className="flex-1">
+            <input
+              type="text"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Rechercher par nom, post-nom ou code"
+              onChange={(e) => setFilters(f => ({ ...f, q: e.target.value }))}
+            />
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700 transition-colors"
+          >
+            Ajouter
+          </button>
+        </div>
+
+        {/* Filtres en dessous */}
+        <div className="space-y-3">
+          {/* Version mobile : Filtres en colonne */}
+          <div className="md:hidden flex flex-col gap-2 w-full">
+            <div className="grid grid-cols-2 gap-2">
               <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
                 value={filters.classId || ""}
                 onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
               >
@@ -451,7 +468,7 @@ function StudentsSection() {
                 ))}
               </select>
               <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
                 value={filters.yearId || ""}
                 onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
               >
@@ -460,21 +477,100 @@ function StudentsSection() {
                   <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
                 ))}
               </select>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-                value={filters.sort}
-                onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
-              >
-                <option value="name_asc">Nom (A→Z)</option>
-                <option value="name_desc">Nom (Z→A)</option>
-                <option value="class">Classe</option>
-              </select>
             </div>
-          }
-        />
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+              value={filters.sort}
+              onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
+            >
+              <option value="name_asc">Nom (A→Z)</option>
+              <option value="name_desc">Nom (Z→A)</option>
+              <option value="class">Classe</option>
+            </select>
+          </div>
 
-        <div className="overflow-x-auto relative">
-          <table className="min-w-full text-sm">
+          {/* Version desktop : Filtres en ligne */}
+          <div className="hidden md:flex items-center gap-2">
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={filters.classId || ""}
+              onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
+            >
+              <option value="">Toutes les classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={filters.yearId || ""}
+              onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
+            >
+              <option value="">Toutes les années</option>
+              {years.map((y) => (
+                <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
+              ))}
+            </select>
+            <select
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={filters.sort}
+              onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
+            >
+              <option value="name_asc">Nom (A→Z)</option>
+              <option value="name_desc">Nom (Z→A)</option>
+              <option value="class">Classe</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          {/* Mobile: stacked cards */}
+          <div className="md:hidden space-y-3">
+            {loading && (
+              <div className="px-3 py-8 text-center text-gray-500">Chargement des données...</div>
+            )}
+            {!loading && items.map((s) => {
+              const enr = s.enrollments?.[0]
+              return (
+                <div key={`mobile-${s.id}`} className="p-4 bg-white rounded-md shadow-sm border space-y-4">
+                  {/* En-tête avec code et actions */}
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-gray-900">Code: {s.code}</div>
+                    <button className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); }}>
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Informations personnelles */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Nom complet</div>
+                      <div className="mt-1 text-sm text-gray-900">{s.lastName} {s.middleName}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Prénom</div>
+                      <div className="mt-1 text-sm text-gray-900">{s.firstName}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Classe</div>
+                      <div className="mt-1 text-sm text-gray-900">{enr?.class?.name || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Année</div>
+                      <div className="mt-1 text-sm text-gray-900">{enr?.year?.name || '-'}</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {!loading && items.length === 0 && (
+              <div className="px-3 py-8 text-center text-gray-500">Aucun élève trouvé.</div>
+            )}
+          </div>
+
+          {/* Desktop/tablet: keep existing table */}
+          <div className="hidden md:block overflow-x-auto relative">
+            <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Code</th>
@@ -666,7 +762,8 @@ function StudentsSection() {
                 </tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
 
         <Pagination state={pagination} setState={setPagination} total={total} />
@@ -784,8 +881,50 @@ function TeachersSection() {
           onSearch={setQ}
         />
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div>
+          {/* Mobile: stacked cards for teachers */}
+          <div className="md:hidden space-y-3">
+            {loading && (
+              <div className="px-3 py-8 text-center text-gray-500">Chargement des données...</div>
+            )}
+            {!loading && items.map((t) => (
+              <div key={`mobile-teacher-${t.id}`} className="p-4 bg-white rounded-md shadow-sm border space-y-4">
+                {/* En-tête avec actions */}
+                <div className="flex items-center justify-end">
+                  <button className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); }}>
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Informations personnelles */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Nom complet</div>
+                    <div className="mt-1 text-sm text-gray-900">{t.lastName} {t.middleName}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Prénom</div>
+                    <div className="mt-1 text-sm text-gray-900">{t.firstName}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Spécialité</div>
+                    <div className="mt-1 text-sm text-gray-900">{t.specialty || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Téléphone</div>
+                    <div className="mt-1 text-sm text-gray-900">{t.phone || '-'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!loading && items.length === 0 && (
+              <div className="px-3 py-8 text-center text-gray-500">Aucun enseignant trouvé.</div>
+            )}
+          </div>
+
+          {/* Desktop/tablet: keep existing table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Nom</th>
@@ -989,6 +1128,7 @@ function TeachersSection() {
             </tbody>
           </table>
         </div>
+      </div>
 
         <Pagination state={pagination} setState={setPagination} total={total} />
         <CreateTeacherModal
