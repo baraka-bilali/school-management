@@ -5,6 +5,9 @@ import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
+import { Eye, Pencil, Check, X } from "lucide-react"
+import { toast } from "sonner"
+import { Banner } from "@/components/ui/banner"
 
 type TabKey = "students" | "teachers"
 
@@ -15,6 +18,13 @@ interface PaginationState {
 
 export default function UsersPage() {
   const [tab, setTab] = useState<TabKey>("students")
+  const [tabVisible, setTabVisible] = useState(true)
+
+  useEffect(() => {
+    setTabVisible(false)
+    const id = setTimeout(() => setTabVisible(true), 20)
+    return () => clearTimeout(id)
+  }, [tab])
 
   return (
     <Layout>
@@ -50,7 +60,9 @@ export default function UsersPage() {
           </button>
         </div>
 
-        {tab === "students" ? <StudentsSection /> : <TeachersSection />}
+        <div className={`transition-all duration-250 ease-out transform ${tabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
+          {tab === "students" ? <StudentsSection /> : <TeachersSection />}
+        </div>
       </div>
     </Layout>
   )
@@ -242,13 +254,129 @@ function StudentsSection() {
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 10 })
   const [filters, setFilters] = useState<{ q?: string; classId?: string; yearId?: string; sort?: string }>({ sort: "name_asc" })
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([])
   const [years, setYears] = useState<Array<{ id: number; name: string; current: boolean }>>([])
   const [currentYearId, setCurrentYearId] = useState<number | null>(null)
-  const [banner, setBanner] = useState<{ email: string; password: string } | null>(null)
+  const [banner, setBanner] = useState<{
+    message?: string;
+    email?: string;
+    password?: string;
+    type?: 'success' | 'error';
+    notificationType: 'create' | 'update';
+  } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({
+    code: "",
+    lastName: "",
+    middleName: "",
+    firstName: "",
+    gender: "M",
+    birthDate: "",
+    classId: "",
+  })
+
+  const handleEdit = (student: any) => {
+    setEditingId(student.id)
+    setEditForm({
+      code: student.code,
+      lastName: student.lastName,
+      middleName: student.middleName,
+      firstName: student.firstName,
+      gender: student.gender,
+      birthDate: student.birthDate.split('T')[0],
+      classId: student.enrollments?.[0]?.classId?.toString() || "",
+    })
+  }
+
+  const handleSaveEdit = async (studentId: number) => {
+    try {
+      // avoid sending update when nothing changed
+      const original = items.find((it) => it.id === studentId)
+      const originalClassId = original?.enrollments?.[0]?.classId?.toString() || ""
+      const changed = (
+        original?.code !== editForm.code ||
+        original?.lastName !== editForm.lastName ||
+        original?.middleName !== editForm.middleName ||
+        original?.firstName !== editForm.firstName ||
+        original?.gender !== editForm.gender ||
+        (original?.birthDate?.split?.('T')?.[0] || '') !== editForm.birthDate ||
+        originalClassId !== (editForm.classId || '')
+      )
+
+      if (!changed) {
+        setEditingId(null)
+        setBanner({ message: "Aucune modification détectée.", type: "success", notificationType: "update" })
+        setTimeout(() => setBanner(null), 2500)
+        return
+      }
+
+      const response = await fetch(`/api/admin/students/${studentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...editForm,
+          classId: editForm.classId ? Number(editForm.classId) : undefined,
+        }),
+      })
+
+      // handle JSON or non-JSON responses gracefully
+      const text = await response.text()
+      let data: any = {}
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch (e) {
+        data = { error: text }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || text || 'Erreur lors de la modification')
+      }
+
+      // Mettre à jour la liste des étudiants
+      setItems(items.map(item => {
+        if (item.id === studentId) {
+          return {
+            ...item,
+            ...editForm,
+            enrollments: [
+              {
+                ...item.enrollments[0],
+                classId: editForm.classId ? Number(editForm.classId) : item.enrollments[0]?.classId,
+              },
+              ...item.enrollments.slice(1),
+            ],
+          }
+        }
+        return item
+      }))
+
+      setEditingId(null)
+      // show loading while we refresh the list
+      setLoading(true)
+      setBanner({ 
+        message: "L'étudiant a été", 
+        type: "success",
+        notificationType: "update"
+      })
+      // refresh list to get the latest data
+      setPagination((p) => ({ ...p }))
+      setTimeout(() => setBanner(null), 3000)
+    } catch (error) {
+      setBanner({ 
+        message: "Une erreur est survenue lors de la modification de l'étudiant", 
+        type: "error",
+        notificationType: "update"
+      })
+      setTimeout(() => setBanner(null), 3000)
+      console.error(error)
+    }
+  }
 
   // Load filter data (classes and academic years)
   useEffect(() => {
@@ -265,19 +393,29 @@ function StudentsSection() {
   }, [])
 
   useEffect(() => {
-    const params = new URLSearchParams()
-    if (filters.q) params.set("q", filters.q)
-    if (filters.classId) params.set("classId", filters.classId)
-    if (filters.yearId) params.set("yearId", filters.yearId)
-    if (filters.sort) params.set("sort", filters.sort)
-    params.set("page", String(pagination.page))
-    params.set("pageSize", String(pagination.pageSize))
-    fetch(`/api/admin/students?${params.toString()}`)
-      .then((r) => r.json())
-      .then((res) => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (filters.q) params.set("q", filters.q)
+        if (filters.classId) params.set("classId", filters.classId)
+        if (filters.yearId) params.set("yearId", filters.yearId)
+        if (filters.sort) params.set("sort", filters.sort)
+        params.set("page", String(pagination.page))
+        params.set("pageSize", String(pagination.pageSize))
+        
+        const response = await fetch(`/api/admin/students?${params.toString()}`)
+        const res = await response.json()
         setItems(res.items || [])
         setTotal(res.total || 0)
-      })
+      } catch (error) {
+        console.error('Erreur lors du chargement des données:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
   }, [pagination, filters])
 
   return (
@@ -286,15 +424,16 @@ function StudentsSection() {
         <CardTitle>Élèves</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {banner && (
-          <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <div className="font-medium">Compte créé</div>
-            <div>Identifiants à transmettre une seule fois:</div>
-            <div className="mt-1"><span className="font-semibold">Email:</span> {banner.email}</div>
-            <div><span className="font-semibold">Mot de passe:</span> {banner.password}</div>
-            <button className="mt-2 text-green-700 underline" onClick={() => setBanner(null)}>Fermer</button>
-          </div>
-        )}
+          {banner && (
+            <Banner
+              type={banner.type}
+              message={banner.message}
+              email={banner.email}
+              password={banner.password}
+              notificationType={banner.notificationType}
+              onClose={() => setBanner(null)}
+            />
+          )}
         <Toolbar
           placeholder="Search by last name, middle name or code"
           onCreate={() => setShowCreate(true)}
@@ -334,7 +473,7 @@ function StudentsSection() {
           }
         />
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto relative">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-gray-600">
               <tr>
@@ -350,28 +489,163 @@ function StudentsSection() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {items.map((s) => {
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">Chargement des données...</div>
+                  </td>
+                </tr>
+              )}
+              {!loading && items.map((s) => {
                 const enr = s.enrollments?.[0]
                 const isOpen = expandedId === s.id
                 return (
                   <React.Fragment key={s.id}>
-                    <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(isOpen ? null : s.id)}>
-                      <td className="px-3 py-2">{s.code}</td>
-                      <td className="px-3 py-2">{s.lastName}</td>
-                      <td className="px-3 py-2">{s.middleName}</td>
-                      <td className="px-3 py-2">{s.firstName}</td>
-                      <td className="px-3 py-2">{s.gender}</td>
-                      <td className="px-3 py-2">{new Date(s.birthDate).toLocaleDateString()}</td>
-                      <td className="px-3 py-2">{enr?.class?.name || "-"}</td>
+                    <tr className={cn(
+                      "hover:bg-gray-50 cursor-pointer",
+                      editingId === s.id ? "bg-blue-50" : ""
+                    )} onClick={() => !editingId && setExpandedId(isOpen ? null : s.id)}>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <input
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.code}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, code: e.target.value }))}
+                          />
+                        ) : s.code}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <input
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.lastName}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))}
+                          />
+                        ) : s.lastName}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <input
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.middleName}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, middleName: e.target.value }))}
+                          />
+                        ) : s.middleName}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <input
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.firstName}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))}
+                          />
+                        ) : s.firstName}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <select
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.gender}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, gender: e.target.value }))}
+                          >
+                            <option value="M">M</option>
+                            <option value="F">F</option>
+                          </select>
+                        ) : s.gender}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <input
+                            type="date"
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.birthDate}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))}
+                          />
+                        ) : new Date(s.birthDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-3 py-2">
+                        {editingId === s.id ? (
+                          <select
+                            className="w-full rounded-md border px-2 py-1"
+                            value={editForm.classId}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, classId: e.target.value }))}
+                          >
+                            {classes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        ) : enr?.class?.name || "-"}
+                      </td>
                       <td className="px-3 py-2">{enr?.year?.name || "-"}</td>
                       <td className="px-3 py-2">
-                        <button className="text-indigo-600 hover:underline" onClick={(e) => { e.stopPropagation(); alert("Edit") }}>Éditer</button>
+                        <div className="flex items-center gap-2">
+                          {editingId === s.id ? (
+                            <>
+                              <button 
+                                className="text-green-600 hover:text-green-700 transition-colors cursor-pointer relative group" 
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  handleSaveEdit(s.id);
+                                }}
+                              >
+                                <Check className="h-4 w-4" />
+                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                  Valider
+                                </span>
+                              </button>
+                              <button 
+                                className="text-red-600 hover:text-red-700 transition-colors cursor-pointer relative group" 
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  setEditingId(null);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                  Annuler
+                                </span>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button 
+                                className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" 
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  handleEdit(s);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                  Modifier
+                                </span>
+                              </button>
+                              <button 
+                                className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" 
+                                onClick={(e) => { e.stopPropagation(); }}
+                              >
+                                <Eye className="h-4 w-4" />
+                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                  Détails
+                                </span>
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                    {isOpen && (
-                      <tr key={`${s.id}-expanded`} className="bg-gray-50">
-                        <td colSpan={9} className="px-3 py-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <tr key={`${s.id}-expanded`} className="bg-gray-50">
+                      <td colSpan={9} className="px-3 py-0">
+                        <div className={cn(
+                          "overflow-hidden transition-all duration-300",
+                          isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+                        )}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
                             <div><span className="text-gray-500">Nom</span><div className="font-medium">{s.lastName}</div></div>
                             <div><span className="text-gray-500">Post-nom</span><div className="font-medium">{s.middleName}</div></div>
                             <div><span className="text-gray-500">Prénom</span><div className="font-medium">{s.firstName}</div></div>
@@ -380,9 +654,9 @@ function StudentsSection() {
                             <div><span className="text-gray-500">Classe</span><div className="font-medium">{enr?.class?.name || "-"}</div></div>
                             <div><span className="text-gray-500">Année</span><div className="font-medium">{enr?.year?.name || "-"}</div></div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
+                        </div>
+                      </td>
+                    </tr>
                   </React.Fragment>
                 )
               })}
@@ -404,8 +678,15 @@ function StudentsSection() {
           defaultYearId={currentYearId || undefined}
           onCreated={(payload) => {
             setShowCreate(false)
-            setBanner({ email: payload.email, password: payload.plaintextPassword })
-            // refresh list
+            // show credentials banner (no extra message)
+            setBanner({
+              email: payload.email,
+              password: payload.plaintextPassword,
+              type: "success",
+              notificationType: "create"
+            })
+            // show loading while refreshing
+            setLoading(true)
             setPagination((p) => ({ ...p }))
           }}
         />
@@ -421,8 +702,25 @@ function TeachersSection() {
   const [q, setQ] = useState("")
   const [years, setYears] = useState<Array<{ id: number; name: string }>>([])
   const [currentYearName, setCurrentYearName] = useState<string>("-")
-  const [banner, setBanner] = useState<{ email: string; password: string } | null>(null)
+  const [banner, setBanner] = useState<{
+    message?: string;
+    email?: string;
+    password?: string;
+    type?: 'success' | 'error';
+    notificationType?: 'create' | 'update';
+  } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({
+    lastName: "",
+    middleName: "",
+    firstName: "",
+    gender: "M",
+    birthDate: "",
+    specialty: "",
+    phone: "",
+  })
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -430,6 +728,7 @@ function TeachersSection() {
     params.set("page", String(pagination.page))
     params.set("pageSize", String(pagination.pageSize))
     ;(async () => {
+      setLoading(true)
       try {
         const r = await fetch(`/api/admin/teachers?${params.toString()}`)
         const text = await r.text()
@@ -440,6 +739,8 @@ function TeachersSection() {
         console.error(e)
         setItems([])
         setTotal(0)
+      } finally {
+        setLoading(false)
       }
     })()
   }, [pagination, q])
@@ -467,15 +768,16 @@ function TeachersSection() {
         <CardTitle>Enseignants</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {banner && (
-          <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <div className="font-medium">Compte créé</div>
-            <div>Identifiants à transmettre une seule fois:</div>
-            <div className="mt-1"><span className="font-semibold">Email:</span> {banner.email}</div>
-            <div><span className="font-semibold">Mot de passe:</span> {banner.password}</div>
-            <button className="mt-2 text-green-700 underline" onClick={() => setBanner(null)}>Fermer</button>
-          </div>
-        )}
+          {banner && (
+            <Banner
+              type={banner.type}
+              message={banner.message}
+              email={banner.email}
+              password={banner.password}
+              notificationType={banner.notificationType}
+              onClose={() => setBanner(null)}
+            />
+          )}
         <Toolbar
           placeholder="Rechercher par nom, spécialité ou téléphone"
           onCreate={() => setShowCreate(true)}
@@ -498,21 +800,187 @@ function TeachersSection() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {items.map((t) => (
-                <tr key={t.id}>
-                  <td className="px-3 py-2">{t.lastName}</td>
-                  <td className="px-3 py-2">{t.middleName}</td>
-                  <td className="px-3 py-2">{t.firstName}</td>
-                  <td className="px-3 py-2">{t.gender}</td>
-                  <td className="px-3 py-2">{new Date(t.birthDate).toLocaleDateString()}</td>
-                  <td className="px-3 py-2">{t.specialty || "-"}</td>
-                  <td className="px-3 py-2">{t.phone || "-"}</td>
-                  <td className="px-3 py-2">{currentYearName}</td>
-                  <td className="px-3 py-2">
-                    <button className="text-indigo-600 hover:underline" onClick={() => alert("Edit")}>Éditer</button>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">Chargement des données...</div>
                   </td>
                 </tr>
-              ))}
+              )}
+              {!loading && items.map((t) => {
+                const isOpen = false // no separate expanded id for teachers; could reuse editingId but keep closed by default
+                return (
+                  <React.Fragment key={t.id}>
+                    <tr className={cn(
+                      "hover:bg-gray-50",
+                      editingId === t.id ? "bg-blue-50" : ""
+                    )}>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input className="w-full rounded-md border px-2 py-1" value={editForm.lastName} onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))} />
+                      ) : t.lastName}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input className="w-full rounded-md border px-2 py-1" value={editForm.middleName} onChange={(e) => setEditForm(prev => ({ ...prev, middleName: e.target.value }))} />
+                      ) : t.middleName}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input className="w-full rounded-md border px-2 py-1" value={editForm.firstName} onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))} />
+                      ) : t.firstName}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <select className="w-full rounded-md border px-2 py-1" value={editForm.gender} onChange={(e) => setEditForm(prev => ({ ...prev, gender: e.target.value }))}>
+                          <option value="M">M</option>
+                          <option value="F">F</option>
+                        </select>
+                      ) : t.gender}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input type="date" className="w-full rounded-md border px-2 py-1" value={editForm.birthDate} onChange={(e) => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
+                      ) : new Date(t.birthDate).toLocaleDateString()}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input className="w-full rounded-md border px-2 py-1" value={editForm.specialty} onChange={(e) => setEditForm(prev => ({ ...prev, specialty: e.target.value }))} />
+                      ) : t.specialty || "-"}</td>
+                      <td className="px-3 py-2">{editingId === t.id ? (
+                        <input className="w-full rounded-md border px-2 py-1" value={editForm.phone} onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))} />
+                      ) : t.phone || "-"}</td>
+                      <td className="px-3 py-2">{currentYearName}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {editingId === t.id ? (
+                            <>
+                              <button className="text-green-600 hover:text-green-700 transition-colors cursor-pointer relative group" onClick={async (e) => { e.stopPropagation();
+                                // avoid calling API if nothing changed
+                                const changed = (
+                                  t.lastName !== editForm.lastName ||
+                                  t.middleName !== editForm.middleName ||
+                                  t.firstName !== editForm.firstName ||
+                                  t.gender !== editForm.gender ||
+                                  (t.birthDate ? t.birthDate.split('T')[0] : '') !== editForm.birthDate ||
+                                  (t.specialty || '') !== editForm.specialty ||
+                                  (t.phone || '') !== editForm.phone
+                                )
+
+                                if (!changed) {
+                                  setEditingId(null)
+                                  setBanner({ message: "Aucune modification détectée.", type: 'success', notificationType: 'update' })
+                                  setTimeout(() => setBanner(null), 2500)
+                                  return
+                                }
+
+                                // handle save
+                                try {
+                                  const res = await fetch(`/api/admin/teachers/${t.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      lastName: editForm.lastName,
+                                      middleName: editForm.middleName,
+                                      firstName: editForm.firstName,
+                                      gender: editForm.gender,
+                                      birthDate: editForm.birthDate,
+                                      specialty: editForm.specialty,
+                                      phone: editForm.phone,
+                                    }),
+                                  })
+
+                                  const text = await res.text()
+                                  console.log('Server response:', { status: res.status, text })
+                                  
+                                  let data: any = {}
+                                  try {
+                                    data = text ? JSON.parse(text) : {}
+                                    console.log('Parsed response:', data)
+                                  } catch (e) {
+                                    console.warn('Failed to parse response as JSON:', text)
+                                    data = { error: text }
+                                  }
+
+                                  if (!res.ok) {
+                                    console.error('Server returned error status:', res.status)
+                                    const errorMsg = data.message || data.error || text || 'Erreur lors de la modification'
+                                    throw new Error(errorMsg)
+                                  }
+
+                                  if (!data || typeof data !== 'object') {
+                                    console.warn('Unexpected response format:', data)
+                                    throw new Error('Format de réponse invalide')
+                                  }
+
+                                  setItems(items.map(item => item.id === t.id ? { 
+                                    ...item,
+                                    ...editForm,
+                                    // preserve other fields that might exist on the server response
+                                    ...(data.teacher || data)
+                                  } : item))
+                                  setEditingId(null)
+                                  setLoading(true)
+                                  setBanner({ 
+                                    message: "L'enseignant a été", 
+                                    type: 'success',
+                                    notificationType: 'update'
+                                  })
+                                  setPagination(p => ({ ...p }))
+                                  setTimeout(() => setBanner(null), 3000)
+                                } catch (err) {
+                                  console.error('Teacher update failed:', err)
+                                  const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
+                                  setBanner({ 
+                                    message: `Une erreur est survenue lors de la modification de l'enseignant: ${errorMessage}`, 
+                                    type: 'error',
+                                  })
+                                  setTimeout(() => setBanner(null), 5000) // longer timeout for error messages
+                                }
+                              }}>
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button className="text-red-600 hover:text-red-700 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>
+                                <X className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setEditForm({
+                                lastName: t.lastName || "",
+                                middleName: t.middleName || "",
+                                firstName: t.firstName || "",
+                                gender: t.gender || "M",
+                                birthDate: t.birthDate ? t.birthDate.split('T')[0] : "",
+                                specialty: t.specialty || "",
+                                phone: t.phone || "",
+                              })}}>
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); }}>
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* expanded details row for teachers (animated) */}
+                    <tr key={`${t.id}-expanded`} className="bg-gray-50">
+                      <td colSpan={9} className="px-3 py-0">
+                        <div className={cn(
+                          "overflow-hidden transition-all duration-300",
+                          editingId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+                        )}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
+                            <div><span className="text-gray-500">Nom</span><div className="font-medium">{t.lastName}</div></div>
+                            <div><span className="text-gray-500">Post-nom</span><div className="font-medium">{t.middleName}</div></div>
+                            <div><span className="text-gray-500">Prénom</span><div className="font-medium">{t.firstName}</div></div>
+                            <div><span className="text-gray-500">Sexe</span><div className="font-medium">{t.gender}</div></div>
+                            <div><span className="text-gray-500">Naissance</span><div className="font-medium">{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "-"}</div></div>
+                            <div><span className="text-gray-500">Spécialité</span><div className="font-medium">{t.specialty || "-"}</div></div>
+                            <div><span className="text-gray-500">Téléphone</span><div className="font-medium">{t.phone || "-"}</div></div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                )
+              })}
               {items.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-3 py-8 text-center text-gray-500">Aucun enseignant trouvé.</td>
@@ -528,7 +996,13 @@ function TeachersSection() {
           onClose={() => setShowCreate(false)}
           onCreated={(payload) => {
             setShowCreate(false)
-            setBanner({ email: payload.email, password: payload.plaintextPassword })
+            setBanner({
+              email: payload.email,
+              password: payload.plaintextPassword,
+              type: "success",
+              notificationType: "create",
+            })
+            setLoading(true)
             setPagination((p) => ({ ...p }))
           }}
         />

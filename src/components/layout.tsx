@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
 
@@ -52,9 +53,29 @@ export default function Layout({ children }: LayoutProps) {
         }
       `}>
         <div className="p-6">
-          {children}
+          <RouteTransition>
+            {children}
+          </RouteTransition>
         </div>
       </main>
+    </div>
+  )
+}
+
+function RouteTransition({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    // quick out/in to trigger transition on pathname change
+    setVisible(false)
+    const id = setTimeout(() => setVisible(true), 20)
+    return () => clearTimeout(id)
+  }, [pathname])
+
+  return (
+    <div className={`transition-all duration-300 ease-out transform ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
+      {children}
     </div>
   )
 }
