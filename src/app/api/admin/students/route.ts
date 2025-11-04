@@ -18,28 +18,24 @@ export async function GET(req: Request) {
     const where: any = {}
     
     if (q) {
+      // include firstName as well so searching by first name works
+      // remove explicit `mode: 'insensitive'` to avoid potential DB/Prisma limitations
       where.OR = [
-        { lastName: { contains: q, mode: 'insensitive' } },
-        { middleName: { contains: q, mode: 'insensitive' } },
-        { code: { contains: q, mode: 'insensitive' } }
+        { lastName: { contains: q } },
+        { middleName: { contains: q } },
+        { firstName: { contains: q } },
+        { code: { contains: q } }
       ]
     }
 
-    // Filtre par classe
-    if (classId) {
-      where.enrollments = {
-        some: {
-          classId: parseInt(classId)
-        }
-      }
-    }
+    // Filtre par classe et/ou année académique
+    if (classId || yearId) {
+      const enrollmentWhere: any = {}
+      if (classId) enrollmentWhere.classId = parseInt(classId)
+      if (yearId) enrollmentWhere.yearId = parseInt(yearId)
 
-    // Filtre par année académique
-    if (yearId) {
       where.enrollments = {
-        some: {
-          yearId: parseInt(yearId)
-        }
+        some: enrollmentWhere
       }
     }
 
@@ -59,24 +55,41 @@ export async function GET(req: Request) {
         orderBy = { lastName: 'asc' }
     }
 
+    // Debug logging for incoming query and constructed filters
+    console.log('GET /api/admin/students params:', { q, classId, yearId, sort, page, pageSize })
+    console.log('Constructed where:', JSON.stringify(where))
+    console.log('Constructed orderBy:', JSON.stringify(orderBy))
+
     // Compter le total
-    const total = await prisma.student.count({ where })
+    let total
+    let students
+    try {
+      total = await prisma.student.count({ where })
+    } catch (err) {
+      console.error('Error counting students with where:', JSON.stringify(where), err)
+      return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
 
     // Récupérer les étudiants avec pagination
-    const students = await prisma.student.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        enrollments: {
-          include: {
-            class: true,
-            year: true
+    try {
+      students = await prisma.student.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          enrollments: {
+            include: {
+              class: true,
+              year: true
+            }
           }
         }
-      }
-    })
+      })
+    } catch (err) {
+      console.error('Error finding students with where/orderBy:', JSON.stringify({ where, orderBy }), err)
+      return NextResponse.json({ error: String(err) }, { status: 500 })
+    }
 
     return NextResponse.json({
       items: students,
