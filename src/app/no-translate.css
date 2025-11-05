@@ -1,0 +1,23 @@
+/* Masquer les éléments de traduction */
+.skiptranslate,
+.translate-tooltip-mtz,
+.translate-button,
+.goog-te-spinner-pos,
+.goog-te-spinner-animation,
+.goog-te-banner-frame,
+#google_translate_element {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Empêcher le décalage du contenu */
+body {
+  top: 0 !important;
+  position: initial !important;
+}
+
+/* Correction pour le wrapper de Google Translate */
+.goog-te-gadget {
+  height: 0;
+  overflow: hidden;
+}

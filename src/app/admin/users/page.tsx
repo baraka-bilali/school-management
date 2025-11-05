@@ -5,6 +5,7 @@ import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
+import Portal from "@/components/portal"
 import { Eye, Pencil, Check, X } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
@@ -18,13 +19,21 @@ interface PaginationState {
 
 export default function UsersPage() {
   const [tab, setTab] = useState<TabKey>("students")
-  const [tabVisible, setTabVisible] = useState(true)
+  const [tabVisible, setTabVisible] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
+  // Effet pour gérer le montage initial
   useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Effet pour gérer les transitions de tab
+  useEffect(() => {
+    if (!isMounted) return
     setTabVisible(false)
     const id = setTimeout(() => setTabVisible(true), 20)
     return () => clearTimeout(id)
-  }, [tab])
+  }, [tab, isMounted])
 
   return (
     <Layout>
@@ -94,13 +103,29 @@ function CreateStudentModal({
     academicYearId: defaultYearId ? String(defaultYearId) : "",
   })
   const [submitting, setSubmitting] = useState(false)
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
     if (defaultYearId) setForm((f) => ({ ...f, academicYearId: String(defaultYearId) }))
   }, [defaultYearId])
 
-  if (!open) return null
+  // manage mount/visibility so opening animates smoothly
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      // allow the element to mount first, then set visible to trigger CSS transition
+      const id = setTimeout(() => setVisible(true), 10)
+      return () => clearTimeout(id)
+    }
 
+    // closing: animate out first then unmount
+    setVisible(false)
+    const t = setTimeout(() => setMounted(false), 220)
+    return () => clearTimeout(t)
+  }, [open])
+
+  if (!mounted) return null
   const submit = async () => {
     setSubmitting(true)
     try {
@@ -124,12 +149,17 @@ function CreateStudentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="text-lg font-semibold">Créer un élève</div>
-          <button className="text-gray-500 hover:text-gray-700" onClick={onClose}>×</button>
-        </div>
+    <Portal>
+      {/* overlay */}
+      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+        {/* dialog */}
+        <div className={`relative w-full max-w-2xl rounded-lg bg-white shadow transform transition-all duration-200 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="text-lg font-semibold">Créer un élève</div>
+            <button className="text-gray-500 hover:text-gray-700" onClick={onClose} aria-label="Fermer">×</button>
+          </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
             <label className="block text-gray-700 mb-1">Nom</label>
@@ -185,6 +215,7 @@ function CreateStudentModal({
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 
@@ -1171,7 +1202,22 @@ function CreateTeacherModal({
   })
   const [submitting, setSubmitting] = useState(false)
 
-  if (!open) return null
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const id = setTimeout(() => setVisible(true), 10)
+      return () => clearTimeout(id)
+    }
+
+    setVisible(false)
+    const t = setTimeout(() => setMounted(false), 220)
+    return () => clearTimeout(t)
+  }, [open])
+
+  if (!mounted) return null
 
   const submit = async () => {
     setSubmitting(true)
@@ -1192,12 +1238,15 @@ function CreateTeacherModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="text-lg font-semibold">Créer un enseignant</div>
-          <button className="text-gray-500 hover:text-gray-700" onClick={onClose}>×</button>
-        </div>
+    <Portal>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+        <div className={`relative w-full max-w-2xl rounded-lg bg-white shadow transform transition-all duration-200 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="text-lg font-semibold">Créer un enseignant</div>
+            <button className="text-gray-500 hover:text-gray-700" onClick={onClose}>×</button>
+          </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
             <label className="block text-gray-700 mb-1">Nom</label>
@@ -1237,8 +1286,9 @@ function CreateTeacherModal({
             {submitting ? "Création..." : "Créer"}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </Portal>
   )
 }
 
