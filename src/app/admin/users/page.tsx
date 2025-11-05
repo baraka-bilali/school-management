@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
 import Portal from "@/components/portal"
-import { Eye, Pencil, Check, X } from "lucide-react"
+import { Eye, Pencil, Check, X, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 
@@ -109,6 +109,23 @@ function CreateStudentModal({
   useEffect(() => {
     if (defaultYearId) setForm((f) => ({ ...f, academicYearId: String(defaultYearId) }))
   }, [defaultYearId])
+
+  // reset form when opening the modal so previous inputs are cleared
+  useEffect(() => {
+    if (open) {
+      setForm({
+        lastName: "",
+        middleName: "",
+        firstName: "",
+        gender: "M",
+        birthDate: "",
+        code: "",
+        classId: "",
+        academicYearId: defaultYearId ? String(defaultYearId) : "",
+      })
+      setSubmitting(false)
+    }
+  }, [open, defaultYearId])
 
   // manage mount/visibility so opening animates smoothly
   useEffect(() => {
@@ -248,9 +265,11 @@ function Toolbar({
       </div>
       <button
         onClick={onCreate}
-        className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        aria-label="Créer"
+        title="Créer"
+        className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700"
       >
-        Créer
+        <Plus className="h-4 w-4" />
       </button>
     </div>
   )
@@ -477,9 +496,11 @@ function StudentsSection() {
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700 transition-colors"
+            aria-label="Ajouter"
+            title="Ajouter"
+            className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
           >
-            Ajouter
+            <Plus className="h-4 w-4" />
           </button>
         </div>
 
@@ -1215,6 +1236,22 @@ function CreateTeacherModal({
     setVisible(false)
     const t = setTimeout(() => setMounted(false), 220)
     return () => clearTimeout(t)
+  }, [open])
+
+  // reset teacher form when opening the modal
+  useEffect(() => {
+    if (open) {
+      setForm({
+        lastName: "",
+        middleName: "",
+        firstName: "",
+        gender: "M",
+        birthDate: "",
+        specialty: "",
+        phone: "",
+      })
+      setSubmitting(false)
+    }
   }, [open])
 
   if (!mounted) return null
