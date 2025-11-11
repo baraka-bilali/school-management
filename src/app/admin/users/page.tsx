@@ -277,21 +277,60 @@ function Toolbar({
 
 function Pagination({ state, setState, total }: { state: PaginationState; setState: (s: PaginationState) => void; total: number }) {
   const totalPages = Math.max(1, Math.ceil(total / state.pageSize))
+  const isFirstPage = state.page === 1
+  const isLastPage = state.page >= totalPages
+  
+  const startItem = total === 0 ? 0 : (state.page - 1) * state.pageSize + 1
+  const endItem = Math.min(state.page * state.pageSize, total)
+
   return (
-    <div className="flex items-center justify-between py-2 text-sm text-gray-600">
-      <div>
-        Page {state.page} / {totalPages}
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2">
+      {/* Info et sélecteur de taille */}
+      <div className="flex items-center gap-4 text-sm text-gray-700">
+        <div className="font-medium">
+          {total === 0 ? "Aucun résultat" : `${startItem}-${endItem} sur ${total}`}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">Afficher:</span>
+          <select
+            value={state.pageSize}
+            onChange={(e) => setState({ ...state, pageSize: Number(e.target.value), page: 1 })}
+            className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value={20}>20</option>
+            <option value={40}>40</option>
+          </select>
+        </div>
       </div>
-      <div className="space-x-2">
+
+      {/* Navigation */}
+      <div className="flex items-center gap-2">
         <button
           onClick={() => setState({ ...state, page: Math.max(1, state.page - 1) })}
-          className="px-3 py-1 rounded border bg-white hover:bg-gray-50"
+          disabled={isFirstPage}
+          className={cn(
+            "px-4 py-2 rounded-md font-medium text-sm transition-colors",
+            isFirstPage
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+          )}
         >
           Précédent
         </button>
+        
+        <div className="px-3 py-2 text-sm font-medium text-gray-700">
+          Page {state.page} / {totalPages}
+        </div>
+
         <button
           onClick={() => setState({ ...state, page: Math.min(totalPages, state.page + 1) })}
-          className="px-3 py-1 rounded border bg-white hover:bg-gray-50"
+          disabled={isLastPage}
+          className={cn(
+            "px-4 py-2 rounded-md font-medium text-sm transition-colors",
+            isLastPage
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+          )}
         >
           Suivant
         </button>
@@ -305,7 +344,7 @@ function StudentsSection() {
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 10 })
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
   const [filters, setFilters] = useState<{ q?: string; classId?: string; yearId?: string; sort?: string }>({ sort: "name_asc" })
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([])
   const [years, setYears] = useState<Array<{ id: number; name: string; current: boolean }>>([])
@@ -847,7 +886,7 @@ function StudentsSection() {
 function TeachersSection() {
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 10 })
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
   const [q, setQ] = useState("")
   const [years, setYears] = useState<Array<{ id: number; name: string }>>([])
   const [currentYearName, setCurrentYearName] = useState<string>("-")

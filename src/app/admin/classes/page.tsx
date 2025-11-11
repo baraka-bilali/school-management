@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
+import { Plus, Pencil, Trash2 } from "lucide-react"
+import Portal from "@/components/portal"
+import { cn } from "@/lib/utils"
 
 interface Class {
   id: number
@@ -34,6 +37,10 @@ export default function ClassesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingClass, setDeletingClass] = useState<Class | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [mountedDelete, setMountedDelete] = useState(false)
+  const [visibleDelete, setVisibleDelete] = useState(false)
 
   const fetchClasses = async () => {
     try {
@@ -50,6 +57,40 @@ export default function ClassesPage() {
   useEffect(() => {
     fetchClasses()
   }, [])
+
+  // Gérer les animations du modal
+  useEffect(() => {
+    if (showModal) {
+      setMounted(true)
+      const id = setTimeout(() => setVisible(true), 10)
+      return () => clearTimeout(id)
+    }
+
+    setVisible(false)
+    const t = setTimeout(() => setMounted(false), 220)
+    return () => clearTimeout(t)
+  }, [showModal])
+
+  // Reset form when opening modal
+  useEffect(() => {
+    if (showModal && !editingClass) {
+      setForm({ level: "", section: "", letter: "", stream: "" })
+      setSubmitting(false)
+    }
+  }, [showModal, editingClass])
+
+  // Gérer les animations du modal de suppression
+  useEffect(() => {
+    if (showDeleteModal) {
+      setMountedDelete(true)
+      const id = setTimeout(() => setVisibleDelete(true), 10)
+      return () => clearTimeout(id)
+    }
+
+    setVisibleDelete(false)
+    const t = setTimeout(() => setMountedDelete(false), 220)
+    return () => clearTimeout(t)
+  }, [showDeleteModal])
 
   const handleCreate = () => {
     setEditingClass(null)
@@ -151,9 +192,11 @@ export default function ClassesPage() {
           </div>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            aria-label="Créer une classe"
+            title="Créer une classe"
+            className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
           >
-            Créer une classe
+            <Plus className="h-4 w-4" />
           </button>
         </div>
 
@@ -185,18 +228,22 @@ export default function ClassesPage() {
                       <td className="px-3 py-2">{cls.stream || "-"}</td>
                       <td className="px-3 py-2">{new Date(cls.createdAt).toLocaleDateString()}</td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleEdit(cls)}
-                            className="text-indigo-600 hover:underline text-sm"
+                            className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            aria-label="Modifier"
+                            title="Modifier"
                           >
-                            Éditer
+                            <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(cls)}
-                            className="text-red-600 hover:underline text-sm"
+                            className="rounded-full p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            aria-label="Supprimer"
+                            title="Supprimer"
                           >
-                            Supprimer
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -216,15 +263,24 @@ export default function ClassesPage() {
         </Card>
 
         {/* Modal de création/édition */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="w-full max-w-2xl rounded-lg bg-white shadow">
-              <div className="flex items-center justify-between border-b px-4 py-3">
-                <div className="text-lg font-semibold">
-                  {editingClass ? "Modifier la classe" : "Créer une classe"}
+        {mounted && (
+          <Portal>
+            <div className={cn(
+              "fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200",
+              visible ? "opacity-100" : "opacity-0 pointer-events-none"
+            )} aria-hidden={!visible}>
+              <div className="absolute inset-0 bg-black/50" onClick={() => setShowModal(false)} />
+
+              <div className={cn(
+                "relative w-full max-w-2xl rounded-lg bg-white shadow transform transition-all duration-200",
+                visible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+              )} role="dialog" aria-modal="true">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <div className="text-lg font-semibold">
+                    {editingClass ? "Modifier la classe" : "Créer une classe"}
+                  </div>
+                  <button className="text-gray-500 hover:text-gray-700" onClick={() => setShowModal(false)} aria-label="Fermer">×</button>
                 </div>
-                <button className="text-gray-500 hover:text-gray-700" onClick={() => setShowModal(false)}>×</button>
-              </div>
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -309,36 +365,47 @@ export default function ClassesPage() {
               </div>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* Modal de confirmation de suppression */}
-        {showDeleteModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="w-full max-w-md rounded-lg bg-white shadow">
-              <div className="p-4">
-                <div className="text-lg font-semibold mb-2">Confirmer la suppression</div>
-                <div className="text-gray-600 mb-4">
-                  Êtes-vous sûr de vouloir supprimer la classe "{deletingClass?.name}" ?
-                  Cette action est irréversible.
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    className="rounded-md border px-4 py-2"
-                    onClick={() => setShowDeleteModal(false)}
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    disabled={submitting}
-                    className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
-                    onClick={confirmDelete}
-                  >
-                    {submitting ? "Suppression..." : "Supprimer"}
-                  </button>
+        {mountedDelete && (
+          <Portal>
+            <div className={cn(
+              "fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200",
+              visibleDelete ? "opacity-100" : "opacity-0 pointer-events-none"
+            )} aria-hidden={!visibleDelete}>
+              <div className="absolute inset-0 bg-black/50" onClick={() => setShowDeleteModal(false)} />
+
+              <div className={cn(
+                "relative w-full max-w-md rounded-lg bg-white shadow transform transition-all duration-200",
+                visibleDelete ? "opacity-100 scale-100" : "opacity-0 scale-95"
+              )} role="dialog" aria-modal="true">
+                <div className="p-4">
+                  <div className="text-lg font-semibold mb-2">Confirmer la suppression</div>
+                  <div className="text-gray-600 mb-4">
+                    Êtes-vous sûr de vouloir supprimer la classe "{deletingClass?.name}" ?
+                    Cette action est irréversible.
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      className="rounded-md border px-4 py-2"
+                      onClick={() => setShowDeleteModal(false)}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      disabled={submitting}
+                      className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
+                      onClick={confirmDelete}
+                    >
+                      {submitting ? "Suppression..." : "Supprimer"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Portal>
         )}
       </div>
     </Layout>
