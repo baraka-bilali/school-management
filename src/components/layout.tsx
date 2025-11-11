@@ -12,6 +12,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true) // Par défaut ouvert sur desktop
   const [isMobile, setIsMobile] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -32,13 +33,36 @@ export default function Layout({ children }: LayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Fetch role from server cookie or fallback to localStorage
+  useEffect(() => {
+    const fetchRole = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const data = await res.json()
+          setRole(data.user?.role || null)
+          return
+        }
+      } catch {}
+      // Fallback decode client token if available
+      try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          setRole(payload.role)
+        }
+      } catch {}
+    }
+    fetchRole()
+  }, [])
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen)
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header onSidebarToggle={toggleSidebar} />
+  <Header onSidebarToggle={toggleSidebar} role={role} />
       <Sidebar 
         isOpen={sidebarOpen} 
         onToggle={toggleSidebar}

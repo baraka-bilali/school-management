@@ -4,9 +4,20 @@ import { Bell, Menu, School } from "lucide-react"
 
 interface HeaderProps {
   onSidebarToggle: () => void
+  role?: string | null
 }
 
-export default function Header({ onSidebarToggle }: HeaderProps) {
+const ROLE_LABEL: Record<string, string> = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  COMPTABLE: 'Comptable',
+  DIRECTEUR_DISCIPLINE: 'Discipline',
+  DIRECTEUR_ETUDES: 'Études',
+  PROFESSEUR: 'Professeur',
+  ELEVE: 'Élève'
+}
+
+export default function Header({ onSidebarToggle, role }: HeaderProps) {
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40">
       <div className="px-4 py-3 flex items-center justify-between">
@@ -39,7 +50,12 @@ export default function Header({ onSidebarToggle }: HeaderProps) {
                 alt="User" 
                 className="w-8 h-8 rounded-full" 
               />
-              <span className="hidden md:inline-block text-gray-700">Admin</span>
+              <span className="hidden md:flex flex-col text-gray-700 leading-tight">
+                <span className="text-xs font-medium uppercase tracking-wide text-indigo-600">
+                  {role ? ROLE_LABEL[role] ?? role : '—'}
+                </span>
+                <span className="text-sm">{role ? ROLE_LABEL[role] ?? role : 'Invité'}</span>
+              </span>
             </button>
           </div>
         </div>

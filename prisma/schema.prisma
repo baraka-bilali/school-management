@@ -16,8 +16,9 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  student   Student?
-  teacher   Teacher?
+  student        Student?
+  teacher        Teacher?
+  createdSchools School[] @relation("SchoolsCreated")
 }
 
 enum User_role {
@@ -26,6 +27,8 @@ enum User_role {
   COMPTABLE
   PROFESSEUR
   DIRECTEUR_DISCIPLINE
+  DIRECTEUR_ETUDES
+  SUPER_ADMIN
 }
 
 model AcademicYear {
@@ -39,34 +42,34 @@ model AcademicYear {
 }
 
 model Class {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
   level     String
   section   String
   letter    String
   stream    String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   enrollments Enrollment[]
 }
 
 model Student {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @unique
-  code        String   @unique
-  lastName    String
-  middleName  String
-  firstName   String
-  gender      String
-  birthDate   DateTime
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  code       String   @unique
+  lastName   String
+  middleName String
+  firstName  String
+  gender     String
+  birthDate  DateTime
 
-  user        User     @relation(fields: [userId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
   enrollments Enrollment[]
 }
 
 model Teacher {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique
   lastName   String
   middleName String
   firstName  String
@@ -76,20 +79,20 @@ model Teacher {
   phone      String?
   hiredAt    DateTime? @default(now())
 
-  user       User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Enrollment {
-  id         Int          @id @default(autoincrement())
+  id         Int              @id @default(autoincrement())
   studentId  Int
   classId    Int
   yearId     Int
   status     EnrollmentStatus @default(ACTIVE)
   exitReason String?
 
-  student    Student      @relation(fields: [studentId], references: [id])
-  class      Class        @relation(fields: [classId], references: [id])
-  year       AcademicYear @relation(fields: [yearId], references: [id])
+  student Student      @relation(fields: [studentId], references: [id])
+  class   Class        @relation(fields: [classId], references: [id])
+  year    AcademicYear @relation(fields: [yearId], references: [id])
 
   @@unique([studentId, classId, yearId])
 }
@@ -100,4 +103,16 @@ enum EnrollmentStatus {
   GRADUATED
   DROPPED_OUT
   EXPELLED
+}
+
+// New: Schools managed by SUPER_ADMIN
+model School {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String   @unique
+  address     String?
+  createdAt   DateTime @default(now())
+  createdById Int?
+
+  createdBy User? @relation("SchoolsCreated", fields: [createdById], references: [id])
 }

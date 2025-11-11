@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { School, Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -36,10 +35,21 @@ export default function LoginPage() {
 				localStorage.setItem("token", data.token)
 				// Décoder le token pour obtenir le rôle
 				const payload = JSON.parse(atob(data.token.split(".")[1]))
-				if (payload.role === "ADMIN") {
-					router.push("/admin")
-				} else {
-					router.push("/")
+				// Bloquer l'accès du SUPER_ADMIN à cette page
+				if (payload.role === "SUPER_ADMIN") {
+					setError("Accès réservé: veuillez utiliser la page Super Admin.")
+					return
+				}
+				// Redirections basées sur le rôle
+				switch (payload.role) {
+					case "ADMIN":
+					case "COMPTABLE":
+					case "DIRECTEUR_DISCIPLINE":
+					case "DIRECTEUR_ETUDES":
+						router.push("/admin")
+						break
+					default:
+						router.push("/")
 				}
 			}
 		} catch (err: any) {
@@ -96,10 +106,7 @@ export default function LoginPage() {
 								{loading ? "Connexion..." : "Se connecter"}
 							</Button>
 						</form>
-						<div className="text-center text-sm text-gray-600 mt-6">
-							Pas de compte ?
-							<Link href="/register" className="ml-1 text-indigo-600 hover:text-indigo-800">Créer un compte</Link>
-						</div>
+						{/* Lien d'inscription supprimé - création réservée au SUPER_ADMIN */}
 					</CardContent>
 				</Card>
 			</div>

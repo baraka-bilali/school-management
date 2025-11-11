@@ -53,8 +53,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     return pathname?.startsWith(href)
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
+  const handleLogout = async () => {
+    try {
+      // Clear HttpOnly cookie on server
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch {}
+    // Clear any client-side token fallback
+    try { localStorage.removeItem("token") } catch {}
     setShowLogoutModal(false)
     router.push("/login")
   }
@@ -84,8 +89,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           w-80
         `}>
+          {/* Shell */}
+          <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
                 <School className="w-4 h-4 text-indigo-600" />
@@ -99,8 +106,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
-          {/* Navigation */}
-          <nav className="p-4">
+          {/* Navigation (scrollable) */}
+          <nav className="p-4 flex-1 overflow-y-auto">
             <div className="mb-6">
               <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Menu principal</h3>
               <ul className="space-y-2">
@@ -124,35 +131,37 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 ))}
               </ul>
             </div>
-            <div className="mb-6">
-              <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
-              <ul className="space-y-2">
-                {adminItems.map((item, index) => (
-                  <li key={index}>
-                    {"key" in item && item.key === "logout" ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowLogoutModal(true)}
-                        className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span>{item.label}</span>
-                      </button>
-                    ) : (
-                      <Link 
-                        href={(item as { href: string }).href}
-                        className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        onClick={onToggle}
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span>{item.label}</span>
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </nav>
+          {/* Footer (pinned) */}
+          <div className="p-4 border-t border-gray-200 flex-shrink-0">
+            <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
+            <ul className="space-y-2">
+              {adminItems.map((item, index) => (
+                <li key={index}>
+                  {"key" in item && item.key === "logout" ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowLogoutModal(true)}
+                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      <span>{item.label}</span>
+                    </button>
+                  ) : (
+                    <Link 
+                      href={(item as { href: string }).href}
+                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      onClick={onToggle}
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      <span>{item.label}</span>
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+          </div>
         </aside>
         {showLogoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -183,50 +192,53 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         transition-all duration-300 ease-in-out
         ${isOpen ? 'w-64' : 'w-16'}
       `}>
-        {/* Logo Section */}
-        <div className="px-4 py-4 flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-            <School className="w-4 h-4 text-indigo-600" />
-          </div>
-          {isOpen && (
-            <span className="text-lg font-semibold text-gray-800 truncate">École ABC</span>
-          )}
-        </div>
-        {/* Navigation */}
-        <nav className="px-4">
-          <div className="mb-6">
+        <div className="flex h-full flex-col">
+          {/* Logo Section */}
+          <div className="px-4 py-4 flex items-center space-x-3 flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <School className="w-4 h-4 text-indigo-600" />
+            </div>
             {isOpen && (
-              <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Menu principal</h3>
+              <span className="text-lg font-semibold text-gray-800 truncate">École ABC</span>
             )}
-            <ul className="space-y-2">
-              {navItems.map((item, index) => (
-                <li key={index}>
-                  <Link 
-                    href={item.href}
-                    className={`
-                      flex items-center px-4 py-3 rounded-lg transition-colors group
-                      ${isActive(item.href) 
-                        ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
-                        : 'text-gray-600 hover:bg-gray-100'
-                      }
-                    `}
-                    title={!isOpen ? item.label : undefined}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    {isOpen && (
-                      <span className="ml-3">{item.label}</span>
-                    )}
-                    {!isOpen && (
-                      <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                        {item.label}
-                      </div>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
           </div>
-          <div className="mb-6">
+          {/* Navigation (scrollable) */}
+          <nav className="px-4 flex-1 overflow-y-auto">
+            <div className="mb-6">
+              {isOpen && (
+                <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Menu principal</h3>
+              )}
+              <ul className="space-y-2">
+                {navItems.map((item, index) => (
+                  <li key={index}>
+                    <Link 
+                      href={item.href}
+                      className={`
+                        flex items-center px-4 py-3 rounded-lg transition-colors group
+                        ${isActive(item.href) 
+                          ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
+                          : 'text-gray-600 hover:bg-gray-100'
+                        }
+                      `}
+                      title={!isOpen ? item.label : undefined}
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      {isOpen && (
+                        <span className="ml-3">{item.label}</span>
+                      )}
+                      {!isOpen && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                          {item.label}
+                        </div>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </nav>
+          {/* Footer (pinned) */}
+          <div className="px-4 py-3 border-t border-gray-200 flex-shrink-0">
             {isOpen && (
               <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
             )}
@@ -237,7 +249,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left group"
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       {isOpen && <span className="ml-3">{item.label}</span>}
@@ -266,7 +278,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               ))}
             </ul>
           </div>
-        </nav>
+        </div>
       </aside>
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">

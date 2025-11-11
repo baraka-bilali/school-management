@@ -94,6 +94,21 @@ async function main() {
 
   console.log('✅ Utilisateur admin créé')
 
+  // Créer un super admin (pour accéder à /super-admin)
+  const superAdminUser = await prisma.user.upsert({
+    where: { email: 'super@school.local' },
+    update: {},
+    create: {
+      name: 'Super Admin',
+      email: 'super@school.local',
+      // même hash que admin123 pour développement
+      password: '$2a$10$K7L1OJ45/4Y2nIvhRVpCe.FSmhDdWoXehVzJptJ/op0lSsvqNu/1m',
+      role: 'SUPER_ADMIN' as any
+    }
+  })
+
+  console.log('✅ Super Admin créé (email: super@school.local / mot de passe: admin123)')
+
   console.log('🎉 Seeding terminé avec succès!')
 }
 
