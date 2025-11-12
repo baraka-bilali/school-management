@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
 
 type School = { id: number; name: string; code: string; address?: string | null; createdAt: string }
+type User = { id: number; name: string; email: string; role: string }
 
 export default function SuperAdminHome() {
   const router = useRouter()
@@ -22,6 +23,11 @@ export default function SuperAdminHome() {
   const [form, setForm] = useState({ name: "", code: "", address: "" })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState("")
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [theme, setTheme] = useState<"dark" | "light">("dark")
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -60,7 +66,56 @@ export default function SuperAdminHome() {
 
   useEffect(() => {
     loadSchools()
+    loadUser()
   }, [])
+
+  const loadUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data.user)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // Fermer le menu utilisateur quand on clique dehors
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showUserMenu])
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      localStorage.removeItem('token')
+      router.push('/super-admin/login')
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === "dark" ? "light" : "dark")
+  }
 
   // Modal animation effects
   useEffect(() => {
@@ -123,42 +178,138 @@ export default function SuperAdminHome() {
     { label: "Revenu mensuel", value: "€25,400", change: "-1.5%", trend: "down", icon: DollarSign },
   ]
 
+  // Thème colors
+  const bgColor = theme === "dark" ? "bg-[#0f1729]" : "bg-gray-100"
+  const textColor = theme === "dark" ? "text-white" : "text-gray-900"
+  const cardBg = theme === "dark" ? "bg-[#1a2332]" : "bg-white"
+  const borderColor = theme === "dark" ? "border-gray-800" : "border-gray-200"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const hoverBg = theme === "dark" ? "hover:bg-[#242f42]" : "hover:bg-gray-50"
+  const inputBg = theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"
+  const notificationBg = theme === "dark" ? "hover:bg-[#1a2332]" : "hover:bg-gray-100"
+
   return (
-    <div className="min-h-screen bg-[#0f1729] text-white p-6">
+    <div className={`min-h-screen ${bgColor} ${textColor} p-6 transition-colors duration-300`}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+          <div className={`w-10 h-10 rounded-xl ${theme === "dark" ? "bg-blue-500/10" : "bg-blue-50"} flex items-center justify-center`}>
             <Building2 className="w-5 h-5 text-blue-500" />
           </div>
           <h1 className="text-3xl font-bold">Tableau de bord Super Admin</h1>
         </div>
-        <p className="text-gray-400">Gérez les écoles, les utilisateurs et visualisez les statistiques de la plateforme.</p>
+        <p className={textSecondary}>Gérez les écoles, les utilisateurs et visualisez les statistiques de la plateforme.</p>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="mb-6 border-b border-gray-800">
-        <div className="flex gap-8">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
-                activeTab === tab.id
-                  ? "text-blue-500"
-                  : "text-gray-400 hover:text-gray-300"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
-              )}
+      <div className={`mb-6 border-b ${borderColor}`}>
+        <div className="flex items-center justify-between">
+          {/* Spacer gauche */}
+          <div className="flex-1"></div>
+          
+          {/* Onglets centrés */}
+          <div className="flex gap-8">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setIsTransitioning(true)
+                  setTimeout(() => {
+                    setActiveTab(tab.id)
+                    setTimeout(() => setIsTransitioning(false), 10)
+                  }, 150)
+                }}
+                className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.id
+                    ? "text-blue-500"
+                    : `${textSecondary} ${theme === "dark" ? "hover:text-gray-300" : "hover:text-gray-900"}`
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Section droite : Utilisateur et notifications */}
+          <div className="flex-1 flex items-center justify-end gap-4 pb-4">
+            {/* Notification */}
+            <button className={`relative p-2 ${notificationBg} rounded-lg transition-colors`}>
+              <Bell className={`w-5 h-5 ${textSecondary}`} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full"></span>
             </button>
-          ))}
+
+            {/* Utilisateur */}
+            {user && user.name && (
+              <div className="relative" ref={userMenuRef}>
+                <button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className={`flex items-center gap-3 pl-4 border-l ${borderColor} hover:opacity-80 transition-opacity`}
+                >
+                  <div className="text-right">
+                    <div className={`text-sm font-medium ${textColor}`}>{user.name}</div>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                      <span className="text-xs text-emerald-500">Connecté</span>
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                </button>
+
+                {/* Menu Dropdown */}
+                {showUserMenu && (
+                  <div className={`absolute right-0 mt-2 w-56 ${cardBg} rounded-lg shadow-xl border ${borderColor} overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200`}>
+                    {/* User Info */}
+                    <div className={`px-4 py-3 border-b ${borderColor}`}>
+                      <div className={`text-sm font-medium ${textColor}`}>{user.name}</div>
+                      <div className={`text-xs ${textSecondary}`}>{user.email}</div>
+                    </div>
+
+                    {/* Theme Toggle */}
+                    <button
+                      onClick={toggleTheme}
+                      className={`w-full px-4 py-3 flex items-center gap-3 ${hoverBg} transition-colors text-left`}
+                    >
+                      {theme === "dark" ? (
+                        <Sun className="w-5 h-5 text-yellow-500" />
+                      ) : (
+                        <Moon className="w-5 h-5 text-blue-500" />
+                      )}
+                      <div>
+                        <div className={`text-sm font-medium ${textColor}`}>
+                          {theme === "dark" ? "Mode clair" : "Mode sombre"}
+                        </div>
+                        <div className={`text-xs ${textSecondary}`}>Changer le thème</div>
+                      </div>
+                    </button>
+
+                    {/* Logout */}
+                    <button
+                      onClick={handleLogout}
+                      className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left border-t ${borderColor}`}
+                    >
+                      <LogOut className="w-5 h-5 text-red-500" />
+                      <div>
+                        <div className="text-sm font-medium text-red-500">Déconnexion</div>
+                        <div className={`text-xs ${textSecondary}`}>Retour à la page login</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tab Content */}
+      <div className={`transition-all duration-300 ${
+        isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
+      }`}>
       {activeTab === "stats" && (
         <>
       {/* Time Period Filters */}
@@ -170,13 +321,13 @@ export default function SuperAdminHome() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               period === days
                 ? "bg-blue-500 text-white"
-                : "bg-[#1a2332] text-gray-400 hover:bg-[#242f42]"
+                : `${cardBg} ${textSecondary} ${hoverBg}`
             }`}
           >
             {days === "7" ? "7 derniers jours" : days === "30" ? "30 jours" : "Année en cours"}
           </button>
         ))}
-        <button className="px-4 py-2 rounded-lg text-sm font-medium bg-[#1a2332] text-gray-400 hover:bg-[#242f42]">
+        <button className={`px-4 py-2 rounded-lg text-sm font-medium ${cardBg} ${textSecondary} ${hoverBg}`}>
           Personnalisé
         </button>
       </div>
@@ -184,13 +335,13 @@ export default function SuperAdminHome() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-[#1a2332] rounded-xl p-5 border border-gray-800">
+          <div key={i} className={`${cardBg} rounded-xl p-5 border ${borderColor} shadow-sm`}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-400 text-sm">{stat.label}</span>
-              <stat.icon className="w-5 h-5 text-gray-500" />
+              <span className={`${textSecondary} text-sm`}>{stat.label}</span>
+              <stat.icon className={`w-5 h-5 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`} />
             </div>
             <div className="flex items-end justify-between">
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <div className={`text-3xl font-bold ${textColor}`}>{stat.value}</div>
               <div className={`flex items-center gap-1 text-sm font-medium ${
                 stat.trend === "up" ? "text-green-500" : "text-red-500"
               }`}>
@@ -205,12 +356,12 @@ export default function SuperAdminHome() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Evolution Chart */}
-        <div className="lg:col-span-2 bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-          <h3 className="text-lg font-semibold mb-1">Évolution des abonnements</h3>
+        <div className={`lg:col-span-2 ${cardBg} rounded-xl p-6 border ${borderColor} shadow-sm`}>
+          <h3 className={`text-lg font-semibold mb-1 ${textColor}`}>Évolution des abonnements</h3>
           <div className="flex items-baseline gap-2 mb-6">
-            <span className="text-3xl font-bold">980</span>
+            <span className={`text-3xl font-bold ${textColor}`}>980</span>
             <span className="text-green-500 text-sm font-medium">Actifs +2.1%</span>
-            <span className="text-gray-500 text-sm">sur les 30 derniers jours</span>
+            <span className={`${textSecondary} text-sm`}>sur les 30 derniers jours</span>
           </div>
           <div className="h-48 flex items-end justify-between gap-2">
             {[65, 85, 75, 95, 70, 80, 90, 75, 85, 95, 80, 90, 85, 95, 75, 85, 95, 85, 75, 95].map((height, i) => (
@@ -220,8 +371,8 @@ export default function SuperAdminHome() {
         </div>
 
         {/* Distribution Chart */}
-        <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-          <h3 className="text-lg font-semibold mb-6">Répartition par formule</h3>
+        <div className={`${cardBg} rounded-xl p-6 border ${borderColor} shadow-sm`}>
+          <h3 className={`text-lg font-semibold mb-6 ${textColor}`}>Répartition par formule</h3>
           <div className="flex items-center justify-center mb-6">
             <div className="relative w-40 h-40">
               <svg className="w-full h-full -rotate-90">
@@ -230,8 +381,8 @@ export default function SuperAdminHome() {
                 <circle cx="80" cy="80" r="70" fill="none" stroke="#ec4899" strokeWidth="20" strokeDasharray="45 440" strokeDashoffset="-395" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold">{schools.length.toLocaleString()}</div>
-                <div className="text-xs text-gray-400">Écoles</div>
+                <div className={`text-3xl font-bold ${textColor}`}>{schools.length.toLocaleString()}</div>
+                <div className={`text-xs ${textSecondary}`}>Écoles</div>
               </div>
             </div>
           </div>
@@ -239,19 +390,19 @@ export default function SuperAdminHome() {
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className="text-gray-400">Basic (40%)</span>
+                <span className={textSecondary}>Basic (40%)</span>
               </div>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                <span className="text-gray-400">Premium (35%)</span>
+                <span className={textSecondary}>Premium (35%)</span>
               </div>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-                <span className="text-gray-400">Enterprise (25%)</span>
+                <span className={textSecondary}>Enterprise (25%)</span>
               </div>
             </div>
           </div>
@@ -259,33 +410,33 @@ export default function SuperAdminHome() {
       </div>
 
       {/* Recent Schools Table */}
-      <div className="bg-[#1a2332] rounded-xl border border-gray-800 overflow-hidden">
-        <div className="p-6 border-b border-gray-800">
-          <h3 className="text-lg font-semibold">Dernières écoles inscrites</h3>
+      <div className={`${cardBg} rounded-xl border ${borderColor} overflow-hidden shadow-sm`}>
+        <div className={`p-6 border-b ${borderColor}`}>
+          <h3 className={`text-lg font-semibold ${textColor}`}>Dernières écoles inscrites</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#0f1729]">
-              <tr className="text-left text-sm text-gray-400">
+            <thead className={theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"}>
+              <tr className={`text-left text-sm ${textSecondary}`}>
                 <th className="px-6 py-4 font-medium">Nom de l'école</th>
                 <th className="px-6 py-4 font-medium">Date d'inscription</th>
                 <th className="px-6 py-4 font-medium">Formule</th>
                 <th className="px-6 py-4 font-medium">Statut</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className={`divide-y ${borderColor}`}>
               {loading ? (
-                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">Chargement...</td></tr>
+                <tr><td colSpan={4} className={`px-6 py-8 text-center ${textSecondary}`}>Chargement...</td></tr>
               ) : schools.length === 0 ? (
-                <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">Aucune école enregistrée</td></tr>
+                <tr><td colSpan={4} className={`px-6 py-8 text-center ${textSecondary}`}>Aucune école enregistrée</td></tr>
               ) : (
                 schools.slice(0, 5).map((school, i) => (
-                  <tr key={school.id} className="hover:bg-[#242f42] transition-colors">
+                  <tr key={school.id} className={`${hoverBg} transition-colors`}>
                     <td className="px-6 py-4">
-                      <div className="font-medium">{school.name}</div>
-                      <div className="text-sm text-gray-500">Code: {school.code}</div>
+                      <div className={`font-medium ${textColor}`}>{school.name}</div>
+                      <div className={`text-sm ${textSecondary}`}>Code: {school.code}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-400">
+                    <td className={`px-6 py-4 text-sm ${textSecondary}`}>
                       {new Date(school.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
@@ -317,18 +468,18 @@ export default function SuperAdminHome() {
           {/* Search and Create Button */}
           <div className="flex items-center justify-between mb-6">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${textSecondary}`} />
               <input
                 type="text"
                 placeholder="Rechercher une école..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#1a2332] border border-gray-800 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${inputBg} border ${borderColor} rounded-lg pl-10 pr-4 py-2.5 ${textColor} ${theme === "dark" ? "placeholder-gray-500" : "placeholder-gray-400"} focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2.5 rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2.5 rounded-lg font-medium text-white transition-colors"
             >
               <Plus className="w-5 h-5" />
               Créer une école
@@ -336,10 +487,10 @@ export default function SuperAdminHome() {
           </div>
 
           {/* Schools Table */}
-          <div className="bg-[#1a2332] rounded-xl border border-gray-800 overflow-hidden">
+          <div className={`${cardBg} rounded-xl border ${borderColor} overflow-hidden shadow-sm`}>
             <table className="w-full">
-              <thead className="bg-[#0f1729]">
-                <tr className="text-left text-sm text-gray-400">
+              <thead className={theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"}>
+                <tr className={`text-left text-sm ${textSecondary}`}>
                   <th className="px-6 py-4 font-medium">Nom de l'école</th>
                   <th className="px-6 py-4 font-medium">Date d'inscription</th>
                   <th className="px-6 py-4 font-medium">Formule</th>
@@ -347,24 +498,24 @@ export default function SuperAdminHome() {
                   <th className="px-6 py-4 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className={`divide-y ${borderColor}`}>
                 {loading ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Chargement...</td></tr>
+                  <tr><td colSpan={5} className={`px-6 py-8 text-center ${textSecondary}`}>Chargement...</td></tr>
                 ) : filteredSchools.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <tr><td colSpan={5} className={`px-6 py-8 text-center ${textSecondary}`}>
                     {searchQuery ? "Aucune école trouvée" : "Aucune école enregistrée"}
                   </td></tr>
                 ) : (
                   filteredSchools.map((school, i) => (
-                    <tr key={school.id} className="hover:bg-[#242f42] transition-colors">
+                    <tr key={school.id} className={`${hoverBg} transition-colors`}>
                       <td className="px-6 py-4">
-                        <div className="font-medium">{school.name}</div>
-                        <div className="text-sm text-gray-500">Code: {school.code}</div>
+                        <div className={`font-medium ${textColor}`}>{school.name}</div>
+                        <div className={`text-sm ${textSecondary}`}>Code: {school.code}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-400">
+                      <td className={`px-6 py-4 text-sm ${textSecondary}`}>
                         {new Date(school.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
+                      <td className={`px-6 py-4 text-sm ${textColor}`}>
                         {i % 3 === 0 ? "Premium" : i % 3 === 1 ? "Enterprise" : "Basic"}
                       </td>
                       <td className="px-6 py-4">
@@ -379,11 +530,11 @@ export default function SuperAdminHome() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Modifier">
-                            <Pencil className="w-4 h-4 text-gray-400 hover:text-white" />
+                          <button className={`p-2 ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-100"} rounded-lg transition-colors`} title="Modifier">
+                            <Pencil className={`w-4 h-4 ${textSecondary} ${theme === "dark" ? "hover:text-white" : "hover:text-blue-600"}`} />
                           </button>
-                          <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors" title="Supprimer">
-                            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                          <button className={`p-2 ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-100"} rounded-lg transition-colors`} title="Supprimer">
+                            <Trash2 className={`w-4 h-4 ${textSecondary} hover:text-red-500`} />
                           </button>
                         </div>
                       </td>
@@ -398,19 +549,19 @@ export default function SuperAdminHome() {
 
       {/* Users Tab */}
       {activeTab === "users" && (
-        <div className="bg-[#1a2332] rounded-xl border border-gray-800 p-8 text-center">
-          <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Gestion des Utilisateurs</h3>
-          <p className="text-gray-400">Cette section est en cours de développement.</p>
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-8 text-center shadow-sm`}>
+          <Users className={`w-16 h-16 ${textSecondary} mx-auto mb-4`} />
+          <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>Gestion des Utilisateurs</h3>
+          <p className={textSecondary}>Cette section est en cours de développement.</p>
         </div>
       )}
 
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
-        <div className="bg-[#1a2332] rounded-xl border border-gray-800 p-8 text-center">
-          <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Notifications</h3>
-          <p className="text-gray-400">Cette section est en cours de développement.</p>
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-8 text-center shadow-sm`}>
+          <Building2 className={`w-16 h-16 ${textSecondary} mx-auto mb-4`} />
+          <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>Notifications</h3>
+          <p className={textSecondary}>Cette section est en cours de développement.</p>
         </div>
       )}
 
@@ -426,35 +577,35 @@ export default function SuperAdminHome() {
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreateModal(false)} />
             
             <div 
-              className={`relative w-full max-w-lg rounded-xl bg-[#1a2332] border border-gray-800 shadow-2xl transform transition-all duration-200 ${
+              className={`relative w-full max-w-lg rounded-xl ${cardBg} border ${borderColor} shadow-2xl transform transition-all duration-200 ${
                 modalVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
               }`}
               role="dialog"
               aria-modal="true"
             >
-              <div className="p-6 border-b border-gray-800">
-                <h2 className="text-xl font-semibold text-white">Créer une nouvelle école</h2>
+              <div className={`p-6 border-b ${borderColor}`}>
+                <h2 className={`text-xl font-semibold ${textColor}`}>Créer une nouvelle école</h2>
               </div>
               
               <form onSubmit={handleCreate} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Nom de l'école</label>
+                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Nom de l'école</label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                     required
-                    className="bg-[#0f1729] border-gray-700 text-white"
+                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
                     placeholder="Ex: École Les Chênes"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Code unique</label>
+                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Code unique</label>
                   <Input
                     value={form.code}
                     onChange={(e) => setForm(prev => ({ ...prev, code: e.target.value }))}
                     required
-                    className="bg-[#0f1729] border-gray-700 text-white"
+                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
                     placeholder="Ex: ECH2023"
                   />
                 </div>
@@ -464,7 +615,7 @@ export default function SuperAdminHome() {
                   <Input
                     value={form.address}
                     onChange={(e) => setForm(prev => ({ ...prev, address: e.target.value }))}
-                    className="bg-[#0f1729] border-gray-700 text-white"
+                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
                     placeholder="Ex: 123 Rue de la Liberté"
                   />
                 </div>
@@ -479,7 +630,7 @@ export default function SuperAdminHome() {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                    className={`px-4 py-2 rounded-lg border ${borderColor} ${textColor} ${hoverBg} transition-colors`}
                   >
                     Annuler
                   </button>
@@ -496,6 +647,7 @@ export default function SuperAdminHome() {
           </div>
         </Portal>
       )}
+      </div>
     </div>
   )
 }
