@@ -145,3 +145,137 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom animations */
+@keyframes fall {
+  to {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-up {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.animate-fall {
+  animation: fall linear forwards;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.animate-scale-up {
+  animation: scale-up 1s ease-in-out infinite;
+}
+
+/* Animation to detect autofill */
+@keyframes onAutoFillStart {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+@keyframes onAutoFillCancel {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+input:-webkit-autofill {
+  animation-name: onAutoFillStart;
+  animation-duration: 0.001s;
+}
+
+input:not(:-webkit-autofill) {
+  animation-name: onAutoFillCancel;
+  animation-duration: 0.001s;
+}
+
+/* Disable autocomplete background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: inherit !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Dark mode autocomplete - Force white text on autofill */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill:active,
+.dark select:-webkit-autofill,
+.dark select:-webkit-autofill:hover,
+.dark select:-webkit-autofill:focus,
+.dark select:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgb(31 41 55) inset !important;
+  box-shadow: 0 0 0 1000px rgb(31 41 55) inset !important;
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+  background-color: rgb(31 41 55) !important;
+  caret-color: white !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Override any text-gray class on autofill - ultra specific */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input[type]:-webkit-autofill,
+.dark input[type]:-webkit-autofill:hover,
+.dark input[type]:-webkit-autofill:focus {
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+}
+
+/* Force white text on all inputs in dark mode with autofill */
+.dark input:-internal-autofill-selected {
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+  background-color: rgb(31 41 55) !important;
+}
+
+/* Select styling for dark mode */
+.dark select {
+  background-color: rgb(31 41 55);
+  color: white;
+}
+
+.dark select option {
+  background-color: rgb(31 41 55);
+  color: white;
+}
