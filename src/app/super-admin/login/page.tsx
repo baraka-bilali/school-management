@@ -35,8 +35,11 @@ export default function SuperAdminLoginPage() {
         const payload = JSON.parse(atob(data.token.split(".")[1]))
         if (payload.role !== "SUPER_ADMIN") {
           setError("Accès réservé au Super Admin")
+          setLoading(false)
           return
         }
+        // Attendre un peu pour montrer l'animation
+        await new Promise(resolve => setTimeout(resolve, 1000))
         router.push("/super-admin")
       }
     } catch (err: any) {
@@ -89,8 +92,17 @@ export default function SuperAdminLoginPage() {
               </div>
               {error && <div className="text-red-600 text-sm">{error}</div>}
               <Button type="submit" className="w-full mt-2" disabled={loading}>
-                <LogIn className="w-4 h-4 mr-2" />
-                {loading ? "Connexion..." : "Se connecter"}
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Connexion en cours...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Se connecter
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>

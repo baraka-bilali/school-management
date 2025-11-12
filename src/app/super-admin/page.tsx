@@ -7,7 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
 
-type School = { id: number; name: string; code: string; address?: string | null; createdAt: string }
+type School = { 
+  id: number; 
+  nomEtablissement: string; 
+  codeEtablissement?: string | null; 
+  ville: string;
+  province: string;
+  typeEtablissement: string;
+  telephone: string;
+  email: string;
+  directeurNom: string;
+  etatCompte: string;
+  dateCreation: string;
+}
 type User = { id: number; name: string; email: string; role: string }
 
 export default function SuperAdminHome() {
@@ -20,13 +32,60 @@ export default function SuperAdminHome() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [modalMounted, setModalMounted] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
-  const [form, setForm] = useState({ name: "", code: "", address: "" })
+  const [currentStep, setCurrentStep] = useState(1)
+  const [form, setForm] = useState({
+    // Informations générales
+    nomEtablissement: "",
+    typeEtablissement: "PRIVE" as "PUBLIC" | "PRIVE" | "SEMI_PRIVE",
+    niveauEnseignement: [] as string[],
+    codeEtablissement: "",
+    anneeCreation: "",
+    slogan: "",
+    
+    // Localisation & Contact
+    adresse: "",
+    ville: "",
+    province: "",
+    pays: "RDC",
+    telephone: "",
+    email: "",
+    siteWeb: "",
+    
+    // Direction
+    directeurNom: "",
+    directeurTelephone: "",
+    directeurEmail: "",
+    secretaireAcademique: "",
+    comptable: "",
+    personnelAdministratifTotal: "",
+    
+    // Informations légales
+    rccm: "",
+    idNat: "",
+    nif: "",
+    agrementMinisteriel: "",
+    dateAgrement: "",
+    
+    // Académique
+    cycles: "",
+    nombreClasses: "",
+    nombreEleves: "",
+    nombreEnseignants: "",
+    langueEnseignement: "",
+    programmes: "",
+    joursOuverture: "",
+    
+    // Abonnement (étape finale)
+    formule: "Basic" as "Basic" | "Premium" | "Enterprise"
+  })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState("")
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [theme, setTheme] = useState<"dark" | "light">("dark")
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,18 +106,23 @@ export default function SuperAdminHome() {
       const res = await fetch('/api/super-admin/schools', {
         credentials: 'include' // Important: envoie les cookies HttpOnly
       })
-      const data = await res.json()
+      
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           // Non authentifié ou pas les bonnes permissions
           router.push('/super-admin/login')
           return
         }
-        throw new Error(data.error || 'Erreur')
+        const errorData = await res.json().catch(() => ({}))
+        console.error('Error loading schools:', errorData)
+        throw new Error(errorData.error || 'Erreur lors du chargement des écoles')
       }
-      setSchools(data.schools)
+      
+      const data = await res.json()
+      setSchools(data.schools || [])
     } catch (e: any) {
-      console.error(e)
+      console.error('Load schools error:', e)
+      setError(e.message)
     } finally {
       setLoading(false)
     }
@@ -100,16 +164,25 @@ export default function SuperAdminHome() {
     }
   }, [showUserMenu])
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    setShowUserMenu(false)
+    setShowLogoutModal(true)
+  }
+
+  const confirmLogout = async () => {
     try {
+      setLoggingOut(true)
       await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include'
       })
       localStorage.removeItem('token')
+      // Attendre un peu pour montrer l'animation
+      await new Promise(resolve => setTimeout(resolve, 1000))
       router.push('/super-admin/login')
     } catch (e) {
       console.error(e)
+      setLoggingOut(false)
     }
   }
 
@@ -121,21 +194,64 @@ export default function SuperAdminHome() {
   useEffect(() => {
     if (showCreateModal) {
       setModalMounted(true)
+      setCurrentStep(1)
       const id = setTimeout(() => setModalVisible(true), 10)
       return () => clearTimeout(id)
     }
     setModalVisible(false)
-    const t = setTimeout(() => setModalMounted(false), 220)
+    const t = setTimeout(() => {
+      setModalMounted(false)
+      // Reset form when modal closes
+      setForm({
+        nomEtablissement: "",
+        typeEtablissement: "PRIVE",
+        niveauEnseignement: [],
+        codeEtablissement: "",
+        anneeCreation: "",
+        slogan: "",
+        adresse: "",
+        ville: "",
+        province: "",
+        pays: "RDC",
+        telephone: "",
+        email: "",
+        siteWeb: "",
+        directeurNom: "",
+        directeurTelephone: "",
+        directeurEmail: "",
+        secretaireAcademique: "",
+        comptable: "",
+        personnelAdministratifTotal: "",
+        rccm: "",
+        idNat: "",
+        nif: "",
+        agrementMinisteriel: "",
+        dateAgrement: "",
+        cycles: "",
+        nombreClasses: "",
+        nombreEleves: "",
+        nombreEnseignants: "",
+        langueEnseignement: "",
+        programmes: "",
+        joursOuverture: "",
+        formule: "Basic"
+      })
+    }, 220)
     return () => clearTimeout(t)
   }, [showCreateModal])
 
-  // Reset form when modal opens
-  useEffect(() => {
-    if (showCreateModal) {
-      setForm({ name: "", code: "", address: "" })
+  const handleNextStep = () => {
+    if (currentStep < 5) {
+      setCurrentStep(prev => prev + 1)
+    }
+  }
+
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1)
       setError("")
     }
-  }, [showCreateModal])
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -160,8 +276,10 @@ export default function SuperAdminHome() {
   }
 
   const filteredSchools = schools.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.code.toLowerCase().includes(searchQuery.toLowerCase())
+    s.nomEtablissement.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.codeEtablissement || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.ville.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.directeurNom.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const tabs = [
@@ -289,7 +407,7 @@ export default function SuperAdminHome() {
 
                     {/* Logout */}
                     <button
-                      onClick={handleLogout}
+                      onClick={handleLogoutClick}
                       className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left border-t ${borderColor}`}
                     >
                       <LogOut className="w-5 h-5 text-red-500" />
@@ -430,26 +548,25 @@ export default function SuperAdminHome() {
               ) : schools.length === 0 ? (
                 <tr><td colSpan={4} className={`px-6 py-8 text-center ${textSecondary}`}>Aucune école enregistrée</td></tr>
               ) : (
-                schools.slice(0, 5).map((school, i) => (
+                schools.slice(0, 5).map((school) => (
                   <tr key={school.id} className={`${hoverBg} transition-colors`}>
                     <td className="px-6 py-4">
-                      <div className={`font-medium ${textColor}`}>{school.name}</div>
-                      <div className={`text-sm ${textSecondary}`}>Code: {school.code}</div>
+                      <div className={`font-medium ${textColor}`}>{school.nomEtablissement}</div>
+                      <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                     </td>
                     <td className={`px-6 py-4 text-sm ${textSecondary}`}>
-                      {new Date(school.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {new Date(school.dateCreation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
-                      {i % 3 === 0 ? "Premium" : i % 3 === 1 ? "Enterprise" : "Basic"}
+                      {school.typeEtablissement}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                        i % 4 === 0 ? "bg-green-500/10 text-green-500" : 
-                        i % 4 === 1 ? "bg-green-500/10 text-green-500" :
-                        i % 4 === 2 ? "bg-yellow-500/10 text-yellow-500" :
+                        school.etatCompte === "ACTIF" ? "bg-green-500/10 text-green-500" :
+                        school.etatCompte === "EN_ATTENTE" ? "bg-yellow-500/10 text-yellow-500" :
                         "bg-red-500/10 text-red-500"
                       }`}>
-                        • {i % 4 === 0 || i % 4 === 1 ? "Actif" : i % 4 === 2 ? "En attente" : "Expiré"}
+                        • {school.etatCompte === "ACTIF" ? "Actif" : school.etatCompte === "EN_ATTENTE" ? "En attente" : "Suspendu"}
                       </span>
                     </td>
                   </tr>
@@ -506,26 +623,25 @@ export default function SuperAdminHome() {
                     {searchQuery ? "Aucune école trouvée" : "Aucune école enregistrée"}
                   </td></tr>
                 ) : (
-                  filteredSchools.map((school, i) => (
+                  filteredSchools.map((school) => (
                     <tr key={school.id} className={`${hoverBg} transition-colors`}>
                       <td className="px-6 py-4">
-                        <div className={`font-medium ${textColor}`}>{school.name}</div>
-                        <div className={`text-sm ${textSecondary}`}>Code: {school.code}</div>
+                        <div className={`font-medium ${textColor}`}>{school.nomEtablissement}</div>
+                        <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                       </td>
                       <td className={`px-6 py-4 text-sm ${textSecondary}`}>
-                        {new Date(school.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {new Date(school.dateCreation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
                       <td className={`px-6 py-4 text-sm ${textColor}`}>
-                        {i % 3 === 0 ? "Premium" : i % 3 === 1 ? "Enterprise" : "Basic"}
+                        {school.typeEtablissement}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                          i % 4 === 0 ? "bg-green-500/10 text-green-500" : 
-                          i % 4 === 1 ? "bg-green-500/10 text-green-500" :
-                          i % 4 === 2 ? "bg-yellow-500/10 text-yellow-500" :
+                          school.etatCompte === "ACTIF" ? "bg-green-500/10 text-green-500" :
+                          school.etatCompte === "EN_ATTENTE" ? "bg-yellow-500/10 text-yellow-500" :
                           "bg-red-500/10 text-red-500"
                         }`}>
-                          • {i % 4 === 0 || i % 4 === 1 ? "Actif" : i % 4 === 2 ? "En attente" : "Expiré"}
+                          • {school.etatCompte === "ACTIF" ? "Actif" : school.etatCompte === "EN_ATTENTE" ? "En attente" : "Suspendu"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -569,7 +685,7 @@ export default function SuperAdminHome() {
       {modalMounted && (
         <Portal>
           <div 
-            className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 overflow-y-auto ${
               modalVisible ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
             aria-hidden={!modalVisible}
@@ -577,72 +693,538 @@ export default function SuperAdminHome() {
             <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreateModal(false)} />
             
             <div 
-              className={`relative w-full max-w-lg rounded-xl ${cardBg} border ${borderColor} shadow-2xl transform transition-all duration-200 ${
+              className={`relative w-full max-w-3xl my-8 rounded-xl ${cardBg} border ${borderColor} shadow-2xl transform transition-all duration-200 max-h-[90vh] flex flex-col ${
                 modalVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
               }`}
               role="dialog"
               aria-modal="true"
             >
-              <div className={`p-6 border-b ${borderColor}`}>
-                <h2 className={`text-xl font-semibold ${textColor}`}>Créer une nouvelle école</h2>
+              {/* Header avec étapes */}
+              <div className={`px-6 py-4 border-b ${borderColor} flex-shrink-0`}>
+                <h2 className={`text-lg font-semibold ${textColor} mb-2`}>Création d'une nouvelle école</h2>
+                <p className={`text-xs ${textSecondary} mb-4`}>Suivez les étapes pour configurer une nouvelle école sur la plateforme.</p>
+                
+                {/* Steps indicator */}
+                <div className="flex items-center justify-between">
+                  {[
+                    { num: 1, label: "Général", icon: "🏫" },
+                    { num: 2, label: "Contact", icon: "📍" },
+                    { num: 3, label: "Direction", icon: "👥" },
+                    { num: 4, label: "Académique", icon: "�🏫" },
+                    { num: 5, label: "Abonnement", icon: "💳" }
+                  ].map((step, idx) => (
+                    <div key={step.num} className="flex items-center flex-1">
+                      <div className="flex flex-col items-center flex-1">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
+                          currentStep >= step.num 
+                            ? "bg-blue-500 text-white" 
+                            : `${theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`
+                        }`}>
+                          {step.icon}
+                        </div>
+                        <span className={`text-[9px] mt-1 text-center ${currentStep >= step.num ? "text-blue-500 font-medium" : textSecondary}`}>
+                          {step.label}
+                        </span>
+                      </div>
+                      {idx < 4 && (
+                        <div className={`h-0.5 flex-1 mx-1 -mt-5 ${
+                          currentStep > step.num ? "bg-blue-500" : `${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`
+                        }`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
               
-              <form onSubmit={handleCreate} className="p-6 space-y-4">
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Nom de l'école</label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
-                    placeholder="Ex: École Les Chênes"
-                  />
-                </div>
-                
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Code unique</label>
-                  <Input
-                    value={form.code}
-                    onChange={(e) => setForm(prev => ({ ...prev, code: e.target.value }))}
-                    required
-                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
-                    placeholder="Ex: ECH2023"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Adresse (optionnel)</label>
-                  <Input
-                    value={form.address}
-                    onChange={(e) => setForm(prev => ({ ...prev, address: e.target.value }))}
-                    className={`${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
-                    placeholder="Ex: 123 Rue de la Liberté"
-                  />
-                </div>
+              <form onSubmit={currentStep === 3 ? handleCreate : (e) => { e.preventDefault(); handleNextStep(); }} className="flex flex-col flex-1 overflow-hidden">
+                {/* Content scrollable */}
+                <div className="overflow-y-auto flex-1 px-6 py-4">
+                {/* Étape 1: Informations Générales */}
+                {currentStep === 1 && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nom de l'établissement *</label>
+                      <Input
+                        value={form.nomEtablissement}
+                        onChange={(e) => setForm(prev => ({ ...prev, nomEtablissement: e.target.value }))}
+                        required
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="Ex: Lycée Victor Hugo"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Type d'établissement *</label>
+                      <select
+                        value={form.typeEtablissement}
+                        onChange={(e) => setForm(prev => ({ ...prev, typeEtablissement: e.target.value as any }))}
+                        required
+                        className={`w-full h-9 px-3 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="PRIVE">École privée</option>
+                        <option value="PUBLIC">École publique</option>
+                        <option value="SEMI_PRIVE">École semi-privée</option>
+                      </select>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Année de création</label>
+                        <select
+                          value={form.anneeCreation}
+                          onChange={(e) => setForm(prev => ({ ...prev, anneeCreation: e.target.value }))}
+                          className={`w-full h-9 px-3 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        >
+                          <option value="">Sélectionner une année</option>
+                          {Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                            <option key={year} value={year}>{year}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Code établissement</label>
+                        <Input
+                          value={form.codeEtablissement}
+                          onChange={(e) => setForm(prev => ({ ...prev, codeEtablissement: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: LVH2024"
+                        />
+                      </div>
+                    </div>
 
-                {error && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-                    {error}
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Description</label>
+                      <textarea
+                        value={form.slogan}
+                        onChange={(e) => setForm(prev => ({ ...prev, slogan: e.target.value }))}
+                        className={`w-full px-3 py-2 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-none`}
+                        placeholder="Brève description de l'école"
+                      />
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className={`px-4 py-2 rounded-lg border ${borderColor} ${textColor} ${hoverBg} transition-colors`}
-                  >
-                    Annuler
-                  </button>
-                  <Button
-                    type="submit"
-                    disabled={creating}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
-                  >
-                    {creating ? "Création..." : "Créer l'école"}
-                  </Button>
+                {/* Étape 2: Coordonnées */}
+                {currentStep === 2 && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Adresse *</label>
+                      <Input
+                        value={form.adresse}
+                        onChange={(e) => setForm(prev => ({ ...prev, adresse: e.target.value }))}
+                        required
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="Ex: 123 Avenue de la Liberté"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Ville *</label>
+                        <Input
+                          value={form.ville}
+                          onChange={(e) => setForm(prev => ({ ...prev, ville: e.target.value }))}
+                          required
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: Kinshasa"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Province *</label>
+                        <Input
+                          value={form.province}
+                          onChange={(e) => setForm(prev => ({ ...prev, province: e.target.value }))}
+                          required
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: Kinshasa"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Téléphone *</label>
+                        <Input
+                          value={form.telephone}
+                          onChange={(e) => setForm(prev => ({ ...prev, telephone: e.target.value }))}
+                          required
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="+243 XXX XXX XXX"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Email *</label>
+                        <Input
+                          type="email"
+                          value={form.email}
+                          onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                          required
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="contact@ecole.cd"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Site Web</label>
+                      <Input
+                        value={form.siteWeb}
+                        onChange={(e) => setForm(prev => ({ ...prev, siteWeb: e.target.value }))}
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="https://www.ecole.cd"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Étape 3: Direction & Personnel */}
+                {currentStep === 3 && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nom du directeur *</label>
+                      <Input
+                        value={form.directeurNom}
+                        onChange={(e) => setForm(prev => ({ ...prev, directeurNom: e.target.value }))}
+                        required
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="Nom complet du directeur"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Téléphone directeur *</label>
+                        <Input
+                          value={form.directeurTelephone}
+                          onChange={(e) => setForm(prev => ({ ...prev, directeurTelephone: e.target.value }))}
+                          required
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="+243 XXX XXX XXX"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Email directeur</label>
+                        <Input
+                          type="email"
+                          value={form.directeurEmail}
+                          onChange={(e) => setForm(prev => ({ ...prev, directeurEmail: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="directeur@ecole.cd"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Secrétaire académique</label>
+                        <Input
+                          value={form.secretaireAcademique}
+                          onChange={(e) => setForm(prev => ({ ...prev, secretaireAcademique: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Nom du secrétaire"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Comptable</label>
+                        <Input
+                          value={form.comptable}
+                          onChange={(e) => setForm(prev => ({ ...prev, comptable: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Nom du comptable"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Personnel administratif total</label>
+                      <Input
+                        type="number"
+                        value={form.personnelAdministratifTotal}
+                        onChange={(e) => setForm(prev => ({ ...prev, personnelAdministratifTotal: e.target.value }))}
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="Ex: 15"
+                      />
+                    </div>
+
+                    <div className={`pt-2 pb-1 border-t ${borderColor}`}>
+                      <h4 className={`text-xs font-semibold ${textColor}`}>Informations légales</h4>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>RCCM</label>
+                        <Input
+                          value={form.rccm}
+                          onChange={(e) => setForm(prev => ({ ...prev, rccm: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="CD/XXX/XXX"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>ID National</label>
+                        <Input
+                          value={form.idNat}
+                          onChange={(e) => setForm(prev => ({ ...prev, idNat: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="ID Nat."
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>NIF</label>
+                        <Input
+                          value={form.nif}
+                          onChange={(e) => setForm(prev => ({ ...prev, nif: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="NIF"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Agrément ministériel</label>
+                        <Input
+                          value={form.agrementMinisteriel}
+                          onChange={(e) => setForm(prev => ({ ...prev, agrementMinisteriel: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="N° Agrément"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Date agrément</label>
+                        <Input
+                          type="date"
+                          value={form.dateAgrement}
+                          onChange={(e) => setForm(prev => ({ ...prev, dateAgrement: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Étape 4: Informations académiques */}
+                {currentStep === 4 && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Cycles d'enseignement</label>
+                      <Input
+                        value={form.cycles}
+                        onChange={(e) => setForm(prev => ({ ...prev, cycles: e.target.value }))}
+                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        placeholder="Ex: Maternel, Primaire, Secondaire"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre de classes</label>
+                        <Input
+                          type="number"
+                          value={form.nombreClasses}
+                          onChange={(e) => setForm(prev => ({ ...prev, nombreClasses: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: 24"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'élèves</label>
+                        <Input
+                          type="number"
+                          value={form.nombreEleves}
+                          onChange={(e) => setForm(prev => ({ ...prev, nombreEleves: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: 600"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'enseignants</label>
+                        <Input
+                          type="number"
+                          value={form.nombreEnseignants}
+                          onChange={(e) => setForm(prev => ({ ...prev, nombreEnseignants: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: 35"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Langue d'enseignement</label>
+                        <Input
+                          value={form.langueEnseignement}
+                          onChange={(e) => setForm(prev => ({ ...prev, langueEnseignement: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: Français"
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Jours d'ouverture</label>
+                        <Input
+                          value={form.joursOuverture}
+                          onChange={(e) => setForm(prev => ({ ...prev, joursOuverture: e.target.value }))}
+                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                          placeholder="Ex: Lundi - Vendredi"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Programmes</label>
+                      <textarea
+                        value={form.programmes}
+                        onChange={(e) => setForm(prev => ({ ...prev, programmes: e.target.value }))}
+                        className={`w-full px-3 py-2 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-none`}
+                        placeholder="Programmes d'enseignement suivis"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Étape 5: Abonnement */}
+                {currentStep === 5 && (
+                  <div className="space-y-3">
+                    <h4 className={`text-sm font-semibold ${textColor} mb-3`}>Choisissez une formule d'abonnement</h4>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { name: "Basic", price: "50$", features: ["10 utilisateurs", "Support email", "Stockage 5GB"] },
+                        { name: "Premium", price: "150$", features: ["50 utilisateurs", "Support prioritaire", "Stockage 50GB"] },
+                        { name: "Enterprise", price: "300$", features: ["Utilisateurs illimités", "Support 24/7", "Stockage illimité"] }
+                      ].map((plan) => (
+                        <div
+                          key={plan.name}
+                          onClick={() => setForm(prev => ({ ...prev, formule: plan.name as any }))}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            form.formule === plan.name
+                              ? "border-blue-500 bg-blue-500/10"
+                              : `${borderColor} ${hoverBg}`
+                          }`}
+                        >
+                          <h5 className={`text-sm font-semibold ${textColor} mb-1`}>{plan.name}</h5>
+                          <p className="text-xl font-bold text-blue-500 mb-2">{plan.price}/mois</p>
+                          <ul className={`space-y-0.5 text-[11px] ${textSecondary}`}>
+                            {plan.features.map((f, i) => (
+                              <li key={i}>✓ {f}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {error && (
+                <div className="mt-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-700 px-6 pb-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className={`px-4 py-1.5 text-sm rounded-lg ${textSecondary} hover:${textColor} transition-colors`}
+                >
+                  Annuler
+                </button>
+
+                <div className="flex gap-2">
+                  {currentStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={handlePrevStep}
+                      disabled={creating}
+                      className={`px-4 py-1.5 text-sm rounded-lg border ${borderColor} ${textColor} ${hoverBg} transition-colors`}
+                    >
+                      Précédent
+                    </button>
+                  )}
+                  
+                  {currentStep < 5 ? (
+                    <Button
+                      type="submit"
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 text-sm h-auto"
+                    >
+                      Étape suivante →
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={creating}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1.5 text-sm h-auto"
+                    >
+                      {creating ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></div>
+                          Création...
+                        </>
+                      ) : (
+                        "Créer l'école"
+                      )}
+                    </Button>
+                  )}
+                  </div>
                 </div>
               </form>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200">
+            <div className="absolute inset-0 bg-black/50" onClick={() => !loggingOut && setShowLogoutModal(false)} />
+            
+            <div className={`relative w-full max-w-md rounded-xl ${cardBg} border ${borderColor} shadow-2xl p-6 animate-in zoom-in-95 duration-200`}>
+              {loggingOut ? (
+                // Loading state
+                <div className="text-center py-8">
+                  <div className="relative w-20 h-20 mx-auto mb-4">
+                    <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                    <LogOut className="absolute inset-0 m-auto w-8 h-8 text-blue-500" />
+                  </div>
+                  <h3 className={`text-lg font-semibold mb-2 ${textColor}`}>Déconnexion en cours...</h3>
+                  <p className={textSecondary}>Veuillez patienter</p>
+                </div>
+              ) : (
+                // Confirmation state
+                <>
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <LogOut className="w-8 h-8 text-red-500" />
+                    </div>
+                  </div>
+                  
+                  <h3 className={`text-xl font-semibold text-center mb-2 ${textColor}`}>
+                    Voulez-vous vous déconnecter ?
+                  </h3>
+                  <p className={`text-center mb-6 ${textSecondary}`}>
+                    Vous serez redirigé vers la page de connexion.
+                  </p>
+                  
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowLogoutModal(false)}
+                      className={`flex-1 px-4 py-2.5 rounded-lg border ${borderColor} ${textColor} ${hoverBg} transition-colors font-medium`}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={confirmLogout}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors font-medium"
+                    >
+                      Déconnexion
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </Portal>

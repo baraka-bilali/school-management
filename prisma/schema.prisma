@@ -108,11 +108,83 @@ enum EnrollmentStatus {
 // New: Schools managed by SUPER_ADMIN
 model School {
   id          Int      @id @default(autoincrement())
-  name        String   @unique
-  code        String   @unique
-  address     String?
-  createdAt   DateTime @default(now())
-  createdById Int?
+  
+  // Informations générales
+  nomEtablissement     String
+  typeEtablissement    TypeEtablissement @default(PRIVE)
+  niveauEnseignement   Json? // String[]
+  codeEtablissement    String?  @unique
+  anneeCreation        Int?
+  slogan               String?
+  logoUrl              String?
+  statutJuridique      String?
+  
+  // Informations légales
+  rccm                     String?
+  idNat                    String?
+  nif                      String?
+  agrementMinisteriel      String?
+  dateAgrement             DateTime?
+  ministereTutelle         String?
+  statutsReglements        String? // lien PDF
+  responsableLegal         String?
+  pieceIdentiteResponsable String?
+  
+  // Localisation
+  adresse     String
+  ville       String
+  province    String
+  pays        String @default("RDC")
+  telephone   String
+  email       String
+  siteWeb     String?
+  
+  // Direction
+  directeurNom              String
+  directeurTelephone        String
+  directeurEmail            String?
+  secretaireAcademique      String?
+  comptable                 String?
+  personnelAdministratifTotal Int?
+  
+  // Académique
+  cycles                String? // JSON array
+  nombreClasses         Int?
+  nombreEleves          Int?
+  nombreEnseignants     Int?
+  langueEnseignement    String?
+  programmes            String?
+  calendrierScolaire    Json? // {dateDebut, dateFin}
+  joursOuverture        String?
+  
+  // Paramètres système
+  domaine              String?
+  identifiantInterne   String   @unique @default(uuid())
+  etatCompte           EtatCompte @default(EN_ATTENTE)
+  dateInscription      DateTime @default(now())
+  derniereMiseAJour    DateTime @updatedAt
+  
+  // Historique
+  creeParId       Int?
+  modifieParId    Int?
+  dateCreation    DateTime @default(now())
+  dateModification DateTime @updatedAt
+  
+  // Relations
+  createdBy User? @relation("SchoolsCreated", fields: [creeParId], references: [id])
+  
+  @@index([codeEtablissement])
+  @@index([email])
+}
 
-  createdBy User? @relation("SchoolsCreated", fields: [createdById], references: [id])
+enum TypeEtablissement {
+  PUBLIC
+  PRIVE
+  SEMI_PRIVE
+}
+
+enum EtatCompte {
+  ACTIF
+  EN_ATTENTE
+  SUSPENDU
 }
