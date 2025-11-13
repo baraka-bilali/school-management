@@ -36,7 +36,7 @@ async function requireSuperAdmin(req: NextRequest) {
 // GET: Récupérer une école spécifique
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireSuperAdmin(req)
@@ -44,6 +44,7 @@ export async function GET(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
+    const params = await context.params
     const schoolId = parseInt(params.id)
     if (isNaN(schoolId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400 })
@@ -67,7 +68,7 @@ export async function GET(
 // PUT: Mettre à jour une école
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireSuperAdmin(req)
@@ -75,6 +76,7 @@ export async function PUT(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
+    const params = await context.params
     const schoolId = parseInt(params.id)
     if (isNaN(schoolId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400 })
@@ -158,10 +160,83 @@ export async function PUT(
   }
 }
 
+// PATCH: Mettre à jour partiellement une école (ex: statut)
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    console.log('🔄 PATCH request received for school activation')
+    const user = await requireSuperAdmin(req)
+    if (!user) {
+      console.log('❌ User not authenticated')
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
+    }
+
+    console.log('✅ User authenticated:', user.role)
+    const params = await context.params
+    const schoolId = parseInt(params.id)
+    console.log('📝 School ID:', schoolId)
+    
+    if (isNaN(schoolId)) {
+      console.log('❌ Invalid school ID')
+      return NextResponse.json({ error: "ID invalide" }, { status: 400 })
+    }
+
+    const body = await req.json()
+    console.log('📦 Request body:', body)
+
+    // Vérifier que l'école existe
+    const existingSchool = await prisma.school.findUnique({
+      where: { id: schoolId }
+    })
+
+    if (!existingSchool) {
+      console.log('❌ School not found')
+      return NextResponse.json({ error: "École non trouvée" }, { status: 404 })
+    }
+
+    console.log('✅ School found:', existingSchool.nomEtablissement)
+
+    // Mettre à jour uniquement les champs fournis
+    const updateData: any = {}
+    if (body.etatCompte !== undefined) {
+      updateData.etatCompte = body.etatCompte
+      console.log('🔄 Updating etatCompte to:', body.etatCompte)
+    }
+    if (body.dateFinAbonnement !== undefined) {
+      updateData.dateFinAbonnement = body.dateFinAbonnement
+      console.log('🔄 Updating dateFinAbonnement to:', body.dateFinAbonnement)
+    }
+    if (body.planAbonnement !== undefined) {
+      updateData.planAbonnement = body.planAbonnement
+      console.log('🔄 Updating planAbonnement to:', body.planAbonnement)
+    }
+    if (body.periodeAbonnement !== undefined) {
+      updateData.periodeAbonnement = body.periodeAbonnement
+      console.log('🔄 Updating periodeAbonnement to:', body.periodeAbonnement)
+    }
+
+    const updatedSchool = await prisma.school.update({
+      where: { id: schoolId },
+      data: updateData
+    })
+
+    console.log('✅ School updated successfully')
+    return NextResponse.json({ 
+      success: true,
+      school: updatedSchool 
+    })
+  } catch (error: any) {
+    console.error('❌ Error updating school status:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
 // DELETE: Supprimer une école
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireSuperAdmin(req)
@@ -169,6 +244,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
     }
 
+    const params = await context.params
     const schoolId = parseInt(params.id)
     if (isNaN(schoolId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400 })

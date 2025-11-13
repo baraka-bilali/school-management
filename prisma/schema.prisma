@@ -164,6 +164,11 @@ model School {
   dateInscription      DateTime @default(now())
   derniereMiseAJour    DateTime @updatedAt
   
+  // Abonnement
+  planAbonnement       String?
+  periodeAbonnement    String?
+  dateFinAbonnement    DateTime?
+  
   // Historique
   creeParId       Int?
   modifieParId    Int?

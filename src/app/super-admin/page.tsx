@@ -348,8 +348,7 @@ export default function SuperAdminHome() {
   }
 
   const handleViewDetails = (school: School) => {
-    setSelectedSchool(school)
-    setShowDetailsModal(true)
+    router.push(`/super-admin/schools/${school.id}`)
   }
 
   const handleEditClick = (school: School) => {
