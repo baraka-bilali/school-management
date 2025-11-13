@@ -95,26 +95,26 @@ export async function PUT(
     const updateData: any = {}
 
     // Informations générales
-    if (body.nomEtablissement) updateData.nomEtablissement = body.nomEtablissement
-    if (body.typeEtablissement) updateData.typeEtablissement = body.typeEtablissement
+    if (body.nomEtablissement !== undefined) updateData.nomEtablissement = body.nomEtablissement
+    if (body.typeEtablissement !== undefined) updateData.typeEtablissement = body.typeEtablissement
     if (body.codeEtablissement !== undefined) updateData.codeEtablissement = body.codeEtablissement || null
     if (body.anneeCreation !== undefined) updateData.anneeCreation = body.anneeCreation || null
     if (body.slogan !== undefined) updateData.slogan = body.slogan || null
 
-    // Localisation
-    if (body.adresse !== undefined) updateData.adresse = body.adresse || null
-    if (body.ville) updateData.ville = body.ville
-    if (body.province) updateData.province = body.province
+    // Localisation (adresse est requis, ne pas convertir en null)
+    if (body.adresse !== undefined) updateData.adresse = body.adresse
+    if (body.ville !== undefined) updateData.ville = body.ville
+    if (body.province !== undefined) updateData.province = body.province
     if (body.pays !== undefined) updateData.pays = body.pays || null
 
-    // Contact
-    if (body.telephone) updateData.telephone = body.telephone
-    if (body.email) updateData.email = body.email
+    // Contact (telephone et email sont requis, ne pas convertir en null)
+    if (body.telephone !== undefined) updateData.telephone = body.telephone
+    if (body.email !== undefined) updateData.email = body.email
     if (body.siteWeb !== undefined) updateData.siteWeb = body.siteWeb || null
 
-    // Direction
-    if (body.directeurNom) updateData.directeurNom = body.directeurNom
-    if (body.directeurTelephone !== undefined) updateData.directeurTelephone = body.directeurTelephone || null
+    // Direction (directeurNom et directeurTelephone sont requis, ne pas convertir en null)
+    if (body.directeurNom !== undefined) updateData.directeurNom = body.directeurNom
+    if (body.directeurTelephone !== undefined) updateData.directeurTelephone = body.directeurTelephone
     if (body.directeurEmail !== undefined) updateData.directeurEmail = body.directeurEmail || null
     if (body.secretaireAcademique !== undefined) updateData.secretaireAcademique = body.secretaireAcademique || null
     if (body.comptable !== undefined) updateData.comptable = body.comptable || null
@@ -129,9 +129,15 @@ export async function PUT(
 
     // Académique
     if (body.cycles !== undefined) updateData.cycles = body.cycles || null
-    if (body.nombreClasses !== undefined) updateData.nombreClasses = body.nombreClasses || null
-    if (body.nombreEleves !== undefined) updateData.nombreEleves = body.nombreEleves || null
-    if (body.nombreEnseignants !== undefined) updateData.nombreEnseignants = body.nombreEnseignants || null
+    if (body.nombreClasses !== undefined) {
+      updateData.nombreClasses = body.nombreClasses ? parseInt(body.nombreClasses) : null
+    }
+    if (body.nombreEleves !== undefined) {
+      updateData.nombreEleves = body.nombreEleves ? parseInt(body.nombreEleves) : null
+    }
+    if (body.nombreEnseignants !== undefined) {
+      updateData.nombreEnseignants = body.nombreEnseignants ? parseInt(body.nombreEnseignants) : null
+    }
     if (body.langueEnseignement !== undefined) updateData.langueEnseignement = body.langueEnseignement || null
     if (body.programmes !== undefined) updateData.programmes = body.programmes || null
     if (body.joursOuverture !== undefined) updateData.joursOuverture = body.joursOuverture || null

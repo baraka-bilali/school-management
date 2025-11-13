@@ -81,6 +81,7 @@ export default function SuperAdminHome() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState("")
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isEditSuccess, setIsEditSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({})
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -94,6 +95,8 @@ export default function SuperAdminHome() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [initialFormData, setInitialFormData] = useState<typeof form | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -248,6 +251,15 @@ export default function SuperAdminHome() {
     return () => clearTimeout(t)
   }, [showCreateModal])
 
+  // Détecter les changements dans le formulaire d'édition
+  useEffect(() => {
+    if (showEditModal && initialFormData) {
+      const changed = JSON.stringify(form) !== JSON.stringify(initialFormData)
+      console.log('🔍 Change detection:', { changed, form, initialFormData })
+      setHasChanges(changed)
+    }
+  }, [form, initialFormData, showEditModal])
+
   const handleNextStep = (e?: React.FormEvent) => {
     e?.preventDefault()
     setError("")
@@ -331,40 +343,43 @@ export default function SuperAdminHome() {
   const handleEditClick = (school: School) => {
     setSelectedSchool(school)
     // Remplir le formulaire avec les données de l'école
-    setForm({
+    const formData = {
       nomEtablissement: school.nomEtablissement || "",
       typeEtablissement: school.typeEtablissement as any || "PRIVE",
       niveauEnseignement: [],
       codeEtablissement: school.codeEtablissement || "",
-      anneeCreation: "",
-      slogan: "",
-      adresse: "",
+      anneeCreation: school.anneeCreation || "",
+      slogan: school.slogan || "",
+      adresse: school.adresse || "",
       ville: school.ville || "",
       province: school.province || "",
-      pays: "RDC",
+      pays: school.pays || "RDC",
       telephone: school.telephone || "",
       email: school.email || "",
-      siteWeb: "",
+      siteWeb: school.siteWeb || "",
       directeurNom: school.directeurNom || "",
-      directeurTelephone: "",
-      directeurEmail: "",
-      secretaireAcademique: "",
-      comptable: "",
-      personnelAdministratifTotal: "",
-      rccm: "",
-      idNat: "",
-      nif: "",
-      agrementMinisteriel: "",
-      dateAgrement: "",
-      cycles: "",
-      nombreClasses: "",
-      nombreEleves: "",
-      nombreEnseignants: "",
-      langueEnseignement: "",
-      programmes: "",
-      joursOuverture: "",
-      formule: "Basic"
-    })
+      directeurTelephone: school.directeurTelephone || "",
+      directeurEmail: school.directeurEmail || "",
+      secretaireAcademique: school.secretaireAcademique || "",
+      comptable: school.comptable || "",
+      personnelAdministratifTotal: school.personnelAdministratifTotal || "",
+      rccm: school.rccm || "",
+      idNat: school.idNat || "",
+      nif: school.nif || "",
+      agrementMinisteriel: school.agrementMinisteriel || "",
+      dateAgrement: school.dateAgrement || "",
+      cycles: school.cycles || "",
+      nombreClasses: school.nombreClasses?.toString() || "",
+      nombreEleves: school.nombreEleves?.toString() || "",
+      nombreEnseignants: school.nombreEnseignants?.toString() || "",
+      langueEnseignement: school.langueEnseignement || "",
+      programmes: school.programmes || "",
+      joursOuverture: school.joursOuverture || "",
+      formule: "Basic" as "Basic" | "Premium" | "Enterprise"
+    }
+    setForm(formData)
+    setInitialFormData({ ...formData })
+    setHasChanges(false)
     setCurrentStep(1)
     setShowEditModal(true)
   }
@@ -440,10 +455,19 @@ export default function SuperAdminHome() {
       
       // Recharger la liste des écoles
       await loadSchools()
+      
+      // Réinitialiser les états
       setShowEditModal(false)
       setSelectedSchool(null)
+      setInitialFormData(null)
+      setHasChanges(false)
+      
+      setIsEditSuccess(true)
       setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 3000)
+      setTimeout(() => {
+        setShowSuccess(false)
+        setIsEditSuccess(false)
+      }, 3000)
     } catch (e: any) {
       console.error('❌ Update error:', e)
       setError(e.message)
@@ -508,6 +532,59 @@ export default function SuperAdminHome() {
     } finally {
       setCreating(false)
     }
+  }
+
+  const getModifiedFields = () => {
+    if (!initialFormData) return []
+    
+    const changes: Array<{ section: string; label: string; oldValue: any; newValue: any }> = []
+    
+    const fieldLabels: Record<string, { section: string; label: string }> = {
+      nomEtablissement: { section: 'Informations générales', label: 'Nom établissement' },
+      typeEtablissement: { section: 'Informations générales', label: 'Type' },
+      codeEtablissement: { section: 'Informations générales', label: 'Code' },
+      anneeCreation: { section: 'Informations générales', label: 'Année création' },
+      slogan: { section: 'Informations générales', label: 'Slogan' },
+      adresse: { section: 'Localisation', label: 'Adresse' },
+      ville: { section: 'Localisation', label: 'Ville' },
+      province: { section: 'Localisation', label: 'Province' },
+      pays: { section: 'Localisation', label: 'Pays' },
+      telephone: { section: 'Contact', label: 'Téléphone' },
+      email: { section: 'Contact', label: 'Email' },
+      siteWeb: { section: 'Contact', label: 'Site web' },
+      directeurNom: { section: 'Direction', label: 'Nom directeur' },
+      directeurTelephone: { section: 'Direction', label: 'Tél. directeur' },
+      directeurEmail: { section: 'Direction', label: 'Email directeur' },
+      secretaireAcademique: { section: 'Personnel', label: 'Secrétaire académique' },
+      comptable: { section: 'Personnel', label: 'Comptable' },
+      personnelAdministratifTotal: { section: 'Personnel', label: 'Personnel administratif' },
+      rccm: { section: 'Informations légales', label: 'RCCM' },
+      idNat: { section: 'Informations légales', label: 'ID National' },
+      nif: { section: 'Informations légales', label: 'NIF' },
+      agrementMinisteriel: { section: 'Informations légales', label: 'Agrément ministériel' },
+      dateAgrement: { section: 'Informations légales', label: 'Date agrément' },
+      cycles: { section: 'Académique', label: 'Cycles' },
+      nombreClasses: { section: 'Académique', label: 'Nombre de classes' },
+      nombreEleves: { section: 'Académique', label: 'Nombre d\'élèves' },
+      nombreEnseignants: { section: 'Académique', label: 'Nombre d\'enseignants' },
+      langueEnseignement: { section: 'Académique', label: 'Langue d\'enseignement' },
+      programmes: { section: 'Académique', label: 'Programmes' },
+      joursOuverture: { section: 'Académique', label: 'Jours d\'ouverture' },
+    }
+    
+    Object.keys(fieldLabels).forEach(key => {
+      const typedKey = key as keyof typeof form
+      if (form[typedKey] !== initialFormData[typedKey]) {
+        changes.push({
+          section: fieldLabels[key].section,
+          label: fieldLabels[key].label,
+          oldValue: initialFormData[typedKey] || '-',
+          newValue: form[typedKey] || '-'
+        })
+      }
+    })
+    
+    return changes
   }
 
   const exportToCSV = () => {
@@ -1906,9 +1983,11 @@ export default function SuperAdminHome() {
                 <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
                   <div className="text-5xl animate-scale-up">🎉</div>
                 </div>
-                <h3 className={`text-2xl font-bold ${textColor} mb-2`}>École créée avec succès !</h3>
+                <h3 className={`text-2xl font-bold ${textColor} mb-2`}>
+                  {isEditSuccess ? "École modifiée avec succès !" : "École créée avec succès !"}
+                </h3>
                 <p className={`text-sm ${textSecondary} mb-4`}>
-                  L'école <span className="font-semibold text-green-500">{form.nomEtablissement}</span> a été enregistrée dans le système.
+                  L'école <span className="font-semibold text-green-500">{form.nomEtablissement}</span> a été {isEditSuccess ? "modifiée" : "enregistrée"} dans le système.
                 </p>
                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${theme === "dark" ? "bg-green-500/10" : "bg-green-50"} text-green-500 text-sm`}>
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -2181,7 +2260,11 @@ export default function SuperAdminHome() {
                   <p className={`text-sm ${textSecondary} mt-1`}>Étape {currentStep} sur 6</p>
                 </div>
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setInitialFormData(null)
+                    setHasChanges(false)
+                  }}
                   disabled={creating}
                   className={`p-2 rounded-md transition-colors ${hoverBg} ${textSecondary} disabled:opacity-50`}
                 >
@@ -2550,16 +2633,55 @@ export default function SuperAdminHome() {
                 {currentStep === 6 && (
                   <div className="space-y-4">
                     <p className={`text-sm ${textSecondary} mb-4`}>
-                      Vérifiez les informations avant de mettre à jour l'école.
+                      Vérifiez les modifications avant de mettre à jour l'école.
                     </p>
-                    <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
-                      <h4 className={`text-sm font-semibold ${textColor} mb-2`}>Informations générales</h4>
-                      <div className="text-sm space-y-1">
-                        <p><span className={textSecondary}>Nom:</span> <span className={textColor}>{form.nomEtablissement}</span></p>
-                        <p><span className={textSecondary}>Type:</span> <span className={textColor}>{form.typeEtablissement}</span></p>
-                        {form.codeEtablissement && <p><span className={textSecondary}>Code:</span> <span className={textColor}>{form.codeEtablissement}</span></p>}
-                      </div>
-                    </div>
+                    
+                    {(() => {
+                      const modifiedFields = getModifiedFields()
+                      
+                      if (modifiedFields.length === 0) {
+                        return (
+                          <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"} text-center`}>
+                            <p className={`text-sm ${textSecondary}`}>Aucune modification détectée</p>
+                          </div>
+                        )
+                      }
+                      
+                      // Grouper les modifications par section
+                      const groupedChanges = modifiedFields.reduce((acc, field) => {
+                        if (!acc[field.section]) acc[field.section] = []
+                        acc[field.section].push(field)
+                        return acc
+                      }, {} as Record<string, typeof modifiedFields>)
+                      
+                      return Object.entries(groupedChanges).map(([section, fields]) => (
+                        <div key={section} className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
+                          <h4 className={`text-sm font-semibold ${textColor} mb-3`}>{section}</h4>
+                          <div className="space-y-2">
+                            {fields.map((field, idx) => (
+                              <div key={idx} className="text-sm">
+                                <p className={`font-medium ${textColor} mb-1`}>{field.label}</p>
+                                <div className="flex items-center gap-2 ml-2">
+                                  <div className="flex-1">
+                                    <span className={`text-xs ${textSecondary}`}>Ancienne valeur: </span>
+                                    <span className={`text-xs ${theme === "dark" ? "text-red-400" : "text-red-600"} line-through`}>
+                                      {field.oldValue}
+                                    </span>
+                                  </div>
+                                  <span className={textSecondary}>→</span>
+                                  <div className="flex-1">
+                                    <span className={`text-xs ${textSecondary}`}>Nouvelle valeur: </span>
+                                    <span className={`text-xs ${theme === "dark" ? "text-green-400" : "text-green-600"} font-medium`}>
+                                      {field.newValue}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    })()}
                   </div>
                 )}
               </div>
@@ -2568,7 +2690,11 @@ export default function SuperAdminHome() {
               <div className={`flex items-center justify-between pt-4 border-t ${borderColor} px-6 pb-4`}>
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setInitialFormData(null)
+                    setHasChanges(false)
+                  }}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
                     theme === "dark"
                       ? "text-gray-400 hover:text-gray-200 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 hover:border-gray-600"
@@ -2610,14 +2736,19 @@ export default function SuperAdminHome() {
                     <button
                       type="button"
                       onClick={handleUpdateSchool}
-                      disabled={creating}
+                      disabled={creating || !hasChanges}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                        theme === "dark"
-                          ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
-                          : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        !hasChanges
+                          ? theme === "dark"
+                            ? "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
+                            : "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
+                          : theme === "dark"
+                            ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
+                            : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
+                      }`}
+                      title={!hasChanges ? "Aucune modification détectée" : ""}
                     >
-                      {creating ? "Mise à jour..." : "Mettre à jour"}
+                      {creating ? "Mise à jour..." : hasChanges ? "Mettre à jour" : "Aucune modification"}
                     </button>
                   )}
                 </div>

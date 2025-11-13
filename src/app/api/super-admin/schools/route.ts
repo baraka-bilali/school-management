@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
 function getTokenFromCookie(req: Request) {
@@ -28,7 +27,7 @@ export async function GET(req: Request) {
   const check = await requireSuperAdmin(req);
   if ("error" in check) return check.error;
   try {
-    const schools = await (prisma as any).school.findMany({ 
+    const schools = await prisma.school.findMany({ 
       orderBy: { dateCreation: "desc" },
       select: {
         id: true,
@@ -72,7 +71,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
     }
     
-    const school = await (prisma as any).school.create({
+    const school = await prisma.school.create({
       data: { 
         nomEtablissement,
         typeEtablissement: typeEtablissement || "PRIVE",
