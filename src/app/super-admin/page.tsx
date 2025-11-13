@@ -97,6 +97,10 @@ export default function SuperAdminHome() {
   const [deleting, setDeleting] = useState(false)
   const [initialFormData, setInitialFormData] = useState<typeof form | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [isEditTransitioning, setIsEditTransitioning] = useState(false)
+  const [isDetailsTransitioning, setIsDetailsTransitioning] = useState(false)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -310,20 +314,28 @@ export default function SuperAdminHome() {
     }
   }
 
-  // Navigation sans validation pour le mode édition
+  // Navigation sans validation pour le mode édition avec transitions
   const handleEditNextStep = () => {
     setError("")
     setFieldErrors({})
     if (currentStep < 6) {
-      setCurrentStep(prev => prev + 1)
+      setIsEditTransitioning(true)
+      setTimeout(() => {
+        setCurrentStep(prev => prev + 1)
+        setTimeout(() => setIsEditTransitioning(false), 10)
+      }, 150)
     }
   }
 
   const handleEditPrevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1)
-      setError("")
-      setFieldErrors({})
+      setIsEditTransitioning(true)
+      setTimeout(() => {
+        setCurrentStep(prev => prev - 1)
+        setError("")
+        setFieldErrors({})
+        setTimeout(() => setIsEditTransitioning(false), 10)
+      }, 150)
     }
   }
 
@@ -831,6 +843,17 @@ export default function SuperAdminHome() {
     s.directeurNom.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredSchools.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedSchools = filteredSchools.slice(startIndex, endIndex)
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
   const tabs = [
     { id: "stats", label: "Statistiques Générales" },
     { id: "schools", label: "Gestion des Écoles" },
@@ -1175,7 +1198,7 @@ export default function SuperAdminHome() {
                     {searchQuery ? "Aucune école trouvée" : "Aucune école enregistrée"}
                   </td></tr>
                 ) : (
-                  filteredSchools.map((school) => (
+                  paginatedSchools.map((school) => (
                     <tr key={school.id} className={`${hoverBg} transition-colors`}>
                       <td className="px-6 py-4">
                         <div className={`font-medium ${textColor}`}>{school.nomEtablissement}</div>
@@ -1238,6 +1261,120 @@ export default function SuperAdminHome() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && filteredSchools.length > 0 && (
+            <div className={`px-6 py-4 border-t ${borderColor} flex items-center justify-between`}>
+              {/* Info */}
+              <div className={`text-sm ${textSecondary}`}>
+                Affichage de <span className={`font-medium ${textColor}`}>{startIndex + 1}</span> à{' '}
+                <span className={`font-medium ${textColor}`}>{Math.min(endIndex, filteredSchools.length)}</span> sur{' '}
+                <span className={`font-medium ${textColor}`}>{filteredSchools.length}</span> écoles
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center gap-2">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2 mr-4">
+                  <span className={`text-sm ${textSecondary}`}>Par page:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value))
+                      setCurrentPage(1)
+                    }}
+                    className={`px-2 py-1 text-sm rounded-md border ${
+                      theme === "dark"
+                        ? "bg-[#0f1729] border-gray-700 text-gray-300"
+                        : "bg-white border-gray-300 text-gray-700"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-all ${
+                    currentPage === 1
+                      ? theme === "dark"
+                        ? "bg-[#21262d] border-gray-800 text-gray-600 cursor-not-allowed"
+                        : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      : theme === "dark"
+                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700 text-gray-300 hover:border-gray-600"
+                      : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  Précédent
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first page, last page, current page and adjacent pages
+                      return (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      )
+                    })
+                    .map((page, index, array) => (
+                      <div key={page} className="flex items-center gap-1">
+                        {/* Show ellipsis if there's a gap */}
+                        {index > 0 && page > array[index - 1] + 1 && (
+                          <span className={`px-2 ${textSecondary}`}>...</span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 flex items-center justify-center text-sm font-medium rounded-md transition-all ${
+                            page === currentPage
+                              ? theme === "dark"
+                                ? "bg-blue-600 text-white border border-blue-600"
+                                : "bg-blue-600 text-white border border-blue-600"
+                              : theme === "dark"
+                              ? "bg-[#21262d] hover:bg-[#30363d] border border-gray-700 text-gray-300 hover:border-gray-600"
+                              : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:border-gray-400"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-all ${
+                    currentPage === totalPages
+                      ? theme === "dark"
+                        ? "bg-[#21262d] border-gray-800 text-gray-600 cursor-not-allowed"
+                        : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      : theme === "dark"
+                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700 text-gray-300 hover:border-gray-600"
+                      : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Copyright */}
+          <div className={`px-6 py-4 border-t ${borderColor} text-center`}>
+            <p className={`text-sm ${textSecondary}`}>
+              © {new Date().getFullYear()} <span className="font-semibold">School Management System</span>. 
+              Tous droits réservés. Développé avec ❤️ par <span className="font-semibold">Becker Baraka-Bilali</span>
+            </p>
           </div>
         </div>
       )}
@@ -2069,9 +2206,9 @@ export default function SuperAdminHome() {
       {/* Modal Détails École */}
       {showDetailsModal && selectedSchool && (
         <Portal>
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setShowDetailsModal(false)}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200" onClick={() => setShowDetailsModal(false)}>
             <div 
-              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto`}
+              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200`}
               onClick={e => e.stopPropagation()}
             >
               <div className={`sticky top-0 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"} border-b px-6 py-4 flex items-center justify-between z-10`}>
@@ -2197,9 +2334,9 @@ export default function SuperAdminHome() {
       {/* Modal Suppression */}
       {showDeleteModal && selectedSchool && (
         <Portal>
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200" onClick={() => !deleting && setShowDeleteModal(false)}>
             <div 
-              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-md w-full p-6`}
+              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200`}
               onClick={e => e.stopPropagation()}
             >
               <div className="text-center">
@@ -2249,9 +2386,9 @@ export default function SuperAdminHome() {
       {/* Modal Modification (réutilise le même modal que création) */}
       {showEditModal && selectedSchool && (
         <Portal>
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => !creating && setShowEditModal(false)}>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200" onClick={() => !creating && setShowEditModal(false)}>
             <div 
-              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col`}
+              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200`}
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
@@ -2283,6 +2420,9 @@ export default function SuperAdminHome() {
 
               {/* Body - Formulaire de modification */}
               <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className={`transition-all duration-300 ${
+                  isEditTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
+                }`}>
                 {/* Étape 1: Informations Générales */}
                 {currentStep === 1 && (
                   <div className="space-y-3">
@@ -2685,6 +2825,7 @@ export default function SuperAdminHome() {
                     })()}
                   </div>
                 )}
+                </div>
               </div>
 
               {/* Footer */}
