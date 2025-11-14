@@ -147,6 +147,19 @@ export default function SuperAdminHome() {
   const [adminFilterSchool, setAdminFilterSchool] = useState("all")
   const [adminCurrentPage, setAdminCurrentPage] = useState(1)
   const adminsPerPage = 10
+  
+  // États pour l'édition et réinitialisation de mot de passe
+  const [editingAdmin, setEditingAdmin] = useState<any>(null)
+  const [showEditAdminModal, setShowEditAdminModal] = useState(false)
+  const [resetPasswordAdmin, setResetPasswordAdmin] = useState<any>(null)
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [newPasswordGenerated, setNewPasswordGenerated] = useState("")
+  const [selectedAdmin, setSelectedAdmin] = useState<any>(null)
+  const [showAdminDetailsModal, setShowAdminDetailsModal] = useState(false)
+  const [showDeleteAdminModal, setShowDeleteAdminModal] = useState(false)
+  const [deletingAdmin, setDeletingAdmin] = useState(false)
+  const [initialAdminData, setInitialAdminData] = useState<any>(null)
+  const [hasAdminChanges, setHasAdminChanges] = useState(false)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -285,6 +298,131 @@ export default function SuperAdminHome() {
       setError('Une erreur est survenue lors de la modification du statut')
     } finally {
       setTogglingAdmin(null)
+    }
+  }
+
+  // Modifier un administrateur
+  const handleEditAdmin = (admin: any) => {
+    setEditingAdmin(admin)
+    const adminData = {
+      schoolId: admin.schoolId?.toString() || "",
+      nom: admin.nom || "",
+      prenom: admin.prenom || "",
+      email: admin.email || "",
+      telephone: admin.telephone || "",
+      fonction: admin.fonction || "Directeur"
+    }
+    setAdminForm(adminData)
+    setInitialAdminData(adminData)
+    setHasAdminChanges(false)
+    setShowEditAdminModal(true)
+  }
+
+  // Sauvegarder les modifications d'un admin
+  const handleSaveEditAdmin = async () => {
+    try {
+      setCreatingAdmin(true)
+      setError("")
+
+      if (!adminForm.nom || !adminForm.prenom || !adminForm.telephone) {
+        setError("Veuillez remplir tous les champs obligatoires")
+        return
+      }
+
+      const res = await fetch(`/api/super-admin/admins/${editingAdmin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          nom: adminForm.nom,
+          prenom: adminForm.prenom,
+          telephone: adminForm.telephone,
+          fonction: adminForm.fonction
+        })
+      })
+
+      if (res.ok) {
+        setShowEditAdminModal(false)
+        setEditingAdmin(null)
+        setInitialAdminData(null)
+        setHasAdminChanges(false)
+        setAdminForm({
+          schoolId: "",
+          nom: "",
+          prenom: "",
+          email: "",
+          telephone: "",
+          fonction: "Directeur"
+        })
+        await loadAdmins()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Erreur lors de la modification')
+      }
+    } catch (e: any) {
+      console.error('Erreur modification admin:', e)
+      setError(e.message)
+    } finally {
+      setCreatingAdmin(false)
+    }
+  }
+
+  // Réinitialiser le mot de passe d'un administrateur
+  const handleResetPassword = (admin: any) => {
+    setResetPasswordAdmin(admin)
+    setShowResetPasswordModal(true)
+  }
+
+  // Confirmer la réinitialisation du mot de passe
+  const handleConfirmResetPassword = async () => {
+    try {
+      setCreatingAdmin(true)
+      const res = await fetch(`/api/super-admin/admins/${resetPasswordAdmin.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setNewPasswordGenerated(data.newPassword)
+        await loadAdmins()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Erreur lors de la réinitialisation du mot de passe')
+      }
+    } catch (e: any) {
+      console.error('Erreur reset password:', e)
+      setError('Une erreur est survenue')
+    } finally {
+      setCreatingAdmin(false)
+    }
+  }
+
+  // Supprimer un administrateur
+  const handleDeleteAdmin = async () => {
+    if (!selectedAdmin) return
+
+    try {
+      setDeletingAdmin(true)
+      const res = await fetch(`/api/super-admin/admins/${selectedAdmin.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      if (res.ok) {
+        setShowDeleteAdminModal(false)
+        setSelectedAdmin(null)
+        await loadAdmins()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Erreur lors de la suppression')
+      }
+    } catch (e: any) {
+      console.error('Erreur suppression admin:', e)
+      setError('Une erreur est survenue lors de la suppression')
+    } finally {
+      setDeletingAdmin(false)
     }
   }
 
@@ -486,6 +624,15 @@ export default function SuperAdminHome() {
       setHasChanges(changed)
     }
   }, [form, initialFormData, showEditModal])
+
+  // Détecter les changements dans le formulaire d'édition d'administrateur
+  useEffect(() => {
+    if (showEditAdminModal && initialAdminData) {
+      const changed = JSON.stringify(adminForm) !== JSON.stringify(initialAdminData)
+      console.log('🔍 Admin change detection:', { changed, adminForm, initialAdminData })
+      setHasAdminChanges(changed)
+    }
+  }, [adminForm, initialAdminData, showEditAdminModal])
 
   const handleNextStep = (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -1558,10 +1705,10 @@ export default function SuperAdminHome() {
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all border ${
                 theme === "dark" 
-                  ? "bg-[#21262d] hover:bg-[#30363d] text-gray-200 border border-gray-600/50 hover:border-gray-500 shadow-sm" 
-                  : "bg-[#f6f8fa] hover:bg-[#f3f4f6] text-gray-800 border border-gray-300 hover:border-gray-400 shadow-sm"
+                  ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/50" 
+                  : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
               }`}
             >
               <Plus className="w-4 h-4" />
@@ -1805,9 +1952,13 @@ export default function SuperAdminHome() {
             </div>
             <button
               onClick={() => setShowCreateAdminModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium transition-all border ${
+                theme === "dark"
+                  ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/50"
+                  : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+              }`}
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Créer un administrateur
             </button>
           </div>
@@ -1858,10 +2009,10 @@ export default function SuperAdminHome() {
                 <tr className={`text-left text-sm ${textSecondary}`}>
                   <th className="px-6 py-4 font-medium">Administrateur</th>
                   <th className="px-6 py-4 font-medium">École</th>
-                  <th className="px-6 py-4 font-medium">Email</th>
                   <th className="px-6 py-4 font-medium">Téléphone</th>
                   <th className="px-6 py-4 font-medium">Statut</th>
                   <th className="px-6 py-4 font-medium text-center">Activer/Désactiver</th>
+                  <th className="px-6 py-4 font-medium text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
@@ -1906,9 +2057,6 @@ export default function SuperAdminHome() {
                         <div className={`text-xs ${textSecondary}`}>{admin.school?.ville}, {admin.school?.province}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className={`text-sm ${textColor} font-mono`}>{admin.email}</div>
-                      </td>
-                      <td className="px-6 py-4">
                         <div className={`text-sm ${textColor}`}>{admin.telephone || "-"}</div>
                       </td>
                       <td className="px-6 py-4">
@@ -1936,6 +2084,61 @@ export default function SuperAdminHome() {
                                 admin.isActive ? 'translate-x-6' : 'translate-x-1'
                               }`}
                             />
+                          </button>
+                        </div>
+                      </td>
+                      {/* Actions */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedAdmin(admin)
+                              setShowAdminDetailsModal(true)
+                            }}
+                            className={`p-2.5 rounded-full transition-all ${
+                              theme === "dark"
+                                ? "hover:bg-green-500/20 text-green-400 hover:scale-110"
+                                : "hover:bg-green-100 text-green-600 hover:scale-110"
+                            }`}
+                            title="Voir les détails"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditAdmin(admin)}
+                            className={`p-2.5 rounded-full transition-all ${
+                              theme === "dark"
+                                ? "hover:bg-blue-500/20 text-blue-400 hover:scale-110"
+                                : "hover:bg-blue-100 text-blue-600 hover:scale-110"
+                            }`}
+                            title="Modifier l'administrateur"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleResetPassword(admin)}
+                            className={`p-2.5 rounded-full transition-all ${
+                              theme === "dark"
+                                ? "hover:bg-orange-500/20 text-orange-400 hover:scale-110"
+                                : "hover:bg-orange-100 text-orange-600 hover:scale-110"
+                            }`}
+                            title="Réinitialiser le mot de passe"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedAdmin(admin)
+                              setShowDeleteAdminModal(true)
+                            }}
+                            className={`p-2.5 rounded-full transition-all ${
+                              theme === "dark"
+                                ? "hover:bg-red-500/20 text-red-400 hover:scale-110"
+                                : "hover:bg-red-100 text-red-600 hover:scale-110"
+                            }`}
+                            title="Supprimer l'administrateur"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -2654,12 +2857,15 @@ export default function SuperAdminHome() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                     theme === "dark"
-                      ? "text-gray-400 hover:text-gray-200 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 hover:border-gray-600"
-                      : "text-gray-600 hover:text-gray-800 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-gray-300 hover:border-gray-400"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                   }`}
                 >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                   Annuler
                 </button>
 
@@ -2669,45 +2875,57 @@ export default function SuperAdminHome() {
                       type="button"
                       onClick={handlePrevStep}
                       disabled={creating}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all flex items-center gap-1.5 ${
                         theme === "dark"
-                          ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
-                          : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
+                          ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                          : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      ← Précédent
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Précédent
                     </button>
                   )}
                   
                   {currentStep < 6 ? (
                     <button
                       type="submit"
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                         theme === "dark"
-                          ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
-                          : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
+                          ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/50"
+                          : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
                       }`}
                     >
-                      Suivant →
+                      Suivant
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleCreate}
                       disabled={creating}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                         theme === "dark"
-                          ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
-                          : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
+                          ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/50"
+                          : "bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {creating ? (
                         <>
-                          <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></div>
+                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
                           Création...
                         </>
                       ) : (
-                        "Créer l'école"
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Créer l'école
+                        </>
                       )}
                     </button>
                   )}
@@ -2984,24 +3202,40 @@ export default function SuperAdminHome() {
                   <button
                     onClick={() => setShowDeleteModal(false)}
                     disabled={deleting}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-md border transition-all ${
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
                       theme === "dark"
-                        ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
-                        : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
+                        ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                        : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                     Annuler
                   </button>
                   <button
                     onClick={confirmDelete}
                     disabled={deleting}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-all shadow-sm ${
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center justify-center gap-1.5 ${
                       theme === "dark"
-                        ? "bg-[#da3633] hover:bg-[#b52f2c] text-white border border-[#da3633]/50"
-                        : "bg-[#cf222e] hover:bg-[#a40e26] text-white border border-[#cf222e]"
+                        ? "bg-red-500 hover:bg-red-600 text-white border-red-600"
+                        : "bg-red-500 hover:bg-red-600 text-white border-red-600"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    {deleting ? "Suppression..." : "Supprimer"}
+                    {deleting ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Suppression...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Supprimer
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -3464,12 +3698,15 @@ export default function SuperAdminHome() {
                     setInitialFormData(null)
                     setHasChanges(false)
                   }}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                     theme === "dark"
-                      ? "text-gray-400 hover:text-gray-200 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 hover:border-gray-600"
-                      : "text-gray-600 hover:text-gray-800 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-gray-300 hover:border-gray-400"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                   }`}
                 >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                   Annuler
                 </button>
 
@@ -3479,13 +3716,16 @@ export default function SuperAdminHome() {
                       type="button"
                       onClick={handleEditPrevStep}
                       disabled={creating}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all flex items-center gap-1.5 ${
                         theme === "dark"
-                          ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
-                          : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
+                          ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                          : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      ← Précédent
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Précédent
                     </button>
                   )}
                   
@@ -3493,31 +3733,49 @@ export default function SuperAdminHome() {
                     <button
                       type="button"
                       onClick={handleEditNextStep}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                         theme === "dark"
-                          ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
-                          : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
+                          ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/50"
+                          : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
                       }`}
                     >
-                      Suivant →
+                      Suivant
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleUpdateSchool}
                       disabled={creating || !hasChanges}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
                         !hasChanges
                           ? theme === "dark"
-                            ? "bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed"
-                            : "bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed"
-                          : theme === "dark"
-                            ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#238636]/50 shadow-sm"
-                            : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37] shadow-sm"
+                            ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed"
+                            : "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed"
+                          : hasChanges
+                            ? "bg-green-500 hover:bg-green-600 text-white border-green-600"
+                            : ""
                       }`}
                       title={!hasChanges ? "Aucune modification détectée" : ""}
                     >
-                      {creating ? "Mise à jour..." : hasChanges ? "Mettre à jour" : "Aucune modification"}
+                      {creating ? (
+                        <>
+                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Mise à jour...
+                        </>
+                      ) : hasChanges ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          Mettre à jour
+                        </>
+                      ) : (
+                        "Aucune modification"
+                      )}
                     </button>
                   )}
                 </div>
@@ -3745,26 +4003,29 @@ export default function SuperAdminHome() {
                 <button
                   onClick={() => setShowCreateAdminModal(false)}
                   disabled={creatingAdmin}
-                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
                     theme === "dark"
-                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
-                      : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                   Annuler
                 </button>
                 <button
                   onClick={handleCreateAdmin}
                   disabled={creatingAdmin || !adminForm.schoolId || !adminForm.nom || !adminForm.prenom || !adminForm.email}
-                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 border ${
                     theme === "dark"
-                      ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#1a7f37]"
-                      : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37]"
+                      ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/50"
+                      : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {creatingAdmin ? (
                     <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -3772,7 +4033,7 @@ export default function SuperAdminHome() {
                     </>
                   ) : (
                     <>
-                      <UserPlus className="w-4 h-4" />
+                      <UserPlus className="w-3.5 h-3.5" />
                       Créer l'administrateur
                     </>
                   )}
@@ -3929,14 +4190,512 @@ export default function SuperAdminHome() {
                     setShowCredentialsModal(false)
                     setGeneratedCredentials(null)
                   }}
-                  className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 border ${
                     theme === "dark"
-                      ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#1a7f37]"
-                      : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37]"
+                      ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/50"
+                      : "bg-green-50 hover:bg-green-100 text-green-600 border-green-200"
                   }`}
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-3.5 h-3.5" />
                   J'ai copié les identifiants
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal d'édition d'administrateur */}
+      {showEditAdminModal && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowEditAdminModal(false)} />
+            
+            <div className={`relative ${cardBg} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up`}>
+              {/* Header avec gradient */}
+              <div className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20" />
+                <div className={`relative p-6 border-b ${borderColor}`}>
+                  <h3 className={`text-2xl font-bold ${textColor} flex items-center gap-3`}>
+                    <div className="p-2 bg-blue-500/20 rounded-lg">
+                      <Pencil className="w-6 h-6 text-blue-500" />
+                    </div>
+                    Modifier l'administrateur
+                  </h3>
+                  <p className={`${textSecondary} text-sm mt-2`}>
+                    Mettez à jour les informations de {editingAdmin?.prenom} {editingAdmin?.nom}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2 animate-shake">
+                    <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <User className="w-3.5 h-3.5" />
+                      Nom <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={adminForm.nom}
+                      onChange={(e) => setAdminForm({...adminForm, nom: e.target.value})}
+                      placeholder="Nom de famille"
+                      className={`h-10 ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <User className="w-3.5 h-3.5" />
+                      Prénom <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={adminForm.prenom}
+                      onChange={(e) => setAdminForm({...adminForm, prenom: e.target.value})}
+                      placeholder="Prénom"
+                      className={`h-10 ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <Phone className="w-3.5 h-3.5" />
+                      Téléphone <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={adminForm.telephone}
+                      onChange={(e) => setAdminForm({...adminForm, telephone: e.target.value})}
+                      placeholder="+243..."
+                      className={`h-10 ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <Briefcase className="w-3.5 h-3.5" />
+                      Fonction
+                    </label>
+                    <select
+                      value={adminForm.fonction}
+                      onChange={(e) => setAdminForm({...adminForm, fonction: e.target.value})}
+                      className={`h-10 text-sm w-full ${inputBg} border ${borderColor} rounded-lg px-3 ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    >
+                      <option value="Directeur">Directeur</option>
+                      <option value="Directeur Adjoint">Directeur Adjoint</option>
+                      <option value="Administrateur">Administrateur</option>
+                    </select>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Footer avec boutons */}
+              <div className="p-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditAdminModal(false)
+                    setEditingAdmin(null)
+                    setError("")
+                    setInitialAdminData(null)
+                    setHasAdminChanges(false)
+                  }}
+                  disabled={creatingAdmin}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSaveEditAdmin}
+                  disabled={creatingAdmin || !adminForm.nom || !adminForm.prenom || !adminForm.telephone || !hasAdminChanges}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    hasAdminChanges 
+                      ? "bg-green-500 hover:bg-green-600 text-white border border-green-600"
+                      : theme === "dark"
+                      ? "bg-[#0d1b2a] text-white border border-[#0d1b2a]"
+                      : "bg-[#1a2332] text-white border border-[#1a2332]"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {creatingAdmin ? "Modification..." : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal de détails d'administrateur */}
+      {showAdminDetailsModal && selectedAdmin && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAdminDetailsModal(false)} />
+            
+            <div className={`relative ${cardBg} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-scale-up`}>
+              {/* Header simplifié */}
+              <div className={`p-5 border-b ${borderColor} flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  {/* Avatar */}
+                  <div className={`w-12 h-12 rounded-xl ${theme === "dark" ? "bg-blue-500/20" : "bg-blue-100"} flex items-center justify-center`}>
+                    <span className={`text-lg font-bold ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>
+                      {selectedAdmin.prenom?.[0]}{selectedAdmin.nom?.[0]}
+                    </span>
+                  </div>
+                  {/* Nom et badge */}
+                  <div>
+                    <h3 className={`text-base font-bold ${textColor}`}>
+                      {selectedAdmin.prenom} {selectedAdmin.nom}
+                    </h3>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1 ${
+                      theme === "dark" 
+                        ? "bg-blue-500/20 text-blue-400" 
+                        : "bg-blue-100 text-blue-700"
+                    }`}>
+                      {selectedAdmin.fonction || "Administrateur"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bouton fermer */}
+                <button
+                  onClick={() => setShowAdminDetailsModal(false)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    theme === "dark"
+                      ? "hover:bg-gray-700/50 text-gray-400 hover:text-gray-200"
+                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Corps avec informations organisées en 2 colonnes */}
+              <div className="p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Section: Informations de contact */}
+                <div>
+                  <h4 className={`text-xs font-semibold ${textSecondary} mb-2 flex items-center gap-2`}>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Informations de contact
+                  </h4>
+                  <div className="space-y-2">
+                    {/* Email */}
+                    <div className={`p-3 rounded-lg border ${borderColor} ${theme === "dark" ? "bg-[#1c2128]" : "bg-gray-50"}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${theme === "dark" ? "bg-blue-500/10" : "bg-blue-100"}`}>
+                          <Mail className={`w-3.5 h-3.5 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[10px] ${textSecondary} mb-0.5`}>Email</p>
+                          <p className={`text-xs font-mono ${textColor} truncate`}>{selectedAdmin.email}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Téléphone */}
+                    <div className={`p-3 rounded-lg border ${borderColor} ${theme === "dark" ? "bg-[#1c2128]" : "bg-gray-50"}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${theme === "dark" ? "bg-green-500/10" : "bg-green-100"}`}>
+                          <Phone className={`w-3.5 h-3.5 ${theme === "dark" ? "text-green-400" : "text-green-600"}`} />
+                        </div>
+                        <div>
+                          <p className={`text-[10px] ${textSecondary} mb-0.5`}>Téléphone</p>
+                          <p className={`text-xs ${textColor} font-medium`}>{selectedAdmin.telephone || "Non renseigné"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: École rattachée */}
+                <div>
+                  <h4 className={`text-xs font-semibold ${textSecondary} mb-2 flex items-center gap-2`}>
+                    <Building2 className="w-3.5 h-3.5" />
+                    École rattachée
+                  </h4>
+                  <div className={`p-3 rounded-lg border ${borderColor} ${theme === "dark" ? "bg-[#1c2128]" : "bg-gray-50"}`}>
+                    <div className="flex items-start gap-2">
+                      <div className={`p-1.5 rounded-lg ${theme === "dark" ? "bg-purple-500/10" : "bg-purple-100"}`}>
+                        <GraduationCap className={`w-4 h-4 ${theme === "dark" ? "text-purple-400" : "text-purple-600"}`} />
+                      </div>
+                      <div className="flex-1">
+                        <h5 className={`text-xs font-bold ${textColor} mb-0.5`}>
+                          {selectedAdmin.school?.nomEtablissement || "N/A"}
+                        </h5>
+                        {selectedAdmin.school && (
+                          <p className={`text-[10px] ${textSecondary}`}>
+                            {selectedAdmin.school.ville}, {selectedAdmin.school.province}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </div>
+              </div>
+
+              {/* Footer avec actions */}
+              <div className="p-4 border-t border-gray-700/50 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAdminDetailsModal(false)
+                    handleEditAdmin(selectedAdmin)
+                  }}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-[#2e4a6a] hover:bg-[#3a5a7f] text-white border border-[#3a5a7f]"
+                      : "bg-blue-500 hover:bg-blue-600 text-white border border-blue-600"
+                  }`}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Modifier
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAdminDetailsModal(false)
+                    handleResetPassword(selectedAdmin)
+                  }}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-[#8b5a3c] hover:bg-[#a06b47] text-white border border-[#a06b47]"
+                      : "bg-orange-500 hover:bg-orange-600 text-white border border-orange-600"
+                  }`}
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  Réinitialiser mot de passe
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal de réinitialisation de mot de passe */}
+      {showResetPasswordModal && !newPasswordGenerated && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowResetPasswordModal(false)} />
+            
+            <div className={`relative ${cardBg} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md`}>
+              <div className={`p-6 border-b ${borderColor}`}>
+                <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                  <KeyRound className="w-5 h-5 text-orange-500" />
+                  Réinitialiser le mot de passe
+                </h3>
+              </div>
+
+              <div className="p-6">
+                <p className={`${textColor} mb-4`}>
+                  Êtes-vous sûr de vouloir réinitialiser le mot de passe de <strong>{resetPasswordAdmin?.prenom} {resetPasswordAdmin?.nom}</strong> ?
+                </p>
+                <p className={`text-sm ${textSecondary}`}>
+                  Un nouveau mot de passe temporaire sera généré. L'administrateur devra le changer lors de sa prochaine connexion.
+                </p>
+              </div>
+
+              <div className="p-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowResetPasswordModal(false)
+                    setResetPasswordAdmin(null)
+                  }}
+                  disabled={creatingAdmin}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Annuler
+                </button>
+                <button
+                  onClick={handleConfirmResetPassword}
+                  disabled={creatingAdmin}
+                  className="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-orange-600"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  {creatingAdmin ? "Réinitialisation..." : "Réinitialiser"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal affichage du nouveau mot de passe */}
+      {newPasswordGenerated && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => {
+              setNewPasswordGenerated("")
+              setShowResetPasswordModal(false)
+              setResetPasswordAdmin(null)
+            }} />
+            
+            <div className={`relative ${cardBg} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md`}>
+              <div className={`p-6 border-b ${borderColor}`}>
+                <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                  <Check className="w-5 h-5 text-green-500" />
+                  Mot de passe réinitialisé
+                </h3>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                  <p className={`text-sm ${textColor} flex items-start gap-2`}>
+                    <svg className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>
+                      <strong>Important :</strong> Copiez ce mot de passe maintenant ! Il ne sera plus affiché.
+                    </span>
+                  </p>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Nouveau mot de passe</label>
+                  <div className={`${inputBg} border-2 ${theme === "dark" ? "border-gray-700" : "border-gray-300"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
+                    <span className={`font-mono text-lg font-bold ${textColor} select-all`}>{newPasswordGenerated}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(newPasswordGenerated)
+                      }}
+                      className="text-orange-500 hover:text-orange-400 transition-colors p-1.5 hover:bg-orange-500/10 rounded"
+                      title="Copier le mot de passe"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className={`text-sm ${textSecondary}`}>
+                  L'administrateur devra changer ce mot de passe lors de sa prochaine connexion.
+                </p>
+              </div>
+
+              <div className="p-6">
+                <button
+                  onClick={() => {
+                    setNewPasswordGenerated("")
+                    setShowResetPasswordModal(false)
+                    setResetPasswordAdmin(null)
+                  }}
+                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50"
+                      : "bg-green-50 hover:bg-green-100 text-green-600 border border-green-200"
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  J'ai copié le mot de passe
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteAdminModal && selectedAdmin && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDeleteAdminModal(false)} />
+            
+            <div className={`relative ${cardBg} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md animate-scale-up`}>
+              <div className={`p-6 border-b ${borderColor}`}>
+                <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Trash2 className="w-5 h-5 text-red-500" />
+                  </div>
+                  Supprimer l'administrateur
+                </h3>
+              </div>
+
+              <div className="p-6">
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg mb-4">
+                  <p className={`text-sm ${textColor} flex items-start gap-2`}>
+                    <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>
+                      <strong>Attention :</strong> Cette action est irréversible !
+                    </span>
+                  </p>
+                </div>
+
+                <p className={`${textColor} mb-4`}>
+                  Êtes-vous sûr de vouloir supprimer l'administrateur <strong>{selectedAdmin.prenom} {selectedAdmin.nom}</strong> ?
+                </p>
+
+                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-100"}`}>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Mail className={`w-4 h-4 ${textSecondary}`} />
+                      <span className={`${textSecondary}`}>Email:</span>
+                      <span className={`${textColor} font-mono`}>{selectedAdmin.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Building2 className={`w-4 h-4 ${textSecondary}`} />
+                      <span className={`${textSecondary}`}>École:</span>
+                      <span className={`${textColor}`}>{selectedAdmin.school?.nomEtablissement || "N/A"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-sm text-red-500">{error}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteAdminModal(false)
+                    setSelectedAdmin(null)
+                    setError("")
+                  }}
+                  disabled={deletingAdmin}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-[#1a2332] hover:bg-[#243041] text-white border border-[#2d3a4d]"
+                      : "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDeleteAdmin}
+                  disabled={deletingAdmin}
+                  className="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 border border-red-600"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {deletingAdmin ? "Suppression..." : "Supprimer"}
                 </button>
               </div>
             </div>

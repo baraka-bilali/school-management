@@ -180,6 +180,17 @@
   }
 }
 
+@keyframes scale-up-modal {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .animate-fall {
   animation: fall linear forwards;
 }
@@ -189,6 +200,10 @@
 }
 
 .animate-scale-up {
+  animation: scale-up-modal 0.2s ease-out;
+}
+
+.animate-scale-up-infinite {
   animation: scale-up 1s ease-in-out infinite;
 }
 
