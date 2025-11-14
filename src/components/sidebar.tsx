@@ -158,16 +158,16 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             </div>
           </nav>
           {/* Footer (pinned) */}
-          <div className={`p-4 border-t ${borderColor} flex-shrink-0`}>
-            <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4`}>Administration</h3>
-            <ul className="space-y-2">
+          <div className={`px-4 py-4 border-t ${borderColor} flex-shrink-0`}>
+            <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-3 px-2`}>Administration</h3>
+            <ul className="space-y-1">
               {adminItems.map((item, index) => (
                 <li key={index}>
                   {"key" in item && item.key === "logout" ? (
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left"
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors w-full text-left`}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
                       <span>{item.label}</span>
@@ -175,7 +175,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   ) : (
                     <Link 
                       href={(item as { href: string }).href}
-                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors`}
                       onClick={onToggle}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
@@ -189,19 +189,51 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           </div>
         </aside>
         {showLogoutModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-              <h2 className="text-lg font-semibold mb-4">Déconnexion</h2>
-              <p className="mb-6">Voulez-vous vraiment vous déconnecter ?</p>
-              <div className="flex justify-end space-x-2">
-                <button
-                  className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  onClick={() => setShowLogoutModal(false)}
-                >Annuler</button>
-                <button
-                  className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
-                  onClick={handleLogout}
-                >Se déconnecter</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+              onClick={() => setShowLogoutModal(false)}
+            />
+            
+            <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md animate-scale-up`}>
+              <div className={`p-6 border-b ${borderColor}`}>
+                <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <LogOut className="w-5 h-5 text-red-500" />
+                  </div>
+                  Confirmer la déconnexion
+                </h3>
+              </div>
+
+              <div className="p-6">
+                <p className={`${textColor} mb-6`}>
+                  Êtes-vous sûr de vouloir vous déconnecter ?
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowLogoutModal(false)}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      theme === "dark"
+                        ? "bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                    }`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      theme === "dark"
+                        ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50"
+                        : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
+                    }`}
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Déconnexion
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -298,19 +330,51 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         </div>
       </aside>
       {showLogoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-            <h2 className="text-lg font-semibold mb-4">Déconnexion</h2>
-            <p className="mb-6">Voulez-vous vraiment vous déconnecter ?</p>
-            <div className="flex justify-end space-x-2">
-              <button
-                className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
-                onClick={() => setShowLogoutModal(false)}
-              >Annuler</button>
-              <button
-                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
-                onClick={handleLogout}
-              >Se déconnecter</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => setShowLogoutModal(false)}
+          />
+          
+          <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md animate-scale-up`}>
+            <div className={`p-6 border-b ${borderColor}`}>
+              <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                <div className="p-2 bg-red-500/20 rounded-lg">
+                  <LogOut className="w-5 h-5 text-red-500" />
+                </div>
+                Confirmer la déconnexion
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <p className={`${textColor} mb-6`}>
+                Êtes-vous sûr de vouloir vous déconnecter ?
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600"
+                      : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                  }`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Annuler
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    theme === "dark"
+                      ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50"
+                      : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
+                  }`}
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Déconnexion
+                </button>
+              </div>
             </div>
           </div>
         </div>
