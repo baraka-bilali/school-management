@@ -24,8 +24,32 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [theme, setTheme] = useState<"light" | "dark">("light")
   const router = useRouter()
   const pathname = usePathname()
+
+  useEffect(() => {
+    // Charger le thème
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
+    if (savedTheme) {
+      setTheme(savedTheme)
+    }
+
+    // Écouter les changements de thème
+    const handleStorageChange = () => {
+      const currentTheme = localStorage.getItem("theme") as "light" | "dark" | null
+      if (currentTheme) {
+        setTheme(currentTheme)
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    window.addEventListener("themeChange", handleStorageChange)
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      window.removeEventListener("themeChange", handleStorageChange)
+    }
+  }, [])
 
   useEffect(() => {
     const checkMobile = () => {
@@ -72,6 +96,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: LogOut, label: "Déconnexion", key: "logout" },
   ]
 
+  const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white"
+  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const hoverBg = theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-100"
+  const activeBg = theme === "dark" ? "bg-indigo-900/50" : "bg-indigo-50"
+
   if (isMobile) {
     return (
       <>
@@ -84,7 +115,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         )}
         {/* Mobile Sidebar */}
         <aside className={`
-          fixed top-0 left-0 bottom-0 z-50 bg-white border-r border-gray-200 
+          fixed top-0 left-0 bottom-0 z-50 ${bgColor} border-r ${borderColor}
           transform transition-transform duration-300 ease-in-out md:hidden
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           w-80
@@ -92,34 +123,28 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           {/* Shell */}
           <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                <School className="w-4 h-4 text-indigo-600" />
-              </div>
-              <span className="text-lg font-semibold text-gray-800">École ABC</span>
-            </div>
+          <div className={`flex items-center justify-between p-4 border-b ${borderColor} flex-shrink-0`}>
             <button
               onClick={onToggle}
-              className="p-2 rounded-lg hover:bg-gray-100"
+              className={`p-2 rounded-lg ${hoverBg} ml-auto`}
             >
-              <X className="w-5 h-5 text-gray-600" />
+              <X className={`w-5 h-5 ${textSecondary}`} />
             </button>
           </div>
           {/* Navigation (scrollable) */}
-          <nav className="p-4 flex-1 overflow-y-auto">
+          <nav className="px-4 py-6 flex-1 overflow-y-auto">
             <div className="mb-6">
-              <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Menu principal</h3>
-              <ul className="space-y-2">
+              <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
+              <ul className="space-y-1">
                 {navItems.map((item, index) => (
                   <li key={index}>
                     <Link 
                       href={item.href}
                       className={`
-                        flex items-center px-4 py-3 rounded-lg transition-colors
+                        flex items-center px-3 py-2.5 rounded-lg transition-colors
                         ${isActive(item.href) 
-                          ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
-                          : 'text-gray-600 hover:bg-gray-100'
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600` 
+                          : `${textSecondary} ${hoverBg}`
                         }
                       `}
                       onClick={onToggle}
@@ -133,8 +158,8 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             </div>
           </nav>
           {/* Footer (pinned) */}
-          <div className="p-4 border-t border-gray-200 flex-shrink-0">
-            <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
+          <div className={`p-4 border-t ${borderColor} flex-shrink-0`}>
+            <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4`}>Administration</h3>
             <ul className="space-y-2">
               {adminItems.map((item, index) => (
                 <li key={index}>
@@ -188,36 +213,28 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   return (
     <>
       <aside className={`
-        fixed top-0 left-0 bottom-0 bg-white border-r border-gray-200 pt-16 z-30
+        fixed top-0 left-0 bottom-0 ${bgColor} border-r ${borderColor} pt-16 z-30
         transition-all duration-300 ease-in-out
         ${isOpen ? 'w-64' : 'w-16'}
       `}>
         <div className="flex h-full flex-col">
-          {/* Logo Section */}
-          <div className="px-4 py-4 flex items-center space-x-3 flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <School className="w-4 h-4 text-indigo-600" />
-            </div>
-            {isOpen && (
-              <span className="text-lg font-semibold text-gray-800 truncate">École ABC</span>
-            )}
-          </div>
+          {/* Logo Section - Removed */}
           {/* Navigation (scrollable) */}
-          <nav className="px-4 flex-1 overflow-y-auto">
+          <nav className="px-4 py-6 flex-1 overflow-y-auto">
             <div className="mb-6">
               {isOpen && (
-                <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Menu principal</h3>
+                <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
               )}
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {navItems.map((item, index) => (
                   <li key={index}>
                     <Link 
                       href={item.href}
                       className={`
-                        flex items-center px-4 py-3 rounded-lg transition-colors group
+                        flex items-center px-3 py-2.5 rounded-lg transition-colors group
                         ${isActive(item.href) 
-                          ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600' 
-                          : 'text-gray-600 hover:bg-gray-100'
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600` 
+                          : `${textSecondary} ${hoverBg}`
                         }
                       `}
                       title={!isOpen ? item.label : undefined}
@@ -227,7 +244,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         <span className="ml-3">{item.label}</span>
                       )}
                       {!isOpen && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
                           {item.label}
                         </div>
                       )}
@@ -238,23 +255,23 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             </div>
           </nav>
           {/* Footer (pinned) */}
-          <div className="px-4 py-3 border-t border-gray-200 flex-shrink-0">
+          <div className={`px-4 py-4 border-t ${borderColor} flex-shrink-0`}>
             {isOpen && (
-              <h3 className="text-xs uppercase font-semibold text-gray-500 mb-4">Administration</h3>
+              <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-3 px-2`}>Administration</h3>
             )}
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {adminItems.map((item, index) => (
                 <li key={index}>
                   {"key" in item && item.key === "logout" ? (
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors w-full text-left group"
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors w-full text-left group`}
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       {isOpen && <span className="ml-3">{item.label}</span>}
                       {!isOpen && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
                           {item.label}
                         </div>
                       )}
@@ -262,13 +279,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   ) : (
                     <Link 
                       href={(item as { href: string }).href}
-                      className="flex items-center px-4 py-3 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors group"
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors group`}
                       title={!isOpen ? item.label : undefined}
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       {isOpen && <span className="ml-3">{item.label}</span>}
                       {!isOpen && (
-                        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
                           {item.label}
                         </div>
                       )}

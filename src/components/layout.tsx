@@ -13,8 +13,28 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true) // Par défaut ouvert sur desktop
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
+  const [theme, setTheme] = useState<"light" | "dark">("light")
 
   useEffect(() => {
+    // Charger le thème depuis localStorage
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
+    if (savedTheme) {
+      setTheme(savedTheme)
+      document.documentElement.classList.toggle("dark", savedTheme === "dark")
+    }
+
+    // Écouter les changements de thème
+    const handleThemeChange = () => {
+      const currentTheme = localStorage.getItem("theme") as "light" | "dark" | null
+      if (currentTheme) {
+        setTheme(currentTheme)
+        document.documentElement.classList.toggle("dark", currentTheme === "dark")
+      }
+    }
+
+    window.addEventListener("storage", handleThemeChange)
+    window.addEventListener("themeChange", handleThemeChange)
+
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
@@ -30,7 +50,11 @@ export default function Layout({ children }: LayoutProps) {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     
-    return () => window.removeEventListener('resize', checkMobile)
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      window.removeEventListener('storage', handleThemeChange)
+      window.removeEventListener('themeChange', handleThemeChange)
+    }
   }, [])
 
   // Fetch role from server cookie or fallback to localStorage
@@ -61,8 +85,8 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-  <Header onSidebarToggle={toggleSidebar} role={role} />
+    <div className={`min-h-screen transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
+      <Header onSidebarToggle={toggleSidebar} role={role} />
       <Sidebar 
         isOpen={sidebarOpen} 
         onToggle={toggleSidebar}
