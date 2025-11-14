@@ -8,63 +8,60 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  name      String
-  email     String    @unique
-  password  String
-  role      User_role @default(ELEVE)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  name              String
+  email             String    @unique
+  password          String
+  role              User_role @default(ELEVE)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  nom               String?
+  prenom            String?
+  telephone         String?
+  fonction          String?
+  schoolId          Int?
+  dateCreation      DateTime? @default(now())
+  temporaryPassword Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  createdSchools    School[]  @relation("SchoolsCreated")
+  student           Student?
+  teacher           Teacher?
+  school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
 
-  student        Student?
-  teacher        Teacher?
-  createdSchools School[] @relation("SchoolsCreated")
-}
-
-enum User_role {
-  ADMIN
-  ELEVE
-  COMPTABLE
-  PROFESSEUR
-  DIRECTEUR_DISCIPLINE
-  DIRECTEUR_ETUDES
-  SUPER_ADMIN
+  @@index([schoolId])
 }
 
 model AcademicYear {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  current   Boolean   @default(false)
-  startDate DateTime?
-  endDate   DateTime?
-
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  current     Boolean      @default(false)
+  startDate   DateTime?
+  endDate     DateTime?
   enrollments Enrollment[]
 }
 
 model Class {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  level     String
-  section   String
-  letter    String
-  stream    String?
-  createdAt DateTime @default(now())
-
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  level       String
+  createdAt   DateTime     @default(now())
+  letter      String
+  section     String
+  stream      String?
   enrollments Enrollment[]
 }
 
 model Student {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique
-  code       String   @unique
-  lastName   String
-  middleName String
-  firstName  String
-  gender     String
-  birthDate  DateTime
-
-  user        User         @relation(fields: [userId], references: [id])
+  id          Int          @id @default(autoincrement())
+  userId      Int          @unique
+  code        String       @unique
+  lastName    String
+  middleName  String
+  firstName   String
+  gender      String
+  birthDate   DateTime
   enrollments Enrollment[]
+  user        User         @relation(fields: [userId], references: [id])
 }
 
 model Teacher {
@@ -78,8 +75,7 @@ model Teacher {
   specialty  String?
   phone      String?
   hiredAt    DateTime? @default(now())
-
-  user User @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
 }
 
 model Enrollment {
@@ -89,12 +85,98 @@ model Enrollment {
   yearId     Int
   status     EnrollmentStatus @default(ACTIVE)
   exitReason String?
-
-  student Student      @relation(fields: [studentId], references: [id])
-  class   Class        @relation(fields: [classId], references: [id])
-  year    AcademicYear @relation(fields: [yearId], references: [id])
+  class      Class            @relation(fields: [classId], references: [id])
+  student    Student          @relation(fields: [studentId], references: [id])
+  year       AcademicYear     @relation(fields: [yearId], references: [id])
 
   @@unique([studentId, classId, yearId])
+  @@index([classId], map: "Enrollment_classId_fkey")
+  @@index([yearId], map: "Enrollment_yearId_fkey")
+}
+
+model School {
+  id                          Int               @id @default(autoincrement())
+  nomEtablissement            String
+  typeEtablissement           TypeEtablissement @default(PRIVE)
+  niveauEnseignement          String?           @db.LongText
+  codeEtablissement           String?           @unique
+  anneeCreation               Int?
+  slogan                      String?
+  logoUrl                     String?
+  statutJuridique             String?
+  rccm                        String?
+  idNat                       String?
+  nif                         String?
+  agrementMinisteriel         String?
+  dateAgrement                DateTime?
+  ministereTutelle            String?
+  statutsReglements           String?
+  responsableLegal            String?
+  pieceIdentiteResponsable    String?
+  adresse                     String
+  ville                       String
+  province                    String
+  pays                        String            @default("RDC")
+  telephone                   String
+  email                       String
+  siteWeb                     String?
+  directeurNom                String
+  directeurTelephone          String
+  directeurEmail              String?
+  secretaireAcademique        String?
+  comptable                   String?
+  personnelAdministratifTotal Int?
+  cycles                      String?
+  nombreClasses               Int?
+  nombreEleves                Int?
+  nombreEnseignants           Int?
+  langueEnseignement          String?
+  programmes                  String?
+  calendrierScolaire          String?           @db.LongText
+  joursOuverture              String?
+  domaine                     String?
+  identifiantInterne          String            @unique @default(uuid())
+  etatCompte                  EtatCompte        @default(EN_ATTENTE)
+  dateInscription             DateTime          @default(now())
+  derniereMiseAJour           DateTime          @updatedAt
+  creeParId                   Int?
+  modifieParId                Int?
+  dateCreation                DateTime          @default(now())
+  dateModification            DateTime          @updatedAt
+  dateFinAbonnement           DateTime?
+  periodeAbonnement           String?
+  planAbonnement              String?
+  createdBy                   User?             @relation("SchoolsCreated", fields: [creeParId], references: [id])
+  admins                      User[]            @relation("SchoolAdmins")
+
+  @@index([codeEtablissement])
+  @@index([email])
+  @@index([creeParId], map: "School_creeParId_fkey")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  type      NotificationType
+  message   String           @db.Text
+  schoolId  Int?
+  userId    Int?
+  isRead    Boolean          @default(false)
+  daysLeft  Int?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([schoolId, isRead])
+  @@index([createdAt])
+}
+
+enum User_role {
+  ADMIN
+  ELEVE
+  COMPTABLE
+  PROFESSEUR
+  DIRECTEUR_DISCIPLINE
+  DIRECTEUR_ETUDES
+  SUPER_ADMIN
 }
 
 enum EnrollmentStatus {
@@ -103,83 +185,6 @@ enum EnrollmentStatus {
   GRADUATED
   DROPPED_OUT
   EXPELLED
-}
-
-// New: Schools managed by SUPER_ADMIN
-model School {
-  id          Int      @id @default(autoincrement())
-  
-  // Informations générales
-  nomEtablissement     String
-  typeEtablissement    TypeEtablissement @default(PRIVE)
-  niveauEnseignement   Json? // String[]
-  codeEtablissement    String?  @unique
-  anneeCreation        Int?
-  slogan               String?
-  logoUrl              String?
-  statutJuridique      String?
-  
-  // Informations légales
-  rccm                     String?
-  idNat                    String?
-  nif                      String?
-  agrementMinisteriel      String?
-  dateAgrement             DateTime?
-  ministereTutelle         String?
-  statutsReglements        String? // lien PDF
-  responsableLegal         String?
-  pieceIdentiteResponsable String?
-  
-  // Localisation
-  adresse     String
-  ville       String
-  province    String
-  pays        String @default("RDC")
-  telephone   String
-  email       String
-  siteWeb     String?
-  
-  // Direction
-  directeurNom              String
-  directeurTelephone        String
-  directeurEmail            String?
-  secretaireAcademique      String?
-  comptable                 String?
-  personnelAdministratifTotal Int?
-  
-  // Académique
-  cycles                String? // JSON array
-  nombreClasses         Int?
-  nombreEleves          Int?
-  nombreEnseignants     Int?
-  langueEnseignement    String?
-  programmes            String?
-  calendrierScolaire    Json? // {dateDebut, dateFin}
-  joursOuverture        String?
-  
-  // Paramètres système
-  domaine              String?
-  identifiantInterne   String   @unique @default(uuid())
-  etatCompte           EtatCompte @default(EN_ATTENTE)
-  dateInscription      DateTime @default(now())
-  derniereMiseAJour    DateTime @updatedAt
-  
-  // Abonnement
-  planAbonnement       String?
-  periodeAbonnement    String?
-  dateFinAbonnement    DateTime?
-  
-  // Historique
-  creeParId       Int?
-  modifieParId    Int?
-  dateCreation    DateTime @default(now())
-  dateModification DateTime @updatedAt
-  
-  // Relations
-  createdBy User? @relation("SchoolsCreated", fields: [creeParId], references: [id])
-  
-  @@index([codeEtablissement])
-  @@index([email])
 }
 
 enum TypeEtablissement {
@@ -192,4 +197,13 @@ enum EtatCompte {
   ACTIF
   EN_ATTENTE
   SUSPENDU
+}
+
+enum NotificationType {
+  SUBSCRIPTION_EXPIRING_15_DAYS
+  SUBSCRIPTION_EXPIRING_10_DAYS
+  SUBSCRIPTION_EXPIRING_5_DAYS
+  SUBSCRIPTION_EXPIRING_2_DAYS
+  SUBSCRIPTION_EXPIRING_1_DAY
+  SUBSCRIPTION_EXPIRED
 }

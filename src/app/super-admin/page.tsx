@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
+import NotificationsSection from "@/components/notifications-section"
 
 type School = { 
   id: number; 
@@ -30,6 +31,7 @@ export default function SuperAdminHome() {
   const [activeTab, setActiveTab] = useState("stats")
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [modalMounted, setModalMounted] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
@@ -96,11 +98,55 @@ export default function SuperAdminHome() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [initialFormData, setInitialFormData] = useState<typeof form | null>(null)
+  const [stats, setStats] = useState({
+    totalSchools: 0,
+    activeSchools: 0,
+    suspendedSchools: 0,
+    totalUsers: 0,
+    totalTeachers: 0,
+    totalStudents: 0,
+    totalAdmins: 0,
+    totalClasses: 0,
+    recentSchools: 0,
+    schoolsGrowth: "0",
+    monthlyRevenue: 0,
+    revenueChange: "0",
+    schoolsByType: [] as { type: string, count: number }[],
+    schoolsByProvince: [] as { province: string, count: number }[],
+    unreadNotifications: 0,
+    subscriptionsByPlan: { Basic: 0, Premium: 0, Enterprise: 0 }
+  })
   const [hasChanges, setHasChanges] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [isEditTransitioning, setIsEditTransitioning] = useState(false)
   const [isDetailsTransitioning, setIsDetailsTransitioning] = useState(false)
+  
+  // States pour les administrateurs
+  const [admins, setAdmins] = useState<any[]>([])
+  const [loadingAdmins, setLoadingAdmins] = useState(false)
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
+  const [adminModalMounted, setAdminModalMounted] = useState(false)
+  const [adminModalVisible, setAdminModalVisible] = useState(false)
+  const [adminForm, setAdminForm] = useState({
+    schoolId: "",
+    nom: "",
+    prenom: "",
+    email: "",
+    telephone: "",
+    fonction: "Directeur"
+  })
+  const [generatedCredentials, setGeneratedCredentials] = useState<{email: string, password: string} | null>(null)
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false)
+  const [showAdminSuccess, setShowAdminSuccess] = useState(false)
+  const [creatingAdmin, setCreatingAdmin] = useState(false)
+  const [togglingAdmin, setTogglingAdmin] = useState<number | null>(null)
+  
+  // États pour la recherche, tri et pagination des admins
+  const [adminSearchQuery, setAdminSearchQuery] = useState("")
+  const [adminFilterSchool, setAdminFilterSchool] = useState("all")
+  const [adminCurrentPage, setAdminCurrentPage] = useState(1)
+  const adminsPerPage = 10
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -144,8 +190,15 @@ export default function SuperAdminHome() {
   }
 
   useEffect(() => {
-    loadSchools()
-    loadUser()
+    const initData = async () => {
+      const userData = await loadUser()
+      if (userData) {
+        loadSchools()
+        loadStats()
+        loadAdmins()
+      }
+    }
+    initData()
   }, [])
 
   const loadUser = async () => {
@@ -156,11 +209,157 @@ export default function SuperAdminHome() {
       if (res.ok) {
         const data = await res.json()
         setUser(data.user)
+        return data.user
+      } else {
+        // Si non autorisé, rediriger vers la page de login
+        router.push('/super-admin/login')
+        return null
+      }
+    } catch (e) {
+      console.error(e)
+      return null
+    }
+  }
+
+  const loadStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats', {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const text = await res.text()
+        if (text) {
+          const data = JSON.parse(text)
+          setStats(data)
+        }
+      }
+    } catch (e) {
+      console.error('Erreur lors du chargement des stats:', e)
+      // Garder les valeurs par défaut en cas d'erreur
+    }
+  }
+
+  // Charger les administrateurs d'écoles
+  const loadAdmins = async () => {
+    try {
+      setLoadingAdmins(true)
+      const res = await fetch('/api/super-admin/admins', {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAdmins(data.admins || [])
+      } else {
+        console.error('Erreur API admins:', res.status, await res.text())
+        setAdmins([])
+      }
+    } catch (e) {
+      console.error('Erreur lors du chargement des admins:', e)
+      setAdmins([])
+    } finally {
+      setLoadingAdmins(false)
+    }
+  }
+
+  // Activer/Désactiver un administrateur
+  const handleToggleAdmin = async (adminId: number, newStatus: boolean) => {
+    try {
+      setTogglingAdmin(adminId)
+      const res = await fetch(`/api/super-admin/admins/${adminId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ isActive: newStatus })
+      })
+      
+      if (res.ok) {
+        // Recharger la liste des admins pour voir le changement
+        await loadAdmins()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.error('Erreur lors du toggle admin:', data.error || res.statusText)
+        setError(data.error || 'Impossible de modifier le statut de l\'administrateur')
+      }
+    } catch (e: any) {
+      console.error('Erreur toggle admin:', e)
+      setError('Une erreur est survenue lors de la modification du statut')
+    } finally {
+      setTogglingAdmin(null)
+    }
+  }
+
+  // Créer un administrateur d'école
+  const handleCreateAdmin = async () => {
+    try {
+      setCreatingAdmin(true)
+      setError("")
+
+      // Validation
+      if (!adminForm.schoolId || !adminForm.nom || !adminForm.prenom || !adminForm.email) {
+        setError("Veuillez remplir tous les champs obligatoires")
+        return
+      }
+
+      const res = await fetch('/api/super-admin/admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(adminForm)
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setGeneratedCredentials({
+          email: data.email,
+          password: data.password
+        })
+        setShowCreateAdminModal(false)
+        
+        // Afficher le modal de succès avec confettis
+        setShowAdminSuccess(true)
+        
+        // Après 3 secondes, fermer le succès et montrer les identifiants
+        setTimeout(() => {
+          setShowAdminSuccess(false)
+          setTimeout(() => {
+            setShowCredentialsModal(true)
+          }, 300)
+        }, 3000)
+        
+        loadAdmins()
+      } else {
+        setError(data.error || "Erreur lors de la création")
+      }
+    } catch (e) {
+      console.error(e)
+      setError("Une erreur est survenue")
+    } finally {
+      setCreatingAdmin(false)
+    }
+  }
+
+  // Charger le compteur de notifications
+  const loadUnreadCount = async () => {
+    try {
+      const res = await fetch('/api/notifications/count', {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUnreadNotifications(data.count)
       }
     } catch (e) {
       console.error(e)
     }
   }
+
+  // Charger le compteur au démarrage et toutes les 5 minutes
+  useEffect(() => {
+    loadUnreadCount()
+    const interval = setInterval(loadUnreadCount, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Fermer le menu utilisateur quand on clique dehors
   useEffect(() => {
@@ -254,6 +453,30 @@ export default function SuperAdminHome() {
     }, 220)
     return () => clearTimeout(t)
   }, [showCreateModal])
+
+  // Animation pour le modal admin
+  useEffect(() => {
+    if (showCreateAdminModal) {
+      setAdminModalMounted(true)
+      const t = setTimeout(() => setAdminModalVisible(true), 10)
+      return () => clearTimeout(t)
+    } else {
+      setAdminModalVisible(false)
+      const t = setTimeout(() => {
+        setAdminModalMounted(false)
+        // Réinitialiser le formulaire
+        setAdminForm({
+          schoolId: "",
+          nom: "",
+          prenom: "",
+          email: "",
+          telephone: "",
+          fonction: "Directeur"
+        })
+      }, 220)
+      return () => clearTimeout(t)
+    }
+  }, [showCreateAdminModal])
 
   // Détecter les changements dans le formulaire d'édition
   useEffect(() => {
@@ -856,15 +1079,44 @@ export default function SuperAdminHome() {
   const tabs = [
     { id: "stats", label: "Statistiques Générales" },
     { id: "schools", label: "Gestion des Écoles" },
+    { id: "admins", label: "Administrateurs d'Écoles" },
     { id: "users", label: "Gestion des Utilisateurs" },
     { id: "notifications", label: "Notifications" }
   ]
 
-  const stats = [
-    { label: "Écoles totales", value: schools.length.toLocaleString(), change: "+4%", trend: "up", icon: Building2 },
-    { label: "Abonnements actifs", value: "980", change: "+2.1%", trend: "up", icon: CreditCard },
-    { label: "Utilisateurs totaux", value: "15,689", change: "+8.6%", trend: "up", icon: Users },
-    { label: "Revenu mensuel", value: "€25,400", change: "-1.5%", trend: "down", icon: DollarSign },
+  const statsCards = [
+    { 
+      label: "Écoles totales", 
+      value: stats.totalSchools.toLocaleString(), 
+      change: `+${stats.schoolsGrowth}%`, 
+      trend: parseFloat(stats.schoolsGrowth) >= 0 ? "up" : "down", 
+      icon: Building2,
+      subtitle: `${stats.activeSchools} actives`
+    },
+    { 
+      label: "Utilisateurs totaux", 
+      value: stats.totalUsers.toLocaleString(), 
+      change: `${stats.totalStudents} élèves`, 
+      trend: "up", 
+      icon: Users,
+      subtitle: `${stats.totalTeachers} enseignants`
+    },
+    { 
+      label: "Classes", 
+      value: stats.totalClasses.toLocaleString(), 
+      change: `${stats.totalAdmins} admins`, 
+      trend: "up", 
+      icon: GraduationCap,
+      subtitle: "Toutes les écoles"
+    },
+    { 
+      label: "Revenu mensuel", 
+      value: `€${stats.monthlyRevenue.toLocaleString()}`, 
+      change: `${parseFloat(stats.revenueChange) >= 0 ? "+" : ""}${stats.revenueChange}%`, 
+      trend: parseFloat(stats.revenueChange) >= 0 ? "up" : "down", 
+      icon: DollarSign,
+      subtitle: `${stats.suspendedSchools} suspendues`
+    },
   ]
 
   // Thème colors
@@ -925,9 +1177,22 @@ export default function SuperAdminHome() {
           {/* Section droite : Utilisateur et notifications */}
           <div className="flex-1 flex items-center justify-end gap-4 pb-4">
             {/* Notification */}
-            <button className={`relative p-2 ${notificationBg} rounded-lg transition-colors`}>
-              <Bell className={`w-5 h-5 ${textSecondary}`} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full"></span>
+            <button 
+              onClick={() => {
+                setIsTransitioning(true)
+                setTimeout(() => {
+                  setActiveTab("notifications")
+                  setTimeout(() => setIsTransitioning(false), 10)
+                }, 150)
+              }}
+              className={`relative p-2 ${notificationBg} rounded-lg transition-colors`}
+            >
+              <Bell className={`w-5 h-5 ${unreadNotifications > 0 ? 'text-yellow-400 animate-pulse' : textSecondary}`} />
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-bounce">
+                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                </span>
+              )}
             </button>
 
             {/* Utilisateur */}
@@ -1023,20 +1288,35 @@ export default function SuperAdminHome() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map((stat, i) => (
-          <div key={i} className={`${cardBg} rounded-xl p-5 border ${borderColor} shadow-sm`}>
+        {statsCards.map((stat, i) => (
+          <div key={i} className={`${cardBg} rounded-xl p-5 border ${borderColor} shadow-sm hover:shadow-md transition-shadow`}>
             <div className="flex items-center justify-between mb-3">
-              <span className={`${textSecondary} text-sm`}>{stat.label}</span>
-              <stat.icon className={`w-5 h-5 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`} />
+              <span className={`${textSecondary} text-sm font-medium`}>{stat.label}</span>
+              <stat.icon className={`w-5 h-5 ${
+                stat.label === "Revenu mensuel" 
+                  ? theme === "dark" ? "text-green-400" : "text-green-500"
+                  : theme === "dark" ? "text-blue-400" : "text-blue-500"
+              }`} />
             </div>
-            <div className="flex items-end justify-between">
-              <div className={`text-3xl font-bold ${textColor}`}>{stat.value}</div>
-              <div className={`flex items-center gap-1 text-sm font-medium ${
-                stat.trend === "up" ? "text-green-500" : "text-red-500"
-              }`}>
-                {stat.trend === "up" ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                {stat.change}
-              </div>
+            <div className={`text-3xl font-bold ${textColor} mb-2`}>{stat.value}</div>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs ${textSecondary}`}>{stat.subtitle}</span>
+              {stat.label === "Revenu mensuel" ? (
+                <span className={`text-xs font-medium flex items-center gap-1 ${
+                  stat.trend === "up" ? "text-green-500" : "text-red-500"
+                }`}>
+                  {stat.trend === "down" && (
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  {stat.change}
+                </span>
+              ) : (
+                <span className={`text-xs font-medium ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  {stat.change}
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -1048,13 +1328,22 @@ export default function SuperAdminHome() {
         <div className={`lg:col-span-2 ${cardBg} rounded-xl p-6 border ${borderColor} shadow-sm`}>
           <h3 className={`text-lg font-semibold mb-1 ${textColor}`}>Évolution des abonnements</h3>
           <div className="flex items-baseline gap-2 mb-6">
-            <span className={`text-3xl font-bold ${textColor}`}>980</span>
-            <span className="text-green-500 text-sm font-medium">Actifs +2.1%</span>
+            <span className={`text-3xl font-bold ${textColor}`}>{stats.activeSchools}</span>
+            <span className="text-green-500 text-sm font-medium">Actifs {parseFloat(stats.schoolsGrowth) >= 0 ? "+" : ""}{stats.schoolsGrowth}%</span>
             <span className={`${textSecondary} text-sm`}>sur les 30 derniers jours</span>
           </div>
           <div className="h-48 flex items-end justify-between gap-2">
             {[65, 85, 75, 95, 70, 80, 90, 75, 85, 95, 80, 90, 85, 95, 75, 85, 95, 85, 75, 95].map((height, i) => (
-              <div key={i} className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t" style={{ height: `${height}%` }} />
+              <div 
+                key={i} 
+                className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-700 ease-out hover:from-blue-600 hover:to-blue-500 cursor-pointer" 
+                style={{ 
+                  height: `${height}%`,
+                  animation: `growBar 0.8s ease-out ${i * 0.05}s forwards`,
+                  transform: 'scaleY(0)',
+                  transformOrigin: 'bottom'
+                }} 
+              />
             ))}
           </div>
         </div>
@@ -1064,38 +1353,141 @@ export default function SuperAdminHome() {
           <h3 className={`text-lg font-semibold mb-6 ${textColor}`}>Répartition par formule</h3>
           <div className="flex items-center justify-center mb-6">
             <div className="relative w-40 h-40">
-              <svg className="w-full h-full -rotate-90">
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#3b82f6" strokeWidth="20" strokeDasharray="175 440" />
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#a855f7" strokeWidth="20" strokeDasharray="220 440" strokeDashoffset="-175" />
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#ec4899" strokeWidth="20" strokeDasharray="45 440" strokeDashoffset="-395" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className={`text-3xl font-bold ${textColor}`}>{schools.length.toLocaleString()}</div>
+              {(() => {
+                const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
+                const basicPercent = total > 0 ? (stats.subscriptionsByPlan.Basic / total) * 100 : 40
+                const premiumPercent = total > 0 ? (stats.subscriptionsByPlan.Premium / total) * 100 : 35
+                const enterprisePercent = total > 0 ? (stats.subscriptionsByPlan.Enterprise / total) * 100 : 25
+                
+                const circumference = 440
+                const basicDash = (basicPercent / 100) * circumference
+                const premiumDash = (premiumPercent / 100) * circumference
+                const enterpriseDash = (enterprisePercent / 100) * circumference
+                
+                return (
+                  <svg className="w-full h-full -rotate-90">
+                    {/* Background circles */}
+                    <circle cx="80" cy="80" r="70" fill="none" stroke={theme === "dark" ? "#1a2332" : "#f3f4f6"} strokeWidth="20" />
+                    
+                    {/* Animated circles avec transitions - SANS strokeLinecap pour garder les bords carrés */}
+                    <circle 
+                      cx="80" 
+                      cy="80" 
+                      r="70" 
+                      fill="none" 
+                      stroke="#3b82f6" 
+                      strokeWidth="20" 
+                      strokeDasharray={`${basicDash} ${circumference}`}
+                      className="transition-all duration-1000 ease-out"
+                      style={{
+                        animation: 'drawCircle 1.5s ease-out forwards'
+                      }}
+                    />
+                    <circle 
+                      cx="80" 
+                      cy="80" 
+                      r="70" 
+                      fill="none" 
+                      stroke="#a855f7" 
+                      strokeWidth="20" 
+                      strokeDasharray={`${premiumDash} ${circumference}`} 
+                      strokeDashoffset={`-${basicDash}`}
+                      className="transition-all duration-1000 ease-out"
+                      style={{
+                        animation: 'drawCircle 1.5s ease-out 0.2s forwards',
+                        opacity: 0,
+                        animationFillMode: 'forwards'
+                      }}
+                    />
+                    <circle 
+                      cx="80" 
+                      cy="80" 
+                      r="70" 
+                      fill="none" 
+                      stroke="#ec4899" 
+                      strokeWidth="20" 
+                      strokeDasharray={`${enterpriseDash} ${circumference}`} 
+                      strokeDashoffset={`-${basicDash + premiumDash}`}
+                      className="transition-all duration-1000 ease-out"
+                      style={{
+                        animation: 'drawCircle 1.5s ease-out 0.4s forwards',
+                        opacity: 0,
+                        animationFillMode: 'forwards'
+                      }}
+                    />
+                  </svg>
+                )
+              })()}
+              <div className="absolute inset-0 flex flex-col items-center justify-center animate-fadeIn">
+                <div className={`text-3xl font-bold ${textColor}`}>{stats.activeSchools > 0 ? stats.activeSchools.toLocaleString() : schools.length.toLocaleString()}</div>
                 <div className={`text-xs ${textSecondary}`}>Écoles</div>
               </div>
             </div>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-blue-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span className={textSecondary}>Basic (40%)</span>
+                <div className="w-3 h-3 rounded-full bg-blue-500 group-hover:scale-110 transition-transform"></div>
+                <span className={textSecondary}>Basic ({(() => {
+                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Basic / total) * 100) : 40
+                })()}%)</span>
               </div>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Basic}</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-purple-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                <span className={textSecondary}>Premium (35%)</span>
+                <div className="w-3 h-3 rounded-full bg-purple-500 group-hover:scale-110 transition-transform"></div>
+                <span className={textSecondary}>Premium ({(() => {
+                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Premium / total) * 100) : 35
+                })()}%)</span>
               </div>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Premium}</span>
             </div>
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-pink-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-                <span className={textSecondary}>Enterprise (25%)</span>
+                <div className="w-3 h-3 rounded-full bg-pink-500 group-hover:scale-110 transition-transform"></div>
+                <span className={textSecondary}>Enterprise ({(() => {
+                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Enterprise / total) * 100) : 25
+                })()}%)</span>
               </div>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Enterprise}</span>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Types d'établissements */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {stats.schoolsByType.map((item, i) => {
+          const colors = [
+            { bg: "bg-blue-500/10", text: "text-blue-500", border: "border-blue-500/20" },
+            { bg: "bg-green-500/10", text: "text-green-500", border: "border-green-500/20" },
+            { bg: "bg-purple-500/10", text: "text-purple-500", border: "border-purple-500/20" }
+          ]
+          const color = colors[i % colors.length]
+          const percentage = stats.totalSchools > 0 ? ((item.count / stats.totalSchools) * 100).toFixed(1) : 0
+          
+          return (
+            <div key={i} className={`${cardBg} rounded-xl p-5 border ${borderColor} shadow-sm`}>
+              <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${color.bg} border ${color.border} mb-3`}>
+                <Building2 className={`w-4 h-4 ${color.text}`} />
+                <span className={`text-sm font-medium ${color.text}`}>{item.type}</span>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className={`text-3xl font-bold ${textColor}`}>{item.count}</div>
+                  <div className={`text-sm ${textSecondary} mt-1`}>{percentage}% du total</div>
+                </div>
+                <div className={`w-16 h-16 rounded-lg ${color.bg} flex items-center justify-center`}>
+                  <span className={`text-2xl font-bold ${color.text}`}>{percentage}%</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Recent Schools Table */}
@@ -1378,6 +1770,246 @@ export default function SuperAdminHome() {
         </div>
       )}
 
+      {/* Admins Tab */}
+      {activeTab === "admins" && (() => {
+        // Filtrage des admins
+        let filteredAdmins = admins.filter(admin => {
+          // Filtre par recherche
+          const searchLower = adminSearchQuery.toLowerCase()
+          const matchesSearch = !adminSearchQuery || 
+            admin.nom?.toLowerCase().includes(searchLower) ||
+            admin.prenom?.toLowerCase().includes(searchLower) ||
+            admin.email.toLowerCase().includes(searchLower) ||
+            admin.telephone?.toLowerCase().includes(searchLower)
+          
+          // Filtre par école
+          const matchesSchool = adminFilterSchool === "all" || 
+            admin.schoolId === parseInt(adminFilterSchool)
+          
+          return matchesSearch && matchesSchool
+        })
+
+        // Pagination
+        const totalPages = Math.ceil(filteredAdmins.length / adminsPerPage)
+        const startIndex = (adminCurrentPage - 1) * adminsPerPage
+        const endIndex = startIndex + adminsPerPage
+        const paginatedAdmins = filteredAdmins.slice(startIndex, endIndex)
+
+        return (
+        <div>
+          {/* Header avec bouton */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className={`text-2xl font-bold ${textColor}`}>Administrateurs d'Écoles</h2>
+              <p className={`${textSecondary} text-sm mt-1`}>Gérez les administrateurs et leurs identifiants de connexion</p>
+            </div>
+            <button
+              onClick={() => setShowCreateAdminModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Créer un administrateur
+            </button>
+          </div>
+
+          {/* Barre de recherche et filtres */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            {/* Barre de recherche */}
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par nom, email ou téléphone..."
+                  value={adminSearchQuery}
+                  onChange={(e) => {
+                    setAdminSearchQuery(e.target.value)
+                    setAdminCurrentPage(1) // Reset à la page 1 lors d'une recherche
+                  }}
+                  className={`w-full pl-10 pr-4 py-2.5 ${cardBg} border ${borderColor} rounded-lg ${textColor} placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+              </div>
+            </div>
+
+            {/* Filtre par école */}
+            <div className="md:w-64">
+              <select
+                value={adminFilterSchool}
+                onChange={(e) => {
+                  setAdminFilterSchool(e.target.value)
+                  setAdminCurrentPage(1) // Reset à la page 1 lors d'un filtrage
+                }}
+                className={`w-full px-4 py-2.5 ${cardBg} border ${borderColor} rounded-lg ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              >
+                <option value="all">Toutes les écoles</option>
+                {schools.map(school => (
+                  <option key={school.id} value={school.id}>
+                    {school.nomEtablissement}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Liste des administrateurs */}
+          <div className={`${cardBg} rounded-xl border ${borderColor} overflow-hidden shadow-sm`}>
+            <table className="w-full">
+              <thead className={theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"}>
+                <tr className={`text-left text-sm ${textSecondary}`}>
+                  <th className="px-6 py-4 font-medium">Administrateur</th>
+                  <th className="px-6 py-4 font-medium">École</th>
+                  <th className="px-6 py-4 font-medium">Email</th>
+                  <th className="px-6 py-4 font-medium">Téléphone</th>
+                  <th className="px-6 py-4 font-medium">Statut</th>
+                  <th className="px-6 py-4 font-medium text-center">Activer/Désactiver</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {loadingAdmins ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span className={textSecondary}>Chargement...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredAdmins.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center">
+                      <UserCheck className={`w-12 h-12 ${textSecondary} mx-auto mb-3 opacity-50`} />
+                      <p className={`${textSecondary} text-sm`}>
+                        {adminSearchQuery || adminFilterSchool !== "all" 
+                          ? "Aucun administrateur ne correspond aux critères de recherche" 
+                          : "Aucun administrateur créé"}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedAdmins.map((admin) => (
+                    <tr key={admin.id} className={`${hoverBg} transition-colors`}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full ${theme === "dark" ? "bg-blue-500/20" : "bg-blue-100"} flex items-center justify-center`}>
+                            <span className={`text-sm font-semibold ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>
+                              {admin.prenom?.[0]}{admin.nom?.[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <div className={`font-medium ${textColor}`}>{admin.prenom} {admin.nom}</div>
+                            <div className={`text-xs ${textSecondary}`}>Administrateur</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`font-medium ${textColor}`}>{admin.school?.nomEtablissement || "N/A"}</div>
+                        <div className={`text-xs ${textSecondary}`}>{admin.school?.ville}, {admin.school?.province}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`text-sm ${textColor} font-mono`}>{admin.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className={`text-sm ${textColor}`}>{admin.telephone || "-"}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          admin.isActive
+                            ? "bg-green-500/20 text-green-400" 
+                            : "bg-red-500/20 text-red-400"
+                        }`}>
+                          {admin.isActive ? "ACTIF" : "INACTIF"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center">
+                          <button
+                            onClick={() => handleToggleAdmin(admin.id, !admin.isActive)}
+                            disabled={togglingAdmin === admin.id}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              togglingAdmin === admin.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                            }`}
+                            style={{ backgroundColor: admin.isActive ? '#10b981' : '#ef4444' }}
+                            title={admin.isActive ? 'Cliquez pour désactiver' : 'Cliquez pour activer'}
+                          >
+                            <span 
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                admin.isActive ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {filteredAdmins.length > 0 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className={`text-sm ${textSecondary}`}>
+                Affichage de {startIndex + 1} à {Math.min(endIndex, filteredAdmins.length)} sur {filteredAdmins.length} administrateur{filteredAdmins.length > 1 ? 's' : ''}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAdminCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={adminCurrentPage === 1}
+                  className={`px-4 py-2 border rounded-lg font-medium transition-colors ${
+                    adminCurrentPage === 1
+                      ? theme === "dark"
+                        ? "bg-[#21262d] border-gray-800 text-gray-600 cursor-not-allowed"
+                        : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      : theme === "dark"
+                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700 text-gray-300 hover:border-gray-600"
+                      : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  Précédent
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setAdminCurrentPage(pageNum)}
+                      className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                        adminCurrentPage === pageNum
+                          ? "bg-blue-500 text-white"
+                          : theme === "dark"
+                          ? "bg-[#21262d] hover:bg-[#30363d] border border-gray-700 text-gray-300"
+                          : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setAdminCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={adminCurrentPage === totalPages}
+                  className={`px-4 py-2 border rounded-lg font-medium transition-colors ${
+                    adminCurrentPage === totalPages
+                      ? theme === "dark"
+                        ? "bg-[#21262d] border-gray-800 text-gray-600 cursor-not-allowed"
+                        : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                      : theme === "dark"
+                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700 text-gray-300 hover:border-gray-600"
+                      : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:border-gray-400"
+                  }`}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        )
+      })()}
+
       {/* Users Tab */}
       {activeTab === "users" && (
         <div className={`${cardBg} rounded-xl border ${borderColor} p-8 text-center shadow-sm`}>
@@ -1389,11 +2021,7 @@ export default function SuperAdminHome() {
 
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
-        <div className={`${cardBg} rounded-xl border ${borderColor} p-8 text-center shadow-sm`}>
-          <Building2 className={`w-16 h-16 ${textSecondary} mx-auto mb-4`} />
-          <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>Notifications</h3>
-          <p className={textSecondary}>Cette section est en cours de développement.</p>
-        </div>
+        <NotificationsSection theme={theme} />
       )}
 
       {/* Create School Modal */}
@@ -2893,6 +3521,423 @@ export default function SuperAdminHome() {
                     </button>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal Créer un Administrateur */}
+      {adminModalMounted && (
+        <Portal>
+          <div 
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
+              adminModalVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreateAdminModal(false)} />
+            
+            <div 
+              className={`relative w-full max-w-2xl rounded-xl ${cardBg} border ${borderColor} shadow-2xl transform transition-all duration-200 max-h-[90vh] flex flex-col ${
+                adminModalVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+              }`}
+            >
+              {/* Header */}
+              <div className={`px-6 py-4 border-b ${borderColor} flex-shrink-0`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <h2 className={`text-lg font-semibold ${textColor}`}>Créer un Administrateur d'École</h2>
+                    <p className={`text-xs ${textSecondary}`}>Un mot de passe temporaire sera généré automatiquement</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content scrollable */}
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-3 py-2.5 rounded-lg text-xs flex items-center gap-2 animate-shake">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <Building2 className="w-3.5 h-3.5" />
+                      École <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={adminForm.schoolId}
+                      onChange={(e) => {
+                        const selectedSchoolId = e.target.value
+                        const selectedSchool = schools.find(s => s.id.toString() === selectedSchoolId)
+                        
+                        // Générer l'email automatiquement
+                        let newEmail = adminForm.email
+                        if (selectedSchool && adminForm.prenom) {
+                          const schoolDomain = selectedSchool.nomEtablissement
+                            .toLowerCase()
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "") // Retirer les accents
+                            .replace(/[^a-z0-9]/g, "") // Garder que lettres et chiffres
+                            .slice(0, 20)
+                          
+                          const prenomNormalized = adminForm.prenom
+                            .toLowerCase()
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "")
+                            .replace(/[^a-z0-9]/g, "")
+                          
+                          newEmail = `${prenomNormalized}@${schoolDomain}.com`
+                        }
+                        
+                        setAdminForm({ 
+                          ...adminForm, 
+                          schoolId: selectedSchoolId,
+                          email: newEmail
+                        })
+                      }}
+                      className={`h-9 text-sm w-full ${inputBg} border ${borderColor} rounded-lg px-3 ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    >
+                      <option value="">Sélectionner une école</option>
+                      {schools.map(school => (
+                        <option key={school.id} value={school.id}>{school.nomEtablissement}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <User className="w-3.5 h-3.5" />
+                      Prénom <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={adminForm.prenom}
+                      onChange={(e) => {
+                        const newPrenom = e.target.value
+                        
+                        // Régénérer l'email si une école est sélectionnée
+                        let newEmail = adminForm.email
+                        if (adminForm.schoolId && newPrenom) {
+                          const selectedSchool = schools.find(s => s.id.toString() === adminForm.schoolId)
+                          if (selectedSchool) {
+                            const schoolDomain = selectedSchool.nomEtablissement
+                              .toLowerCase()
+                              .normalize("NFD")
+                              .replace(/[\u0300-\u036f]/g, "")
+                              .replace(/[^a-z0-9]/g, "")
+                              .slice(0, 20)
+                            
+                            const prenomNormalized = newPrenom
+                              .toLowerCase()
+                              .normalize("NFD")
+                              .replace(/[\u0300-\u036f]/g, "")
+                              .replace(/[^a-z0-9]/g, "")
+                            
+                            newEmail = `${prenomNormalized}@${schoolDomain}.com`
+                          }
+                        }
+                        
+                        setAdminForm({ 
+                          ...adminForm, 
+                          prenom: newPrenom,
+                          email: newEmail
+                        })
+                      }}
+                      className={`h-9 text-sm ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500`}
+                      placeholder="Jean"
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <User className="w-3.5 h-3.5" />
+                      Nom <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={adminForm.nom}
+                      onChange={(e) => setAdminForm({ ...adminForm, nom: e.target.value })}
+                      className={`h-9 text-sm ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500`}
+                      placeholder="Dupont"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <Mail className="w-3.5 h-3.5" />
+                      Email <span className="text-red-500">*</span>
+                      {adminForm.email && adminForm.schoolId && adminForm.prenom && (
+                        <span className="ml-auto text-[10px] text-green-500 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Généré automatiquement
+                        </span>
+                      )}
+                    </label>
+                    <Input
+                      type="email"
+                      value={adminForm.email}
+                      onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                      className={`h-9 text-sm ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500`}
+                      placeholder="prenom@ecole.com"
+                    />
+                    <p className={`text-[10px] ${textSecondary} mt-1 flex items-center gap-1`}>
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      L'email est généré à partir du prénom et de l'école (modifiable)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <Phone className="w-3.5 h-3.5" />
+                      Téléphone
+                    </label>
+                    <Input
+                      type="text"
+                      value={adminForm.telephone}
+                      onChange={(e) => setAdminForm({ ...adminForm, telephone: e.target.value })}
+                      className={`h-9 text-sm ${inputBg} border ${borderColor} ${textColor} placeholder:text-gray-500`}
+                      placeholder="+243 XXX XXX XXX"
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium ${textColor} mb-1.5 flex items-center gap-1.5`}>
+                      <Briefcase className="w-3.5 h-3.5" />
+                      Fonction
+                    </label>
+                    <select
+                      value={adminForm.fonction}
+                      onChange={(e) => setAdminForm({ ...adminForm, fonction: e.target.value })}
+                      className={`h-9 text-sm w-full ${inputBg} border ${borderColor} rounded-lg px-3 ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    >
+                      <option value="Directeur">Directeur</option>
+                      <option value="Directeur Adjoint">Directeur Adjoint</option>
+                      <option value="Secrétaire Académique">Secrétaire Académique</option>
+                      <option value="Administrateur">Administrateur</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={`${theme === "dark" ? "bg-yellow-500/10" : "bg-yellow-50"} border ${theme === "dark" ? "border-yellow-500/30" : "border-yellow-200"} rounded-lg p-3`}>
+                  <p className={`text-xs ${theme === "dark" ? "text-yellow-400" : "text-yellow-700"} flex items-start gap-2`}>
+                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span>Un mot de passe temporaire sera généré et devra être changé lors de la première connexion.</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer avec boutons */}
+              <div className={`px-6 py-4 border-t ${borderColor} flex gap-3 flex-shrink-0`}>
+                <button
+                  onClick={() => setShowCreateAdminModal(false)}
+                  disabled={creatingAdmin}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+                    theme === "dark"
+                      ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
+                      : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleCreateAdmin}
+                  disabled={creatingAdmin || !adminForm.schoolId || !adminForm.nom || !adminForm.prenom || !adminForm.email}
+                  className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                    theme === "dark"
+                      ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#1a7f37]"
+                      : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37]"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {creatingAdmin ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      Créer l'administrateur
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Success Modal with Confetti */}
+      {showAdminSuccess && (
+        <Portal>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center animate-in fade-in duration-200">
+            {/* Confetti animation */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {[...Array(50)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute animate-fall"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `-20px`,
+                    animationDelay: `${Math.random() * 0.5}s`,
+                    animationDuration: `${2 + Math.random() * 2}s`
+                  }}
+                >
+                  {['🎉', '🎊', '✨', '🌟', '💫', '👨‍💼', '👩‍💼'][Math.floor(Math.random() * 7)]}
+                </div>
+              ))}
+            </div>
+
+            <div className="absolute inset-0 bg-black/50" />
+            
+            <div className={`relative ${cardBg} rounded-xl p-8 shadow-2xl max-w-md w-full mx-4 border ${borderColor} transform scale-100 animate-bounce-in`}>
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <div className="text-5xl animate-scale-up">👨‍💼</div>
+                </div>
+                <h3 className={`text-2xl font-bold ${textColor} mb-2`}>
+                  Administrateur créé avec succès !
+                </h3>
+                <p className={`text-sm ${textSecondary} mb-4`}>
+                  L'administrateur <span className="font-semibold text-green-500">{adminForm.prenom} {adminForm.nom}</span> a été enregistré dans le système.
+                </p>
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${theme === "dark" ? "bg-green-500/10" : "bg-green-50"} text-green-500 text-sm`}>
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Affichage des identifiants...
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
+
+      {/* Modal Identifiants Générés */}
+      {showCredentialsModal && generatedCredentials && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
+            <div className={`${cardBg} rounded-xl border ${borderColor} max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-200`}>
+              <div className={`p-6 border-b ${theme === "dark" ? "border-green-500/20 bg-green-500/5" : "border-green-200 bg-green-50"}`}>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                    <KeyRound className="w-7 h-7 text-green-500" />
+                  </div>
+                  <div>
+                    <h2 className={`text-lg font-bold ${textColor}`}>Identifiants de Connexion</h2>
+                    <p className={`text-xs ${textSecondary}`}>Informations d'accès générées automatiquement</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className={`${theme === "dark" ? "bg-yellow-500/10" : "bg-yellow-50"} border ${theme === "dark" ? "border-yellow-500/30" : "border-yellow-200"} rounded-lg p-4`}>
+                  <p className={`${theme === "dark" ? "text-yellow-400" : "text-yellow-700"} text-sm font-medium flex items-start gap-2`}>
+                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>
+                      <strong>Important :</strong> Copiez ces identifiants maintenant ! Ils ne seront plus affichés après la fermeture de cette fenêtre.
+                    </span>
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <Mail className="w-3.5 h-3.5" />
+                      Email de connexion
+                    </label>
+                    <div className={`${inputBg} border-2 ${theme === "dark" ? "border-gray-700" : "border-gray-300"} rounded-lg p-3 flex items-center justify-between group hover:border-blue-500 transition-all`}>
+                      <span className={`font-mono text-sm ${textColor} select-all`}>{generatedCredentials.email}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedCredentials.email)
+                          // Toast notification visuelle
+                        }}
+                        className="text-blue-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded"
+                        title="Copier l'email"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-semibold ${textColor} mb-2 flex items-center gap-1.5`}>
+                      <Lock className="w-3.5 h-3.5" />
+                      Mot de passe temporaire
+                    </label>
+                    <div className={`${inputBg} border-2 ${theme === "dark" ? "border-gray-700" : "border-gray-300"} rounded-lg p-3 flex items-center justify-between group hover:border-blue-500 transition-all`}>
+                      <span className={`font-mono text-lg font-bold ${textColor} tracking-wider select-all`}>{generatedCredentials.password}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedCredentials.password)
+                        }}
+                        className="text-blue-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded"
+                        title="Copier le mot de passe"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className={`text-[10px] ${textSecondary} mt-1.5 flex items-center gap-1`}>
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      L'administrateur devra changer ce mot de passe lors de sa première connexion
+                    </p>
+                  </div>
+                </div>
+
+                <div className={`${theme === "dark" ? "bg-blue-500/10" : "bg-blue-50"} border ${theme === "dark" ? "border-blue-500/30" : "border-blue-200"} rounded-lg p-4 space-y-2`}>
+                  <p className={`text-xs font-semibold ${theme === "dark" ? "text-blue-400" : "text-blue-700"} flex items-center gap-2`}>
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    </svg>
+                    Prochaines étapes
+                  </p>
+                  <ul className={`text-xs ${textSecondary} space-y-1 ml-6`}>
+                    <li className="list-disc">Transmettez ces identifiants de manière sécurisée</li>
+                    <li className="list-disc">L'administrateur se connectera sur la page de login standard</li>
+                    <li className="list-disc">Il sera invité à créer un nouveau mot de passe</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className={`p-6 border-t ${borderColor} flex gap-3`}>
+                <button
+                  onClick={() => {
+                    setShowCredentialsModal(false)
+                    setGeneratedCredentials(null)
+                  }}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                    theme === "dark"
+                      ? "bg-[#238636] hover:bg-[#2ea043] text-white border border-[#1a7f37]"
+                      : "bg-[#2da44e] hover:bg-[#2c974b] text-white border border-[#1a7f37]"
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  J'ai copié les identifiants
+                </button>
               </div>
             </div>
           </div>

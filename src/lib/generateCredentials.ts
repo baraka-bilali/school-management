@@ -36,4 +36,34 @@ export function generatePassword(): string {
   return pwd
 }
 
+/**
+ * Génère les identifiants pour un administrateur d'école
+ * Format email: admin.nomecole@school.local
+ * Mot de passe: Généré automatiquement (14 caractères)
+ */
+export function generateSchoolCredentials(
+  schoolName: string, 
+  lastName: string, 
+  firstName: string
+): { email: string; password: string } {
+  // Normaliser le nom de l'école (enlever les accents, espaces, caractères spéciaux)
+  const normalizedSchoolName = schoolName
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 20) // Limiter à 20 caractères
+  
+  // Construire l'email: admin.nomecole@school.local
+  const email = `admin.${normalizedSchoolName}@${DEFAULT_DOMAIN}`
+  
+  // Générer un mot de passe sécurisé
+  const password = generatePassword()
+  
+  return {
+    email,
+    password
+  }
+}
+
 

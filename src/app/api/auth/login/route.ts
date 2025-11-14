@@ -35,7 +35,18 @@ export async function POST(req: Request) {
     );
 
     // Définir un cookie HttpOnly pour être lisible par le middleware côté serveur
-    const res = NextResponse.json({ message: "Connexion réussie", token });
+    const res = NextResponse.json({ 
+      message: "Connexion réussie", 
+      token,
+      temporaryPassword: user.temporaryPassword || false, // Indiquer si le mot de passe est temporaire
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        nom: user.nom,
+        prenom: user.prenom
+      }
+    });
     const isProd = process.env.NODE_ENV === "production";
     res.cookies.set({
       name: "token",
