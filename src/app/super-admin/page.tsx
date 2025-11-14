@@ -154,6 +154,7 @@ export default function SuperAdminHome() {
   const [resetPasswordAdmin, setResetPasswordAdmin] = useState<any>(null)
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
   const [newPasswordGenerated, setNewPasswordGenerated] = useState("")
+  const [passwordCopied, setPasswordCopied] = useState(false)
   const [selectedAdmin, setSelectedAdmin] = useState<any>(null)
   const [showAdminDetailsModal, setShowAdminDetailsModal] = useState(false)
   const [showDeleteAdminModal, setShowDeleteAdminModal] = useState(false)
@@ -4575,16 +4576,22 @@ export default function SuperAdminHome() {
 
                 <div>
                   <label className={`block text-sm font-medium ${textColor} mb-2`}>Nouveau mot de passe</label>
-                  <div className={`${inputBg} border-2 ${theme === "dark" ? "border-gray-700" : "border-gray-300"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
+                  <div className={`${inputBg} border-2 ${passwordCopied ? "border-green-500" : theme === "dark" ? "border-gray-700" : "border-gray-300"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
                     <span className={`font-mono text-lg font-bold ${textColor} select-all`}>{newPasswordGenerated}</span>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(newPasswordGenerated)
+                        setPasswordCopied(true)
+                        setTimeout(() => setPasswordCopied(false), 2000)
                       }}
-                      className="text-orange-500 hover:text-orange-400 transition-colors p-1.5 hover:bg-orange-500/10 rounded"
-                      title="Copier le mot de passe"
+                      className={`transition-colors p-1.5 rounded ${
+                        passwordCopied 
+                          ? "text-green-500 bg-green-500/20" 
+                          : "text-orange-500 hover:text-orange-400 hover:bg-orange-500/10"
+                      }`}
+                      title={passwordCopied ? "Copié !" : "Copier le mot de passe"}
                     >
-                      <Copy className="w-4 h-4" />
+                      {passwordCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -4600,15 +4607,20 @@ export default function SuperAdminHome() {
                     setNewPasswordGenerated("")
                     setShowResetPasswordModal(false)
                     setResetPasswordAdmin(null)
+                    setPasswordCopied(false)
                   }}
                   className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    theme === "dark"
+                    passwordCopied
+                      ? theme === "dark"
+                        ? "bg-green-500/30 hover:bg-green-500/40 text-green-300 border border-green-500/70"
+                        : "bg-green-100 hover:bg-green-200 text-green-700 border border-green-300"
+                      : theme === "dark"
                       ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50"
                       : "bg-green-50 hover:bg-green-100 text-green-600 border border-green-200"
                   }`}
                 >
                   <Check className="w-3.5 h-3.5" />
-                  J'ai copié le mot de passe
+                  {passwordCopied ? "✓ Mot de passe copié !" : "J'ai copié le mot de passe"}
                 </button>
               </div>
             </div>
