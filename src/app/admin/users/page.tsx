@@ -21,6 +21,30 @@ export default function UsersPage() {
   const [tab, setTab] = useState<TabKey>("students")
   const [tabVisible, setTabVisible] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [theme, setTheme] = useState<"light" | "dark">("light")
+
+  // Gestion du thème
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
+    if (savedTheme) {
+      setTheme(savedTheme)
+    }
+
+    const handleThemeChange = () => {
+      const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
+      if (newTheme) {
+        setTheme(newTheme)
+      }
+    }
+
+    window.addEventListener("themeChange", handleThemeChange)
+    window.addEventListener("storage", handleThemeChange)
+
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange)
+      window.removeEventListener("storage", handleThemeChange)
+    }
+  }, [])
 
   // Effet pour gérer le montage initial
   useEffect(() => {
@@ -35,22 +59,27 @@ export default function UsersPage() {
     return () => clearTimeout(id)
   }, [tab, isMounted])
 
+  // Variables de couleur basées sur le thème
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+
   return (
     <Layout>
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Utilisateurs</h1>
-          <p className="text-gray-600">Gestion des administrateurs, enseignants et élèves.</p>
+          <h1 className={`text-2xl font-bold ${textColor}`}>Utilisateurs</h1>
+          <p className={textSecondary}>Gestion des administrateurs, enseignants et élèves.</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center space-x-2 border-b">
+        <div className={`flex items-center space-x-2 border-b ${borderColor}`}>
           <button
             className={cn(
               "px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "students"
                 ? "border-indigo-600 text-indigo-700"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+                : `border-transparent ${textSecondary} hover:${textColor}`
             )}
             onClick={() => setTab("students")}
           >
@@ -61,7 +90,7 @@ export default function UsersPage() {
               "px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "teachers"
                 ? "border-indigo-600 text-indigo-700"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+                : `border-transparent ${textSecondary} hover:${textColor}`
             )}
             onClick={() => setTab("teachers")}
           >
@@ -70,7 +99,7 @@ export default function UsersPage() {
         </div>
 
         <div className={`transition-all duration-250 ease-out transform ${tabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
-          {tab === "students" ? <StudentsSection /> : <TeachersSection />}
+          {tab === "students" ? <StudentsSection theme={theme} /> : <TeachersSection theme={theme} />}
         </div>
       </div>
     </Layout>
@@ -84,6 +113,7 @@ function CreateStudentModal({
   years,
   defaultYearId,
   onCreated,
+  theme = "light",
 }: {
   open: boolean
   onClose: () => void
@@ -91,6 +121,7 @@ function CreateStudentModal({
   years: Array<{ id: number; name: string }>
   defaultYearId?: number
   onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  theme?: "light" | "dark"
 }) {
   const [form, setForm] = useState({
     lastName: "",
@@ -169,45 +200,45 @@ function CreateStudentModal({
     <Portal>
       {/* overlay */}
       <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
         {/* dialog */}
-        <div className={`relative w-full max-w-2xl rounded-lg bg-white shadow transform transition-all duration-200 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="text-lg font-semibold">Créer un élève</div>
-            <button className="text-gray-500 hover:text-gray-700" onClick={onClose} aria-label="Fermer">×</button>
+        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+            <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un élève</div>
+            <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose} aria-label="Fermer">×</button>
           </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
-            <label className="block text-gray-700 mb-1">Nom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Post-nom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Post-nom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Prénom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Sexe</label>
-            <select className="w-full rounded-md border px-3 py-2" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Sexe</label>
+            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
               <option value="M">M</option>
               <option value="F">F</option>
             </select>
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Date de naissance</label>
-            <input type="date" className="w-full rounded-md border px-3 py-2" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Date de naissance</label>
+            <input type="date" className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Code</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Code</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Classe</label>
-            <select className="w-full rounded-md border px-3 py-2" value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Classe</label>
+            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })}>
               <option value="">Sélectionner</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -215,8 +246,8 @@ function CreateStudentModal({
             </select>
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Année académique</label>
-            <select className="w-full rounded-md border px-3 py-2" value={form.academicYearId} onChange={(e) => setForm({ ...form, academicYearId: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Année académique</label>
+            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.academicYearId} onChange={(e) => setForm({ ...form, academicYearId: e.target.value })}>
               <option value="">Sélectionner</option>
               {years.map((y) => (
                 <option key={y.id} value={y.id}>{y.name}</option>
@@ -224,8 +255,8 @@ function CreateStudentModal({
             </select>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
-          <button className="rounded-md border px-4 py-2" onClick={onClose}>Annuler</button>
+        <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+          <button className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`} onClick={onClose}>Annuler</button>
           <button disabled={submitting} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
             {submitting ? "Création..." : "Créer"}
           </button>
@@ -241,26 +272,41 @@ function Toolbar({
   onCreate,
   rightContent,
   onSearch,
+  theme,
+  isSearching = false,
 }: {
   placeholder: string
   onCreate: () => void
   rightContent?: React.ReactNode
   onSearch: (q: string) => void
+  theme?: "light" | "dark"
+  isSearching?: boolean
 }) {
   const [q, setQ] = useState("")
   useEffect(() => {
-    const id = setTimeout(() => onSearch(q), 300)
+    // Augmentation du debounce à 500ms pour réduire les appels API pendant la saisie
+    const id = setTimeout(() => onSearch(q), 500)
     return () => clearTimeout(id)
   }, [q])
+
+  const bgInput = theme === "dark" ? "bg-gray-700" : "bg-white"
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
+  const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div className="flex-1 flex items-center gap-2">
+      <div className="flex-1 flex items-center gap-2 relative">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
-          className="w-full sm:max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className={`w-full sm:max-w-sm rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500`}
         />
+        {isSearching && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-indigo-600"></div>
+          </div>
+        )}
         {rightContent}
       </div>
       <button
@@ -339,13 +385,14 @@ function Pagination({ state, setState, total }: { state: PaginationState; setSta
   )
 }
 
-function StudentsSection() {
+function StudentsSection({ theme }: { theme: "light" | "dark" }) {
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
   const [filters, setFilters] = useState<{ q?: string; classId?: string; yearId?: string; sort?: string }>({ sort: "name_asc" })
+  const [searchInput, setSearchInput] = useState("")
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([])
   const [years, setYears] = useState<Array<{ id: number; name: string; current: boolean }>>([])
   const [currentYearId, setCurrentYearId] = useState<number | null>(null)
@@ -367,6 +414,14 @@ function StudentsSection() {
     birthDate: "",
     classId: "",
   })
+
+  // Debounce pour la recherche - applique le filtre après 500ms
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setFilters(f => ({ ...f, q: searchInput }))
+    }, 500)
+    return () => clearTimeout(timerId)
+  }, [searchInput])
 
   const handleEdit = (student: any) => {
     setEditingId(student.id)
@@ -484,6 +539,10 @@ function StudentsSection() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
+      // Logging de performance pour mesurer la vitesse réelle
+      const perfLabel = `[PERF] Students fetch (q=${filters.q || 'none'}, page=${pagination.page})`
+      console.time(perfLabel)
+      
       try {
         const params = new URLSearchParams()
         if (filters.q) params.set("q", filters.q)
@@ -497,8 +556,12 @@ function StudentsSection() {
         const res = await response.json()
         setItems(res.items || [])
         setTotal(res.total || 0)
+        
+        console.timeEnd(perfLabel)
+        console.log(`[PERF] Loaded ${res.items?.length || 0} students out of ${res.total || 0} total`)
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error)
+        console.timeEnd(perfLabel)
       } finally {
         setLoading(false)
       }
@@ -507,8 +570,16 @@ function StudentsSection() {
     fetchData()
   }, [pagination, filters])
 
+  // Variables de couleur basées sur le thème
+  const bgCard = theme === "dark" ? "bg-gray-800" : "bg-white"
+  const bgInput = theme === "dark" ? "bg-gray-700" : "bg-white"
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
+  const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+
   return (
-    <Card>
+    <Card theme={theme}>
       <CardHeader>
         <CardTitle>Élèves</CardTitle>
       </CardHeader>
@@ -525,13 +596,19 @@ function StudentsSection() {
           )}
         {/* Barre de recherche par mots clés */}
         <div className="flex gap-4 items-center">
-          <div className="flex-1">
+          <div className="flex-1 relative">
             <input
               type="text"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              value={searchInput}
+              className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500`}
               placeholder="Rechercher par nom, post-nom ou code"
-              onChange={(e) => setFilters(f => ({ ...f, q: e.target.value }))}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
+            {loading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-indigo-600"></div>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowCreate(true)}
@@ -549,7 +626,7 @@ function StudentsSection() {
           <div className="md:hidden flex flex-col gap-2 w-full">
             <div className="grid grid-cols-2 gap-2">
               <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
                 value={filters.classId || ""}
                 onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
               >
@@ -559,7 +636,7 @@ function StudentsSection() {
                 ))}
               </select>
               <select
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
                 value={filters.yearId || ""}
                 onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
               >
@@ -570,7 +647,7 @@ function StudentsSection() {
               </select>
             </div>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm bg-white"
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
               value={filters.sort}
               onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
             >
@@ -583,7 +660,7 @@ function StudentsSection() {
           {/* Version desktop : Filtres en ligne */}
           <div className="hidden md:flex items-center gap-2">
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
               value={filters.classId || ""}
               onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
             >
@@ -593,7 +670,7 @@ function StudentsSection() {
               ))}
             </select>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
               value={filters.yearId || ""}
               onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
             >
@@ -603,7 +680,7 @@ function StudentsSection() {
               ))}
             </select>
             <select
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
               value={filters.sort}
               onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
             >
@@ -618,16 +695,16 @@ function StudentsSection() {
           {/* Mobile: stacked cards */}
           <div className="md:hidden space-y-3">
             {loading && (
-              <div className="px-3 py-8 text-center text-gray-500">Chargement des données...</div>
+              <div className={`px-3 py-8 text-center ${textSecondary}`}>Chargement des données...</div>
             )}
             {!loading && items.map((s) => {
               const enr = s.enrollments?.[0]
               return (
-                <div key={`mobile-${s.id}`} className="p-4 bg-white rounded-md shadow-sm border space-y-4">
+                <div key={`mobile-${s.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
                   {/* En-tête avec code et actions */}
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-gray-900">Code: {s.code}</div>
-                    <button className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); }}>
+                    <div className={`font-medium ${textColor}`}>Code: {s.code}</div>
+                    <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); }}>
                       <Eye className="h-4 w-4" />
                     </button>
                   </div>
@@ -635,34 +712,34 @@ function StudentsSection() {
                   {/* Informations personnelles */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-500">Nom complet</div>
-                      <div className="mt-1 text-sm text-gray-900">{s.lastName} {s.middleName}</div>
+                      <div className={`text-sm font-medium ${textSecondary}`}>Nom complet</div>
+                      <div className={`mt-1 text-sm ${textColor}`}>{s.lastName} {s.middleName}</div>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-500">Prénom</div>
-                      <div className="mt-1 text-sm text-gray-900">{s.firstName}</div>
+                      <div className={`text-sm font-medium ${textSecondary}`}>Prénom</div>
+                      <div className={`mt-1 text-sm ${textColor}`}>{s.firstName}</div>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-500">Classe</div>
-                      <div className="mt-1 text-sm text-gray-900">{enr?.class?.name || '-'}</div>
+                      <div className={`text-sm font-medium ${textSecondary}`}>Classe</div>
+                      <div className={`mt-1 text-sm ${textColor}`}>{enr?.class?.name || '-'}</div>
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-500">Année</div>
-                      <div className="mt-1 text-sm text-gray-900">{enr?.year?.name || '-'}</div>
+                      <div className={`text-sm font-medium ${textSecondary}`}>Année</div>
+                      <div className={`mt-1 text-sm ${textColor}`}>{enr?.year?.name || '-'}</div>
                     </div>
                   </div>
                 </div>
               )
             })}
             {!loading && items.length === 0 && (
-              <div className="px-3 py-8 text-center text-gray-500">Aucun élève trouvé.</div>
+              <div className={`px-3 py-8 text-center ${textSecondary}`}>Aucun élève trouvé.</div>
             )}
           </div>
 
           {/* Desktop/tablet: keep existing table */}
           <div className="hidden md:block overflow-x-auto relative">
             <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+            <thead className={theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-600"}>
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Code</th>
                 <th className="px-3 py-2 text-left font-medium">Nom</th>
@@ -675,68 +752,57 @@ function StudentsSection() {
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {loading && (
-                <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center">
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">Chargement des données...</div>
-                  </td>
-                </tr>
-              )}
+            <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
               {!loading && items.map((s) => {
                 const enr = s.enrollments?.[0]
                 const isOpen = expandedId === s.id
                 return (
                   <React.Fragment key={s.id}>
                     <tr className={cn(
-                      "hover:bg-gray-50 cursor-pointer",
-                      editingId === s.id ? "bg-blue-50" : ""
+                      hoverBg,
+                      "cursor-pointer",
+                      editingId === s.id ? (theme === "dark" ? "bg-blue-900/30" : "bg-blue-50") : ""
                     )} onClick={() => !editingId && setExpandedId(isOpen ? null : s.id)}>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <input
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.code}
                             onChange={(e) => setEditForm(prev => ({ ...prev, code: e.target.value }))}
                           />
                         ) : s.code}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <input
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.lastName}
                             onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))}
                           />
                         ) : s.lastName}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <input
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.middleName}
                             onChange={(e) => setEditForm(prev => ({ ...prev, middleName: e.target.value }))}
                           />
                         ) : s.middleName}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <input
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.firstName}
                             onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))}
                           />
                         ) : s.firstName}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <select
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.gender}
                             onChange={(e) => setEditForm(prev => ({ ...prev, gender: e.target.value }))}
                           >
@@ -749,16 +815,16 @@ function StudentsSection() {
                         {editingId === s.id ? (
                           <input
                             type="date"
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.birthDate}
                             onChange={(e) => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))}
                           />
                         ) : new Date(s.birthDate).toLocaleDateString()}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <select
-                            className="w-full rounded-md border px-2 py-1"
+                            className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.classId}
                             onChange={(e) => setEditForm(prev => ({ ...prev, classId: e.target.value }))}
                           >
@@ -768,7 +834,7 @@ function StudentsSection() {
                           </select>
                         ) : enr?.class?.name || "-"}
                       </td>
-                      <td className="px-3 py-2">{enr?.year?.name || "-"}</td>
+                      <td className={`px-3 py-2 ${textColor}`}>{enr?.year?.name || "-"}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           {editingId === s.id ? (
@@ -781,7 +847,7 @@ function StudentsSection() {
                                 }}
                               >
                                 <Check className="h-4 w-4" />
-                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
                                   Valider
                                 </span>
                               </button>
@@ -793,7 +859,7 @@ function StudentsSection() {
                                 }}
                               >
                                 <X className="h-4 w-4" />
-                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
                                   Annuler
                                 </span>
                               </button>
@@ -801,23 +867,23 @@ function StudentsSection() {
                           ) : (
                             <>
                               <button 
-                                className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" 
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
                                   handleEdit(s);
                                 }}
                               >
                                 <Pencil className="h-4 w-4" />
-                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
                                   Modifier
                                 </span>
                               </button>
                               <button 
-                                className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" 
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
                                 onClick={(e) => { e.stopPropagation(); }}
                               >
                                 <Eye className="h-4 w-4" />
-                                <span className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
                                   Détails
                                 </span>
                               </button>
@@ -826,20 +892,20 @@ function StudentsSection() {
                         </div>
                       </td>
                     </tr>
-                    <tr key={`${s.id}-expanded`} className="bg-gray-50">
+                    <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
                       <td colSpan={9} className="px-3 py-0">
                         <div className={cn(
                           "overflow-hidden transition-all duration-300",
                           isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                         )}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
-                            <div><span className="text-gray-500">Nom</span><div className="font-medium">{s.lastName}</div></div>
-                            <div><span className="text-gray-500">Post-nom</span><div className="font-medium">{s.middleName}</div></div>
-                            <div><span className="text-gray-500">Prénom</span><div className="font-medium">{s.firstName}</div></div>
-                            <div><span className="text-gray-500">Sexe</span><div className="font-medium">{s.gender}</div></div>
-                            <div><span className="text-gray-500">Naissance</span><div className="font-medium">{new Date(s.birthDate).toLocaleDateString()}</div></div>
-                            <div><span className="text-gray-500">Classe</span><div className="font-medium">{enr?.class?.name || "-"}</div></div>
-                            <div><span className="text-gray-500">Année</span><div className="font-medium">{enr?.year?.name || "-"}</div></div>
+                            <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{s.lastName}</div></div>
+                            <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{s.middleName}</div></div>
+                            <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{s.firstName}</div></div>
+                            <div><span className={textSecondary}>Sexe</span><div className={`font-medium ${textColor}`}>{s.gender}</div></div>
+                            <div><span className={textSecondary}>Naissance</span><div className={`font-medium ${textColor}`}>{new Date(s.birthDate).toLocaleDateString()}</div></div>
+                            <div><span className={textSecondary}>Classe</span><div className={`font-medium ${textColor}`}>{enr?.class?.name || "-"}</div></div>
+                            <div><span className={textSecondary}>Année</span><div className={`font-medium ${textColor}`}>{enr?.year?.name || "-"}</div></div>
                           </div>
                         </div>
                       </td>
@@ -847,9 +913,23 @@ function StudentsSection() {
                   </React.Fragment>
                 )
               })}
-              {items.length === 0 && (
+              {loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-gray-500">Aucun élève trouvé.</td>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      Chargement des données...
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!loading && items.length === 0 && (
+                <tr>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun élève trouvé.</td>
                 </tr>
               )}
             </tbody>
@@ -864,6 +944,7 @@ function StudentsSection() {
           classes={classes}
           years={years}
           defaultYearId={currentYearId || undefined}
+          theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
             // show credentials banner (no extra message)
@@ -883,7 +964,7 @@ function StudentsSection() {
   )
 }
 
-function TeachersSection() {
+function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
@@ -917,14 +998,22 @@ function TeachersSection() {
     params.set("pageSize", String(pagination.pageSize))
     ;(async () => {
       setLoading(true)
+      // Logging de performance pour mesurer la vitesse réelle
+      const perfLabel = `[PERF] Teachers fetch (q=${q || 'none'}, page=${pagination.page})`
+      console.time(perfLabel)
+      
       try {
         const r = await fetch(`/api/admin/teachers?${params.toString()}`)
         const text = await r.text()
         const res = text ? JSON.parse(text) : { items: [], total: 0 }
         setItems(res.items || [])
         setTotal(res.total || 0)
+        
+        console.timeEnd(perfLabel)
+        console.log(`[PERF] Loaded ${res.items?.length || 0} teachers out of ${res.total || 0} total`)
       } catch (e) {
         console.error(e)
+        console.timeEnd(perfLabel)
         setItems([])
         setTotal(0)
       } finally {
@@ -950,8 +1039,16 @@ function TeachersSection() {
     })()
   }, [])
 
+  // Variables de couleur basées sur le thème
+  const bgCard = theme === "dark" ? "bg-gray-800" : "bg-white"
+  const bgInput = theme === "dark" ? "bg-gray-700" : "bg-white"
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
+  const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+
   return (
-    <Card>
+    <Card theme={theme}>
       <CardHeader>
         <CardTitle>Enseignants</CardTitle>
       </CardHeader>
@@ -970,19 +1067,30 @@ function TeachersSection() {
           placeholder="Rechercher par nom, spécialité ou téléphone"
           onCreate={() => setShowCreate(true)}
           onSearch={setQ}
+          theme={theme}
+          isSearching={loading}
         />
 
         <div>
           {/* Mobile: stacked cards for teachers */}
           <div className="md:hidden space-y-3">
             {loading && (
-              <div className="px-3 py-8 text-center text-gray-500">Chargement des données...</div>
+              <div className={`px-3 py-8 text-center ${textSecondary}`}>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  Chargement des données...
+                </div>
+              </div>
             )}
             {!loading && items.map((t) => (
-              <div key={`mobile-teacher-${t.id}`} className="p-4 bg-white rounded-md shadow-sm border space-y-4">
+              <div key={`mobile-teacher-${t.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
                 {/* En-tête avec actions */}
                 <div className="flex items-center justify-end">
-                  <button className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50" onClick={(e) => { e.stopPropagation(); }}>
+                  <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); }}>
                     <Eye className="h-4 w-4" />
                   </button>
                 </div>
@@ -990,33 +1098,33 @@ function TeachersSection() {
                 {/* Informations personnelles */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-sm font-medium text-gray-500">Nom complet</div>
-                    <div className="mt-1 text-sm text-gray-900">{t.lastName} {t.middleName}</div>
+                    <div className={`text-sm font-medium ${textSecondary}`}>Nom complet</div>
+                    <div className={`mt-1 text-sm ${textColor}`}>{t.lastName} {t.middleName}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-500">Prénom</div>
-                    <div className="mt-1 text-sm text-gray-900">{t.firstName}</div>
+                    <div className={`text-sm font-medium ${textSecondary}`}>Prénom</div>
+                    <div className={`mt-1 text-sm ${textColor}`}>{t.firstName}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-500">Spécialité</div>
-                    <div className="mt-1 text-sm text-gray-900">{t.specialty || '-'}</div>
+                    <div className={`text-sm font-medium ${textSecondary}`}>Spécialité</div>
+                    <div className={`mt-1 text-sm ${textColor}`}>{t.specialty || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-500">Téléphone</div>
-                    <div className="mt-1 text-sm text-gray-900">{t.phone || '-'}</div>
+                    <div className={`text-sm font-medium ${textSecondary}`}>Téléphone</div>
+                    <div className={`mt-1 text-sm ${textColor}`}>{t.phone || '-'}</div>
                   </div>
                 </div>
               </div>
             ))}
             {!loading && items.length === 0 && (
-              <div className="px-3 py-8 text-center text-gray-500">Aucun enseignant trouvé.</div>
+              <div className={`px-3 py-8 text-center ${textSecondary}`}>Aucun enseignant trouvé.</div>
             )}
           </div>
 
           {/* Desktop/tablet: keep existing table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+            <thead className={theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-600"}>
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Nom</th>
                 <th className="px-3 py-2 text-left font-medium">Post-nom</th>
@@ -1029,50 +1137,39 @@ function TeachersSection() {
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {loading && (
-                <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center">
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">Chargement des données...</div>
-                  </td>
-                </tr>
-              )}
+            <tbody className={theme === "dark" ? "divide-y divide-gray-700" : "divide-y divide-gray-200"}>
               {!loading && items.map((t) => {
                 const isOpen = false // no separate expanded id for teachers; could reuse editingId but keep closed by default
                 return (
                   <React.Fragment key={t.id}>
                     <tr className={cn(
-                      "hover:bg-gray-50",
-                      editingId === t.id ? "bg-blue-50" : ""
+                      theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50",
+                      editingId === t.id ? (theme === "dark" ? "bg-blue-900/30" : "bg-blue-50") : "",
+                      textColor
                     )}>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input className="w-full rounded-md border px-2 py-1" value={editForm.lastName} onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))} />
+                        <input className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.lastName} onChange={(e) => setEditForm(prev => ({ ...prev, lastName: e.target.value }))} />
                       ) : t.lastName}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input className="w-full rounded-md border px-2 py-1" value={editForm.middleName} onChange={(e) => setEditForm(prev => ({ ...prev, middleName: e.target.value }))} />
+                        <input className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.middleName} onChange={(e) => setEditForm(prev => ({ ...prev, middleName: e.target.value }))} />
                       ) : t.middleName}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input className="w-full rounded-md border px-2 py-1" value={editForm.firstName} onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))} />
+                        <input className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.firstName} onChange={(e) => setEditForm(prev => ({ ...prev, firstName: e.target.value }))} />
                       ) : t.firstName}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <select className="w-full rounded-md border px-2 py-1" value={editForm.gender} onChange={(e) => setEditForm(prev => ({ ...prev, gender: e.target.value }))}>
+                        <select className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.gender} onChange={(e) => setEditForm(prev => ({ ...prev, gender: e.target.value }))}>
                           <option value="M">M</option>
                           <option value="F">F</option>
                         </select>
                       ) : t.gender}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input type="date" className="w-full rounded-md border px-2 py-1" value={editForm.birthDate} onChange={(e) => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
+                        <input type="date" className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.birthDate} onChange={(e) => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
                       ) : new Date(t.birthDate).toLocaleDateString()}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input className="w-full rounded-md border px-2 py-1" value={editForm.specialty} onChange={(e) => setEditForm(prev => ({ ...prev, specialty: e.target.value }))} />
+                        <input className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.specialty} onChange={(e) => setEditForm(prev => ({ ...prev, specialty: e.target.value }))} />
                       ) : t.specialty || "-"}</td>
                       <td className="px-3 py-2">{editingId === t.id ? (
-                        <input className="w-full rounded-md border px-2 py-1" value={editForm.phone} onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))} />
+                        <input className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`} value={editForm.phone} onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))} />
                       ) : t.phone || "-"}</td>
                       <td className="px-3 py-2">{currentYearName}</td>
                       <td className="px-3 py-2">
@@ -1170,7 +1267,7 @@ function TeachersSection() {
                             </>
                           ) : (
                             <>
-                              <button className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setEditForm({
+                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setEditForm({
                                 lastName: t.lastName || "",
                                 middleName: t.middleName || "",
                                 firstName: t.firstName || "",
@@ -1181,7 +1278,7 @@ function TeachersSection() {
                               })}}>
                                 <Pencil className="h-4 w-4" />
                               </button>
-                              <button className="text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); }}>
+                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); }}>
                                 <Eye className="h-4 w-4" />
                               </button>
                             </>
@@ -1190,20 +1287,20 @@ function TeachersSection() {
                       </td>
                     </tr>
                     {/* expanded details row for teachers (animated) */}
-                    <tr key={`${t.id}-expanded`} className="bg-gray-50">
+                    <tr key={`${t.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
                       <td colSpan={9} className="px-3 py-0">
                         <div className={cn(
                           "overflow-hidden transition-all duration-300",
                           editingId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                         )}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
-                            <div><span className="text-gray-500">Nom</span><div className="font-medium">{t.lastName}</div></div>
-                            <div><span className="text-gray-500">Post-nom</span><div className="font-medium">{t.middleName}</div></div>
-                            <div><span className="text-gray-500">Prénom</span><div className="font-medium">{t.firstName}</div></div>
-                            <div><span className="text-gray-500">Sexe</span><div className="font-medium">{t.gender}</div></div>
-                            <div><span className="text-gray-500">Naissance</span><div className="font-medium">{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "-"}</div></div>
-                            <div><span className="text-gray-500">Spécialité</span><div className="font-medium">{t.specialty || "-"}</div></div>
-                            <div><span className="text-gray-500">Téléphone</span><div className="font-medium">{t.phone || "-"}</div></div>
+                            <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{t.lastName}</div></div>
+                            <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{t.middleName}</div></div>
+                            <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{t.firstName}</div></div>
+                            <div><span className={textSecondary}>Sexe</span><div className={`font-medium ${textColor}`}>{t.gender}</div></div>
+                            <div><span className={textSecondary}>Naissance</span><div className={`font-medium ${textColor}`}>{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "-"}</div></div>
+                            <div><span className={textSecondary}>Spécialité</span><div className={`font-medium ${textColor}`}>{t.specialty || "-"}</div></div>
+                            <div><span className={textSecondary}>Téléphone</span><div className={`font-medium ${textColor}`}>{t.phone || "-"}</div></div>
                           </div>
                         </div>
                       </td>
@@ -1211,9 +1308,23 @@ function TeachersSection() {
                   </React.Fragment>
                 )
               })}
-              {items.length === 0 && (
+              {loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-gray-500">Aucun enseignant trouvé.</td>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      Chargement des données...
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!loading && items.length === 0 && (
+                <tr>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun enseignant trouvé.</td>
                 </tr>
               )}
             </tbody>
@@ -1225,6 +1336,7 @@ function TeachersSection() {
         <CreateTeacherModal
           open={showCreate}
           onClose={() => setShowCreate(false)}
+          theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
             setBanner({
@@ -1246,10 +1358,12 @@ function CreateTeacherModal({
   open,
   onClose,
   onCreated,
+  theme = "light",
 }: {
   open: boolean
   onClose: () => void
   onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  theme?: "light" | "dark"
 }) {
   const [form, setForm] = useState({
     lastName: "",
@@ -1316,48 +1430,48 @@ function CreateTeacherModal({
   return (
     <Portal>
       <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-        <div className={`relative w-full max-w-2xl rounded-lg bg-white shadow transform transition-all duration-200 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="text-lg font-semibold">Créer un enseignant</div>
-            <button className="text-gray-500 hover:text-gray-700" onClick={onClose}>×</button>
+        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+            <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un enseignant</div>
+            <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose}>×</button>
           </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
-            <label className="block text-gray-700 mb-1">Nom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Post-nom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Post-nom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Prénom</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Sexe</label>
-            <select className="w-full rounded-md border px-3 py-2" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Sexe</label>
+            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
               <option value="M">M</option>
               <option value="F">F</option>
             </select>
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Date de naissance</label>
-            <input type="date" className="w-full rounded-md border px-3 py-2" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Date de naissance</label>
+            <input type="date" className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Spécialité</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Spécialité</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
           </div>
           <div>
-            <label className="block text-gray-700 mb-1">Téléphone</label>
-            <input className="w-full rounded-md border px-3 py-2" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Téléphone</label>
+            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
-          <button className="rounded-md border px-4 py-2" onClick={onClose}>Annuler</button>
+        <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+          <button className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`} onClick={onClose}>Annuler</button>
           <button disabled={submitting} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
             {submitting ? "Création..." : "Créer"}
           </button>

@@ -44,14 +44,35 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
         
         console.log("Payload du token:", payload)
         
-        // Toujours appeler fetchSchoolName
-        fetchSchoolName()
+        // Vérifier si le token contient un schoolId
+        if (!payload.schoolId && payload.role === "ADMIN") {
+          console.warn("⚠️ Le token ne contient pas de schoolId. Veuillez vous reconnecter pour obtenir les informations de l'école.")
+        }
+        
+        // Vérifier si le nom de l'école est déjà en cache
+        const cachedSchoolName = localStorage.getItem("schoolName")
+        if (cachedSchoolName) {
+          console.log("📦 Nom de l'école récupéré du cache:", cachedSchoolName)
+          setSchoolName(cachedSchoolName)
+        } else {
+          // Seulement charger depuis l'API si pas en cache
+          fetchSchoolName()
+        }
       } catch (error) {
         console.error("Erreur lors du décodage du token:", error)
-        fetchSchoolName()
+        const cachedSchoolName = localStorage.getItem("schoolName")
+        if (cachedSchoolName) {
+          setSchoolName(cachedSchoolName)
+        } else {
+          fetchSchoolName()
+        }
       }
     } else {
-      fetchSchoolName()
+      // Pas de token, vérifier quand même le cache
+      const cachedSchoolName = localStorage.getItem("schoolName")
+      if (cachedSchoolName) {
+        setSchoolName(cachedSchoolName)
+      }
     }
 
     // Récupérer le thème depuis localStorage
@@ -64,7 +85,7 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
 
   const fetchSchoolName = async () => {
     try {
-      // Toujours essayer de récupérer le nom de l'école via l'API
+      console.log("🔄 Chargement du nom de l'école depuis l'API...")
       const res = await fetch(`/api/admin/school`, {
         credentials: "include"
       })
@@ -74,14 +95,25 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       if (res.ok) {
         const data = await res.json()
         console.log("Données école:", data)
-        setSchoolName(data.nom || "École")
+        if (data.nom && data.nom.trim() !== "") {
+          setSchoolName(data.nom)
+          // Sauvegarder en localStorage pour les prochaines navigations
+          localStorage.setItem("schoolName", data.nom)
+          console.log("✅ Nom de l'école sauvegardé en cache:", data.nom)
+        } else {
+          setSchoolName("Établissement")
+          localStorage.setItem("schoolName", "Établissement")
+        }
       } else {
-        console.log("Erreur API:", await res.text())
-        setSchoolName("École")
+        const errorText = await res.text()
+        console.log("Erreur API école:", errorText)
+        setSchoolName("Établissement")
+        localStorage.setItem("schoolName", "Établissement")
       }
     } catch (error) {
       console.error("Erreur lors de la récupération du nom de l'école:", error)
-      setSchoolName("École")
+      setSchoolName("Établissement")
+      localStorage.setItem("schoolName", "Établissement")
     }
   }
 
@@ -100,6 +132,8 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       await fetch("/api/auth/logout", { method: "POST" })
     } catch {}
     localStorage.removeItem("token")
+    localStorage.removeItem("schoolName") // Nettoyer le cache du nom de l'école
+    console.log("🗑️ Cache du nom de l'école nettoyé")
     setShowLogoutModal(false)
     setShowProfileModal(false)
     router.push("/login")
@@ -125,7 +159,7 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
                 <School className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <h1 className={`text-xl font-semibold ${textColor}`}>
-                {schoolName || "School Management"}
+                {schoolName || "Chargement..."}
               </h1>
             </div>
           </div>
@@ -163,89 +197,84 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
               onClick={() => setShowProfileModal(false)}
             />
             
-            <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-md animate-scale-up`}>
+            <div className={`relative ${bgColor} rounded-xl border ${borderColor} shadow-2xl w-full max-w-sm animate-scale-up overflow-hidden`}>
               {/* Header */}
-              <div className={`p-6 border-b ${borderColor} flex items-center justify-between`}>
-                <h3 className={`text-xl font-bold ${textColor}`}>Mon Profil</h3>
+              <div className={`px-4 py-3 border-b ${borderColor} flex items-center justify-between`}>
+                <h3 className={`text-lg font-semibold ${textColor}`}>Mon Profil</h3>
                 <button
                   onClick={() => setShowProfileModal(false)}
-                  className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ${textSecondary} hover:${textColor} transition-colors`}
+                  className={`p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ${textSecondary} hover:${textColor} transition-colors`}
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-6">
+              <div className="p-4 space-y-4">
                 {/* Avatar and Name */}
-                <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <User className="w-10 h-10 text-white" />
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                    <User className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h4 className={`text-lg font-bold ${textColor}`}>{userName}</h4>
-                    <p className={`text-sm ${textSecondary}`}>{userEmail}</p>
-                    <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400">
+                    <h4 className={`text-base font-semibold ${textColor}`}>{userName}</h4>
+                    <p className={`text-xs ${textSecondary}`}>{userEmail}</p>
+                    <span className="inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
                       {userRole ? ROLE_LABEL[userRole] || userRole : "Utilisateur"}
                     </span>
                   </div>
                 </div>
 
                 {/* School Info */}
-                {schoolName && schoolName !== "School Management" && (
-                  <div className={`p-4 rounded-lg border ${borderColor} bg-gray-50 dark:bg-gray-800`}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                        <School className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                {schoolName && schoolName !== "Chargement..." && schoolName !== "Établissement" && (
+                  <div className={`p-3 rounded-lg border ${borderColor} ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0">
+                        <School className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className={`text-xs ${textSecondary}`}>École</p>
-                        <p className={`text-sm font-semibold ${textColor}`}>{schoolName}</p>
+                        <p className={`text-sm font-medium ${textColor} truncate`}>{schoolName}</p>
                       </div>
                     </div>
                   </div>
                 )}
+              </div>
 
-                {/* Actions */}
-                <div className="space-y-2">
-                  {/* Theme Toggle */}
-                  <button
-                    onClick={toggleTheme}
-                    className={`w-full px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
-                      theme === "dark"
-                        ? "bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/50"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
-                    }`}
-                  >
-                    {theme === "dark" ? (
-                      <>
-                        <Sun className="w-4 h-4" />
-                        Mode Clair
-                      </>
-                    ) : (
-                      <>
-                        <Moon className="w-4 h-4" />
-                        Mode Sombre
-                      </>
-                    )}
-                  </button>
+              {/* Actions */}
+              <div className={`border-t ${borderColor}`}>
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="w-5 h-5 text-yellow-500" />
+                  ) : (
+                    <Moon className="w-5 h-5 text-blue-500" />
+                  )}
+                  <div>
+                    <div className={`text-sm font-medium ${textColor}`}>
+                      {theme === "dark" ? "Mode Clair" : "Mode Sombre"}
+                    </div>
+                    <div className={`text-xs ${textSecondary}`}>Changer le thème</div>
+                  </div>
+                </button>
 
-                  {/* Logout Button */}
-                  <button
-                    onClick={() => {
-                      setShowProfileModal(false)
-                      setShowLogoutModal(true)
-                    }}
-                    className={`w-full px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ${
-                      theme === "dark"
-                        ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50"
-                        : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
-                    }`}
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Déconnexion
-                  </button>
-                </div>
+                {/* Logout Button */}
+                <button
+                  onClick={() => {
+                    setShowProfileModal(false)
+                    setShowLogoutModal(true)
+                  }}
+                  className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left border-t ${borderColor}`}
+                >
+                  <LogOut className="w-5 h-5 text-red-500" />
+                  <div>
+                    <div className="text-sm font-medium text-red-500">Déconnexion</div>
+                    <div className={`text-xs ${textSecondary}`}>Se déconnecter du compte</div>
+                  </div>
+                </button>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { buildTeacherEmail, generatePassword } from "@/lib/generateCredentials"
+import { getCached, invalidateCachePattern } from "@/lib/cache"
 
 export async function GET(req: Request) {
   try {
@@ -14,35 +15,62 @@ export async function GET(req: Request) {
     const where: any = {}
     
     if (q) {
+      // IMPORTANT: MySQL ne supporte pas mode: 'insensitive' dans Prisma
+      // La collation MySQL utf8mb4_general_ci gère l'insensibilité à la casse automatiquement
+      const searchTerm = q.trim()
       where.OR = [
-        { lastName: { contains: q, mode: 'insensitive' } },
-        { middleName: { contains: q, mode: 'insensitive' } },
-        { firstName: { contains: q, mode: 'insensitive' } },
-        { specialty: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } }
+        { lastName: { contains: searchTerm } },
+        { middleName: { contains: searchTerm } },
+        { firstName: { contains: searchTerm } },
+        { specialty: { contains: searchTerm } },
+        { phone: { contains: searchTerm } }
       ]
     }
 
-    // Compter le total
-    const total = await prisma.teacher.count({ where })
+    // Cache key basé sur les paramètres de recherche
+    const cacheKey = `teachers-${q || 'all'}-${page}-${pageSize}`
 
-    // Récupérer les enseignants avec pagination
-    const teachers = await prisma.teacher.findMany({
-      where,
-      orderBy: { lastName: 'asc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        user: true
+    // Utiliser le cache pour réduire les requêtes à la base de données
+    const result = await getCached(cacheKey, async () => {
+      // Compter le total
+      const total = await prisma.teacher.count({ where })
+
+      // Récupérer les enseignants avec pagination
+      // Optimisation: Utiliser select au lieu de include pour réduire la taille des données
+      const teachers = await prisma.teacher.findMany({
+        where,
+        orderBy: { lastName: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          lastName: true,
+          middleName: true,
+          firstName: true,
+          gender: true,
+          birthDate: true,
+          specialty: true,
+          phone: true,
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true
+            }
+          }
+        }
+      })
+
+      return {
+        items: teachers,
+        total,
+        page,
+        pageSize
       }
-    })
+    }, 300000) // Cache de 5 minutes
 
-    return NextResponse.json({
-      items: teachers,
-      total,
-      page,
-      pageSize
-    })
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Erreur lors de la récupération des enseignants:', error)
     return NextResponse.json(
@@ -98,6 +126,10 @@ export async function POST(req: Request) {
         userId: user.id,
       },
     })
+
+    // Invalider le cache des enseignants après création
+    console.log('[CACHE-INVALIDATE] Invalidating teachers-* cache after creation')
+    invalidateCachePattern('teachers-*')
 
     return NextResponse.json({ user, teacher, plaintextPassword })
   } catch (e: any) {

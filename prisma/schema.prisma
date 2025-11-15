@@ -49,6 +49,10 @@ model Class {
   section     String
   stream      String?
   enrollments Enrollment[]
+
+  @@index([section])
+  @@index([level])
+  @@index([section, level, letter])
 }
 
 model Student {
@@ -62,6 +66,10 @@ model Student {
   birthDate   DateTime
   enrollments Enrollment[]
   user        User         @relation(fields: [userId], references: [id])
+
+  @@index([lastName])
+  @@index([code])
+  @@index([lastName, firstName])
 }
 
 model Teacher {
@@ -76,6 +84,10 @@ model Teacher {
   phone      String?
   hiredAt    DateTime? @default(now())
   user       User      @relation(fields: [userId], references: [id])
+
+  @@index([lastName])
+  @@index([specialty])
+  @@index([lastName, firstName])
 }
 
 model Enrollment {

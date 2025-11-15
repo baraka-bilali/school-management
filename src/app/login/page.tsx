@@ -53,6 +53,8 @@ export default function LoginPage() {
 			// Stocker le token dans le localStorage
 			if (data.token) {
 				localStorage.setItem("token", data.token)
+				// Nettoyer l'ancien cache du nom de l'école pour forcer un nouveau chargement
+				localStorage.removeItem("schoolName")
 				// Décoder le token pour obtenir le rôle
 				const payload = JSON.parse(atob(data.token.split(".")[1]))
 				// Bloquer l'accès du SUPER_ADMIN à cette page
@@ -106,6 +108,9 @@ export default function LoginPage() {
 			// Récupérer le nom de l'utilisateur
 			const payload = JSON.parse(atob(localStorage.getItem("token")?.split(".")[1] || ""))
 			setUserName(payload.name || payload.username || "")
+			
+			// Nettoyer l'ancien cache du nom de l'école pour forcer un nouveau chargement
+			localStorage.removeItem("schoolName")
 			
 			// Afficher le modal de bienvenue
 			setShowChangePasswordModal(false)

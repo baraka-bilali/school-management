@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
 import { buildStudentEmail, generatePassword } from "@/lib/generateCredentials"
+import { getCached, invalidateCachePattern } from "@/lib/cache"
 
 export async function GET(req: Request) {
   try {
@@ -18,13 +19,16 @@ export async function GET(req: Request) {
     const where: any = {}
     
     if (q) {
-      // include firstName as well so searching by first name works
-      // remove explicit `mode: 'insensitive'` to avoid potential DB/Prisma limitations
+      // IMPORTANT: MySQL ne supporte pas mode: 'insensitive'
+      // Solution: Rechercher avec contains (sensible à la casse par défaut)
+      // MySQL avec collation utf8mb4_general_ci est insensible à la casse par défaut
+      const searchTerm = q.trim()
+      
       where.OR = [
-        { lastName: { contains: q } },
-        { middleName: { contains: q } },
-        { firstName: { contains: q } },
-        { code: { contains: q } }
+        { lastName: { contains: searchTerm } },
+        { middleName: { contains: searchTerm } },
+        { firstName: { contains: searchTerm } },
+        { code: { contains: searchTerm } }
       ]
     }
 
@@ -40,7 +44,10 @@ export async function GET(req: Request) {
     }
 
     // Construire le tri
+    // Note: Le tri par classe se fera côté application car Prisma ne peut pas trier par relation many
     let orderBy: any = {}
+    const shouldSortByClass = sort === 'class'
+    
     switch (sort) {
       case 'name_asc':
         orderBy = { lastName: 'asc' }
@@ -49,54 +56,113 @@ export async function GET(req: Request) {
         orderBy = { lastName: 'desc' }
         break
       case 'class':
-        orderBy = { enrollments: { class: { name: 'asc' } } }
+        // Tri par défaut lastName, on triera côté application après
+        orderBy = { lastName: 'asc' }
         break
       default:
         orderBy = { lastName: 'asc' }
     }
 
     // Debug logging for incoming query and constructed filters
+    const perfLabel = `[API-PERF] Students query (q="${q}", page=${page})`
     console.log('GET /api/admin/students params:', { q, classId, yearId, sort, page, pageSize })
     console.log('Constructed where:', JSON.stringify(where))
     console.log('Constructed orderBy:', JSON.stringify(orderBy))
+    console.time(perfLabel)
 
-    // Compter le total
-    let total
-    let students
-    try {
-      total = await prisma.student.count({ where })
-    } catch (err) {
-      console.error('Error counting students with where:', JSON.stringify(where), err)
-      return NextResponse.json({ error: String(err) }, { status: 500 })
-    }
+    // Clé de cache unique basée sur les paramètres de recherche
+    const cacheKey = `students-${q || 'all'}-${classId || 'all'}-${yearId || 'all'}-${sort}-${page}-${pageSize}`
+    
+    // Utiliser le cache pour cette requête (5 minutes de cache)
+    const result = await getCached(cacheKey, async () => {
+      let total
+      let students
+      
+      try {
+        console.time(`${perfLabel} - count`)
+        total = await prisma.student.count({ where })
+        console.timeEnd(`${perfLabel} - count`)
+      } catch (err) {
+        console.error('Error counting students with where:', JSON.stringify(where), err)
+        throw err
+      }
 
-    // Récupérer les étudiants avec pagination
-    try {
-      students = await prisma.student.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        include: {
-          enrollments: {
-            include: {
-              class: true,
-              year: true
+      // Récupérer les étudiants avec pagination
+      // Optimisation: Utiliser select au lieu de include pour réduire la taille des données
+      try {
+        console.time(`${perfLabel} - findMany`)
+        students = await prisma.student.findMany({
+          where,
+          orderBy,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          select: {
+            id: true,
+            code: true,
+            lastName: true,
+            middleName: true,
+            firstName: true,
+            gender: true,
+            birthDate: true,
+            enrollments: {
+              select: {
+                id: true,
+                classId: true,
+                yearId: true,
+                status: true,
+                class: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                },
+                year: {
+                  select: {
+                    id: true,
+                    name: true,
+                    current: true
+                  }
+                }
+              }
             }
           }
-        }
-      })
-    } catch (err) {
-      console.error('Error finding students with where/orderBy:', JSON.stringify({ where, orderBy }), err)
-      return NextResponse.json({ error: String(err) }, { status: 500 })
+        })
+        console.timeEnd(`${perfLabel} - findMany`)
+      } catch (err) {
+        console.error('Error finding students with where/orderBy:', JSON.stringify({ where, orderBy }), err)
+        console.timeEnd(`${perfLabel} - findMany`)
+        throw err
+      }
+      
+      // Tri par classe si demandé (côté application car Prisma ne peut pas trier par relation many)
+      if (shouldSortByClass) {
+        students.sort((a: any, b: any) => {
+          const classA = a.enrollments?.[0]?.class?.name || ''
+          const classB = b.enrollments?.[0]?.class?.name || ''
+          return classA.localeCompare(classB)
+        })
+      }
+
+      return { items: students, total, page, pageSize }
+    }, 300000) // Cache de 5 minutes
+
+    console.timeEnd(perfLabel)
+    console.log(`[API-PERF] Returned ${result.items.length} students out of ${result.total} total`)
+    
+    // Log détaillé pour débuggage si recherche active
+    if (q) {
+      console.log(`[SEARCH-DEBUG] Searching for: "${q}"`)
+      console.log(`[SEARCH-DEBUG] Found ${result.total} matching students`)
+      if (result.items.length > 0) {
+        console.log(`[SEARCH-DEBUG] First result:`, {
+          code: result.items[0].code,
+          lastName: result.items[0].lastName,
+          firstName: result.items[0].firstName
+        })
+      }
     }
 
-    return NextResponse.json({
-      items: students,
-      total,
-      page,
-      pageSize
-    })
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Erreur lors de la récupération des étudiants:', error)
     return NextResponse.json(
@@ -178,6 +244,10 @@ export async function POST(req: Request) {
 
       return { user, student }
     })
+
+    // Invalider le cache des étudiants après création
+    invalidateCachePattern('students-*')
+    console.log('[CACHE] Invalidated students cache after creation')
 
     return NextResponse.json({ 
       ...result, 

@@ -32,6 +32,8 @@ export default function SuperAdminLoginPage() {
       if (!res.ok) throw new Error(data.error || "Erreur inconnue")
       if (data.token) {
         localStorage.setItem("token", data.token)
+        // Nettoyer le cache du nom de l'école (super admin n'en a pas besoin)
+        localStorage.removeItem("schoolName")
         const payload = JSON.parse(atob(data.token.split(".")[1]))
         if (payload.role !== "SUPER_ADMIN") {
           setError("Accès réservé au Super Admin")

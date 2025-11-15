@@ -1,19 +1,33 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getCached, invalidateCachePattern } from "@/lib/cache"
 
 export async function GET() {
+  const perfLabel = `[API-PERF] Classes fetch`
+  console.time(perfLabel)
+  
   try {
-    const classes = await prisma.class.findMany({
-      orderBy: [
-        { section: 'asc' },
-        { level: 'asc' },
-        { letter: 'asc' }
-      ]
-    })
+    // Cache key simple car pas de paramètres de recherche
+    const cacheKey = 'classes-all'
 
-    return NextResponse.json({ classes })
+    const result = await getCached(cacheKey, async () => {
+      const classes = await prisma.class.findMany({
+        orderBy: [
+          { section: 'asc' },
+          { level: 'asc' },
+          { letter: 'asc' }
+        ]
+      })
+      return { classes }
+    }, 300000) // Cache de 5 minutes
+
+    console.timeEnd(perfLabel)
+    console.log(`[API-PERF] Returned ${result.classes.length} classes`)
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Erreur lors de la récupération des classes:', error)
+    console.timeEnd(perfLabel)
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }
@@ -78,6 +92,10 @@ export async function POST(req: Request) {
         stream: stream || null
       }
     })
+
+    // Invalider le cache des classes après création
+    console.log('[CACHE-INVALIDATE] Invalidating classes-* cache after creation')
+    invalidateCachePattern('classes-*')
 
     return NextResponse.json(newClass)
   } catch (error) {

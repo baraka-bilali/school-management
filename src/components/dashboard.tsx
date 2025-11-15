@@ -51,26 +51,22 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      // Récupérer les statistiques des étudiants
-      const studentsRes = await fetch('/api/admin/students?pageSize=1')
-      const studentsText = await studentsRes.text()
-      const studentsData = studentsText ? JSON.parse(studentsText) : { total: 0 }
-      
-      // Récupérer les statistiques des enseignants
-      const teachersRes = await fetch('/api/admin/teachers?pageSize=1')
-      const teachersText = await teachersRes.text()
-      const teachersData = teachersText ? JSON.parse(teachersText) : { total: 0 }
-      
-      // Récupérer les métadonnées (classes)
-      const metaRes = await fetch('/api/admin/meta')
-      const metaText = await metaRes.text()
-      const metaData = metaText ? JSON.parse(metaText) : { classes: [] }
+      // OPTIMISATION: Utiliser l'endpoint unifié au lieu de 3 requêtes séparées
+      // Réduit les appels API de 3 à 1 (66% de réduction)
+      const statsRes = await fetch('/api/admin/dashboard-stats')
+      const statsText = await statsRes.text()
+      const statsData = statsText ? JSON.parse(statsText) : { 
+        students: 0, 
+        teachers: 0, 
+        classes: 0, 
+        attendance: "94%" 
+      }
 
       setStats({
-        students: studentsData.total || 0,
-        teachers: teachersData.total || 0,
-        classes: metaData.classes?.length || 0,
-        attendance: "94%" // Placeholder pour l'instant
+        students: statsData.students || 0,
+        teachers: statsData.teachers || 0,
+        classes: statsData.classes || 0,
+        attendance: statsData.attendance || "94%"
       })
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error)

@@ -27,9 +27,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Mot de passe incorrect." }, { status: 401 });
     }
 
-    // Générer un token JWT
+    // Générer un token JWT avec schoolId
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role,
+        schoolId: user.schoolId,
+        name: user.name
+      },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
