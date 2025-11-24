@@ -116,14 +116,15 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         {/* Mobile Sidebar */}
         <aside className={`
           fixed top-0 left-0 bottom-0 z-50 ${bgColor} border-r ${borderColor}
-          transform transition-transform duration-300 ease-in-out md:hidden
+          transform transition-transform duration-300 ease-out md:hidden
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           w-80
-        `}>
+        `}
+        style={{ willChange: 'transform' }}>
           {/* Shell */}
           <div className="flex h-full flex-col">
           {/* Header */}
-          <div className={`flex items-center justify-between p-4 border-b ${borderColor} flex-shrink-0`}>
+          <div className={`flex items-center justify-between p-4 border-b ${borderColor} flex-shrink-0 overflow-hidden`}>
             <button
               onClick={onToggle}
               className={`p-2 rounded-lg ${hoverBg} ml-auto`}
@@ -132,7 +133,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             </button>
           </div>
           {/* Navigation (scrollable) */}
-          <nav className="px-4 py-6 flex-1 overflow-y-auto">
+          <nav className="px-4 py-6 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="mb-6">
               <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
               <ul className="space-y-1">
@@ -141,7 +142,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     <Link 
                       href={item.href}
                       className={`
-                        flex items-center px-3 py-2.5 rounded-lg transition-colors
+                        flex items-center px-3 py-2.5 rounded-lg transition-all duration-300 ease-out
                         ${isActive(item.href) 
                           ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600` 
                           : `${textSecondary} ${hoverBg}`
@@ -167,7 +168,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors w-full text-left`}
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-all duration-300 ease-out w-full text-left`}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
                       <span>{item.label}</span>
@@ -175,7 +176,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   ) : (
                     <Link 
                       href={(item as { href: string }).href}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors`}
+                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-all duration-300 ease-out`}
                       onClick={onToggle}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
@@ -246,26 +247,28 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     <>
       <aside className={`
         fixed top-0 left-0 bottom-0 ${bgColor} border-r ${borderColor} pt-16 z-30
-        transition-all duration-300 ease-in-out
+        transition-all duration-300 ease-out overflow-hidden
         ${isOpen ? 'w-64' : 'w-16'}
-      `}>
-        <div className="flex h-full flex-col">
+      `}
+      style={{ willChange: 'width' }}>
+        <div className="flex h-full flex-col overflow-hidden">
           {/* Logo Section - Removed */}
           {/* Navigation (scrollable) */}
-          <nav className="px-4 py-6 flex-1 overflow-y-auto">
+          <nav className="px-4 py-6 flex-1 overflow-y-auto overflow-x-hidden">
             <div className="mb-6">
-              {isOpen && (
-                <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
-              )}
+              <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2 transition-all duration-300 ease-out ${
+                isOpen ? 'opacity-100 max-h-10' : 'opacity-0 max-h-0 overflow-hidden'
+              }`}>Menu principal</h3>
               <ul className="space-y-1">
                 {navItems.map((item, index) => (
                   <li key={index}>
                     <Link 
                       href={item.href}
                       className={`
-                        flex items-center px-3 py-2.5 rounded-lg transition-colors group
+                        flex items-center rounded-lg transition-all duration-300 ease-out group relative
+                        ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
                         ${isActive(item.href) 
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600` 
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 ${isOpen ? 'border-r-2 border-indigo-600' : ''}` 
                           : `${textSecondary} ${hoverBg}`
                         }
                       `}
@@ -288,9 +291,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           </nav>
           {/* Footer (pinned) */}
           <div className={`px-4 py-4 border-t ${borderColor} flex-shrink-0`}>
-            {isOpen && (
-              <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-3 px-2`}>Administration</h3>
-            )}
+            <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-3 px-2 transition-all duration-300 ease-out ${
+              isOpen ? 'opacity-100 max-h-10' : 'opacity-0 max-h-0 overflow-hidden mb-0'
+            }`}>Administration</h3>
             <ul className="space-y-1">
               {adminItems.map((item, index) => (
                 <li key={index}>
@@ -298,7 +301,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors w-full text-left group`}
+                      className={`flex items-center rounded-lg transition-all duration-300 ease-out w-full text-left group relative ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'} ${textSecondary} ${hoverBg}`}
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       {isOpen && <span className="ml-3">{item.label}</span>}
@@ -311,7 +314,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   ) : (
                     <Link 
                       href={(item as { href: string }).href}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-colors group`}
+                      className={`flex items-center rounded-lg transition-all duration-300 ease-out group relative ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'} ${textSecondary} ${hoverBg}`}
                       title={!isOpen ? item.label : undefined}
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
