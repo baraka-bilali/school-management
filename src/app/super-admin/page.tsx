@@ -1911,7 +1911,7 @@ export default function SuperAdminHome() {
           {/* Copyright */}
           <div className={`px-6 py-4 border-t ${borderColor} text-center`}>
             <p className={`text-sm ${textSecondary}`}>
-              © {new Date().getFullYear()} <span className="font-semibold">School Management System</span>. 
+              © {new Date().getFullYear()} <span className="font-semibold">digiSchool</span>. 
               Tous droits réservés. Développé avec ❤️ par <span className="font-semibold">Becker Baraka-Bilali</span>
             </p>
           </div>

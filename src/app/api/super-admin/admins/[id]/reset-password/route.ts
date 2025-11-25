@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs"
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
 type JwtPayload = {
-  userId: number
+  id: number
   role: string
 }
 

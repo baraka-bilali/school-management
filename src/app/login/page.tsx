@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { School, Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,13 +140,12 @@ export default function LoginPage() {
 	return (
 		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
 			<div className="w-full max-w-md">
-				<div className="flex flex-col items-center mb-6">
-					<div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center mb-3">
-						<School className="w-6 h-6 text-indigo-600" />
-					</div>
-					<h1 className="text-2xl font-semibold text-gray-800">School Management</h1>
-					<p className="text-sm text-gray-500 mt-1">Connectez-vous à votre compte</p>
+			<div className="flex flex-col items-center mb-4">
+				<div className="mb-2">
+					<Image src="/DigiSchool.png" alt="digiSchool" width={200} height={80} priority />
 				</div>
+				<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
+			</div>
 				<Card className="shadow-lg">
 					<CardHeader>
 						<CardTitle>Connexion</CardTitle>

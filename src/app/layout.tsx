@@ -4,8 +4,8 @@ import "./no-translate.css";
 import ClientOnly from "@/components/client-only";
 
 export const metadata: Metadata = {
-  title: "School Management",
-  description: "Système de gestion scolaire",
+  title: "digiSchool",
+  description: "Plateforme de gestion scolaire digitale",
 };
 
 export default function RootLayout({

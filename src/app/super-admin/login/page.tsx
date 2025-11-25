@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,12 +55,12 @@ export default function SuperAdminLoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-3">
-            <ShieldCheck className="w-6 h-6 text-emerald-600" />
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-2">
+            <Image src="/DigiSchool.png" alt="digiSchool" width={200} height={80} priority />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-800">Super Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Connexion réservée</p>
+          <h1 className="text-xl font-semibold text-emerald-600">Super Admin</h1>
+          <p className="text-sm text-gray-500">Connexion réservée</p>
         </div>
         <Card className="shadow-lg">
           <CardHeader>
