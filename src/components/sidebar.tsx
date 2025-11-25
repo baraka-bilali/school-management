@@ -83,9 +83,13 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       await fetch("/api/auth/logout", { method: "POST" })
     } catch {}
     // Clear any client-side token fallback
-    try { localStorage.removeItem("token") } catch {}
+    try { 
+      localStorage.removeItem("token")
+      localStorage.removeItem("schoolName")
+    } catch {}
     setShowLogoutModal(false)
-    router.push("/login")
+    // Forcer un rechargement complet pour éviter les problèmes de cache
+    window.location.href = "/login"
   }
 
   type AdminItem =

@@ -530,9 +530,11 @@ export default function SuperAdminHome() {
         credentials: 'include'
       })
       localStorage.removeItem('token')
+      localStorage.removeItem('schoolName')
       // Attendre un peu pour montrer l'animation
       await new Promise(resolve => setTimeout(resolve, 1000))
-      router.push('/super-admin/login')
+      // Forcer un rechargement complet pour éviter les problèmes de cache
+      window.location.href = '/super-admin/login'
     } catch (e) {
       console.error(e)
       setLoggingOut(false)

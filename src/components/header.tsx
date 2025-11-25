@@ -136,7 +136,8 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
     console.log("🗑️ Cache du nom de l'école nettoyé")
     setShowLogoutModal(false)
     setShowProfileModal(false)
-    router.push("/login")
+    // Forcer un rechargement complet pour éviter les problèmes de cache
+    window.location.href = "/login"
   }
   const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
