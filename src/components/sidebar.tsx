@@ -24,6 +24,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const router = useRouter()
   const pathname = usePathname()
@@ -79,17 +80,21 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
+      setLoggingOut(true)
       // Clear HttpOnly cookie on server
       await fetch("/api/auth/logout", { method: "POST" })
-    } catch {}
-    // Clear any client-side token fallback
-    try { 
+      // Clear any client-side token fallback
       localStorage.removeItem("token")
       localStorage.removeItem("schoolName")
-    } catch {}
-    setShowLogoutModal(false)
-    // Forcer un rechargement complet pour éviter les problèmes de cache
-    window.location.href = "/login"
+      // Attendre un peu pour montrer l'animation
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setShowLogoutModal(false)
+      // Forcer un rechargement complet pour éviter les problèmes de cache
+      window.location.href = "/login"
+    } catch (error) {
+      console.error(error)
+      setLoggingOut(false)
+    }
   }
 
   type AdminItem =
@@ -229,14 +234,26 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                   </button>
                   <button
                     onClick={handleLogout}
+                    disabled={loggingOut}
                     className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      theme === "dark"
+                      loggingOut
+                        ? "opacity-50 cursor-not-allowed"
+                        : theme === "dark"
                         ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50"
                         : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
                     }`}
                   >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Déconnexion
+                    {loggingOut ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Déconnexion...
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-3.5 h-3.5" />
+                        Déconnexion
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -372,14 +389,26 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 </button>
                 <button
                   onClick={handleLogout}
+                  disabled={loggingOut}
                   className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                    theme === "dark"
+                    loggingOut
+                      ? "opacity-50 cursor-not-allowed"
+                      : theme === "dark"
                       ? "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50"
                       : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
                   }`}
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Déconnexion
+                  {loggingOut ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Déconnexion...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="w-3.5 h-3.5" />
+                      Déconnexion
+                    </>
+                  )}
                 </button>
               </div>
             </div>

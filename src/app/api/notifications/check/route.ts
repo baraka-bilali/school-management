@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma"
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 interface JwtPayload {
-  userId: number
+  id: number
   role: string
+  schoolId?: number
 }
 
 // Fonction pour générer les notifications d'expiration
@@ -138,12 +139,22 @@ export async function POST(req: NextRequest) {
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
 
-    // Seuls les super admins peuvent déclencher la vérification
-    if (decoded.role !== "SUPER_ADMIN") {
+    // Seuls les super admins et admins peuvent déclencher la vérification
+    const allowedRoles = ["SUPER_ADMIN", "ADMIN", "COMPTABLE", "DIRECTEUR_DISCIPLINE", "DIRECTEUR_ETUDES"]
+    if (!allowedRoles.includes(decoded.role)) {
       return NextResponse.json(
         { error: "Accès refusé" },
         { status: 403 }
       )
+    }
+
+    // Seuls les super admins peuvent générer toutes les notifications
+    // Les admins normaux reçoivent juste une confirmation (les notifications sont créées automatiquement)
+    if (decoded.role !== "SUPER_ADMIN") {
+      return NextResponse.json({
+        success: true,
+        message: "Vérification effectuée"
+      })
     }
 
     const notifications = await generateExpirationNotifications()

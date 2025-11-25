@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma"
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 interface JwtPayload {
-  userId: number
+  id: number
   role: string
+  schoolId?: number
 }
 
 // PATCH /api/notifications/[id] - Marquer une notification comme lue
@@ -22,7 +23,7 @@ export async function PATCH(
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.userId
+    const userId = decoded.id
     
     const params = await context.params
     const notificationId = parseInt(params.id)
@@ -75,7 +76,7 @@ export async function DELETE(
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.userId
+    const userId = decoded.id
     
     const params = await context.params
     const notificationId = parseInt(params.id)

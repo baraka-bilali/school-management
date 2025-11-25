@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma"
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 interface JwtPayload {
-  userId: number
+  id: number
   role: string
+  schoolId?: number
 }
 
 // GET /api/notifications - Récupérer les notifications
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.userId
+    const userId = decoded.id
     const userRole = decoded.role
 
     // Super admin voit toutes les notifications
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.userId
+    const userId = decoded.id
 
     await prisma.notification.updateMany({
       where: {
