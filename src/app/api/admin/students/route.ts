@@ -1,11 +1,20 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
 import { buildStudentEmail, generatePassword } from "@/lib/generateCredentials"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
+import jwt from "jsonwebtoken"
 
-export async function GET(req: Request) {
+const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
+
+interface JwtPayload {
+  id: number
+  role: string
+  schoolId?: number
+}
+
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q') || ''
@@ -172,8 +181,21 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Vérifier l'authentification
+    const token = req.cookies.get("token")?.value
+    if (!token) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+    const adminSchoolId = decoded.schoolId
+
+    if (!adminSchoolId) {
+      return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
+    }
+
     const body = await req.json()
 
     const {
@@ -209,13 +231,14 @@ export async function POST(req: Request) {
 
     // Créer l'utilisateur et l'étudiant dans une transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Créer l'utilisateur
+      // Créer l'utilisateur avec le schoolId de l'admin
       const user = await tx.user.create({
         data: {
           name: `${lastName} ${firstName}`,
           email,
           password: hashedPassword,
           role: "ELEVE",
+          schoolId: adminSchoolId,
         },
       })
 

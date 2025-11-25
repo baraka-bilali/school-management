@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
@@ -386,6 +387,7 @@ function Pagination({ state, setState, total }: { state: PaginationState; setSta
 }
 
 function StudentsSection({ theme }: { theme: "light" | "dark" }) {
+  const router = useRouter()
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -704,7 +706,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                   {/* En-tête avec code et actions */}
                   <div className="flex items-center justify-between">
                     <div className={`font-medium ${textColor}`}>Code: {s.code}</div>
-                    <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); }}>
+                    <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}>
                       <Eye className="h-4 w-4" />
                     </button>
                   </div>
@@ -880,7 +882,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                               </button>
                               <button 
                                 className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
-                                onClick={(e) => { e.stopPropagation(); }}
+                                onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}
                               >
                                 <Eye className="h-4 w-4" />
                                 <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
