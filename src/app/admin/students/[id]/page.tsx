@@ -209,7 +209,7 @@ export default function StudentDetailsPage() {
           <div className="flex items-start gap-6">
             {/* Photo de profil */}
             <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+              <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
                 {student.firstName.charAt(0)}{student.lastName.charAt(0)}
               </div>
             </div>
