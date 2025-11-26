@@ -136,7 +136,7 @@ export default function StudentDetailsPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-32">
+        <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 140px)' }}>
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className={textSecondary}>Chargement...</p>
@@ -149,7 +149,7 @@ export default function StudentDetailsPage() {
   if (error || !student) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-32">
+        <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 140px)' }}>
           <div className="text-center p-8">
             <div className="mb-4">
               <svg className="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
