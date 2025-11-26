@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
 import { buildStudentEmail, generatePassword } from "@/lib/generateCredentials"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
+import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -87,20 +88,15 @@ export async function GET(req: NextRequest) {
       let total
       let students
       
-      try {
-        console.time(`${perfLabel} - count`)
-        total = await prisma.student.count({ where })
-        console.timeEnd(`${perfLabel} - count`)
-      } catch (err) {
-        console.error('Error counting students with where:', JSON.stringify(where), err)
-        throw err
-      }
+      // Compter avec retry automatique
+      console.time(`${perfLabel} - count`)
+      total = await withRetry(() => prisma.student.count({ where }))
+      console.timeEnd(`${perfLabel} - count`)
 
-      // Récupérer les étudiants avec pagination
-      // Optimisation: Utiliser select au lieu de include pour réduire la taille des données
-      try {
-        console.time(`${perfLabel} - findMany`)
-        students = await prisma.student.findMany({
+      // Récupérer les étudiants avec pagination et retry automatique
+      console.time(`${perfLabel} - findMany`)
+      students = await withRetry(() => 
+        prisma.student.findMany({
           where,
           orderBy,
           skip: (page - 1) * pageSize,
@@ -136,12 +132,8 @@ export async function GET(req: NextRequest) {
             }
           }
         })
-        console.timeEnd(`${perfLabel} - findMany`)
-      } catch (err) {
-        console.error('Error finding students with where/orderBy:', JSON.stringify({ where, orderBy }), err)
-        console.timeEnd(`${perfLabel} - findMany`)
-        throw err
-      }
+      )
+      console.timeEnd(`${perfLabel} - findMany`)
       
       // Tri par classe si demandé (côté application car Prisma ne peut pas trier par relation many)
       if (shouldSortByClass) {

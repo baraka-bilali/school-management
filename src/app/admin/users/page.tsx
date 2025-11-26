@@ -697,7 +697,16 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
           {/* Mobile: stacked cards */}
           <div className="md:hidden space-y-3">
             {loading && (
-              <div className={`px-3 py-8 text-center ${textSecondary}`}>Chargement des données...</div>
+              <div className={`px-3 py-8 text-center ${textSecondary}`}>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <p>Chargement des données...</p>
+                </div>
+              </div>
             )}
             {!loading && items.map((s) => {
               const enr = s.enrollments?.[0]
@@ -755,6 +764,20 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className={`px-3 py-12 ${textSecondary}`}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <p>Chargement des données...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {!loading && items.map((s) => {
                 const enr = s.enrollments?.[0]
                 const isOpen = expandedId === s.id
@@ -915,20 +938,6 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                   </React.Fragment>
                 )
               })}
-              {loading && items.length === 0 && (
-                <tr>
-                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      Chargement des données...
-                    </div>
-                  </td>
-                </tr>
-              )}
               {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun élève trouvé.</td>
@@ -1140,6 +1149,20 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
               </tr>
             </thead>
             <tbody className={theme === "dark" ? "divide-y divide-gray-700" : "divide-y divide-gray-200"}>
+              {loading && (
+                <tr>
+                  <td colSpan={9} className={`px-3 py-12 ${textSecondary}`}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <p>Chargement des données...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {!loading && items.map((t) => {
                 const isOpen = false // no separate expanded id for teachers; could reuse editingId but keep closed by default
                 return (
@@ -1310,20 +1333,6 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                   </React.Fragment>
                 )
               })}
-              {loading && items.length === 0 && (
-                <tr>
-                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      Chargement des données...
-                    </div>
-                  </td>
-                </tr>
-              )}
               {!loading && items.length === 0 && (
                 <tr>
                   <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun enseignant trouvé.</td>
