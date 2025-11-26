@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Layout from "@/components/layout"
 import { 
   User, 
   Mail, 
@@ -131,77 +132,78 @@ export default function StudentDetailsPage() {
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const textMuted = theme === "dark" ? "text-gray-500" : "text-gray-500"
-  const headerBg = theme === "dark" ? "bg-gray-800/50" : "bg-gray-800"
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${bgColor} flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className={textSecondary}>Chargement...</p>
+      <Layout>
+        <div className="flex items-center justify-center py-32">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className={textSecondary}>Chargement...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     )
   }
 
   if (error || !student) {
     return (
-      <div className={`min-h-screen ${bgColor} flex items-center justify-center`}>
-        <div className="text-center p-8">
-          <div className="mb-4">
-            <svg className="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      <Layout>
+        <div className="flex items-center justify-center py-32">
+          <div className="text-center p-8">
+            <div className="mb-4">
+              <svg className="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className={`${textColor} text-xl font-semibold mb-2`}>{error || "Élève introuvable"}</p>
+            <p className={`${textSecondary} mb-6`}>
+              {error || `L'élève avec l'ID ${params.id} n'existe pas ou vous n'avez pas l'autorisation d'y accéder.`}
+            </p>
+            <button
+              onClick={() => router.push('/admin/users')}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Retour à la liste
+            </button>
           </div>
-          <p className={`${textColor} text-xl font-semibold mb-2`}>{error || "Élève introuvable"}</p>
-          <p className={`${textSecondary} mb-6`}>L'élève avec l'ID {params.id} n'existe pas ou vous n'avez pas l'autorisation d'y accéder.</p>
-          <button
-            onClick={() => router.push('/admin/users')}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            Retour à la liste
-          </button>
         </div>
-      </div>
+      </Layout>
     )
   }
 
   const enrollment = student.enrollments[0]
 
   return (
-    <div className={`min-h-screen ${bgColor}`}>
-      {/* Header */}
-      <div className={`${headerBg} border-b ${borderColor} sticky top-0 z-10`}>
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/admin/users')}
-                className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors text-white"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Détails de l'élève</h1>
-                <p className="text-gray-400 text-sm mt-0.5">
-                  Informations complètes de l'élève
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
-                <Edit className="w-4 h-4" />
-                Modifier
-              </button>
-              <button className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                Archiver l'élève
-              </button>
+    <Layout>
+      <div className="p-6 space-y-6">
+        {/* Header avec bouton retour */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/admin/users')}
+              className={`p-2 rounded-lg ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"} transition-colors ${textColor}`}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className={`text-2xl font-bold ${textColor}`}>Détails de l'élève</h1>
+              <p className={`${textSecondary} text-sm mt-0.5`}>
+                Informations complètes de l'élève
+              </p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+              <Edit className="w-4 h-4" />
+              Modifier
+            </button>
+            <button className={`px-4 py-2 ${theme === "dark" ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"} ${textColor} rounded-lg transition-colors`}>
+              Archiver l'élève
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Carte de profil */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6 mb-6`}>
           <div className="flex items-start gap-6">
@@ -490,6 +492,6 @@ export default function StudentDetailsPage() {
           )}
         </div>
       </div>
-    </div>
+    </Layout>
   )
 }

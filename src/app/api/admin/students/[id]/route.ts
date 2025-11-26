@@ -23,6 +23,7 @@ export async function GET(
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+    console.log(`[DEBUG] JWT decoded - User ID: ${decoded.id}, Role: ${decoded.role}, SchoolId: ${decoded.schoolId}`)
 
     const allowedRoles = ["ADMIN", "COMPTABLE", "DIRECTEUR_DISCIPLINE", "DIRECTEUR_ETUDES"]
     if (!allowedRoles.includes(decoded.role)) {
@@ -31,6 +32,7 @@ export async function GET(
 
     const params = await context.params
     const studentId = parseInt(params.id)
+    console.log(`[DEBUG] Tentative d'accès à l'élève ID: ${studentId}`)
 
     if (isNaN(studentId)) {
       return NextResponse.json({ error: "ID invalide" }, { status: 400 })
@@ -75,12 +77,16 @@ export async function GET(
       return NextResponse.json({ error: "Élève introuvable" }, { status: 404 })
     }
 
+    // Debug: afficher les schoolId
+    console.log(`[DEBUG] Admin schoolId: ${decoded.schoolId}, Élève schoolId: ${student.user?.schoolId}`)
+
     // Vérifier que l'élève appartient à l'école de l'admin (si schoolId est défini)
     if (decoded.schoolId && student.user?.schoolId && student.user.schoolId !== decoded.schoolId) {
       console.log(`Accès refusé: élève de l'école ${student.user?.schoolId}, admin de l'école ${decoded.schoolId}`)
       return NextResponse.json({ error: "Accès refusé à cet élève" }, { status: 403 })
     }
 
+    console.log(`[DEBUG] Accès autorisé pour l'élève ${studentId}`)
     return NextResponse.json({ student })
   } catch (error) {
     console.error("Erreur lors de la récupération de l'élève:", error)
