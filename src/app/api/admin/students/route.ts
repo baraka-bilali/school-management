@@ -17,6 +17,19 @@ interface JwtPayload {
 
 export async function GET(req: NextRequest) {
   try {
+    // Vérifier l'authentification et récupérer le schoolId de l'admin
+    const token = req.cookies.get("token")?.value
+    let adminSchoolId: number | undefined
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+        adminSchoolId = decoded.schoolId
+      } catch (error) {
+        console.log('Token invalide, continuer sans filtre schoolId')
+      }
+    }
+
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q') || ''
     const classId = searchParams.get('classId')
@@ -28,18 +41,45 @@ export async function GET(req: NextRequest) {
     // Construire les filtres
     const where: any = {}
     
+    // Filtrer par schoolId de l'admin connecté
+    if (adminSchoolId) {
+      where.user = {
+        schoolId: adminSchoolId
+      }
+    }
+    
     if (q) {
       // IMPORTANT: MySQL ne supporte pas mode: 'insensitive'
       // Solution: Rechercher avec contains (sensible à la casse par défaut)
       // MySQL avec collation utf8mb4_general_ci est insensible à la casse par défaut
       const searchTerm = q.trim()
       
-      where.OR = [
-        { lastName: { contains: searchTerm } },
-        { middleName: { contains: searchTerm } },
-        { firstName: { contains: searchTerm } },
-        { code: { contains: searchTerm } }
-      ]
+      // Combiner le filtre de recherche avec le filtre schoolId
+      if (adminSchoolId) {
+        where.AND = [
+          {
+            user: {
+              schoolId: adminSchoolId
+            }
+          },
+          {
+            OR: [
+              { lastName: { contains: searchTerm } },
+              { middleName: { contains: searchTerm } },
+              { firstName: { contains: searchTerm } },
+              { code: { contains: searchTerm } }
+            ]
+          }
+        ]
+        delete where.user // Supprimer le filtre simple car on utilise AND
+      } else {
+        where.OR = [
+          { lastName: { contains: searchTerm } },
+          { middleName: { contains: searchTerm } },
+          { firstName: { contains: searchTerm } },
+          { code: { contains: searchTerm } }
+        ]
+      }
     }
 
     // Filtre par classe et/ou année académique
@@ -80,8 +120,8 @@ export async function GET(req: NextRequest) {
     console.log('Constructed orderBy:', JSON.stringify(orderBy))
     console.time(perfLabel)
 
-    // Clé de cache unique basée sur les paramètres de recherche
-    const cacheKey = `students-${q || 'all'}-${classId || 'all'}-${yearId || 'all'}-${sort}-${page}-${pageSize}`
+    // Clé de cache unique basée sur les paramètres de recherche ET le schoolId
+    const cacheKey = `students-${adminSchoolId || 'all'}-${q || 'all'}-${classId || 'all'}-${yearId || 'all'}-${sort}-${page}-${pageSize}`
     
     // Utiliser le cache pour cette requête (5 minutes de cache)
     const result = await getCached(cacheKey, async () => {

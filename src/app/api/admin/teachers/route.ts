@@ -15,6 +15,19 @@ interface JwtPayload {
 
 export async function GET(req: NextRequest) {
   try {
+    // Vérifier l'authentification et récupérer le schoolId de l'admin
+    const token = req.cookies.get("token")?.value
+    let adminSchoolId: number | undefined
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+        adminSchoolId = decoded.schoolId
+      } catch (error) {
+        console.log('Token invalide, continuer sans filtre schoolId')
+      }
+    }
+
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q') || ''
     const page = parseInt(searchParams.get('page') || '1')
@@ -23,21 +36,50 @@ export async function GET(req: NextRequest) {
     // Construire les filtres
     const where: any = {}
     
+    // Filtrer par schoolId de l'admin connecté
+    if (adminSchoolId) {
+      where.user = {
+        schoolId: adminSchoolId
+      }
+    }
+    
     if (q) {
       // IMPORTANT: MySQL ne supporte pas mode: 'insensitive' dans Prisma
       // La collation MySQL utf8mb4_general_ci gère l'insensibilité à la casse automatiquement
       const searchTerm = q.trim()
-      where.OR = [
-        { lastName: { contains: searchTerm } },
-        { middleName: { contains: searchTerm } },
-        { firstName: { contains: searchTerm } },
-        { specialty: { contains: searchTerm } },
-        { phone: { contains: searchTerm } }
-      ]
+      
+      // Combiner le filtre de recherche avec le filtre schoolId
+      if (adminSchoolId) {
+        where.AND = [
+          {
+            user: {
+              schoolId: adminSchoolId
+            }
+          },
+          {
+            OR: [
+              { lastName: { contains: searchTerm } },
+              { middleName: { contains: searchTerm } },
+              { firstName: { contains: searchTerm } },
+              { specialty: { contains: searchTerm } },
+              { phone: { contains: searchTerm } }
+            ]
+          }
+        ]
+        delete where.user
+      } else {
+        where.OR = [
+          { lastName: { contains: searchTerm } },
+          { middleName: { contains: searchTerm } },
+          { firstName: { contains: searchTerm } },
+          { specialty: { contains: searchTerm } },
+          { phone: { contains: searchTerm } }
+        ]
+      }
     }
 
-    // Cache key basé sur les paramètres de recherche
-    const cacheKey = `teachers-${q || 'all'}-${page}-${pageSize}`
+    // Cache key basé sur les paramètres de recherche ET le schoolId
+    const cacheKey = `teachers-${adminSchoolId || 'all'}-${q || 'all'}-${page}-${pageSize}`
 
     // Utiliser le cache pour réduire les requêtes à la base de données
     const result = await getCached(cacheKey, async () => {
