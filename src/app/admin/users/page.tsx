@@ -10,6 +10,7 @@ import Portal from "@/components/portal"
 import { Eye, Pencil, Check, X, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
+import { authFetch } from "@/lib/auth-fetch"
 
 type TabKey = "students" | "teachers"
 
@@ -178,7 +179,7 @@ function CreateStudentModal({
   const submit = async () => {
     setSubmitting(true)
     try {
-      const res = await fetch("/api/admin/students", {
+      const res = await authFetch("/api/admin/students", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -460,7 +461,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
         return
       }
 
-      const response = await fetch(`/api/admin/students/${studentId}`, {
+      const response = await authFetch(`/api/admin/students/${studentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -526,7 +527,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
 
   // Load filter data (classes and academic years)
   useEffect(() => {
-    fetch("/api/admin/meta")
+    authFetch("/api/admin/meta")
       .then((r) => r.json())
       .then((res) => {
         setClasses(res.classes || [])
@@ -554,7 +555,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
         params.set("page", String(pagination.page))
         params.set("pageSize", String(pagination.pageSize))
         
-        const response = await fetch(`/api/admin/students?${params.toString()}`)
+        const response = await authFetch(`/api/admin/students?${params.toString()}`)
         const res = await response.json()
         setItems(res.items || [])
         setTotal(res.total || 0)
@@ -1014,7 +1015,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
       console.time(perfLabel)
       
       try {
-        const r = await fetch(`/api/admin/teachers?${params.toString()}`)
+        const r = await authFetch(`/api/admin/teachers?${params.toString()}`)
         const text = await r.text()
         const res = text ? JSON.parse(text) : { items: [], total: 0 }
         setItems(res.items || [])
@@ -1036,7 +1037,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   useEffect(() => {
     ;(async () => {
       try {
-        const r = await fetch("/api/admin/meta")
+        const r = await authFetch("/api/admin/meta")
         const text = await r.text()
         const res = text ? JSON.parse(text) : { years: [], currentYearId: null }
         setYears(res.years || [])
@@ -1222,7 +1223,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
 
                                 // handle save
                                 try {
-                                  const res = await fetch(`/api/admin/teachers/${t.id}`, {
+                                  const res = await authFetch(`/api/admin/teachers/${t.id}`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
@@ -1423,7 +1424,7 @@ function CreateTeacherModal({
   const submit = async () => {
     setSubmitting(true)
     try {
-      const res = await fetch("/api/admin/teachers", {
+      const res = await authFetch("/api/admin/teachers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

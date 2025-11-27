@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Layout from "@/components/layout"
+import { authFetch } from "@/lib/auth-fetch"
 import { 
   User, 
   Mail, 
@@ -91,7 +92,7 @@ export default function StudentDetailsPage() {
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch(`/api/admin/students/${params.id}`, {
+      const res = await authFetch(`/api/admin/students/${params.id}`, {
         credentials: "include"
       })
       
