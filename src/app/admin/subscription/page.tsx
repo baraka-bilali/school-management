@@ -205,66 +205,123 @@ export default function SubscriptionPage() {
           </CardContent>
         </Card>
 
-        {/* Timeline de l'abonnement */}
+        {/* Timeline de l'abonnement - Horizontale */}
         <Card theme={theme}>
           <CardHeader>
-            <CardTitle>Timeline de l'abonnement</CardTitle>
+            <CardTitle>Progression de l'abonnement</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative">
-              {/* Ligne de progression */}
-              <div className="absolute left-8 top-8 bottom-8 w-1 bg-gradient-to-b from-green-500 via-indigo-500 to-red-500"></div>
-              
-              {/* Début d'abonnement */}
-              <div className="relative flex items-start gap-6 mb-12">
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
-                    <PlayCircle className="w-8 h-8 text-white" />
+            <div className="py-8">
+              {/* Conteneur Timeline Horizontale */}
+              <div className="relative max-w-4xl mx-auto px-4">
+                {/* Structure avec tiges verticales */}
+                <div className="flex items-center justify-between">
+                  {/* Étape 1 : Début - positionné à gauche */}
+                  <div className="flex flex-col items-center">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl ${theme === "dark" ? "bg-green-500" : "bg-green-500"} ring-4 ring-offset-2 ${theme === "dark" ? "ring-green-500/30 ring-offset-gray-800" : "ring-green-500/20 ring-offset-white"}`}>
+                      <PlayCircle className="w-5 h-5 text-white" />
+                    </div>
+                    {/* Tige vers la barre - colle au cercle */}
+                    <div className={`w-0.5 h-8 bg-green-500 -mt-1`}></div>
                   </div>
-                </div>
-                <div className="flex-1 pt-3">
-                  <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Début de l'abonnement</h3>
-                  <p className={`${textSecondary} text-sm mb-2`}>{formatDate(school.dateDebutAbonnement)}</p>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${theme === "dark" ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"}`}>
-                    Activation
-                  </div>
-                </div>
-              </div>
 
-              {/* Aujourd'hui (si l'abonnement est actif) */}
-              {daysRemaining !== null && daysRemaining > 0 && (
-                <div className="relative flex items-start gap-6 mb-12">
-                  <div className="relative z-10">
-                    <div className="w-16 h-16 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg animate-pulse">
-                      <Clock className="w-8 h-8 text-white" />
+                  {/* Étape 2 : Aujourd'hui */}
+                  {daysRemaining !== null && daysRemaining > 0 && (
+                    <div className="flex flex-col items-center">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl bg-indigo-500 ring-4 ring-offset-2 ${theme === "dark" ? "ring-indigo-500/30 ring-offset-gray-800" : "ring-indigo-500/20 ring-offset-white"} animate-pulse`}>
+                        <Clock className="w-5 h-5 text-white" />
+                      </div>
+                      {/* Tige vers la barre - colle au cercle */}
+                      <div className={`w-0.5 h-8 bg-indigo-500 -mt-1`}></div>
+                    </div>
+                  )}
+
+                  {/* Étape 3 : Fin - positionné à droite */}
+                  <div className="flex flex-col items-center">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl ring-4 ring-offset-2 ${
+                      daysRemaining !== null && daysRemaining <= 0 
+                        ? `bg-red-500 ${theme === "dark" ? "ring-red-500/30 ring-offset-gray-800" : "ring-red-500/20 ring-offset-white"}`
+                        : `${theme === "dark" ? "bg-gray-600" : "bg-gray-400"} ${theme === "dark" ? "ring-gray-600/30 ring-offset-gray-800" : "ring-gray-400/20 ring-offset-white"}`
+                    }`}>
+                      <StopCircle className="w-5 h-5 text-white" />
+                    </div>
+                    {/* Tige vers la barre - colle au cercle */}
+                    <div className={`w-0.5 h-8 -mt-1 ${
+                      daysRemaining !== null && daysRemaining <= 0 ? "bg-red-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-400"
+                    }`}></div>
+                  </div>
+                </div>
+
+                {/* Barre de progression horizontale */}
+                <div className="relative mb-8">
+                  <div className={`h-3 w-full rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                    {/* Barre de progression colorée */}
+                    {daysRemaining !== null && daysRemaining > 0 && (
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-green-500 via-indigo-500 to-indigo-600 transition-all duration-500"
+                        style={{
+                          width: school.dateDebutAbonnement && school.dateFinAbonnement
+                            ? `${Math.min(100, Math.max(0, ((new Date().getTime() - new Date(school.dateDebutAbonnement).getTime()) / (new Date(school.dateFinAbonnement).getTime() - new Date(school.dateDebutAbonnement).getTime())) * 100))}%`
+                            : '0%'
+                        }}
+                      ></div>
+                    )}
+                    {daysRemaining !== null && daysRemaining <= 0 && (
+                      <div className="h-full w-full rounded-full bg-gradient-to-r from-green-500 via-indigo-500 to-red-500"></div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cartes d'information en dessous */}
+                <div className="flex items-start justify-between">
+                  {/* Info Début */}
+                  <div className="flex justify-start" style={{ width: '33.333%' }}>
+                    <div className={`text-center px-4 py-3 rounded-lg ${theme === "dark" ? "bg-gray-700/80" : "bg-white"} shadow-md border ${theme === "dark" ? "border-gray-600" : "border-gray-200"} max-w-[140px]`}>
+                      <p className={`text-xs font-semibold ${textSecondary} uppercase tracking-wide mb-1`}>Début</p>
+                      <p className={`${textColor} font-bold text-sm`}>{formatDate(school.dateDebutAbonnement)}</p>
                     </div>
                   </div>
-                  <div className="flex-1 pt-3">
-                    <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Aujourd'hui</h3>
-                    <p className={`${textSecondary} text-sm mb-2`}>{formatDate(new Date().toISOString())}</p>
-                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${theme === "dark" ? "bg-indigo-900/30 text-indigo-400" : "bg-indigo-100 text-indigo-700"}`}>
-                      {daysRemaining} jours restants
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Fin d'abonnement */}
-              <div className="relative flex items-start gap-6">
-                <div className="relative z-10">
-                  <div className={`w-16 h-16 rounded-full ${daysRemaining !== null && daysRemaining <= 0 ? "bg-red-500" : "bg-gray-400"} flex items-center justify-center shadow-lg`}>
-                    <StopCircle className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 pt-3">
-                  <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Fin de l'abonnement</h3>
-                  <p className={`${textSecondary} text-sm mb-2`}>{formatDate(school.dateFinAbonnement)}</p>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                    daysRemaining !== null && daysRemaining <= 0 
-                      ? theme === "dark" ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-700"
-                      : theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-700"
-                  }`}>
-                    {daysRemaining !== null && daysRemaining <= 0 ? "Expiré" : "À venir"}
+                  {/* Info Aujourd'hui */}
+                  {daysRemaining !== null && daysRemaining > 0 && (
+                    <div className="flex justify-center" style={{ width: '33.333%' }}>
+                      <div className={`text-center px-4 py-3 rounded-lg ${theme === "dark" ? "bg-indigo-900/40" : "bg-indigo-50"} shadow-md border-2 ${theme === "dark" ? "border-indigo-500/50" : "border-indigo-300"} max-w-[160px]`}>
+                        <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${theme === "dark" ? "text-indigo-400" : "text-indigo-700"}`}>Aujourd'hui</p>
+                        <p className={`font-bold text-sm ${theme === "dark" ? "text-indigo-300" : "text-indigo-900"}`}>{formatDate(new Date().toISOString())}</p>
+                        <div className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${theme === "dark" ? "bg-indigo-500/30 text-indigo-200" : "bg-indigo-200 text-indigo-800"}`}>
+                          {daysRemaining}j restants
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Info Fin */}
+                  <div className="flex justify-end" style={{ width: '33.333%' }}>
+                    <div className={`text-center px-4 py-3 rounded-lg ${
+                      daysRemaining !== null && daysRemaining <= 0 
+                        ? theme === "dark" ? "bg-red-900/40" : "bg-red-50"
+                        : theme === "dark" ? "bg-gray-700/80" : "bg-white"
+                    } shadow-md border ${
+                      daysRemaining !== null && daysRemaining <= 0
+                        ? theme === "dark" ? "border-red-500/50" : "border-red-300"
+                        : theme === "dark" ? "border-gray-600" : "border-gray-200"
+                    } max-w-[140px]`}>
+                      <p className={`text-xs font-semibold ${
+                        daysRemaining !== null && daysRemaining <= 0
+                          ? theme === "dark" ? "text-red-400" : "text-red-700"
+                          : textSecondary
+                      } uppercase tracking-wide mb-1`}>Fin</p>
+                      <p className={`${
+                        daysRemaining !== null && daysRemaining <= 0
+                          ? theme === "dark" ? "text-red-300" : "text-red-900"
+                          : textColor
+                      } font-bold text-sm`}>{formatDate(school.dateFinAbonnement)}</p>
+                      {daysRemaining !== null && daysRemaining <= 0 && (
+                        <div className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${theme === "dark" ? "bg-red-500/30 text-red-200" : "bg-red-200 text-red-800"}`}>
+                          Expiré
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
