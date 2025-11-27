@@ -167,162 +167,95 @@ export default function SubscriptionPage() {
             <CardTitle>Statut de l'abonnement</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4 mb-6">
-              <div className="relative">
-                {/* Point de statut animé */}
-                <div className={`w-4 h-4 rounded-full absolute -top-1 -right-1 z-10 ${
-                  statusInfo.color === "green" ? "bg-green-500" : 
-                  statusInfo.color === "orange" ? "bg-orange-500" : 
-                  "bg-red-500"
-                }`}>
-                  <div className={`absolute inset-0 rounded-full animate-ping ${
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {/* Point de statut animé */}
+                  <div className={`w-4 h-4 rounded-full absolute -top-1 -right-1 z-10 ${
                     statusInfo.color === "green" ? "bg-green-500" : 
                     statusInfo.color === "orange" ? "bg-orange-500" : 
                     "bg-red-500"
-                  }`}></div>
+                  }`}>
+                    <div className={`absolute inset-0 rounded-full animate-ping ${
+                      statusInfo.color === "green" ? "bg-green-500" : 
+                      statusInfo.color === "orange" ? "bg-orange-500" : 
+                      "bg-red-500"
+                    }`}></div>
+                  </div>
+                  <StatusIcon className={`w-12 h-12 ${statusInfo.color === "green" ? "text-green-500" : statusInfo.color === "orange" ? "text-orange-500" : statusInfo.color === "red" ? "text-red-500" : "text-gray-500"}`} />
                 </div>
-                <StatusIcon className={`w-12 h-12 ${statusInfo.color === "green" ? "text-green-500" : statusInfo.color === "orange" ? "text-orange-500" : statusInfo.color === "red" ? "text-red-500" : "text-gray-500"}`} />
-              </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-4 py-2 rounded-full text-sm font-semibold ${statusColors[statusInfo.color as keyof typeof statusColors]}`}>
-                    {statusInfo.label}
-                  </span>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-4 py-2 rounded-full text-sm font-semibold ${statusColors[statusInfo.color as keyof typeof statusColors]}`}>
+                      {statusInfo.label}
+                    </span>
+                  </div>
+                  <p className={`${textSecondary} text-sm mt-2`}>
+                    {school.nomEtablissement}
+                  </p>
                 </div>
-                <p className={`${textSecondary} text-sm mt-2`}>
-                  {school.nomEtablissement}
-                </p>
               </div>
-            </div>
 
-            {daysRemaining !== null && daysRemaining > 0 && (
-              <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"} border ${theme === "dark" ? "border-gray-600" : "border-gray-200"}`}>
-                <p className={`${textColor} font-medium`}>
-                  Jours restants : <span className="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{daysRemaining}</span>
-                </p>
-              </div>
-            )}
+              {/* Jours restants à droite */}
+              {daysRemaining !== null && daysRemaining > 0 && (
+                <div className="text-right">
+                  <p className={`${textSecondary} text-sm mb-1`}>Jours restants</p>
+                  <p className="text-indigo-600 dark:text-indigo-400 text-4xl font-bold">{daysRemaining}</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Timeline de l'abonnement - Horizontale */}
+        {/* Timeline de l'abonnement */}
         <Card theme={theme}>
           <CardHeader>
             <CardTitle>Progression de l'abonnement</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="py-8">
-              {/* Conteneur Timeline Horizontale */}
-              <div className="relative max-w-4xl mx-auto px-4">
-                {/* Structure avec tiges verticales */}
-                <div className="flex items-center justify-between">
-                  {/* Étape 1 : Début - positionné à gauche */}
-                  <div className="flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl ${theme === "dark" ? "bg-green-500" : "bg-green-500"} ring-4 ring-offset-2 ${theme === "dark" ? "ring-green-500/30 ring-offset-gray-800" : "ring-green-500/20 ring-offset-white"}`}>
-                      <PlayCircle className="w-5 h-5 text-white" />
-                    </div>
-                    {/* Tige vers la barre - colle au cercle */}
-                    <div className={`w-0.5 h-8 bg-green-500 -mt-1`}></div>
+            <div className="py-6">
+              {/* Barre de progression simple */}
+              <div className="relative group">
+                {/* Labels en haut */}
+                <div className="flex justify-between items-start mb-3 px-2">
+                  <div className="text-left transition-all duration-300 group-hover:scale-105">
+                    <p className={`text-xs font-semibold ${textSecondary} uppercase tracking-wide mb-1`}>Début</p>
+                    <p className={`${textColor} font-medium text-sm`}>{formatDate(school.dateDebutAbonnement)}</p>
                   </div>
-
-                  {/* Étape 2 : Aujourd'hui */}
-                  {daysRemaining !== null && daysRemaining > 0 && (
-                    <div className="flex flex-col items-center">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl bg-indigo-500 ring-4 ring-offset-2 ${theme === "dark" ? "ring-indigo-500/30 ring-offset-gray-800" : "ring-indigo-500/20 ring-offset-white"} animate-pulse`}>
-                        <Clock className="w-5 h-5 text-white" />
-                      </div>
-                      {/* Tige vers la barre - colle au cercle */}
-                      <div className={`w-0.5 h-8 bg-indigo-500 -mt-1`}></div>
-                    </div>
-                  )}
-
-                  {/* Étape 3 : Fin - positionné à droite */}
-                  <div className="flex flex-col items-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-xl ring-4 ring-offset-2 ${
-                      daysRemaining !== null && daysRemaining <= 0 
-                        ? `bg-red-500 ${theme === "dark" ? "ring-red-500/30 ring-offset-gray-800" : "ring-red-500/20 ring-offset-white"}`
-                        : `${theme === "dark" ? "bg-gray-600" : "bg-gray-400"} ${theme === "dark" ? "ring-gray-600/30 ring-offset-gray-800" : "ring-gray-400/20 ring-offset-white"}`
-                    }`}>
-                      <StopCircle className="w-5 h-5 text-white" />
-                    </div>
-                    {/* Tige vers la barre - colle au cercle */}
-                    <div className={`w-0.5 h-8 -mt-1 ${
-                      daysRemaining !== null && daysRemaining <= 0 ? "bg-red-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-400"
-                    }`}></div>
+                  
+                  <div className="text-right transition-all duration-300 group-hover:scale-105">
+                    <p className={`text-xs font-semibold ${textSecondary} uppercase tracking-wide mb-1`}>Fin</p>
+                    <p className={`${textColor} font-medium text-sm`}>{formatDate(school.dateFinAbonnement)}</p>
                   </div>
                 </div>
 
-                {/* Barre de progression horizontale */}
-                <div className="relative mb-8">
-                  <div className={`h-3 w-full rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
-                    {/* Barre de progression colorée */}
+                {/* Barre de progression avec animation hover */}
+                <div className={`h-2 w-full rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"} overflow-hidden transition-all duration-300 group-hover:h-3 group-hover:shadow-lg`}>
+                  {daysRemaining !== null && daysRemaining > 0 && (
+                    <div 
+                      className="h-full bg-gradient-to-r from-green-500 via-indigo-500 to-indigo-600 transition-all duration-500 rounded-full group-hover:shadow-[0_0_15px_rgba(99,102,241,0.5)]"
+                      style={{
+                        width: school.dateDebutAbonnement && school.dateFinAbonnement
+                          ? `${Math.min(100, Math.max(0, ((new Date().getTime() - new Date(school.dateDebutAbonnement).getTime()) / (new Date(school.dateFinAbonnement).getTime() - new Date(school.dateDebutAbonnement).getTime())) * 100))}%`
+                          : '0%'
+                      }}
+                    ></div>
+                  )}
+                  {daysRemaining !== null && daysRemaining <= 0 && (
+                    <div className="h-full w-full bg-gradient-to-r from-green-500 via-indigo-500 to-red-500 rounded-full group-hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"></div>
+                  )}
+                </div>
+
+                {/* Info avec la date actuelle */}
+                <div className="mt-3 text-center">
+                  <p className={`text-xs ${textSecondary}`}>
+                    📅 Aujourd'hui : <span className={`${textColor} font-semibold`}>{formatDate(new Date().toISOString())}</span>
                     {daysRemaining !== null && daysRemaining > 0 && (
-                      <div 
-                        className="h-full rounded-full bg-gradient-to-r from-green-500 via-indigo-500 to-indigo-600 transition-all duration-500"
-                        style={{
-                          width: school.dateDebutAbonnement && school.dateFinAbonnement
-                            ? `${Math.min(100, Math.max(0, ((new Date().getTime() - new Date(school.dateDebutAbonnement).getTime()) / (new Date(school.dateFinAbonnement).getTime() - new Date(school.dateDebutAbonnement).getTime())) * 100))}%`
-                            : '0%'
-                        }}
-                      ></div>
+                      <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-bold">
+                        ({Math.round(((new Date().getTime() - new Date(school.dateDebutAbonnement!).getTime()) / (new Date(school.dateFinAbonnement!).getTime() - new Date(school.dateDebutAbonnement!).getTime())) * 100)}% complété)
+                      </span>
                     )}
-                    {daysRemaining !== null && daysRemaining <= 0 && (
-                      <div className="h-full w-full rounded-full bg-gradient-to-r from-green-500 via-indigo-500 to-red-500"></div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Cartes d'information en dessous */}
-                <div className="flex items-start justify-between">
-                  {/* Info Début */}
-                  <div className="flex justify-start" style={{ width: '33.333%' }}>
-                    <div className={`text-center px-4 py-3 rounded-lg ${theme === "dark" ? "bg-gray-700/80" : "bg-white"} shadow-md border ${theme === "dark" ? "border-gray-600" : "border-gray-200"} max-w-[140px]`}>
-                      <p className={`text-xs font-semibold ${textSecondary} uppercase tracking-wide mb-1`}>Début</p>
-                      <p className={`${textColor} font-bold text-sm`}>{formatDate(school.dateDebutAbonnement)}</p>
-                    </div>
-                  </div>
-
-                  {/* Info Aujourd'hui */}
-                  {daysRemaining !== null && daysRemaining > 0 && (
-                    <div className="flex justify-center" style={{ width: '33.333%' }}>
-                      <div className={`text-center px-4 py-3 rounded-lg ${theme === "dark" ? "bg-indigo-900/40" : "bg-indigo-50"} shadow-md border-2 ${theme === "dark" ? "border-indigo-500/50" : "border-indigo-300"} max-w-[160px]`}>
-                        <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${theme === "dark" ? "text-indigo-400" : "text-indigo-700"}`}>Aujourd'hui</p>
-                        <p className={`font-bold text-sm ${theme === "dark" ? "text-indigo-300" : "text-indigo-900"}`}>{formatDate(new Date().toISOString())}</p>
-                        <div className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${theme === "dark" ? "bg-indigo-500/30 text-indigo-200" : "bg-indigo-200 text-indigo-800"}`}>
-                          {daysRemaining}j restants
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Info Fin */}
-                  <div className="flex justify-end" style={{ width: '33.333%' }}>
-                    <div className={`text-center px-4 py-3 rounded-lg ${
-                      daysRemaining !== null && daysRemaining <= 0 
-                        ? theme === "dark" ? "bg-red-900/40" : "bg-red-50"
-                        : theme === "dark" ? "bg-gray-700/80" : "bg-white"
-                    } shadow-md border ${
-                      daysRemaining !== null && daysRemaining <= 0
-                        ? theme === "dark" ? "border-red-500/50" : "border-red-300"
-                        : theme === "dark" ? "border-gray-600" : "border-gray-200"
-                    } max-w-[140px]`}>
-                      <p className={`text-xs font-semibold ${
-                        daysRemaining !== null && daysRemaining <= 0
-                          ? theme === "dark" ? "text-red-400" : "text-red-700"
-                          : textSecondary
-                      } uppercase tracking-wide mb-1`}>Fin</p>
-                      <p className={`${
-                        daysRemaining !== null && daysRemaining <= 0
-                          ? theme === "dark" ? "text-red-300" : "text-red-900"
-                          : textColor
-                      } font-bold text-sm`}>{formatDate(school.dateFinAbonnement)}</p>
-                      {daysRemaining !== null && daysRemaining <= 0 && (
-                        <div className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${theme === "dark" ? "bg-red-500/30 text-red-200" : "bg-red-200 text-red-800"}`}>
-                          Expiré
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  </p>
                 </div>
               </div>
             </div>
