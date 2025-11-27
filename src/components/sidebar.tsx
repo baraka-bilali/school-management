@@ -11,7 +11,8 @@ import {
   Settings, 
   LogOut,
   School,
-  X
+  X,
+  CreditCard
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -71,6 +72,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: BookOpen, label: "Matières", href: "/admin/subjects" },
     { icon: ClipboardCheck, label: "Présences", href: "/admin/attendance" },
     { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades" },
+    { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
   ]
 
   const isActive = (href: string) => {
