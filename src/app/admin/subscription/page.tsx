@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { authFetch } from "@/lib/auth-fetch"
-import { CreditCard, Calendar, AlertCircle, CheckCircle, Clock } from "lucide-react"
+import { CreditCard, Calendar, AlertCircle, CheckCircle, Clock, PlayCircle, StopCircle, Mail, Phone } from "lucide-react"
 
 interface School {
   id: number
@@ -168,7 +168,21 @@ export default function SubscriptionPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 mb-6">
-              <StatusIcon className={`w-12 h-12 ${statusInfo.color === "green" ? "text-green-500" : statusInfo.color === "orange" ? "text-orange-500" : statusInfo.color === "red" ? "text-red-500" : "text-gray-500"}`} />
+              <div className="relative">
+                {/* Point de statut animé */}
+                <div className={`w-4 h-4 rounded-full absolute -top-1 -right-1 z-10 ${
+                  statusInfo.color === "green" ? "bg-green-500" : 
+                  statusInfo.color === "orange" ? "bg-orange-500" : 
+                  "bg-red-500"
+                }`}>
+                  <div className={`absolute inset-0 rounded-full animate-ping ${
+                    statusInfo.color === "green" ? "bg-green-500" : 
+                    statusInfo.color === "orange" ? "bg-orange-500" : 
+                    "bg-red-500"
+                  }`}></div>
+                </div>
+                <StatusIcon className={`w-12 h-12 ${statusInfo.color === "green" ? "text-green-500" : statusInfo.color === "orange" ? "text-orange-500" : statusInfo.color === "red" ? "text-red-500" : "text-gray-500"}`} />
+              </div>
               <div>
                 <div className="flex items-center gap-3">
                   <span className={`px-4 py-2 rounded-full text-sm font-semibold ${statusColors[statusInfo.color as keyof typeof statusColors]}`}>
@@ -188,6 +202,73 @@ export default function SubscriptionPage() {
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Timeline de l'abonnement */}
+        <Card theme={theme}>
+          <CardHeader>
+            <CardTitle>Timeline de l'abonnement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              {/* Ligne de progression */}
+              <div className="absolute left-8 top-8 bottom-8 w-1 bg-gradient-to-b from-green-500 via-indigo-500 to-red-500"></div>
+              
+              {/* Début d'abonnement */}
+              <div className="relative flex items-start gap-6 mb-12">
+                <div className="relative z-10">
+                  <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-lg">
+                    <PlayCircle className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 pt-3">
+                  <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Début de l'abonnement</h3>
+                  <p className={`${textSecondary} text-sm mb-2`}>{formatDate(school.dateDebutAbonnement)}</p>
+                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${theme === "dark" ? "bg-green-900/30 text-green-400" : "bg-green-100 text-green-700"}`}>
+                    Activation
+                  </div>
+                </div>
+              </div>
+
+              {/* Aujourd'hui (si l'abonnement est actif) */}
+              {daysRemaining !== null && daysRemaining > 0 && (
+                <div className="relative flex items-start gap-6 mb-12">
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg animate-pulse">
+                      <Clock className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1 pt-3">
+                    <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Aujourd'hui</h3>
+                    <p className={`${textSecondary} text-sm mb-2`}>{formatDate(new Date().toISOString())}</p>
+                    <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${theme === "dark" ? "bg-indigo-900/30 text-indigo-400" : "bg-indigo-100 text-indigo-700"}`}>
+                      {daysRemaining} jours restants
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fin d'abonnement */}
+              <div className="relative flex items-start gap-6">
+                <div className="relative z-10">
+                  <div className={`w-16 h-16 rounded-full ${daysRemaining !== null && daysRemaining <= 0 ? "bg-red-500" : "bg-gray-400"} flex items-center justify-center shadow-lg`}>
+                    <StopCircle className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 pt-3">
+                  <h3 className={`text-lg font-semibold ${textColor} mb-1`}>Fin de l'abonnement</h3>
+                  <p className={`${textSecondary} text-sm mb-2`}>{formatDate(school.dateFinAbonnement)}</p>
+                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                    daysRemaining !== null && daysRemaining <= 0 
+                      ? theme === "dark" ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-700"
+                      : theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-700"
+                  }`}>
+                    {daysRemaining !== null && daysRemaining <= 0 ? "Expiré" : "À venir"}
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -238,19 +319,39 @@ export default function SubscriptionPage() {
           </Card>
         </div>
 
-        {/* Actions */}
+        {/* Actions - Contact Service */}
         <Card theme={theme}>
           <CardHeader>
-            <CardTitle>Renouvellement</CardTitle>
+            <CardTitle>Besoin d'aide ?</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`${textSecondary} mb-4`}>
-              Pour renouveler votre abonnement ou modifier vos informations de paiement, 
-              veuillez contacter le support technique.
+            <p className={`${textSecondary} mb-6`}>
+              Pour renouveler votre abonnement, modifier vos informations de paiement ou toute autre question, 
+              notre équipe est à votre disposition.
             </p>
-            <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
-              Contacter le support
-            </button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Bouton Email */}
+              <button className="flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
+                <Mail className="w-5 h-5" />
+                <span>Envoyer un email</span>
+              </button>
+
+              {/* Bouton Téléphone */}
+              <button className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
+                <Phone className="w-5 h-5" />
+                <span>Appeler le support</span>
+              </button>
+            </div>
+
+            {/* Informations de contact */}
+            <div className={`mt-6 p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"} border ${theme === "dark" ? "border-gray-600" : "border-gray-200"}`}>
+              <p className={`${textSecondary} text-sm`}>
+                <strong className={textColor}>Email :</strong> support@digischool.com<br />
+                <strong className={textColor}>Téléphone :</strong> +243 XXX XXX XXX<br />
+                <strong className={textColor}>Horaires :</strong> Lun - Ven : 8h00 - 17h00
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

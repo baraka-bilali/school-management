@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Bell, X, Check, AlertCircle, Clock, ArrowRight } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { authFetch } from "@/lib/auth-fetch"
 
 interface Notification {
   id: number
@@ -29,7 +30,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   // Récupérer le nombre de notifications non lues
   const fetchUnreadCount = async () => {
     try {
-      const res = await fetch("/api/notifications/count", {
+      const res = await authFetch("/api/notifications/count", {
         credentials: "include",
       })
       if (res.ok) {
@@ -45,7 +46,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   const fetchNotifications = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/notifications", {
+      const res = await authFetch("/api/notifications", {
         credentials: "include",
       })
       if (res.ok) {
@@ -77,7 +78,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   // Marquer une notification comme lue
   const markAsRead = async (id: number) => {
     try {
-      const res = await fetch(`/api/notifications/${id}`, {
+      const res = await authFetch(`/api/notifications/${id}`, {
         method: "PATCH",
         credentials: "include",
       })
@@ -95,7 +96,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   // Supprimer une notification
   const deleteNotification = async (id: number) => {
     try {
-      const res = await fetch(`/api/notifications/${id}`, {
+      const res = await authFetch(`/api/notifications/${id}`, {
         method: "DELETE",
         credentials: "include",
       })
@@ -114,7 +115,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   // Marquer toutes comme lues
   const markAllAsRead = async () => {
     try {
-      const res = await fetch("/api/notifications", {
+      const res = await authFetch("/api/notifications", {
         method: "POST",
         credentials: "include",
       })
@@ -130,7 +131,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   // Déclencher la vérification automatique des abonnements
   const checkSubscriptions = async () => {
     try {
-      await fetch("/api/notifications/check", {
+      await authFetch("/api/notifications/check", {
         method: "POST",
         credentials: "include",
       })

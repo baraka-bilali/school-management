@@ -155,9 +155,12 @@ model School {
   modifieParId                Int?
   dateCreation                DateTime          @default(now())
   dateModification            DateTime          @updatedAt
+  dateDebutAbonnement         DateTime?
   dateFinAbonnement           DateTime?
   periodeAbonnement           String?
   planAbonnement              String?
+  typePaiement                String?
+  montantPaye                 Float?
   createdBy                   User?             @relation("SchoolsCreated", fields: [creeParId], references: [id])
   admins                      User[]            @relation("SchoolAdmins")
 

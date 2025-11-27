@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
         adresse: true,
         telephone: true,
         email: true,
+        etatCompte: true,
+        dateDebutAbonnement: true,
+        dateFinAbonnement: true,
+        typePaiement: true,
+        montantPaye: true,
       }
     })
 
@@ -42,11 +47,18 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      id: school.id,
-      nom: school.nomEtablissement,
-      adresse: school.adresse,
-      telephone: school.telephone,
-      email: school.email,
+      school: {
+        id: school.id,
+        nomEtablissement: school.nomEtablissement,
+        adresse: school.adresse,
+        telephone: school.telephone,
+        email: school.email,
+        etatCompte: school.etatCompte,
+        dateDebutAbonnement: school.dateDebutAbonnement,
+        dateFinAbonnement: school.dateFinAbonnement,
+        typePaiement: school.typePaiement,
+        montantPaye: school.montantPaye,
+      }
     })
   } catch (error) {
     console.error("Erreur lors de la récupération de l'école:", error)
