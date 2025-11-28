@@ -106,9 +106,14 @@ export default function LoginPage() {
 				throw new Error(data.error || "Erreur lors du changement de mot de passe")
 			}
 			
-			// Récupérer le nom de l'utilisateur
-			const payload = JSON.parse(atob(localStorage.getItem("token")?.split(".")[1] || ""))
-			setUserName(payload.name || payload.username || "")
+			// Récupérer les informations de l'utilisateur via l'API
+			const meRes = await fetch("/api/auth/me", { credentials: "include" })
+			let userRole = ""
+			if (meRes.ok) {
+				const meData = await meRes.json()
+				setUserName(meData.user?.name || meData.user?.username || "")
+				userRole = meData.user?.role || ""
+			}
 			
 			// Nettoyer l'ancien cache du nom de l'école pour forcer un nouveau chargement
 			localStorage.removeItem("schoolName")
@@ -119,7 +124,7 @@ export default function LoginPage() {
 			
 			// Rediriger après 4 secondes
 			setTimeout(() => {
-				switch (payload.role) {
+				switch (userRole) {
 					case "ADMIN":
 					case "COMPTABLE":
 					case "DIRECTEUR_DISCIPLINE":
