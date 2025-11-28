@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check, AlertTriangle, CalendarX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
@@ -20,6 +20,7 @@ type School = {
   directeurNom: string;
   etatCompte: string;
   dateCreation: string;
+  dateFinAbonnement?: string | null;
 }
 type User = { id: number; name: string; email: string; role: string }
 
@@ -724,6 +725,10 @@ export default function SuperAdminHome() {
     router.push(`/super-admin/schools/${school.id}`)
   }
 
+  const handleManageSubscription = (school: School) => {
+    router.push(`/super-admin/schools/${school.id}/subscription`)
+  }
+
   const handleEditClick = (school: School) => {
     setSelectedSchool(school)
     // Remplir le formulaire avec les données de l'école
@@ -1230,7 +1235,6 @@ export default function SuperAdminHome() {
     { id: "stats", label: "Statistiques Générales" },
     { id: "schools", label: "Gestion des Écoles" },
     { id: "admins", label: "Administrateurs d'Écoles" },
-    { id: "users", label: "Gestion des Utilisateurs" },
     { id: "notifications", label: "Notifications" }
   ]
 
@@ -1650,7 +1654,7 @@ export default function SuperAdminHome() {
             <thead className={theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"}>
               <tr className={`text-left text-sm ${textSecondary}`}>
                 <th className="px-6 py-4 font-medium">Nom de l'école</th>
-                <th className="px-6 py-4 font-medium">Date d'inscription</th>
+                <th className="px-6 py-4 font-medium">Fin d'abonnement</th>
                 <th className="px-6 py-4 font-medium">Formule</th>
                 <th className="px-6 py-4 font-medium">Statut</th>
               </tr>
@@ -1661,14 +1665,46 @@ export default function SuperAdminHome() {
               ) : schools.length === 0 ? (
                 <tr><td colSpan={4} className={`px-6 py-8 text-center ${textSecondary}`}>Aucune école enregistrée</td></tr>
               ) : (
-                schools.slice(0, 5).map((school) => (
+                schools.slice(0, 5).map((school) => {
+                  const isExpired = school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date();
+                  const daysUntilExpiry = school.dateFinAbonnement 
+                    ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+                  
+                  return (
                   <tr key={school.id} className={`${hoverBg} transition-colors`}>
                     <td className="px-6 py-4">
                       <div className={`font-medium ${textColor}`}>{school.nomEtablissement}</div>
                       <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                     </td>
-                    <td className={`px-6 py-4 text-sm ${textSecondary}`}>
-                      {new Date(school.dateCreation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <td className="px-6 py-4">
+                      {school.dateFinAbonnement ? (
+                        isExpired ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30">
+                              <CalendarX className="w-4 h-4 text-red-500 animate-pulse" />
+                              <span className="text-sm font-medium text-red-500">Expiré</span>
+                            </div>
+                          </div>
+                        ) : isNearExpiry ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/30 w-fit">
+                              <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+                              <span className="text-xs font-medium text-orange-500">{daysUntilExpiry}j restants</span>
+                            </div>
+                            <span className={`text-sm ${textSecondary}`}>
+                              {new Date(school.dateFinAbonnement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={`text-sm ${textSecondary}`}>
+                            {new Date(school.dateFinAbonnement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        )
+                      ) : (
+                        <span className={`text-sm ${textSecondary} italic`}>Non défini</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
                       {school.typeEtablissement}
@@ -1683,7 +1719,7 @@ export default function SuperAdminHome() {
                       </span>
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>
@@ -1725,7 +1761,7 @@ export default function SuperAdminHome() {
               <thead className={theme === "dark" ? "bg-[#0f1729]" : "bg-gray-50"}>
                 <tr className={`text-left text-sm ${textSecondary}`}>
                   <th className="px-6 py-4 font-medium">Nom de l'école</th>
-                  <th className="px-6 py-4 font-medium">Date d'inscription</th>
+                  <th className="px-6 py-4 font-medium">Fin d'abonnement</th>
                   <th className="px-6 py-4 font-medium">Formule</th>
                   <th className="px-6 py-4 font-medium">Statut de l'abonnement</th>
                   <th className="px-6 py-4 font-medium">Actions</th>
@@ -1739,14 +1775,46 @@ export default function SuperAdminHome() {
                     {searchQuery ? "Aucune école trouvée" : "Aucune école enregistrée"}
                   </td></tr>
                 ) : (
-                  paginatedSchools.map((school) => (
+                  paginatedSchools.map((school) => {
+                    const isExpired = school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date();
+                    const daysUntilExpiry = school.dateFinAbonnement 
+                      ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                      : null;
+                    const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+                    
+                    return (
                     <tr key={school.id} className={`${hoverBg} transition-colors`}>
                       <td className="px-6 py-4">
                         <div className={`font-medium ${textColor}`}>{school.nomEtablissement}</div>
                         <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                       </td>
-                      <td className={`px-6 py-4 text-sm ${textSecondary}`}>
-                        {new Date(school.dateCreation).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      <td className="px-6 py-4">
+                        {school.dateFinAbonnement ? (
+                          isExpired ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30">
+                                <CalendarX className="w-4 h-4 text-red-500 animate-pulse" />
+                                <span className="text-sm font-medium text-red-500">Expiré</span>
+                              </div>
+                            </div>
+                          ) : isNearExpiry ? (
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-orange-500/10 border border-orange-500/30 w-fit">
+                                <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+                                <span className="text-xs font-medium text-orange-500">{daysUntilExpiry}j restants</span>
+                              </div>
+                              <span className={`text-sm ${textSecondary}`}>
+                                {new Date(school.dateFinAbonnement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={`text-sm ${textSecondary}`}>
+                              {new Date(school.dateFinAbonnement).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )
+                        ) : (
+                          <span className={`text-sm ${textSecondary} italic`}>Non défini</span>
+                        )}
                       </td>
                       <td className={`px-6 py-4 text-sm ${textColor}`}>
                         {school.typeEtablissement}
@@ -1774,6 +1842,17 @@ export default function SuperAdminHome() {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button 
+                            onClick={() => handleManageSubscription(school)}
+                            className={`p-1.5 rounded-md transition-all ${
+                              theme === "dark" 
+                                ? "text-gray-400 hover:text-emerald-400 bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 hover:border-emerald-500/50" 
+                                : "text-gray-600 hover:text-emerald-600 bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-gray-300 hover:border-emerald-400"
+                            }`} 
+                            title="Gérer l'abonnement"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                          </button>
+                          <button 
                             onClick={() => handleEditClick(school)}
                             className={`p-1.5 rounded-md transition-all ${
                               theme === "dark" 
@@ -1798,7 +1877,7 @@ export default function SuperAdminHome() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                  )})
                 )}
               </tbody>
             </table>
@@ -2215,15 +2294,6 @@ export default function SuperAdminHome() {
         </div>
         )
       })()}
-
-      {/* Users Tab */}
-      {activeTab === "users" && (
-        <div className={`${cardBg} rounded-xl border ${borderColor} p-8 text-center shadow-sm`}>
-          <Users className={`w-16 h-16 ${textSecondary} mx-auto mb-4`} />
-          <h3 className={`text-xl font-semibold mb-2 ${textColor}`}>Gestion des Utilisateurs</h3>
-          <p className={textSecondary}>Cette section est en cours de développement.</p>
-        </div>
-      )}
 
       {/* Notifications Tab */}
       {activeTab === "notifications" && (

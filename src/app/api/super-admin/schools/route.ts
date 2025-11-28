@@ -40,7 +40,8 @@ export async function GET(req: Request) {
         email: true,
         directeurNom: true,
         etatCompte: true,
-        dateCreation: true
+        dateCreation: true,
+        dateFinAbonnement: true
       }
     });
     return NextResponse.json({ schools });
