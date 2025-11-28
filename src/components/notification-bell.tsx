@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, X, Check, AlertCircle, Clock, ArrowRight } from "lucide-react"
+import { Bell, X, Check, AlertCircle, Clock, ArrowRight, BellOff } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
 
@@ -26,6 +26,25 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [theme, setTheme] = useState<"light" | "dark">("light")
+
+  // Récupérer le thème
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
+    if (savedTheme) setTheme(savedTheme)
+
+    const handleThemeChange = () => {
+      const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
+      if (newTheme) setTheme(newTheme)
+    }
+
+    window.addEventListener("themeChange", handleThemeChange)
+    window.addEventListener("storage", handleThemeChange)
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange)
+      window.removeEventListener("storage", handleThemeChange)
+    }
+  }, [])
 
   // Récupérer le nombre de notifications non lues
   const fetchUnreadCount = async () => {
@@ -199,9 +218,11 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
       {/* Bouton cloche */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
+        className={`relative p-2 rounded-lg transition-colors ${
+          theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-100"
+        }`}
       >
-        <Bell className={`w-6 h-6 ${unreadCount > 0 ? "text-yellow-400 animate-pulse" : "text-gray-300"}`} />
+        <Bell className={`w-6 h-6 ${unreadCount > 0 ? "text-indigo-500 animate-pulse" : theme === "dark" ? "text-gray-300" : "text-gray-600"}`} />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-bounce">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -219,85 +240,74 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
           />
 
           {/* Panneau */}
-          <div className="absolute right-0 mt-2 w-96 max-h-[600px] bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50 flex flex-col overflow-hidden">
+          <div className={`absolute right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden border ${
+            theme === "dark" 
+              ? "bg-gray-800 border-gray-700" 
+              : "bg-white border-gray-200"
+          }`}>
             {/* Header */}
-            <div className="p-4 border-b border-gray-700 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-white" />
-                <h3 className="font-semibold text-white">Notifications</h3>
-                {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {notifications.some((n) => !n.isRead) && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="text-xs text-white/80 hover:text-white flex items-center gap-1"
-                  >
-                    <Check className="w-3 h-3" />
-                    Tout marquer lu
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-white/80 hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+            <div className={`px-4 py-3 flex items-center justify-between ${
+              theme === "dark" 
+                ? "bg-indigo-600" 
+                : "bg-indigo-500"
+            }`}>
+              <h3 className="font-semibold text-white">Notifications</h3>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Liste des 5 dernières notifications */}
-            <div className="overflow-y-auto flex-1">
+            {/* Corps */}
+            <div className="overflow-y-auto max-h-80">
               {loading ? (
-                <div className="p-8 text-center text-gray-400">
+                <div className="p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto" />
-                  <p className="mt-2">Chargement...</p>
+                  <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Chargement...</p>
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">
-                  <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Aucune notification</p>
+                <div className="p-8 text-center">
+                  <BellOff className={`w-12 h-12 mx-auto mb-3 ${theme === "dark" ? "text-gray-600" : "text-gray-300"}`} />
+                  <p className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>Aucune notification</p>
+                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>Vous êtes à jour.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-700">
+                <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`p-4 hover:bg-gray-700/50 transition-colors cursor-pointer ${
-                        !notification.isRead ? "bg-indigo-900/20" : ""
-                      }`}
+                      className={`p-4 transition-colors cursor-pointer ${
+                        !notification.isRead 
+                          ? theme === "dark" ? "bg-indigo-900/20" : "bg-indigo-50"
+                          : ""
+                      } ${theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"}`}
                     >
                       <div className="flex items-start gap-3">
                         <div className={getNotificationColor(notification.type)}>
                           {getNotificationIcon(notification.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-200 whitespace-pre-wrap">
+                          <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
                             {notification.message}
                           </p>
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs text-gray-400">
+                            <span className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                               {formatDate(notification.createdAt)}
                             </span>
                             {notification.daysLeft !== null && (
                               <span className={`text-xs font-semibold ${
-                                notification.daysLeft === 0 ? "text-red-400" :
-                                notification.daysLeft <= 2 ? "text-orange-400" :
-                                notification.daysLeft <= 5 ? "text-yellow-400" :
-                                "text-blue-400"
+                                notification.daysLeft === 0 ? "text-red-500" :
+                                notification.daysLeft <= 2 ? "text-orange-500" :
+                                notification.daysLeft <= 5 ? "text-yellow-500" :
+                                "text-blue-500"
                               }`}>
                                 {notification.daysLeft === 0 ? "Expiré" : `${notification.daysLeft}j restants`}
                               </span>
                             )}
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
                         </div>
                       </div>
                     </div>
@@ -307,22 +317,17 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
             </div>
 
             {/* Footer - Voir tout */}
-            {notifications.length > 0 && (
-              <div className="p-3 border-t border-gray-700 bg-gray-800/50">
-                <button
-                  onClick={() => {
-                    setIsOpen(false)
-                    if (onNotificationClick) {
-                      onNotificationClick()
-                    }
-                  }}
-                  className="w-full py-2 text-sm font-medium text-indigo-400 hover:text-indigo-300 flex items-center justify-center gap-2 transition-colors"
-                >
-                  Voir toutes les notifications
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            <div className={`p-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-100"}`}>
+              <button
+                onClick={() => {
+                  setIsOpen(false)
+                  router.push("/admin/notifications")
+                }}
+                className="w-full py-2 text-sm font-medium text-indigo-500 hover:text-indigo-600 flex items-center justify-center gap-2 transition-colors"
+              >
+                Voir toutes les notifications
+              </button>
+            </div>
           </div>
         </>
       )}
