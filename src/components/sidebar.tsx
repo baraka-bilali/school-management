@@ -87,7 +87,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: BarChart3, label: "Tableau de bord", href: "/admin" },
     { icon: Users, label: "Utilisateurs", href: "/admin/users" },
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
-    { icon: BookOpen, label: "Matières", href: "/admin/subjects" },
+    { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
     { icon: ClipboardCheck, label: "Présences", href: "/admin/attendance" },
     { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
