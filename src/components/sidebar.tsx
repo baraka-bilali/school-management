@@ -13,7 +13,10 @@ import {
   School,
   X,
   CreditCard,
-  Bell
+  Bell,
+  Calendar,
+  FileText,
+  Wallet
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -28,6 +31,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [userRole, setUserRole] = useState<string>("ADMIN")
   const router = useRouter()
   const pathname = usePathname()
 
@@ -36,6 +40,17 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) {
       setTheme(savedTheme)
+    }
+
+    // Récupérer le rôle de l'utilisateur depuis le token
+    const token = localStorage.getItem("token")
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]))
+        setUserRole(payload.role || "ADMIN")
+      } catch (error) {
+        console.error("Erreur lors du décodage du token:", error)
+      }
     }
 
     // Écouter les changements de thème
@@ -66,7 +81,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   }, [])
 
   type NavItem = { icon: LucideIcon; label: string; href: string }
-  const navItems: NavItem[] = [
+  
+  // Menu pour les administrateurs
+  const adminNavItems: NavItem[] = [
     { icon: BarChart3, label: "Tableau de bord", href: "/admin" },
     { icon: Users, label: "Utilisateurs", href: "/admin/users" },
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
@@ -77,8 +94,20 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: Bell, label: "Notifications", href: "/admin/notifications" },
   ]
 
+  // Menu pour les élèves
+  const studentNavItems: NavItem[] = [
+    { icon: BarChart3, label: "Tableau de bord", href: "/student" },
+    { icon: Calendar, label: "Horaire des cours", href: "/student/schedule" },
+    { icon: FileText, label: "Notes & Bulletins", href: "/student/grades" },
+    { icon: Wallet, label: "Frais scolaires", href: "/student/fees" },
+  ]
+
+  // Sélectionner le menu selon le rôle
+  const navItems = userRole === "ELEVE" ? studentNavItems : adminNavItems
+  const basePath = userRole === "ELEVE" ? "/student" : "/admin"
+
   const isActive = (href: string) => {
-    if (href === "/admin") return pathname === "/admin"
+    if (href === basePath) return pathname === basePath
     return pathname?.startsWith(href)
   }
 
@@ -104,8 +133,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   type AdminItem =
     | { icon: LucideIcon; label: string; href: string }
     | { icon: LucideIcon; label: string; key: "logout" }
+  
+  // Items de pied de page (Paramètres + Déconnexion) selon le rôle
   const adminItems: AdminItem[] = [
-    { icon: Settings, label: "Paramètres", href: "/admin/settings" },
+    { icon: Settings, label: "Paramètres", href: userRole === "ELEVE" ? "/student/settings" : "/admin/settings" },
     { icon: LogOut, label: "Déconnexion", key: "logout" },
   ]
 

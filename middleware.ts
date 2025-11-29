@@ -22,6 +22,7 @@ export async function middleware(req: NextRequest) {
   const isSuperAdminArea = pathname.startsWith("/super-admin")
   const isSuperAdminLogin = pathname === "/super-admin/login"
   const isAdminArea = pathname.startsWith("/admin")
+  const isStudentArea = pathname.startsWith("/student")
   const isGeneralLogin = pathname === "/login"
   const isRegister = pathname === "/register"
 
@@ -69,10 +70,37 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Student space protection
+  if (isStudentArea) {
+    if (!role) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/login"
+      return NextResponse.redirect(url)
+    }
+    if (role !== "ELEVE") {
+      // Si ce n'est pas un élève, rediriger vers la bonne zone
+      const url = req.nextUrl.clone()
+      if (role === "SUPER_ADMIN") {
+        url.pathname = "/super-admin"
+      } else if (adminAllowed.has(role) || role === "ADMIN") {
+        url.pathname = "/admin"
+      } else {
+        url.pathname = "/login"
+      }
+      return NextResponse.redirect(url)
+    }
+  }
+
   // General login: if already logged in, push to respective area
   if (isGeneralLogin && role) {
     const url = req.nextUrl.clone()
-    url.pathname = role === "SUPER_ADMIN" ? "/super-admin" : "/admin"
+    if (role === "SUPER_ADMIN") {
+      url.pathname = "/super-admin"
+    } else if (role === "ELEVE") {
+      url.pathname = "/student"
+    } else {
+      url.pathname = "/admin"
+    }
     return NextResponse.redirect(url)
   }
 
@@ -83,6 +111,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/super-admin/:path*",
+    "/student/:path*",
     "/login",
     "/super-admin/login",
     "/register",
