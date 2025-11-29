@@ -94,14 +94,14 @@ export default function StudentDashboard() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center justify-center gap-1.5">
-              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        <div className="flex items-center justify-center min-h-[calc(100vh-120px)]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
             </div>
-            <p className={textSecondary}>Chargement...</p>
+            <p className={`text-lg ${textSecondary}`}>Chargement...</p>
           </div>
         </div>
       </Layout>
