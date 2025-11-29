@@ -52,17 +52,18 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
         
         // Vérifier si le nom de l'école est déjà en cache
         const cachedSchoolName = localStorage.getItem("schoolName")
-        if (cachedSchoolName) {
+        // Ignorer le cache s'il contient la valeur par défaut "Établissement"
+        if (cachedSchoolName && cachedSchoolName !== "Établissement") {
           console.log("📦 Nom de l'école récupéré du cache:", cachedSchoolName)
           setSchoolName(cachedSchoolName)
         } else {
-          // Seulement charger depuis l'API si pas en cache
+          // Charger depuis l'API si pas en cache ou si c'est la valeur par défaut
           fetchSchoolName()
         }
       } catch (error) {
         console.error("Erreur lors du décodage du token:", error)
         const cachedSchoolName = localStorage.getItem("schoolName")
-        if (cachedSchoolName) {
+        if (cachedSchoolName && cachedSchoolName !== "Établissement") {
           setSchoolName(cachedSchoolName)
         } else {
           fetchSchoolName()
@@ -71,8 +72,10 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
     } else {
       // Pas de token, vérifier quand même le cache
       const cachedSchoolName = localStorage.getItem("schoolName")
-      if (cachedSchoolName) {
+      if (cachedSchoolName && cachedSchoolName !== "Établissement") {
         setSchoolName(cachedSchoolName)
+      } else {
+        fetchSchoolName()
       }
     }
 
@@ -96,11 +99,12 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       if (res.ok) {
         const data = await res.json()
         console.log("Données école:", data)
-        if (data.nom && data.nom.trim() !== "") {
-          setSchoolName(data.nom)
+        const nom = data.school?.nomEtablissement || data.nom
+        if (nom && nom.trim() !== "") {
+          setSchoolName(nom)
           // Sauvegarder en localStorage pour les prochaines navigations
-          localStorage.setItem("schoolName", data.nom)
-          console.log("✅ Nom de l'école sauvegardé en cache:", data.nom)
+          localStorage.setItem("schoolName", nom)
+          console.log("✅ Nom de l'école sauvegardé en cache:", nom)
         } else {
           setSchoolName("Établissement")
           localStorage.setItem("schoolName", "Établissement")

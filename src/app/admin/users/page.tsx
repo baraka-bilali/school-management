@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
 import Portal from "@/components/portal"
-import { Eye, Pencil, Check, X, Plus } from "lucide-react"
+import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
@@ -418,6 +418,14 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
     classId: "",
   })
 
+  // États pour la réinitialisation de mot de passe
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [selectedStudentForReset, setSelectedStudentForReset] = useState<any>(null)
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [newPasswordGenerated, setNewPasswordGenerated] = useState("")
+  const [passwordCopied, setPasswordCopied] = useState(false)
+  const [emailCopied, setEmailCopied] = useState(false)
+
   // Debounce pour la recherche - applique le filtre après 500ms
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -425,6 +433,57 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
     }, 500)
     return () => clearTimeout(timerId)
   }, [searchInput])
+
+  // Gestionnaire pour réinitialiser le mot de passe
+  const handleResetPassword = (student: any) => {
+    setSelectedStudentForReset(student)
+    setShowResetPasswordModal(true)
+    setNewPasswordGenerated("")
+    setPasswordCopied(false)
+    setEmailCopied(false)
+  }
+
+  // Confirmer la réinitialisation
+  const handleConfirmResetPassword = async () => {
+    if (!selectedStudentForReset) return
+    
+    try {
+      setResettingPassword(true)
+      const res = await authFetch(`/api/admin/students/${selectedStudentForReset.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setNewPasswordGenerated(data.newPassword)
+        // Mettre à jour les infos de l'élève avec l'email retourné
+        setSelectedStudentForReset({
+          ...selectedStudentForReset,
+          email: data.student.email
+        })
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Erreur lors de la réinitialisation du mot de passe')
+        setShowResetPasswordModal(false)
+      }
+    } catch (e: any) {
+      console.error('Erreur reset password:', e)
+      toast.error('Une erreur est survenue')
+      setShowResetPasswordModal(false)
+    } finally {
+      setResettingPassword(false)
+    }
+  }
+
+  // Fermer le modal de réinitialisation
+  const closeResetPasswordModal = () => {
+    setShowResetPasswordModal(false)
+    setSelectedStudentForReset(null)
+    setNewPasswordGenerated("")
+    setPasswordCopied(false)
+    setEmailCopied(false)
+  }
 
   const handleEdit = (student: any) => {
     setEditingId(student.id)
@@ -905,6 +964,18 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                                 </span>
                               </button>
                               <button 
+                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer relative group`}
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  handleResetPassword(s);
+                                }}
+                              >
+                                <KeyRound className="h-4 w-4" />
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
+                                  Réinitialiser mot de passe
+                                </span>
+                              </button>
+                              <button 
                                 className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
                                 onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}
                               >
@@ -971,6 +1042,200 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
             setPagination((p) => ({ ...p }))
           }}
         />
+
+        {/* Modal de confirmation de réinitialisation de mot de passe */}
+        {showResetPasswordModal && !newPasswordGenerated && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeResetPasswordModal} />
+              
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-md transform transition-all duration-200`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <h3 className={`text-xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}>
+                    <KeyRound className="w-5 h-5 text-orange-500" />
+                    Réinitialiser le mot de passe
+                  </h3>
+                </div>
+
+                <div className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"}`}>
+                      {selectedStudentForReset?.firstName?.charAt(0)}{selectedStudentForReset?.lastName?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                        {selectedStudentForReset?.lastName} {selectedStudentForReset?.middleName} {selectedStudentForReset?.firstName}
+                      </p>
+                      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        Code: {selectedStudentForReset?.code}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <p className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"} mb-4`}>
+                    Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet élève ?
+                  </p>
+                  <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Un nouveau mot de passe temporaire sera généré. L'élève devra le changer lors de sa prochaine connexion.
+                  </p>
+                </div>
+
+                <div className={`p-6 flex gap-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button
+                    onClick={closeResetPasswordModal}
+                    disabled={resettingPassword}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      theme === "dark"
+                        ? "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600"
+                        : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    <X className="w-4 h-4" />
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleConfirmResetPassword}
+                    disabled={resettingPassword}
+                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    {resettingPassword ? "Réinitialisation..." : "Réinitialiser"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+
+        {/* Modal affichage des nouveaux identifiants */}
+        {newPasswordGenerated && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeResetPasswordModal} />
+              
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-lg transform transition-all duration-200`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-green-500/20 bg-green-500/5" : "border-green-200 bg-green-50"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <KeyRound className="w-7 h-7 text-green-500" />
+                    </div>
+                    <div>
+                      <h2 className={`text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Identifiants de Connexion</h2>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Mot de passe réinitialisé avec succès</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* Avertissement */}
+                  <div className={`${theme === "dark" ? "bg-yellow-500/10" : "bg-yellow-50"} border ${theme === "dark" ? "border-yellow-500/30" : "border-yellow-200"} rounded-lg p-4`}>
+                    <p className={`${theme === "dark" ? "text-yellow-400" : "text-yellow-700"} text-sm font-medium flex items-start gap-2`}>
+                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>
+                        <strong>Important :</strong> Copiez ces identifiants maintenant ! Ils ne seront plus affichés après la fermeture de cette fenêtre.
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Infos élève */}
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"}`}>
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                        {selectedStudentForReset?.lastName} {selectedStudentForReset?.firstName}
+                      </p>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        Code: {selectedStudentForReset?.code}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}>
+                      <Mail className="w-3.5 h-3.5" />
+                      Adresse email
+                    </label>
+                    <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${emailCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-indigo-500 transition-all`}>
+                      <span className={`font-mono text-sm ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>
+                        {selectedStudentForReset?.email}
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedStudentForReset?.email || "")
+                          setEmailCopied(true)
+                          setTimeout(() => setEmailCopied(false), 2000)
+                        }}
+                        className={`transition-colors p-1.5 rounded ${
+                          emailCopied 
+                            ? "text-green-500 bg-green-500/20" 
+                            : "text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/10"
+                        }`}
+                        title={emailCopied ? "Copié !" : "Copier l'email"}
+                      >
+                        {emailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mot de passe */}
+                  <div>
+                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}>
+                      <KeyRound className="w-3.5 h-3.5" />
+                      Nouveau mot de passe
+                    </label>
+                    <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${passwordCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
+                      <span className={`font-mono text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>
+                        {newPasswordGenerated}
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(newPasswordGenerated)
+                          setPasswordCopied(true)
+                          setTimeout(() => setPasswordCopied(false), 2000)
+                        }}
+                        className={`transition-colors p-1.5 rounded ${
+                          passwordCopied 
+                            ? "text-green-500 bg-green-500/20" 
+                            : "text-orange-500 hover:text-orange-400 hover:bg-orange-500/10"
+                        }`}
+                        title={passwordCopied ? "Copié !" : "Copier le mot de passe"}
+                      >
+                        {passwordCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    L'élève devra changer ce mot de passe lors de sa prochaine connexion.
+                  </p>
+                </div>
+
+                <div className={`p-6 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button
+                    onClick={closeResetPasswordModal}
+                    className={`w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      passwordCopied && emailCopied
+                        ? theme === "dark"
+                          ? "bg-green-500/30 hover:bg-green-500/40 text-green-300 border border-green-500/70"
+                          : "bg-green-100 hover:bg-green-200 text-green-700 border border-green-300"
+                        : theme === "dark"
+                        ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50"
+                        : "bg-green-50 hover:bg-green-100 text-green-600 border border-green-200"
+                    }`}
+                  >
+                    <Check className="w-4 h-4" />
+                    {passwordCopied && emailCopied ? "✓ Identifiants copiés !" : "J'ai copié les identifiants"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
       </CardContent>
     </Card>
   )

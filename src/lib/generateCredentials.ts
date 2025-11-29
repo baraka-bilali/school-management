@@ -14,9 +14,45 @@ export function initial(input: string): string {
   return normalize(input).slice(0, 1)
 }
 
+/**
+ * Génère un domaine d'email basé sur le nom de l'école
+ * Ex: "École Saint Joseph" -> "ecolesaintjoseph.school"
+ */
+export function buildSchoolDomain(schoolName: string): string {
+  const normalized = schoolName
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 30) // Limiter à 30 caractères
+  
+  return `${normalized}.school`
+}
+
 export function buildStudentEmail({ lastName, middleName, code }: { lastName: string; middleName: string; code: string }): string {
   const left = `${initial(lastName)}${initial(middleName)}${normalize(code)}`
   return `${left}@${DEFAULT_DOMAIN}`
+}
+
+/**
+ * Génère un email pour un élève avec le domaine de l'école
+ * Format: initialNom + initialPostnom + code@nomecole.school
+ * Ex: "ab001@ecolesaintjoseph.school"
+ */
+export function buildStudentEmailWithSchool({ 
+  lastName, 
+  middleName, 
+  code, 
+  schoolName 
+}: { 
+  lastName: string; 
+  middleName: string; 
+  code: string;
+  schoolName: string;
+}): string {
+  const left = `${initial(lastName)}${initial(middleName)}${normalize(code)}`
+  const domain = buildSchoolDomain(schoolName)
+  return `${left}@${domain}`
 }
 
 export function buildTeacherEmail({ lastName, middleName, suffix }: { lastName: string; middleName: string; suffix?: string }): string {

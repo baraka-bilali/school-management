@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
-import { buildStudentEmail, generatePassword } from "@/lib/generateCredentials"
+import { buildStudentEmailWithSchool, generatePassword } from "@/lib/generateCredentials"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
 import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
@@ -228,6 +228,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
     }
 
+    // Récupérer le nom de l'école pour générer l'email
+    const school = await prisma.school.findUnique({
+      where: { id: adminSchoolId },
+      select: { nomEtablissement: true }
+    })
+
+    if (!school) {
+      return NextResponse.json({ error: "École introuvable" }, { status: 404 })
+    }
+
     const body = await req.json()
 
     const {
@@ -256,8 +266,13 @@ export async function POST(req: NextRequest) {
       yearId = currentYear.id
     }
 
-    // Générer email et mot de passe
-    const email = buildStudentEmail({ lastName, middleName, code })
+    // Générer email avec le domaine de l'école et mot de passe
+    const email = buildStudentEmailWithSchool({ 
+      lastName, 
+      middleName, 
+      code, 
+      schoolName: school.nomEtablissement 
+    })
     const plaintextPassword = generatePassword()
     const hashedPassword = await bcrypt.hash(plaintextPassword, 10)
 
