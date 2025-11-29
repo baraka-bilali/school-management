@@ -100,6 +100,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: Calendar, label: "Horaire des cours", href: "/student/schedule" },
     { icon: FileText, label: "Notes & Bulletins", href: "/student/grades" },
     { icon: Wallet, label: "Frais scolaires", href: "/student/fees" },
+    { icon: Bell, label: "Notifications", href: "/student/notifications" },
   ]
 
   // Sélectionner le menu selon le rôle
