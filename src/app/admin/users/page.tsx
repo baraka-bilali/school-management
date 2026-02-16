@@ -1166,7 +1166,18 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                       </span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(selectedStudentForReset?.email || "")
+                          if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(selectedStudentForReset?.email || "")
+                          } else {
+                            const textArea = document.createElement('textarea')
+                            textArea.value = selectedStudentForReset?.email || ""
+                            textArea.style.position = 'fixed'
+                            textArea.style.left = '-9999px'
+                            document.body.appendChild(textArea)
+                            textArea.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(textArea)
+                          }
                           setEmailCopied(true)
                           setTimeout(() => setEmailCopied(false), 2000)
                         }}
@@ -1194,7 +1205,18 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                       </span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(newPasswordGenerated)
+                          if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(newPasswordGenerated)
+                          } else {
+                            const textArea = document.createElement('textarea')
+                            textArea.value = newPasswordGenerated
+                            textArea.style.position = 'fixed'
+                            textArea.style.left = '-9999px'
+                            document.body.appendChild(textArea)
+                            textArea.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(textArea)
+                          }
                           setPasswordCopied(true)
                           setTimeout(() => setPasswordCopied(false), 2000)
                         }}

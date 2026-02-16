@@ -4204,7 +4204,18 @@ export default function SuperAdminHome() {
                       <span className={`font-mono text-sm ${textColor} select-all`}>{generatedCredentials.email}</span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(generatedCredentials.email)
+                          if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(generatedCredentials.email)
+                          } else {
+                            const textArea = document.createElement('textarea')
+                            textArea.value = generatedCredentials.email
+                            textArea.style.position = 'fixed'
+                            textArea.style.left = '-9999px'
+                            document.body.appendChild(textArea)
+                            textArea.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(textArea)
+                          }
                           // Toast notification visuelle
                         }}
                         className="text-blue-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded"
@@ -4224,7 +4235,18 @@ export default function SuperAdminHome() {
                       <span className={`font-mono text-lg font-bold ${textColor} tracking-wider select-all`}>{generatedCredentials.password}</span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(generatedCredentials.password)
+                          if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(generatedCredentials.password)
+                          } else {
+                            const textArea = document.createElement('textarea')
+                            textArea.value = generatedCredentials.password
+                            textArea.style.position = 'fixed'
+                            textArea.style.left = '-9999px'
+                            document.body.appendChild(textArea)
+                            textArea.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(textArea)
+                          }
                         }}
                         className="text-blue-500 hover:text-blue-400 transition-colors p-1.5 hover:bg-blue-500/10 rounded"
                         title="Copier le mot de passe"
@@ -4652,7 +4674,18 @@ export default function SuperAdminHome() {
                     <span className={`font-mono text-lg font-bold ${textColor} select-all`}>{newPasswordGenerated}</span>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(newPasswordGenerated)
+                        if (navigator.clipboard && window.isSecureContext) {
+                          navigator.clipboard.writeText(newPasswordGenerated)
+                        } else {
+                          const textArea = document.createElement('textarea')
+                          textArea.value = newPasswordGenerated
+                          textArea.style.position = 'fixed'
+                          textArea.style.left = '-9999px'
+                          document.body.appendChild(textArea)
+                          textArea.select()
+                          document.execCommand('copy')
+                          document.body.removeChild(textArea)
+                        }
                         setPasswordCopied(true)
                         setTimeout(() => setPasswordCopied(false), 2000)
                       }}
