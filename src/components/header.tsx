@@ -177,6 +177,15 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-800 text-yellow-400" : "hover:bg-gray-100 text-indigo-500"}`}
+              title={theme === "dark" ? "Mode Clair" : "Mode Sombre"}
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+
             <NotificationBell onNotificationClick={onNotificationClick} />
             
             {/* Profile Button */}
@@ -255,31 +264,13 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
 
               {/* Actions */}
               <div className={`border-t ${borderColor}`}>
-                {/* Theme Toggle */}
-                <button
-                  onClick={toggleTheme}
-                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors text-left ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="w-5 h-5 text-yellow-500" />
-                  ) : (
-                    <Moon className="w-5 h-5 text-blue-500" />
-                  )}
-                  <div>
-                    <div className={`text-sm font-medium ${textColor}`}>
-                      {theme === "dark" ? "Mode Clair" : "Mode Sombre"}
-                    </div>
-                    <div className={`text-xs ${textSecondary}`}>Changer le thème</div>
-                  </div>
-                </button>
-
                 {/* Logout Button */}
                 <button
                   onClick={() => {
                     setShowProfileModal(false)
                     setShowLogoutModal(true)
                   }}
-                  className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left border-t ${borderColor}`}
+                  className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left`}
                 >
                   <LogOut className="w-5 h-5 text-red-500" />
                   <div>
