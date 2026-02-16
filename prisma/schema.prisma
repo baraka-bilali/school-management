@@ -32,23 +32,26 @@ model User {
 }
 
 model AcademicYear {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  current     Boolean      @default(false)
-  startDate   DateTime?
-  endDate     DateTime?
-  enrollments Enrollment[]
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  current         Boolean          @default(false)
+  startDate       DateTime?
+  endDate         DateTime?
+  enrollments     Enrollment[]
+  tarifications   Tarification[]
+  receiptCounters ReceiptCounter[]
 }
 
 model Class {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  level       String
-  createdAt   DateTime     @default(now())
-  letter      String
-  section     String
-  stream      String?
-  enrollments Enrollment[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  level         String
+  createdAt     DateTime       @default(now())
+  letter        String
+  section       String
+  stream        String?
+  enrollments   Enrollment[]
+  tarifications Tarification[]
 
   @@index([section])
   @@index([level])
@@ -65,6 +68,7 @@ model Student {
   gender      String
   birthDate   DateTime
   enrollments Enrollment[]
+  paiements   Paiement[]
   user        User         @relation(fields: [userId], references: [id])
 
   @@index([lastName])
@@ -100,6 +104,7 @@ model Enrollment {
   class      Class            @relation(fields: [classId], references: [id])
   student    Student          @relation(fields: [studentId], references: [id])
   year       AcademicYear     @relation(fields: [yearId], references: [id])
+  paiements  Paiement[]
 
   @@unique([studentId, classId, yearId])
   @@index([classId], map: "Enrollment_classId_fkey")
@@ -184,6 +189,123 @@ model Notification {
   @@index([createdAt])
 }
 
+// ============================================================
+// MODULE FRAIS SCOLAIRES
+// ============================================================
+
+model TypeFrais {
+  id            Int             @id @default(autoincrement())
+  code          String          @unique
+  nom           String
+  description   String?         @db.Text
+  schoolId      Int
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  tarifications Tarification[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+}
+
+model Tarification {
+  id           Int          @id @default(autoincrement())
+  typeFraisId  Int
+  yearId       Int
+  classId      Int?
+  montant      Float
+  description  String?      @db.Text
+  schoolId     Int
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  typeFrais    TypeFrais    @relation(fields: [typeFraisId], references: [id])
+  year         AcademicYear @relation(fields: [yearId], references: [id])
+  class        Class?       @relation(fields: [classId], references: [id])
+  echeances    Echeance[]
+  paiements    Paiement[]
+
+  @@unique([typeFraisId, yearId, classId, schoolId])
+  @@index([schoolId])
+  @@index([yearId])
+  @@index([classId])
+  @@index([typeFraisId])
+}
+
+model Echeance {
+  id              Int          @id @default(autoincrement())
+  tarificationId  Int
+  nom             String
+  montant         Float
+  dateEcheance    DateTime
+  ordre           Int          @default(1)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  tarification    Tarification @relation(fields: [tarificationId], references: [id], onDelete: Cascade)
+
+  @@index([tarificationId])
+  @@index([dateEcheance])
+}
+
+model Paiement {
+  id               Int                    @id @default(autoincrement())
+  numeroRecu       String                 @unique
+  enrollmentId     Int
+  studentId        Int
+  tarificationId   Int
+  montant          Float
+  datePaiement     DateTime               @default(now())
+  modePaiement     ModePaiement           @default(CASH)
+  reference        String?
+  notes            String?                @db.Text
+  recuPdfPath      String?
+  schoolId         Int
+  createdBy        Int
+  isAnnule         Boolean                @default(false)
+  motifAnnulation  String?                @db.Text
+  annulePar        Int?
+  dateAnnulation   DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  enrollment       Enrollment             @relation(fields: [enrollmentId], references: [id])
+  student          Student                @relation(fields: [studentId], references: [id])
+  tarification     Tarification           @relation(fields: [tarificationId], references: [id])
+  modifications    PaiementModification[]
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([enrollmentId])
+  @@index([tarificationId])
+  @@index([numeroRecu])
+  @@index([datePaiement])
+  @@index([schoolId, datePaiement])
+}
+
+model PaiementModification {
+  id              Int      @id @default(autoincrement())
+  paiementId      Int
+  champModifie    String
+  ancienneValeur  String   @db.Text
+  nouvelleValeur  String   @db.Text
+  modifiePar      Int
+  motif           String?  @db.Text
+  createdAt       DateTime @default(now())
+  paiement        Paiement @relation(fields: [paiementId], references: [id])
+
+  @@index([paiementId])
+  @@index([createdAt])
+}
+
+model ReceiptCounter {
+  id        Int          @id @default(autoincrement())
+  schoolId  Int
+  yearId    Int
+  counter   Int          @default(0)
+  year      AcademicYear @relation(fields: [yearId], references: [id])
+
+  @@unique([schoolId, yearId])
+}
+
 enum User_role {
   ADMIN
   ELEVE
@@ -221,4 +343,12 @@ enum NotificationType {
   SUBSCRIPTION_EXPIRING_2_DAYS
   SUBSCRIPTION_EXPIRING_1_DAY
   SUBSCRIPTION_EXPIRED
+}
+
+enum ModePaiement {
+  CASH
+  VIREMENT
+  MOBILE_MONEY
+  CHEQUE
+  AUTRE
 }
