@@ -34,16 +34,35 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
   const [userRole, setUserRole] = useState("")
 
   useEffect(() => {
-    // Récupérer les infos utilisateur depuis le token
+    // Récupérer les infos utilisateur depuis le token et l'API
     const token = localStorage.getItem("token")
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]))
-        setUserName(payload.name || payload.username || "Utilisateur")
         setUserEmail(payload.email || "")
         setUserRole(payload.role || "")
         
         console.log("Payload du token:", payload)
+        
+        // Récupérer le nom depuis l'API pour éviter les problèmes d'encodage UTF-8
+        fetch("/api/auth/me", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Cookie": `token=${token}`
+          }
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.user?.name) {
+              setUserName(data.user.name)
+              console.log("✅ Nom d'utilisateur récupéré de l'API:", data.user.name)
+            }
+          })
+          .catch(error => {
+            console.error("Erreur lors de la récupération du nom:", error)
+            // Fallback au JWT si l'API échoue
+            setUserName(payload.name || payload.username || "Utilisateur")
+          })
         
         // Vérifier si le token contient un schoolId
         if (!payload.schoolId && payload.role === "ADMIN") {
