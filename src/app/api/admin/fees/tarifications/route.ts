@@ -66,12 +66,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Année scolaire introuvable" }, { status: 404 })
     }
 
-    // Vérifier la classe si spécifiée
-    if (data.classId) {
-      const cls = await prisma.class.findUnique({ where: { id: data.classId } })
-      if (!cls) {
-        return NextResponse.json({ error: "Classe introuvable" }, { status: 404 })
-      }
+    // Vérifier la classe
+    const cls = await prisma.class.findUnique({ where: { id: data.classId } })
+    if (!cls) {
+      return NextResponse.json({ error: "Classe introuvable" }, { status: 404 })
     }
 
     // Vérifier l'unicité
@@ -79,7 +77,7 @@ export async function POST(req: NextRequest) {
       where: {
         typeFraisId: data.typeFraisId,
         yearId: data.yearId,
-        classId: data.classId || null,
+        classId: data.classId,
         schoolId: user.schoolId,
       },
     })
@@ -95,7 +93,7 @@ export async function POST(req: NextRequest) {
       data: {
         typeFraisId: data.typeFraisId,
         yearId: data.yearId,
-        classId: data.classId || null,
+        classId: data.classId,
         montant: data.montant,
         description: data.description || null,
         schoolId: user.schoolId,

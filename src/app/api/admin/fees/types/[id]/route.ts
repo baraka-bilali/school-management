@@ -56,22 +56,33 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Type de frais introuvable" }, { status: 404 })
     }
 
-    // Si le code change, vérifier l'unicité
-    if (data.code && data.code !== existing.code) {
-      const duplicate = await prisma.typeFrais.findUnique({
-        where: { schoolId_code: { schoolId: user.schoolId, code: data.code } },
-      })
-      if (duplicate) {
-        return NextResponse.json(
-          { error: `Le code "${data.code}" est déjà utilisé` },
-          { status: 409 }
-        )
+    // Si le nom change, re-générer le code automatiquement
+    const updateData: Record<string, unknown> = { ...data }
+    if (data.nom && data.nom !== existing.nom) {
+      const baseCode = data.nom
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .substring(0, 20)
+
+      let code = baseCode
+      let suffix = 1
+      while (true) {
+        const duplicate = await prisma.typeFrais.findUnique({
+          where: { schoolId_code: { schoolId: user.schoolId, code } },
+        })
+        if (!duplicate || duplicate.id === parseInt(id)) break
+        code = `${baseCode.substring(0, 17)}_${suffix}`
+        suffix++
       }
+      updateData.code = code
     }
 
     const updated = await prisma.typeFrais.update({
       where: { id: parseInt(id) },
-      data,
+      data: updateData,
     })
 
     return NextResponse.json({ data: updated })

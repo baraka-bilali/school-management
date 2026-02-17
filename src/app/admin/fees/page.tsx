@@ -83,6 +83,19 @@ interface TypeFrais {
   _count: { tarifications: number }
 }
 
+interface ClassOption {
+  id: number
+  name: string
+  level: string
+  section: string
+}
+
+interface AcademicYearOption {
+  id: number
+  name: string
+  current: boolean
+}
+
 interface Tarification {
   id: number
   typeFraisId: number
@@ -150,7 +163,7 @@ const MODES_PAIEMENT = [
 
 export default function AdminFeesPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
-  const [activeTab, setActiveTab] = useState<"overview" | "types" | "students" | "payments">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "types" | "tarifications" | "students" | "payments">("overview")
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -160,10 +173,13 @@ export default function AdminFeesPage() {
   const [tarifications, setTarifications] = useState<Tarification[]>([])
   const [paiements, setPaiements] = useState<PaiementRecord[]>([])
   const [paiementsPagination, setPaiementsPagination] = useState({ total: 0, page: 1, totalPages: 1 })
+  const [classes, setClasses] = useState<ClassOption[]>([])
+  const [years, setYears] = useState<AcademicYearOption[]>([])
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCreateTypeModal, setShowCreateTypeModal] = useState(false)
+  const [showCreateTarifModal, setShowCreateTarifModal] = useState(false)
 
   // Theme listener
   useEffect(() => {
@@ -186,11 +202,12 @@ export default function AdminFeesPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [statsRes, typesRes, tarifsRes, paiementsRes] = await Promise.all([
+      const [statsRes, typesRes, tarifsRes, paiementsRes, metaRes] = await Promise.all([
         fetch("/api/admin/fees/stats"),
         fetch("/api/admin/fees/types"),
         fetch("/api/admin/fees/tarifications"),
         fetch("/api/admin/fees/paiements?pageSize=15"),
+        fetch("/api/admin/meta"),
       ])
 
       if (statsRes.ok) {
@@ -209,6 +226,14 @@ export default function AdminFeesPage() {
         const result = await paiementsRes.json()
         setPaiements(result.data)
         setPaiementsPagination(result.pagination)
+      }
+      if (metaRes.ok) {
+        const meta = await metaRes.json()
+        setClasses(meta.classes || [])
+        setYears((meta.years || []).map((y: { id: number; name: string; current: boolean }) => ({
+          ...y,
+          current: y.id === meta.currentYearId,
+        })))
       }
     } catch (error) {
       console.error("Erreur lors du chargement:", error)
@@ -245,6 +270,7 @@ export default function AdminFeesPage() {
   const tabs = [
     { key: "overview", label: "Vue d'ensemble", icon: TrendingUp },
     { key: "types", label: "Types de frais", icon: FileText },
+    { key: "tarifications", label: "Tarifications", icon: Wallet },
     { key: "students", label: "Par élève", icon: Users },
     { key: "payments", label: "Paiements", icon: Receipt },
   ]
@@ -513,7 +539,7 @@ export default function AdminFeesPage() {
                     <div className="text-center py-12">
                       <FileText className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
                       <p className={`text-lg font-medium ${textColor}`}>Aucun type de frais</p>
-                      <p className={`text-sm ${textSecondary} mt-1`}>Commencez par créer un type de frais pour pouvoir enregistrer des paiements</p>
+                      <p className={`text-sm ${textSecondary} mt-1`}>Commencez par créer un type de frais pour pouvoir configurer les tarifications</p>
                       <button
                         onClick={() => setShowCreateTypeModal(true)}
                         className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -527,7 +553,6 @@ export default function AdminFeesPage() {
                       <table className="w-full">
                         <thead className={headerBg}>
                           <tr>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Code</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Nom</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Tarifications</th>
@@ -538,9 +563,6 @@ export default function AdminFeesPage() {
                         <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                           {typesFrais.map((t) => (
                             <tr key={t.id} className={hoverRow}>
-                              <td className={`px-4 py-3`}>
-                                <span className="font-mono text-xs px-2 py-1 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">{t.code}</span>
-                              </td>
                               <td className={`px-4 py-3 ${textColor} font-medium`}>{t.nom}</td>
                               <td className={`px-4 py-3 ${textSecondary} text-sm`}>{t.description || "—"}</td>
                               <td className={`px-4 py-3 ${textColor}`}>{t._count.tarifications}</td>
@@ -572,6 +594,25 @@ export default function AdminFeesPage() {
                   )}
                 </CardContent>
               </Card>
+            )}
+
+            {/* === TARIFICATIONS (Grille tarifaire par classe) === */}
+            {activeTab === "tarifications" && (
+              <TarificationsTab
+                theme={theme}
+                tarifications={tarifications}
+                typesFrais={typesFrais}
+                classes={classes}
+                years={years}
+                textColor={textColor}
+                textSecondary={textSecondary}
+                borderColor={borderColor}
+                headerBg={headerBg}
+                hoverRow={hoverRow}
+                formatCurrency={formatCurrency}
+                onCreateTarif={() => setShowCreateTarifModal(true)}
+                onRefresh={fetchAll}
+              />
             )}
 
             {/* === PAIEMENTS === */}
@@ -689,6 +730,20 @@ export default function AdminFeesPage() {
           onClose={() => setShowCreateTypeModal(false)}
           onSuccess={() => {
             setShowCreateTypeModal(false)
+            fetchAll()
+          }}
+        />
+      )}
+
+      {showCreateTarifModal && (
+        <CreateTarificationModal
+          theme={theme}
+          typesFrais={typesFrais}
+          classes={classes}
+          years={years}
+          onClose={() => setShowCreateTarifModal(false)}
+          onSuccess={() => {
+            setShowCreateTarifModal(false)
             fetchAll()
           }}
         />
@@ -1329,7 +1384,6 @@ function CreateFeeTypeModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [code, setCode] = useState("")
   const [nom, setNom] = useState("")
   const [description, setDescription] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -1342,7 +1396,7 @@ function CreateFeeTypeModal({
   const inputClasses = `w-full px-3 py-2.5 rounded-xl border ${theme === "dark" ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-800"} focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all`
 
   const handleSubmit = async () => {
-    if (!code || !nom) return
+    if (!nom) return
     setSubmitting(true)
     setError("")
 
@@ -1350,7 +1404,7 @@ function CreateFeeTypeModal({
       const res = await fetch("/api/admin/fees/types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.toUpperCase(), nom, description: description || undefined }),
+        body: JSON.stringify({ nom, description: description || undefined }),
       })
 
       if (!res.ok) {
@@ -1389,20 +1443,6 @@ function CreateFeeTypeModal({
             )}
 
             <div>
-              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Code</label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
-                placeholder="Ex: SCOLARITE, INSCRIPTION"
-                className={`${inputClasses} font-mono`}
-                maxLength={20}
-                autoFocus
-              />
-              <p className={`text-xs ${textSecondary} mt-1`}>Majuscules, chiffres et underscores uniquement</p>
-            </div>
-
-            <div>
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Nom</label>
               <input
                 type="text"
@@ -1410,6 +1450,7 @@ function CreateFeeTypeModal({
                 onChange={(e) => setNom(e.target.value)}
                 placeholder="Ex: Frais de scolarité"
                 className={inputClasses}
+                autoFocus
               />
             </div>
 
@@ -1436,15 +1477,573 @@ function CreateFeeTypeModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting || !code || !nom}
+              disabled={submitting || !nom}
               className={`px-5 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${
-                submitting || !code || !nom
+                submitting || !nom
                   ? "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
                   : "bg-indigo-600 hover:bg-indigo-700 text-white"
               }`}
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Créer
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
+
+// ============================================================
+// ONGLET TARIFICATIONS - GRILLE TARIFAIRE PAR CLASSE
+// ============================================================
+
+function TarificationsTab({
+  theme,
+  tarifications,
+  typesFrais,
+  classes,
+  years,
+  textColor,
+  textSecondary,
+  borderColor,
+  headerBg,
+  hoverRow,
+  formatCurrency,
+  onCreateTarif,
+  onRefresh,
+}: {
+  theme: "light" | "dark"
+  tarifications: Tarification[]
+  typesFrais: TypeFrais[]
+  classes: ClassOption[]
+  years: AcademicYearOption[]
+  textColor: string
+  textSecondary: string
+  borderColor: string
+  headerBg: string
+  hoverRow: string
+  formatCurrency: (amount: number) => string
+  onCreateTarif: () => void
+  onRefresh: () => void
+}) {
+  const currentYear = years.find((y) => y.current)
+  const [selectedYearId, setSelectedYearId] = useState<number | null>(currentYear?.id || years[0]?.id || null)
+  const [editingTarif, setEditingTarif] = useState<number | null>(null)
+  const [editMontant, setEditMontant] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  // Use effect to set default year when data loads
+  useEffect(() => {
+    if (!selectedYearId && years.length > 0) {
+      const current = years.find((y) => y.current)
+      setSelectedYearId(current?.id || years[0]?.id)
+    }
+  }, [years, selectedYearId])
+
+  const filteredTarifs = tarifications.filter(
+    (t) => t.yearId === selectedYearId && t.isActive
+  )
+
+  // Group by type de frais
+  const tarifsByType = typesFrais
+    .filter((t) => t.isActive)
+    .map((type) => ({
+      type,
+      tarifs: filteredTarifs.filter((t) => t.typeFraisId === type.id),
+    }))
+
+  const handleSaveMontant = async (tarifId: number) => {
+    const montant = parseFloat(editMontant)
+    if (!montant || montant <= 0) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/fees/tarifications/${tarifId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ montant }),
+      })
+      if (res.ok) {
+        setEditingTarif(null)
+        onRefresh()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteTarif = async (tarifId: number) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette tarification ?")) return
+
+    try {
+      const res = await fetch(`/api/admin/fees/tarifications/${tarifId}`, {
+        method: "DELETE",
+      })
+      if (res.ok) onRefresh()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if (typesFrais.filter((t) => t.isActive).length === 0) {
+    return (
+      <Card theme={theme}>
+        <CardContent className="pt-5">
+          <div className="text-center py-12">
+            <Wallet className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
+            <p className={`text-lg font-medium ${textColor}`}>Aucun type de frais configuré</p>
+            <p className={`text-sm ${textSecondary} mt-1`}>
+              Créez d&apos;abord un type de frais dans l&apos;onglet &quot;Types de frais&quot;, puis configurez les tarifs par classe ici.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filtre par année + bouton ajouter */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Calendar className={`w-5 h-5 ${textSecondary}`} />
+          <select
+            value={selectedYearId || ""}
+            onChange={(e) => setSelectedYearId(parseInt(e.target.value))}
+            className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-800"
+            } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
+          >
+            {years.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.name} {y.current ? "(en cours)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          onClick={onCreateTarif}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-indigo-500/25"
+        >
+          <Plus className="w-4 h-4" />
+          Ajouter une tarification
+        </button>
+      </div>
+
+      {/* Grille par type de frais */}
+      {tarifsByType.map(({ type, tarifs }) => (
+        <Card key={type.id} theme={theme}>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BadgeDollarSign className="w-5 h-5 text-indigo-500" />
+                <span>{type.nom}</span>
+                {type.description && (
+                  <span className={`text-xs font-normal ${textSecondary}`}>— {type.description}</span>
+                )}
+              </div>
+              <span className={`text-xs font-normal px-2 py-1 rounded-full ${
+                theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
+              }`}>
+                {tarifs.length} classe{tarifs.length > 1 ? "s" : ""} configurée{tarifs.length > 1 ? "s" : ""}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {tarifs.length === 0 ? (
+              <div className={`text-center py-6 border-2 border-dashed ${borderColor} rounded-xl`}>
+                <p className={`text-sm ${textSecondary}`}>Aucune tarification pour cette année</p>
+                <button
+                  onClick={onCreateTarif}
+                  className="mt-2 text-sm text-indigo-500 hover:text-indigo-400 font-medium inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Ajouter un tarif
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className={headerBg}>
+                    <tr>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Classe</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Paiements</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
+                    {tarifs
+                      .sort((a, b) => (a.class?.name || "").localeCompare(b.class?.name || ""))
+                      .map((tarif) => (
+                        <tr key={tarif.id} className={hoverRow}>
+                          <td className={`px-4 py-3`}>
+                            <div className="flex items-center gap-2">
+                              <Building className="w-4 h-4 text-indigo-400" />
+                              <span className={`font-medium ${textColor}`}>
+                                {tarif.class?.name || "Toutes les classes"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-3`}>
+                            {editingTarif === tarif.id ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={editMontant}
+                                  onChange={(e) => setEditMontant(e.target.value)}
+                                  className={`w-28 px-2 py-1 rounded-lg border text-sm ${
+                                    theme === "dark"
+                                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                                      : "bg-white border-gray-300 text-gray-800"
+                                  } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveMontant(tarif.id)
+                                    if (e.key === "Escape") setEditingTarif(null)
+                                  }}
+                                />
+                                <button
+                                  onClick={() => handleSaveMontant(tarif.id)}
+                                  disabled={saving}
+                                  className="p-1 rounded text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                >
+                                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                </button>
+                                <button
+                                  onClick={() => setEditingTarif(null)}
+                                  className="p-1 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                {formatCurrency(tarif.montant)}
+                              </span>
+                            )}
+                          </td>
+                          <td className={`px-4 py-3`}>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              tarif._count.paiements > 0
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                : "bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
+                            }`}>
+                              {tarif._count.paiements} paiement{tarif._count.paiements > 1 ? "s" : ""}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-3 text-sm ${textSecondary}`}>
+                            {tarif.description || "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingTarif(tarif.id)
+                                  setEditMontant(String(tarif.montant))
+                                }}
+                                className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}
+                                title="Modifier le montant"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTarif(tarif.id)}
+                                className={`p-1.5 rounded-lg ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+
+// ============================================================
+// MODAL : CRÉER UNE TARIFICATION
+// ============================================================
+
+function CreateTarificationModal({
+  theme,
+  typesFrais,
+  classes,
+  years,
+  onClose,
+  onSuccess,
+}: {
+  theme: "light" | "dark"
+  typesFrais: TypeFrais[]
+  classes: ClassOption[]
+  years: AcademicYearOption[]
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const currentYear = years.find((y) => y.current)
+  const [typeFraisId, setTypeFraisId] = useState<number | "">(typesFrais[0]?.id || "")
+  const [yearId, setYearId] = useState<number | "">(currentYear?.id || years[0]?.id || "")
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([])
+  const [montant, setMontant] = useState("")
+  const [description, setDescription] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [successCount, setSuccessCount] = useState(0)
+
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const bgColor = theme === "dark" ? "bg-gray-800" : "bg-white"
+  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+  const inputClasses = `w-full px-3 py-2.5 rounded-xl border ${theme === "dark" ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-800"} focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all`
+  const selectClasses = `${inputClasses} appearance-none`
+
+  const activeTypes = typesFrais.filter((t) => t.isActive)
+
+  const toggleClass = (classId: number) => {
+    setSelectedClassIds((prev) =>
+      prev.includes(classId) ? prev.filter((id) => id !== classId) : [...prev, classId]
+    )
+  }
+
+  const toggleAllClasses = () => {
+    if (selectedClassIds.length === classes.length) {
+      setSelectedClassIds([])
+    } else {
+      setSelectedClassIds(classes.map((c) => c.id))
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!typeFraisId || !yearId || selectedClassIds.length === 0 || !montant) return
+    setSubmitting(true)
+    setError("")
+    setSuccessCount(0)
+
+    let created = 0
+    const errors: string[] = []
+
+    for (const classId of selectedClassIds) {
+      try {
+        const res = await fetch("/api/admin/fees/tarifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            typeFraisId: Number(typeFraisId),
+            yearId: Number(yearId),
+            classId,
+            montant: parseFloat(montant),
+            description: description || undefined,
+          }),
+        })
+
+        if (res.ok) {
+          created++
+        } else {
+          const err = await res.json()
+          const className = classes.find((c) => c.id === classId)?.name || `Classe ${classId}`
+          errors.push(`${className}: ${err.error}`)
+        }
+      } catch {
+        const className = classes.find((c) => c.id === classId)?.name || `Classe ${classId}`
+        errors.push(`${className}: Erreur réseau`)
+      }
+    }
+
+    setSuccessCount(created)
+
+    if (errors.length > 0) {
+      setError(`${created} tarification(s) créée(s). Erreurs :\n${errors.join("\n")}`)
+      if (created > 0) {
+        // Partial success - refresh but keep modal open to show errors
+        setTimeout(() => onSuccess(), 2000)
+      }
+    } else {
+      onSuccess()
+    }
+
+    setSubmitting(false)
+  }
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+        <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-lg overflow-hidden`}>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-600 to-purple-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Nouvelle tarification</h3>
+                  <p className="text-indigo-100 text-xs">Définir le montant par classe</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-sm whitespace-pre-line">
+                {error}
+              </div>
+            )}
+
+            {successCount > 0 && !error && (
+              <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600 dark:text-green-400 text-sm">
+                {successCount} tarification(s) créée(s) avec succès !
+              </div>
+            )}
+
+            {/* Type de frais */}
+            <div>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Type de frais</label>
+              <select
+                value={typeFraisId}
+                onChange={(e) => setTypeFraisId(parseInt(e.target.value))}
+                className={selectClasses}
+              >
+                <option value="">Sélectionner un type</option>
+                {activeTypes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.nom}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Année scolaire */}
+            <div>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Année scolaire</label>
+              <select
+                value={yearId}
+                onChange={(e) => setYearId(parseInt(e.target.value))}
+                className={selectClasses}
+              >
+                {years.map((y) => (
+                  <option key={y.id} value={y.id}>{y.name} {y.current ? "(en cours)" : ""}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Montant */}
+            <div>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Montant ($)</label>
+              <input
+                type="number"
+                value={montant}
+                onChange={(e) => setMontant(e.target.value)}
+                placeholder="Ex: 50000"
+                min="0"
+                step="100"
+                className={inputClasses}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>
+                Description <span className={`font-normal ${textSecondary}`}>(optionnel)</span>
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ex: Frais annuels de scolarité"
+                className={inputClasses}
+              />
+            </div>
+
+            {/* Sélection de classes */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`text-sm font-semibold ${textColor}`}>Classes</label>
+                <button
+                  onClick={toggleAllClasses}
+                  className="text-xs text-indigo-500 hover:text-indigo-400 font-medium"
+                >
+                  {selectedClassIds.length === classes.length ? "Tout désélectionner" : "Tout sélectionner"}
+                </button>
+              </div>
+              <div className={`border ${borderColor} rounded-xl p-3 max-h-48 overflow-y-auto space-y-1`}>
+                {classes.length === 0 ? (
+                  <p className={`text-sm ${textSecondary} text-center py-2`}>Aucune classe disponible</p>
+                ) : (
+                  classes
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((cls) => (
+                      <label
+                        key={cls.id}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                          selectedClassIds.includes(cls.id)
+                            ? theme === "dark"
+                              ? "bg-indigo-500/15 text-indigo-300"
+                              : "bg-indigo-50 text-indigo-700"
+                            : theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedClassIds.includes(cls.id)}
+                          onChange={() => toggleClass(cls.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Building className="w-3.5 h-3.5 opacity-50" />
+                          <span className="text-sm font-medium">{cls.name}</span>
+                        </div>
+                      </label>
+                    ))
+                )}
+              </div>
+              {selectedClassIds.length > 0 && (
+                <p className={`text-xs ${textSecondary} mt-1`}>
+                  {selectedClassIds.length} classe{selectedClassIds.length > 1 ? "s" : ""} sélectionnée{selectedClassIds.length > 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className={`px-6 py-4 border-t ${borderColor} flex justify-end gap-3`}>
+            <button
+              onClick={onClose}
+              className={`px-4 py-2 rounded-xl border ${borderColor} ${textColor} text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700`}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !typeFraisId || !yearId || selectedClassIds.length === 0 || !montant}
+              className={`px-5 py-2 rounded-xl text-sm font-medium transition-all inline-flex items-center gap-2 ${
+                submitting || !typeFraisId || !yearId || selectedClassIds.length === 0 || !montant
+                  ? "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              }`}
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {selectedClassIds.length > 1
+                ? `Créer ${selectedClassIds.length} tarifications`
+                : "Créer la tarification"
+              }
             </button>
           </div>
         </div>

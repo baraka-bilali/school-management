@@ -5,11 +5,6 @@ import { z } from "zod"
 // ============================================================
 
 export const createTypeFraisSchema = z.object({
-  code: z
-    .string()
-    .min(2, "Le code doit avoir au moins 2 caractères")
-    .max(20, "Le code ne peut dépasser 20 caractères")
-    .regex(/^[A-Z0-9_]+$/, "Le code ne doit contenir que des majuscules, chiffres et underscores"),
   nom: z.string().min(2, "Le nom doit avoir au moins 2 caractères").max(100),
   description: z.string().optional(),
 })
@@ -23,7 +18,7 @@ export const updateTypeFraisSchema = createTypeFraisSchema.partial()
 export const createTarificationSchema = z.object({
   typeFraisId: z.number().int().positive("typeFraisId invalide"),
   yearId: z.number().int().positive("yearId invalide"),
-  classId: z.number().int().positive("classId invalide").nullable().optional(),
+  classId: z.number().int().positive("classId invalide"),
   montant: z.number().positive("Le montant doit être positif"),
   description: z.string().optional(),
 })

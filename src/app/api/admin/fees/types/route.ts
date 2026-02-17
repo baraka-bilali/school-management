@@ -40,21 +40,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const data = createTypeFraisSchema.parse(body)
 
-    // Vérifier l'unicité du code pour cette école
-    const existing = await prisma.typeFrais.findUnique({
-      where: { schoolId_code: { schoolId: user.schoolId, code: data.code } },
-    })
+    // Générer le code automatiquement à partir du nom
+    const baseCode = data.nom
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .substring(0, 20)
 
-    if (existing) {
-      return NextResponse.json(
-        { error: `Le code "${data.code}" existe déjà pour cette école` },
-        { status: 409 }
-      )
+    let code = baseCode
+    let suffix = 1
+    while (await prisma.typeFrais.findUnique({ where: { schoolId_code: { schoolId: user.schoolId, code } } })) {
+      code = `${baseCode.substring(0, 17)}_${suffix}`
+      suffix++
     }
 
     const typeFrais = await prisma.typeFrais.create({
       data: {
         ...data,
+        code,
         schoolId: user.schoolId,
       },
     })
