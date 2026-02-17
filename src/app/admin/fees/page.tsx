@@ -849,10 +849,7 @@ function PaymentFormModal({
         if (res.ok) {
           const { data } = await res.json()
           setBalanceInfo(data)
-          // Pré-remplir le montant avec le solde restant
-          if (data.solde > 0) {
-            setMontant(String(data.solde))
-          }
+          setMontant("")
         }
       } catch (err) {
         console.error(err)
@@ -1186,34 +1183,33 @@ function PaymentFormModal({
                   </div>
                 </div>
 
-                {/* Montant */}
+                {/* Montant reçu */}
                 <div>
                   <label className={`block text-sm font-semibold ${textColor} mb-2`}>
                     <DollarSign className="w-4 h-4 inline mr-1" />
-                    Montant à payer
+                    Montant reçu
                   </label>
                   <div className="relative">
                     <input
                       type="number"
                       min="1"
-                      max={balanceInfo?.solde ?? undefined}
                       step="any"
                       value={montant}
                       onChange={(e) => setMontant(e.target.value)}
-                      placeholder="0"
+                      placeholder="Entrez le montant reçu"
                       className={`${inputClasses} text-xl font-bold pr-10`}
                       autoFocus
                     />
                     <span className={`absolute right-3 top-1/2 -translate-y-1/2 font-bold ${textSecondary}`}>$</span>
                   </div>
                   {balanceInfo && parseFloat(montant) > balanceInfo.solde && (
-                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      Le montant dépasse le solde restant ({balanceInfo.solde} $)
+                      Ce montant dépasse le reste à payer ({balanceInfo.solde} $)
                     </p>
                   )}
 
-                  {/* Quick amounts */}
+                  {/* Raccourcis montants */}
                   {balanceInfo && balanceInfo.solde > 0 && (
                     <div className="flex gap-2 mt-2 flex-wrap">
                       {[
@@ -1230,9 +1226,35 @@ function PaymentFormModal({
                               : `${borderColor} ${textSecondary} hover:border-green-500`
                           }`}
                         >
-                          {amount === balanceInfo.solde ? "Totalité" : `${amount} $`}
+                          {amount === balanceInfo.solde ? "Tout payer" : `${amount} $`}
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Calcul en direct du reste à payer */}
+                  {balanceInfo && montant && parseFloat(montant) > 0 && (
+                    <div className={`mt-3 p-3 rounded-xl ${theme === "dark" ? "bg-gray-700/50" : "bg-green-50"} space-y-1.5`}>
+                      <div className="flex justify-between text-sm">
+                        <span className={textSecondary}>Reste à payer actuel</span>
+                        <span className={`font-medium ${textColor}`}>{balanceInfo.solde} $</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className={textSecondary}>Ce paiement</span>
+                        <span className="font-medium text-green-500">- {parseFloat(montant)} $</span>
+                      </div>
+                      <div className={`flex justify-between text-sm pt-1.5 border-t ${borderColor}`}>
+                        <span className={`font-semibold ${textColor}`}>Nouveau solde</span>
+                        {(() => {
+                          const newBalance = balanceInfo.solde - parseFloat(montant)
+                          return (
+                            <span className={`font-bold ${newBalance <= 0 ? "text-green-500" : "text-orange-500"}`}>
+                              {newBalance <= 0 ? "0" : newBalance} $
+                              {newBalance <= 0 && " ✓ Soldé"}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </div>
                   )}
                 </div>
