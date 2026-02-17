@@ -355,6 +355,8 @@ export default function ClassesPage() {
                       <option value="4ème">4ème</option>
                       <option value="5ème">5ème</option>
                       <option value="6ème">6ème</option>
+                      <option value="7ème">7ème</option>
+                      <option value="8ème">8ème</option>
                     </select>
                   </div>
                   <div>
