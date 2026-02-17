@@ -796,6 +796,7 @@ function PaymentFormModal({
     numeroRecu: string
     montant: number
     studentName: string
+    id: number
   } | null>(null)
 
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -894,6 +895,7 @@ function PaymentFormModal({
 
       const { data } = await res.json()
       setCreatedPayment({
+        id: data.id,
         numeroRecu: data.numeroRecu,
         montant: data.montant,
         studentName: `${data.student.lastName} ${data.student.middleName} ${data.student.firstName}`,
@@ -984,6 +986,33 @@ function PaymentFormModal({
                     className={`flex-1 px-4 py-2.5 rounded-xl border ${borderColor} ${textColor} font-medium text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
                   >
                     Fermer
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!createdPayment) return
+                      try {
+                        const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}?receipt=1`)
+                        if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
+                        const { data } = await res.json()
+
+                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} $</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Imprimé le ${new Date().toLocaleString()}</div></body></html>`
+
+                        const w = window.open("", "_blank", "width=700,height=900")
+                        if (!w) throw new Error("Impossible d'ouvrir la fenêtre d'impression")
+                        w.document.write(html)
+                        w.document.close()
+                        w.focus()
+                        setTimeout(() => {
+                          w.print()
+                        }, 300)
+                      } catch (err) {
+                        console.error(err)
+                        alert(err instanceof Error ? err.message : "Erreur lors de la génération du reçu")
+                      }
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors"
+                  >
+                    Imprimer le reçu
                   </button>
                   <button
                     onClick={onSuccess}

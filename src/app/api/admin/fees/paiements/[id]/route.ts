@@ -19,8 +19,15 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const user = getAuthUser(req)
     requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
     const { id } = await params
+    const { searchParams } = new URL(req.url)
 
     const paiement = await getPaiementById(parseInt(id), user.schoolId)
+
+    // Si on demande les données du reçu via ?receipt=1, retourner les données structurées
+    if (searchParams.get("receipt") === "1") {
+      const receipt = await getReceiptData(parseInt(id))
+      return NextResponse.json({ data: receipt })
+    }
 
     return NextResponse.json({ data: paiement })
   } catch (error) {
