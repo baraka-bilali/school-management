@@ -1972,7 +1972,7 @@ function CreateTarificationModal({
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Type de frais</label>
               <select
                 value={typeFraisId}
-                onChange={(e) => setTypeFraisId(parseInt(e.target.value))}
+                onChange={(e) => setTypeFraisId(e.target.value ? parseInt(e.target.value) : "")}
                 className={selectClasses}
               >
                 <option value="">Sélectionner un type</option>
