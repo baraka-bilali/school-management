@@ -16,7 +16,8 @@ import {
   Bell,
   Calendar,
   FileText,
-  Wallet
+  Wallet,
+  Landmark
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -88,6 +89,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     { icon: Users, label: "Utilisateurs", href: "/admin/users" },
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
     { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
+    { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
     { icon: ClipboardCheck, label: "Présences", href: "/admin/attendance" },
     { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },

@@ -32,6 +32,9 @@ import {
   Building,
   UserCheck,
   BadgeDollarSign,
+  Filter,
+  ArrowUpDown,
+  SlidersHorizontal,
 } from "lucide-react"
 import Portal from "@/components/portal"
 
@@ -145,6 +148,25 @@ interface BalanceInfo {
   nombrePaiements: number
 }
 
+interface StudentFeeRow {
+  studentId: number
+  enrollmentId: number
+  lastName: string
+  middleName: string
+  firstName: string
+  code: string
+  gender: string
+  classId: number
+  className: string
+  totalExpected: number
+  totalPaid: number
+  remaining: number
+  percent: number
+  status: "solde" | "partiel" | "impaye"
+  paymentCount: number
+  lastPaymentDate: string | null
+}
+
 // ============================================================
 // MODE DE PAIEMENT OPTIONS
 // ============================================================
@@ -175,6 +197,17 @@ export default function AdminFeesPage() {
   const [paiementsPagination, setPaiementsPagination] = useState({ total: 0, page: 1, totalPages: 1 })
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [years, setYears] = useState<AcademicYearOption[]>([])
+
+  // Par élève
+  const [studentFees, setStudentFees] = useState<StudentFeeRow[]>([])
+  const [studentFeesLoading, setStudentFeesLoading] = useState(false)
+  const [sfSearch, setSfSearch] = useState("")
+  const [sfClassFilter, setSfClassFilter] = useState("")
+  const [sfStatusFilter, setSfStatusFilter] = useState<"" | "solde" | "partiel" | "impaye">("")
+  const [sfAmountThreshold, setSfAmountThreshold] = useState("")
+  const [sfAmountMode, setSfAmountMode] = useState<"gte" | "lt">("gte")
+  const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
+  const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -245,6 +278,128 @@ export default function AdminFeesPage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  // Charger les élèves quand l'onglet "students" est actif
+  const fetchStudentFees = useCallback(async () => {
+    setStudentFeesLoading(true)
+    try {
+      const res = await fetch("/api/admin/fees/students")
+      if (res.ok) {
+        const { data } = await res.json()
+        setStudentFees(data)
+      }
+    } catch (error) {
+      console.error("Erreur chargement élèves:", error)
+    } finally {
+      setStudentFeesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === "students" && studentFees.length === 0 && !studentFeesLoading) {
+      fetchStudentFees()
+    }
+  }, [activeTab, studentFees.length, studentFeesLoading, fetchStudentFees])
+
+  // Filtrer et trier les élèves
+  const filteredStudentFees = (() => {
+    let list = [...studentFees]
+
+    // Recherche par nom/code
+    if (sfSearch.trim()) {
+      const q = sfSearch.toLowerCase()
+      list = list.filter(
+        (s) =>
+          s.lastName.toLowerCase().includes(q) ||
+          s.firstName.toLowerCase().includes(q) ||
+          s.middleName.toLowerCase().includes(q) ||
+          s.code.toLowerCase().includes(q)
+      )
+    }
+
+    // Filtre par classe
+    if (sfClassFilter) {
+      list = list.filter((s) => s.classId === parseInt(sfClassFilter))
+    }
+
+    // Filtre par statut
+    if (sfStatusFilter) {
+      list = list.filter((s) => s.status === sfStatusFilter)
+    }
+
+    // Filtre par montant seuil
+    if (sfAmountThreshold) {
+      const threshold = parseFloat(sfAmountThreshold)
+      if (!isNaN(threshold)) {
+        if (sfAmountMode === "gte") {
+          list = list.filter((s) => s.totalPaid >= threshold)
+        } else {
+          list = list.filter((s) => s.totalPaid < threshold)
+        }
+      }
+    }
+
+    // Tri
+    list.sort((a, b) => {
+      let cmp = 0
+      switch (sfSortKey) {
+        case "name":
+          cmp = a.lastName.localeCompare(b.lastName)
+          break
+        case "paid":
+          cmp = a.totalPaid - b.totalPaid
+          break
+        case "remaining":
+          cmp = a.remaining - b.remaining
+          break
+        case "percent":
+          cmp = a.percent - b.percent
+          break
+        case "class":
+          cmp = a.className.localeCompare(b.className)
+          break
+      }
+      return sfSortDir === "asc" ? cmp : -cmp
+    })
+
+    return list
+  })()
+
+  // Export Excel (CSV UTF-8 avec BOM pour Excel)
+  const exportStudentsExcel = () => {
+    const rows = filteredStudentFees
+    if (rows.length === 0) return
+
+    const headers = ["Code", "Nom", "Post-nom", "Prénom", "Sexe", "Classe", "Total Attendu ($)", "Total Payé ($)", "Reste ($)", "Progression (%)", "Statut", "Nb Paiements", "Dernier Paiement"]
+    const csvRows = [headers.join(";")]
+
+    for (const r of rows) {
+      csvRows.push([
+        r.code,
+        r.lastName,
+        r.middleName,
+        r.firstName,
+        r.gender === "M" ? "Masculin" : "Féminin",
+        r.className,
+        r.totalExpected,
+        r.totalPaid,
+        r.remaining,
+        r.percent,
+        r.status === "solde" ? "Soldé" : r.status === "partiel" ? "Partiel" : "Impayé",
+        r.paymentCount,
+        r.lastPaymentDate ? new Date(r.lastPaymentDate).toLocaleDateString("fr-FR") : "—",
+      ].join(";"))
+    }
+
+    const BOM = "\uFEFF"
+    const blob = new Blob([BOM + csvRows.join("\n")], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `frais-par-eleve-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // Couleurs thème
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
@@ -694,11 +849,191 @@ export default function AdminFeesPage() {
             {activeTab === "students" && (
               <Card theme={theme}>
                 <CardContent className="pt-5">
-                  <div className="text-center py-12">
-                    <Users className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
-                    <p className={`text-lg font-medium ${textColor}`}>Vue par élève</p>
-                    <p className={`text-sm ${textSecondary} mt-1`}>La vue détaillée par élève sera disponible prochainement</p>
-                  </div>
+                  {studentFeesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Barre de filtres */}
+                      <div className="flex flex-col lg:flex-row gap-3 flex-wrap">
+                        {/* Recherche */}
+                        <div className="relative flex-1 min-w-[200px]">
+                          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`} />
+                          <input
+                            type="text"
+                            placeholder="Rechercher un élève..."
+                            value={sfSearch}
+                            onChange={(e) => setSfSearch(e.target.value)}
+                            className={`w-full pl-10 pr-4 py-2 rounded-xl border ${inputBg} ${textColor} text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent`}
+                          />
+                        </div>
+
+                        {/* Filtre classe */}
+                        <select
+                          value={sfClassFilter}
+                          onChange={(e) => setSfClassFilter(e.target.value)}
+                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[140px]`}
+                        >
+                          <option value="">Toutes les classes</option>
+                          {classes.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+
+                        {/* Filtre statut */}
+                        <select
+                          value={sfStatusFilter}
+                          onChange={(e) => setSfStatusFilter(e.target.value as typeof sfStatusFilter)}
+                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[130px]`}
+                        >
+                          <option value="">Tous les statuts</option>
+                          <option value="solde">Soldé</option>
+                          <option value="partiel">Partiel</option>
+                          <option value="impaye">Impayé</option>
+                        </select>
+
+                        {/* Filtre montant */}
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={sfAmountMode}
+                            onChange={(e) => setSfAmountMode(e.target.value as "gte" | "lt")}
+                            className={`px-2 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}
+                          >
+                            <option value="gte">Payé ≥</option>
+                            <option value="lt">Payé &lt;</option>
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Montant $"
+                            value={sfAmountThreshold}
+                            onChange={(e) => setSfAmountThreshold(e.target.value)}
+                            className={`w-[110px] px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}
+                          />
+                        </div>
+
+                        {/* Bouton export */}
+                        <button
+                          onClick={exportStudentsExcel}
+                          disabled={filteredStudentFees.length === 0}
+                          title="Télécharger en Excel"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          Excel
+                        </button>
+                      </div>
+
+                      {/* Résumé rapide */}
+                      <div className="flex flex-wrap gap-3 text-sm">
+                        <span className={`px-3 py-1 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} ${textSecondary}`}>
+                          {filteredStudentFees.length} élève{filteredStudentFees.length > 1 ? "s" : ""}
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                          {filteredStudentFees.filter((s) => s.status === "solde").length} soldé{filteredStudentFees.filter((s) => s.status === "solde").length > 1 ? "s" : ""}
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
+                          {filteredStudentFees.filter((s) => s.status === "partiel").length} partiel{filteredStudentFees.filter((s) => s.status === "partiel").length > 1 ? "s" : ""}
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                          {filteredStudentFees.filter((s) => s.status === "impaye").length} impayé{filteredStudentFees.filter((s) => s.status === "impaye").length > 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {/* Tableau */}
+                      {filteredStudentFees.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Users className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
+                          <p className={`text-lg font-medium ${textColor}`}>Aucun élève trouvé</p>
+                          <p className={`text-sm ${textSecondary} mt-1`}>Modifiez les filtres pour afficher des résultats</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border ${borderColor}">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className={headerBg}>
+                                {[
+                                  { key: "name" as const, label: "Élève" },
+                                  { key: "class" as const, label: "Classe" },
+                                  { key: "paid" as const, label: "Payé" },
+                                  { key: "remaining" as const, label: "Reste" },
+                                  { key: "percent" as const, label: "Progression" },
+                                ].map((col) => (
+                                  <th
+                                    key={col.key}
+                                    onClick={() => {
+                                      if (sfSortKey === col.key) {
+                                        setSfSortDir(sfSortDir === "asc" ? "desc" : "asc")
+                                      } else {
+                                        setSfSortKey(col.key)
+                                        setSfSortDir("asc")
+                                      }
+                                    }}
+                                    className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase cursor-pointer select-none hover:text-indigo-500 transition-colors`}
+                                  >
+                                    <span className="inline-flex items-center gap-1">
+                                      {col.label}
+                                      <ArrowUpDown className={`w-3 h-3 ${sfSortKey === col.key ? "text-indigo-500" : "opacity-30"}`} />
+                                    </span>
+                                  </th>
+                                ))}
+                                <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
+                                <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Nb Paie.</th>
+                              </tr>
+                            </thead>
+                            <tbody className={`divide-y ${borderColor}`}>
+                              {filteredStudentFees.map((s) => (
+                                <tr key={s.studentId} className={`${hoverRow} transition-colors`}>
+                                  <td className={`px-4 py-3 ${textColor}`}>
+                                    <div className="font-medium">{s.lastName} {s.middleName} {s.firstName}</div>
+                                    <div className={`text-xs ${textSecondary}`}>{s.code}</div>
+                                  </td>
+                                  <td className={`px-4 py-3 ${textSecondary}`}>{s.className}</td>
+                                  <td className={`px-4 py-3 font-medium ${textColor}`}>{formatCurrency(s.totalPaid)}</td>
+                                  <td className={`px-4 py-3 font-medium ${s.remaining > 0 ? "text-red-500" : "text-green-500"}`}>
+                                    {formatCurrency(s.remaining)}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-20 h-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                                        <div
+                                          className={`h-full rounded-full ${
+                                            s.percent >= 100 ? "bg-green-500" : s.percent >= 50 ? "bg-orange-400" : "bg-red-400"
+                                          }`}
+                                          style={{ width: `${Math.min(s.percent, 100)}%` }}
+                                        />
+                                      </div>
+                                      <span className={`text-xs font-medium ${textSecondary}`}>{s.percent}%</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        s.status === "solde"
+                                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                          : s.status === "partiel"
+                                          ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                      }`}
+                                    >
+                                      {s.status === "solde" ? (
+                                        <><CheckCircle className="w-3 h-3" /> Soldé</>
+                                      ) : s.status === "partiel" ? (
+                                        <><Clock className="w-3 h-3" /> Partiel</>
+                                      ) : (
+                                        <><AlertCircle className="w-3 h-3" /> Impayé</>
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className={`px-4 py-3 text-center ${textSecondary}`}>{s.paymentCount}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -990,6 +1325,12 @@ function PaymentFormModal({
                   <button
                     onClick={async () => {
                       if (!createdPayment) return
+                      // Ouvrir la fenêtre AVANT le fetch pour éviter le popup blocker
+                      const w = window.open("", "_blank", "width=700,height=900")
+                      if (!w) {
+                        alert("Veuillez autoriser les popups pour imprimer le reçu")
+                        return
+                      }
                       try {
                         const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}?receipt=1`)
                         if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
@@ -997,22 +1338,46 @@ function PaymentFormModal({
 
                         const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} $</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Imprimé le ${new Date().toLocaleString()}</div></body></html>`
 
-                        const w = window.open("", "_blank", "width=700,height=900")
-                        if (!w) throw new Error("Impossible d'ouvrir la fenêtre d'impression")
                         w.document.write(html)
                         w.document.close()
                         w.focus()
-                        setTimeout(() => {
-                          w.print()
-                        }, 300)
+                        setTimeout(() => { w.print() }, 300)
                       } catch (err) {
                         console.error(err)
+                        w.close()
                         alert(err instanceof Error ? err.message : "Erreur lors de la génération du reçu")
                       }
                     }}
                     className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors"
                   >
                     Imprimer le reçu
+                  </button>
+                  <button
+                    title="Télécharger le reçu"
+                    onClick={async () => {
+                      if (!createdPayment) return
+                      try {
+                        const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}?receipt=1`)
+                        if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
+                        const { data } = await res.json()
+
+                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} $</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Téléchargé le ${new Date().toLocaleString()}</div></body></html>`
+
+                        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement("a")
+                        a.href = url
+                        a.download = `recu-${data.numeroRecu}.html`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      } catch (err) {
+                        console.error(err)
+                        alert(err instanceof Error ? err.message : "Erreur lors du téléchargement du reçu")
+                      }
+                    }}
+                    className="px-3 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
                   </button>
                   <button
                     onClick={onSuccess}
