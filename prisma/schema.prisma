@@ -77,8 +77,8 @@ model Student {
 }
 
 model Teacher {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @unique
+  id         Int              @id @default(autoincrement())
+  userId     Int              @unique
   lastName   String
   middleName String
   firstName  String
@@ -86,8 +86,9 @@ model Teacher {
   birthDate  DateTime
   specialty  String?
   phone      String?
-  hiredAt    DateTime? @default(now())
-  user       User      @relation(fields: [userId], references: [id])
+  hiredAt    DateTime?        @default(now())
+  user       User             @relation(fields: [userId], references: [id])
+  payments   TeacherPayment[]
 
   @@index([lastName])
   @@index([specialty])
@@ -304,6 +305,69 @@ model ReceiptCounter {
   year      AcademicYear @relation(fields: [yearId], references: [id])
 
   @@unique([schoolId, yearId])
+}
+
+// ============================================================
+// MODULE TRÉSORERIE — SALAIRES & DÉPENSES
+// ============================================================
+
+model TeacherPayment {
+  id            Int          @id @default(autoincrement())
+  teacherId     Int
+  schoolId      Int
+  montant       Float
+  type          PaymentType  @default(SALAIRE)
+  mois          String       // ex: "2026-04"
+  description   String?      @db.Text
+  modePaiement  ModePaiement @default(CASH)
+  reference     String?
+  datePaiement  DateTime     @default(now())
+  createdBy     Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  teacher       Teacher      @relation(fields: [teacherId], references: [id])
+
+  @@index([schoolId])
+  @@index([teacherId])
+  @@index([datePaiement])
+  @@index([schoolId, mois])
+}
+
+model SchoolExpense {
+  id            Int             @id @default(autoincrement())
+  schoolId      Int
+  categorie     ExpenseCategory @default(AUTRE)
+  motif         String          @db.Text
+  montant       Float
+  beneficiaire  String?
+  modePaiement  ModePaiement    @default(CASH)
+  reference     String?
+  dateDepense   DateTime        @default(now())
+  createdBy     Int
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([schoolId])
+  @@index([dateDepense])
+  @@index([schoolId, categorie])
+}
+
+enum PaymentType {
+  SALAIRE
+  PRIME
+  BONUS
+  AVANCE
+  AUTRE
+}
+
+enum ExpenseCategory {
+  FOURNITURES
+  EQUIPEMENT
+  MAINTENANCE
+  TRANSPORT
+  COMMUNICATION
+  EVENEMENT
+  AUTRE
 }
 
 enum User_role {
