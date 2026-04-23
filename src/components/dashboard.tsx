@@ -47,8 +47,18 @@ interface DashboardStatsResponse {
   }
 }
 
-function formatFc(value: number): string {
-  return `${new Intl.NumberFormat("fr-FR").format(value)} FC`
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatCdf(value: number): string {
+  return `${new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0,
+  }).format(value)} CDF`
 }
 
 function TrendCard({
@@ -107,6 +117,7 @@ function TrendCard({
 
 export default function Dashboard() {
   const [theme, setTheme] = useState<Theme>("light")
+  const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStatsResponse>({
     students: 0,
@@ -125,16 +136,31 @@ export default function Dashboard() {
     const savedTheme = localStorage.getItem("theme") as Theme | null
     if (savedTheme) setTheme(savedTheme)
 
+    const savedRate = localStorage.getItem("usdToCdfRate")
+    if (savedRate) {
+      const parsedRate = Number(savedRate)
+      if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
+    }
+
     const onThemeChange = () => {
       const currentTheme = localStorage.getItem("theme") as Theme | null
       if (currentTheme) setTheme(currentTheme)
     }
 
+    const onRateChange = () => {
+      const nextRate = localStorage.getItem("usdToCdfRate")
+      if (!nextRate) return
+      const parsedRate = Number(nextRate)
+      if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
+    }
+
     window.addEventListener("storage", onThemeChange)
     window.addEventListener("themeChange", onThemeChange)
+    window.addEventListener("exchangeRateChange", onRateChange)
     return () => {
       window.removeEventListener("storage", onThemeChange)
       window.removeEventListener("themeChange", onThemeChange)
+      window.removeEventListener("exchangeRateChange", onRateChange)
     }
   }, [])
 
@@ -233,7 +259,7 @@ export default function Dashboard() {
           <TrendCard title="Eleves" value={stats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
           <TrendCard title="Enseignants" value={stats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
           <TrendCard title="Classes" value={stats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
-          <TrendCard title="Paiements (mois)" value={formatFc(currentMonthPayment)} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
+          <TrendCard title="Paiements (mois)" value={formatUsd(currentMonthPayment)} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
@@ -266,7 +292,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Frais collectes</p>
-                <p className={`text-xs ${textSecondary}`}>Somme des paiements non annules par mois</p>
+                <p className={`text-xs ${textSecondary}`}>Somme des paiements non annules par mois (USD)</p>
               </div>
               <BarChart3 className={`w-4 h-4 ${textSecondary}`} />
             </div>
@@ -275,9 +301,9 @@ export default function Dashboard() {
                 <BarChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tickFormatter={(v) => `$${Math.round(v)}`} />
                   <Tooltip
-                    formatter={(value: number) => [formatFc(value), "Montant collecte"]}
+                    formatter={(value: number) => [`${formatUsd(value)} (≈ ${formatCdf(value * usdToCdfRate)})`, "Montant collecte"]}
                     labelFormatter={(label: string) => `Mois: ${label}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
@@ -285,6 +311,7 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className={`text-xs ${textSecondary} mt-2`}>Taux applique: 1 USD = {new Intl.NumberFormat("fr-FR").format(usdToCdfRate)} CDF</p>
           </div>
         </div>
 
@@ -386,7 +413,7 @@ export default function Dashboard() {
             </div>
             <div className={`p-5 ${textSecondary} text-sm space-y-2`}>
               <p>Les graphiques utilisent des donnees de la BDD: Student, Teacher, Paiement, Enrollment.</p>
-              <p>Au survol, chaque point/barre affiche la valeur exacte du mois.</p>
+              <p>Au survol, chaque point/barre affiche la valeur exacte du mois en USD, avec equivalent CDF.</p>
               <p>Le taux de presence reste un placeholder tant que le module de presences n&apos;est pas calcule en base.</p>
             </div>
           </div>
