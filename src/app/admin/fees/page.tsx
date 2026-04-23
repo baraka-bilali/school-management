@@ -1076,6 +1076,7 @@ export default function AdminFeesPage() {
           typesFrais={typesFrais}
           classes={classes}
           years={years}
+          existingTarifications={tarifications}
           onClose={() => setShowCreateTarifModal(false)}
           onSuccess={() => {
             setShowCreateTarifModal(false)
@@ -2202,6 +2203,7 @@ function CreateTarificationModal({
   typesFrais,
   classes,
   years,
+  existingTarifications,
   onClose,
   onSuccess,
 }: {
@@ -2209,6 +2211,7 @@ function CreateTarificationModal({
   typesFrais: TypeFrais[]
   classes: ClassOption[]
   years: AcademicYearOption[]
+  existingTarifications: Tarification[]
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -2216,6 +2219,16 @@ function CreateTarificationModal({
   const [typeFraisId, setTypeFraisId] = useState<number | "">(typesFrais[0]?.id || "")
   const [yearId, setYearId] = useState<number | "">(currentYear?.id || years[0]?.id || "")
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([])
+
+  // Classes déjà assignées à ce type de frais + cette année
+  const alreadyAssignedClassIds = typeFraisId && yearId
+    ? existingTarifications
+        .filter((t) => t.typeFraisId === Number(typeFraisId) && t.yearId === Number(yearId) && t.classId !== null)
+        .map((t) => t.classId as number)
+    : []
+
+  // Classes disponibles (pas encore assignées)
+  const availableClasses = classes.filter((c) => !alreadyAssignedClassIds.includes(c.id))
   const [montant, setMontant] = useState("")
   const [description, setDescription] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -2238,11 +2251,22 @@ function CreateTarificationModal({
   }
 
   const toggleAllClasses = () => {
-    if (selectedClassIds.length === classes.length) {
+    if (selectedClassIds.length === availableClasses.length) {
       setSelectedClassIds([])
     } else {
-      setSelectedClassIds(classes.map((c) => c.id))
+      setSelectedClassIds(availableClasses.map((c) => c.id))
     }
+  }
+
+  // Réinitialiser la sélection si le type ou l'année change
+  const handleTypeFraisChange = (val: number | "") => {
+    setTypeFraisId(val)
+    setSelectedClassIds([])
+  }
+
+  const handleYearChange = (val: number) => {
+    setYearId(val)
+    setSelectedClassIds([])
   }
 
   const handleSubmit = async () => {
@@ -2337,7 +2361,7 @@ function CreateTarificationModal({
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Type de frais</label>
               <select
                 value={typeFraisId}
-                onChange={(e) => setTypeFraisId(e.target.value ? parseInt(e.target.value) : "")}
+                onChange={(e) => handleTypeFraisChange(e.target.value ? parseInt(e.target.value) : "")}
                 className={selectClasses}
               >
                 <option value="">Sélectionner un type</option>
@@ -2352,7 +2376,7 @@ function CreateTarificationModal({
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Année scolaire</label>
               <select
                 value={yearId}
-                onChange={(e) => setYearId(parseInt(e.target.value))}
+                onChange={(e) => handleYearChange(parseInt(e.target.value))}
                 className={selectClasses}
               >
                 {years.map((y) => (
@@ -2393,18 +2417,49 @@ function CreateTarificationModal({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className={`text-sm font-semibold ${textColor}`}>Classes</label>
-                <button
-                  onClick={toggleAllClasses}
-                  className="text-xs text-indigo-500 hover:text-indigo-400 font-medium"
-                >
-                  {selectedClassIds.length === classes.length ? "Tout désélectionner" : "Tout sélectionner"}
-                </button>
+                {availableClasses.length > 0 && (
+                  <button
+                    onClick={toggleAllClasses}
+                    className="text-xs text-indigo-500 hover:text-indigo-400 font-medium"
+                  >
+                    {selectedClassIds.length === availableClasses.length ? "Tout désélectionner" : "Tout sélectionner"}
+                  </button>
+                )}
               </div>
+
+              {/* Avertissement classes déjà attribuées */}
+              {alreadyAssignedClassIds.length > 0 && (
+                <div className={`flex items-start gap-2 px-3 py-2 mb-2 rounded-lg text-xs ${
+                  theme === "dark" ? "bg-amber-500/10 text-amber-300" : "bg-amber-50 text-amber-700"
+                }`}>
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    {alreadyAssignedClassIds.length} classe{alreadyAssignedClassIds.length > 1 ? "s ont" : " a"} déjà une tarification pour ce type de frais et cette année — elles ne s&apos;affichent pas.
+                  </span>
+                </div>
+              )}
+
               <div className={`border ${borderColor} rounded-xl p-3 max-h-48 overflow-y-auto space-y-1`}>
-                {classes.length === 0 ? (
-                  <p className={`text-sm ${textSecondary} text-center py-2`}>Aucune classe disponible</p>
+                {availableClasses.length === 0 ? (
+                  <div className="text-center py-4">
+                    <CheckCircle className={`w-8 h-8 mx-auto mb-2 ${
+                      theme === "dark" ? "text-green-400" : "text-green-500"
+                    } opacity-70`} />
+                    <p className={`text-sm font-medium ${
+                      theme === "dark" ? "text-green-400" : "text-green-600"
+                    }`}>
+                      {classes.length === 0
+                        ? "Aucune classe disponible"
+                        : "Toutes les classes ont déjà ce type de frais"}
+                    </p>
+                    {classes.length > 0 && typeFraisId && (
+                      <p className={`text-xs ${textSecondary} mt-1`}>
+                        Pour modifier les montants, utilisez la grille tarifaire.
+                      </p>
+                    )}
+                  </div>
                 ) : (
-                  classes
+                  availableClasses
                     .sort((a, b) => a.name.localeCompare(b.name))
                     .map((cls) => (
                       <label
