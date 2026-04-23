@@ -66,10 +66,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Année scolaire introuvable" }, { status: 404 })
     }
 
-    // Vérifier la classe
-    const cls = await prisma.class.findUnique({ where: { id: data.classId } })
+    // ✅ Vérifier que la classe existe ET appartient à cette école
+    const cls = await prisma.class.findFirst({ 
+      where: { 
+        id: data.classId,
+        schoolId: user.schoolId
+      } 
+    })
     if (!cls) {
-      return NextResponse.json({ error: "Classe introuvable" }, { status: 404 })
+      return NextResponse.json({ error: "Classe introuvable ou vous n'avez pas accès à cette classe" }, { status: 404 })
     }
 
     // Vérifier l'unicité

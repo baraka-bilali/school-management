@@ -1,17 +1,46 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
+import jwt from "jsonwebtoken"
 
-export async function GET() {
+const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
+
+interface JwtPayload {
+  id: number
+  role: string
+  schoolId?: number
+}
+
+export async function GET(request: NextRequest) {
   const perfLabel = `[API-PERF] Classes fetch`
   console.time(perfLabel)
   
   try {
-    // Cache key simple car pas de paramètres de recherche
-    const cacheKey = 'classes-all'
+    // ✅ Vérification de l'authentification
+    const token = request.cookies.get("token")?.value
+
+    if (!token) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+    const schoolId = decoded.schoolId
+
+    if (!schoolId) {
+      return NextResponse.json(
+        { error: "Aucune école associée à cet utilisateur" },
+        { status: 403 }
+      )
+    }
+
+    // Cache key par école
+    const cacheKey = `classes-school-${schoolId}`
 
     const result = await getCached(cacheKey, async () => {
       const classes = await prisma.class.findMany({
+        where: {
+          schoolId: schoolId
+        },
         orderBy: [
           { section: 'asc' },
           { level: 'asc' },
@@ -37,6 +66,23 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // ✅ Vérification de l'authentification
+    const token = req.headers.get("cookie")?.split("token=")[1]?.split(";")[0]
+
+    if (!token) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+    const schoolId = decoded.schoolId
+
+    if (!schoolId) {
+      return NextResponse.json(
+        { error: "Aucune école associée à cet utilisateur" },
+        { status: 403 }
+      )
+    }
+
     const body = await req.json()
     const { level, section, letter, stream } = body
 
@@ -54,42 +100,47 @@ export async function POST(req: Request) {
       className += ` ${stream}`
     }
 
-    // Vérifier l'unicité du nom de la classe
-    const existingClass = await prisma.class.findUnique({
-      where: { name: className }
+    // ✅ Vérifier l'unicité du nom de la classe DANS CETTE ÉCOLE (composite unique: name + schoolId)
+    const existingClass = await prisma.class.findFirst({
+      where: { 
+        name: className,
+        schoolId: schoolId
+      }
     })
 
     if (existingClass) {
       return NextResponse.json(
-        { error: 'Une classe avec ce nom existe déjà' },
+        { error: 'Une classe avec ce nom existe déjà dans votre école' },
         { status: 400 }
       )
     }
 
-    // Vérifier l'unicité de la combinaison level + section + letter
+    // Vérifier l'unicité de la combinaison level + section + letter DANS CETTE ÉCOLE
     const existingCombination = await prisma.class.findFirst({
       where: {
         level,
         section,
-        letter
+        letter,
+        schoolId: schoolId
       }
     })
 
     if (existingCombination) {
       return NextResponse.json(
-        { error: 'Une classe avec cette combinaison Niveau + Section + Lettre existe déjà' },
+        { error: 'Une classe avec cette combinaison Niveau + Section + Lettre existe déjà dans votre école' },
         { status: 400 }
       )
     }
 
-    // Créer la classe
+    // ✅ Créer la classe avec le schoolId
     const newClass = await prisma.class.create({
       data: {
         name: className,
         level,
         section,
         letter,
-        stream: stream || null
+        stream: stream || null,
+        schoolId: schoolId
       }
     })
 

@@ -32,29 +32,37 @@ model User {
 }
 
 model AcademicYear {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique
-  current         Boolean          @default(false)
+  id              Int                @id @default(autoincrement())
+  name            String             @unique
+  current         Boolean            @default(false)
   startDate       DateTime?
   endDate         DateTime?
   enrollments     Enrollment[]
   tarifications   Tarification[]
   receiptCounters ReceiptCounter[]
+  assignments     CourseAssignment[]
+  slots           ScheduleSlot[]
 }
 
 model Class {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
+  id            Int                @id @default(autoincrement())
+  name          String
   level         String
-  createdAt     DateTime       @default(now())
+  createdAt     DateTime           @default(now())
   letter        String
   section       String
   stream        String?
+  schoolId      Int
+  school        School             @relation(fields: [schoolId], references: [id])
   enrollments   Enrollment[]
   tarifications Tarification[]
+  assignments   CourseAssignment[]
+  slots         ScheduleSlot[]
 
+  @@unique([name, schoolId])
   @@index([section])
   @@index([level])
+  @@index([schoolId])
   @@index([section, level, letter])
 }
 
@@ -77,18 +85,19 @@ model Student {
 }
 
 model Teacher {
-  id         Int              @id @default(autoincrement())
-  userId     Int              @unique
-  lastName   String
-  middleName String
-  firstName  String
-  gender     String
-  birthDate  DateTime
-  specialty  String?
-  phone      String?
-  hiredAt    DateTime?        @default(now())
-  user       User             @relation(fields: [userId], references: [id])
-  payments   TeacherPayment[]
+  id          Int                @id @default(autoincrement())
+  userId      Int                @unique
+  lastName    String
+  middleName  String
+  firstName   String
+  gender      String
+  birthDate   DateTime
+  specialty   String?
+  phone       String?
+  hiredAt     DateTime?          @default(now())
+  user        User               @relation(fields: [userId], references: [id])
+  payments    TeacherPayment[]
+  assignments CourseAssignment[]
 
   @@index([lastName])
   @@index([specialty])
@@ -169,6 +178,7 @@ model School {
   montantPaye                 Float?
   createdBy                   User?             @relation("SchoolsCreated", fields: [creeParId], references: [id])
   admins                      User[]            @relation("SchoolAdmins")
+  classes                     Class[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -415,4 +425,100 @@ enum ModePaiement {
   MOBILE_MONEY
   CHEQUE
   AUTRE
+}
+
+// ============================================================
+// MODULE GESTION D'HORAIRES
+// ============================================================
+
+model Subject {
+  id             Int                @id @default(autoincrement())
+  name           String             // ex: Mathématiques
+  code           String             // ex: MATH
+  description    String?            @db.Text
+  color          String?            // ex: #4f46e5
+  coefficient    Float              @default(1)
+  maxWeeklyHours Int                @default(5)
+  schoolId       Int
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  assignments    CourseAssignment[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+}
+
+model CourseAssignment {
+  id            Int            @id @default(autoincrement())
+  subjectId     Int
+  teacherId     Int
+  classId       Int
+  yearId        Int
+  weeklyHours   Float          // heures allouées par semaine
+  maxDailyHours Float?         // plafond horaire par jour
+  schoolId      Int
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subject       Subject        @relation(fields: [subjectId], references: [id])
+  teacher       Teacher        @relation(fields: [teacherId], references: [id])
+  class         Class          @relation(fields: [classId], references: [id])
+  year          AcademicYear   @relation(fields: [yearId], references: [id])
+  slots         ScheduleSlot[]
+
+  @@unique([subjectId, classId, yearId, schoolId])
+  @@index([schoolId])
+  @@index([teacherId])
+  @@index([classId])
+  @@index([yearId])
+}
+
+model ScheduleSlot {
+  id           Int              @id @default(autoincrement())
+  assignmentId Int
+  classId      Int
+  dayOfWeek    Int              // 1=Lundi … 6=Samedi
+  startTime    String           // "08:00"
+  endTime      String           // "09:00"
+  room         String?
+  schoolId     Int
+  yearId       Int
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  assignment   CourseAssignment @relation(fields: [assignmentId], references: [id])
+  class        Class            @relation(fields: [classId], references: [id])
+  year         AcademicYear     @relation(fields: [yearId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([assignmentId])
+  @@index([dayOfWeek])
+  @@index([yearId])
+}
+
+model ScheduleBreak {
+  id        Int       @id @default(autoincrement())
+  name      String    // "Récréation du matin"
+  type      BreakType @default(RECREATION)
+  startTime String    // "10:00"
+  endTime   String    // "10:20"
+  duration  Int       // durée en minutes
+  section   String?   // "Primaire", "Secondaire" ou null = tous
+  schoolId  Int
+  dayOfWeek Int?      // null = tous les jours scolaires
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([schoolId])
+}
+
+enum BreakType {
+  RECREATION
+  PAUSE_DEJEUNER
+  INTER_COURS
+  DEBUT_VACATION
+  FIN_VACATION
 }
