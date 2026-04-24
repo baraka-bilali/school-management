@@ -33,6 +33,7 @@ export async function GET(req: Request) {
         id: true,
         nomEtablissement: true,
         typeEtablissement: true,
+        planAbonnement: true,
         codeEtablissement: true,
         ville: true,
         province: true,
@@ -60,15 +61,12 @@ export async function POST(req: Request) {
     const { 
       nomEtablissement, typeEtablissement, codeEtablissement, anneeCreation, slogan,
       adresse, ville, province, pays, telephone, email, siteWeb,
-      directeurNom, directeurTelephone, directeurEmail,
-      secretaireAcademique, comptable, personnelAdministratifTotal,
       rccm, idNat, nif, agrementMinisteriel, dateAgrement,
-      cycles, nombreClasses, nombreEleves, nombreEnseignants,
       langueEnseignement, programmes, joursOuverture
     } = body;
     
     // Validation des champs requis
-    if (!nomEtablissement || !adresse || !ville || !province || !telephone || !email || !directeurNom || !directeurTelephone) {
+    if (!nomEtablissement || !adresse || !ville || !province || !telephone || !email) {
       return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
     }
     
@@ -86,21 +84,13 @@ export async function POST(req: Request) {
         telephone,
         email,
         siteWeb: siteWeb || null,
-        directeurNom,
-        directeurTelephone,
-        directeurEmail: directeurEmail || null,
-        secretaireAcademique: secretaireAcademique || null,
-        comptable: comptable || null,
-        personnelAdministratifTotal: personnelAdministratifTotal ? parseInt(personnelAdministratifTotal) : null,
+        directeurNom: "",
+        directeurTelephone: "",
         rccm: rccm || null,
         idNat: idNat || null,
         nif: nif || null,
         agrementMinisteriel: agrementMinisteriel || null,
         dateAgrement: dateAgrement ? new Date(dateAgrement) : null,
-        cycles: cycles || null,
-        nombreClasses: nombreClasses ? parseInt(nombreClasses) : null,
-        nombreEleves: nombreEleves ? parseInt(nombreEleves) : null,
-        nombreEnseignants: nombreEnseignants ? parseInt(nombreEnseignants) : null,
         langueEnseignement: langueEnseignement || null,
         programmes: programmes || null,
         joursOuverture: joursOuverture || null,
