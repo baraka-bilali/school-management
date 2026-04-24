@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL") -- réactiver après db push initial
 }
 
 model User {
@@ -117,15 +118,15 @@ model Enrollment {
   paiements  Paiement[]
 
   @@unique([studentId, classId, yearId])
-  @@index([classId], map: "Enrollment_classId_fkey")
-  @@index([yearId], map: "Enrollment_yearId_fkey")
+  @@index([classId])
+  @@index([yearId])
 }
 
 model School {
   id                          Int               @id @default(autoincrement())
   nomEtablissement            String
   typeEtablissement           TypeEtablissement @default(PRIVE)
-  niveauEnseignement          String?           @db.LongText
+  niveauEnseignement          String?           @db.Text
   codeEtablissement           String?           @unique
   anneeCreation               Int?
   slogan                      String?
@@ -159,7 +160,7 @@ model School {
   nombreEnseignants           Int?
   langueEnseignement          String?
   programmes                  String?
-  calendrierScolaire          String?           @db.LongText
+  calendrierScolaire          String?           @db.Text
   joursOuverture              String?
   domaine                     String?
   identifiantInterne          String            @unique @default(uuid())
@@ -182,7 +183,7 @@ model School {
 
   @@index([codeEtablissement])
   @@index([email])
-  @@index([creeParId], map: "School_creeParId_fkey")
+  @@index([creeParId])
 }
 
 model Notification {
