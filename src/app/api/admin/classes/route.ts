@@ -87,17 +87,28 @@ export async function POST(req: Request) {
     const { level, section, letter, stream } = body
 
     // Validation des champs obligatoires
-    if (!level || !section || !letter) {
+    if (!level || !section) {
       return NextResponse.json(
-        { error: 'Niveau, Section et Lettre sont obligatoires' },
+        { error: 'Niveau et Section sont obligatoires' },
+        { status: 400 }
+      )
+    }
+    if (section !== "Maternelle" && !letter) {
+      return NextResponse.json(
+        { error: 'La Lettre est obligatoire pour cette section' },
         { status: 400 }
       )
     }
 
     // Générer le nom de la classe selon le format RDC
-    let className = `${level} ${letter} ${section}`
-    if (stream && (section === "Secondaire" || section === "Supérieur")) {
-      className += ` ${stream}`
+    let className: string
+    if (section === "Maternelle") {
+      className = letter ? `${level} ${letter} Maternelle` : `${level} Maternelle`
+    } else {
+      className = `${level} ${letter} ${section}`
+      if (stream && (section === "Secondaire" || section === "Supérieur")) {
+        className += ` ${stream}`
+      }
     }
 
     // ✅ Vérifier l'unicité du nom de la classe DANS CETTE ÉCOLE (composite unique: name + schoolId)

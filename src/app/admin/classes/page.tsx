@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { Plus, Pencil, Trash2 } from "lucide-react"
@@ -150,7 +150,7 @@ export default function ClassesPage() {
   }
 
   const handleSubmit = async () => {
-    if (!form.level || !form.section || !form.letter) {
+    if (!form.level || !form.section || (form.section !== "Maternelle" && !form.letter)) {
       alert("Niveau, Section et Lettre sont obligatoires")
       return
     }
@@ -207,9 +207,45 @@ export default function ClassesPage() {
     }
   }
 
+  const LEVELS_BY_SECTION: Record<string, string[]> = {
+    Maternelle: ["Petite Section", "Moyenne Section", "Grande Section"],
+    Primaire: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"],
+    Secondaire: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème", "7ème"],
+    Supérieur: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème", "7ème", "8ème"],
+  }
+
+  const SECTION_ORDER = ["Maternelle", "Primaire", "Secondaire", "Supérieur"]
+  const SECTION_LABELS: Record<string, string> = {
+    Maternelle: "Maternelle — Préscolaire",
+    Primaire: "Primaire",
+    Secondaire: "Secondaire — Humanités",
+    Supérieur: "Supérieur / Université",
+  }
+  const sectionStyles: Record<string, { bg: string; text: string }> = {
+    Maternelle: {
+      bg: theme === "dark" ? "bg-pink-900/20 border-l-4 border-pink-500" : "bg-pink-50 border-l-4 border-pink-400",
+      text: theme === "dark" ? "text-pink-300 font-semibold" : "text-pink-700 font-semibold",
+    },
+    Primaire: {
+      bg: theme === "dark" ? "bg-blue-900/20 border-l-4 border-blue-500" : "bg-blue-50 border-l-4 border-blue-400",
+      text: theme === "dark" ? "text-blue-300 font-semibold" : "text-blue-700 font-semibold",
+    },
+    Secondaire: {
+      bg: theme === "dark" ? "bg-green-900/20 border-l-4 border-green-500" : "bg-green-50 border-l-4 border-green-400",
+      text: theme === "dark" ? "text-green-300 font-semibold" : "text-green-700 font-semibold",
+    },
+    Supérieur: {
+      bg: theme === "dark" ? "bg-purple-900/20 border-l-4 border-purple-500" : "bg-purple-50 border-l-4 border-purple-400",
+      text: theme === "dark" ? "text-purple-300 font-semibold" : "text-purple-700 font-semibold",
+    },
+  }
+
   const generatePreviewName = () => {
-    if (!form.level || !form.section || !form.letter) return ""
-    
+    if (!form.level || !form.section) return ""
+    if (form.section === "Maternelle") {
+      return form.letter ? `${form.level} ${form.letter} Maternelle` : `${form.level} Maternelle`
+    }
+    if (!form.letter) return ""
     let name = `${form.level} ${form.letter} ${form.section}`
     if (form.stream && (form.section === "Secondaire" || form.section === "Supérieur")) {
       name += ` ${form.stream}`
@@ -274,42 +310,69 @@ export default function ClassesPage() {
                     </tr>
                   ) : (
                     <>
-                      {classes.map((cls) => (
-                        <tr key={cls.id} className={hoverBg}>
-                          <td className={`px-3 py-2 font-medium ${textColor}`}>{cls.name}</td>
-                          <td className={`px-3 py-2 ${textColor}`}>{cls.level}</td>
-                          <td className={`px-3 py-2 ${textColor}`}>{cls.section}</td>
-                          <td className={`px-3 py-2 ${textColor}`}>{cls.letter}</td>
-                          <td className={`px-3 py-2 ${textColor}`}>{cls.stream || "-"}</td>
-                          <td className={`px-3 py-2 ${textColor}`}>{new Date(cls.createdAt).toLocaleDateString()}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => handleEdit(cls)}
-                                className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${theme === "dark" ? "hover:bg-indigo-900/30" : "hover:bg-indigo-50"} transition-colors`}
-                                aria-label="Modifier"
-                                title="Modifier"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(cls)}
-                                className={`rounded-full p-2 ${textSecondary} hover:text-red-600 ${theme === "dark" ? "hover:bg-red-900/30" : "hover:bg-red-50"} transition-colors`}
-                                aria-label="Supprimer"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {!loading && classes.length === 0 && (
+                      {classes.length === 0 ? (
                         <tr>
                           <td colSpan={7} className={`px-3 py-8 text-center ${textSecondary}`}>
                             Aucune classe trouvée.
                           </td>
                         </tr>
+                      ) : (
+                        SECTION_ORDER.map((section) => {
+                          const sectionClasses = classes
+                            .filter(cls => cls.section === section)
+                            .sort((a, b) => {
+                              const levels = LEVELS_BY_SECTION[section] ?? []
+                              const ai = levels.indexOf(a.level)
+                              const bi = levels.indexOf(b.level)
+                              const aIdx = ai === -1 ? 999 : ai
+                              const bIdx = bi === -1 ? 999 : bi
+                              if (aIdx !== bIdx) return aIdx - bIdx
+                              return a.letter.localeCompare(b.letter)
+                            })
+                          if (sectionClasses.length === 0) return null
+                          const style = sectionStyles[section] ?? { bg: theme === "dark" ? "bg-gray-700" : "bg-gray-100", text: textColor }
+                          return (
+                            <Fragment key={section}>
+                              <tr>
+                                <td colSpan={7} className={`px-3 py-2 ${style.bg}`}>
+                                  <span className={style.text}>
+                                    {SECTION_LABELS[section]} — {sectionClasses.length} classe{sectionClasses.length > 1 ? "s" : ""}
+                                  </span>
+                                </td>
+                              </tr>
+                              {sectionClasses.map((cls) => (
+                                <tr key={cls.id} className={hoverBg}>
+                                  <td className={`px-3 py-2 font-medium ${textColor}`}>{cls.name}</td>
+                                  <td className={`px-3 py-2 ${textColor}`}>{cls.level}</td>
+                                  <td className={`px-3 py-2 ${textColor}`}>{cls.section}</td>
+                                  <td className={`px-3 py-2 ${textColor}`}>{cls.letter || "—"}</td>
+                                  <td className={`px-3 py-2 ${textColor}`}>{cls.stream || "—"}</td>
+                                  <td className={`px-3 py-2 ${textColor}`}>{new Date(cls.createdAt).toLocaleDateString()}</td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-3">
+                                      <button
+                                        onClick={() => handleEdit(cls)}
+                                        className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${theme === "dark" ? "hover:bg-indigo-900/30" : "hover:bg-indigo-50"} transition-colors`}
+                                        aria-label="Modifier"
+                                        title="Modifier"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(cls)}
+                                        className={`rounded-full p-2 ${textSecondary} hover:text-red-600 ${theme === "dark" ? "hover:bg-red-900/30" : "hover:bg-red-50"} transition-colors`}
+                                        aria-label="Supprimer"
+                                        title="Supprimer"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </Fragment>
+                          )
+                        })
                       )}
                     </>
                   )}
@@ -342,44 +405,43 @@ export default function ClassesPage() {
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={`block ${textColor} mb-1`}>Niveau *</label>
-                    <select
-                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
-                      value={form.level}
-                      onChange={(e) => setForm({ ...form, level: e.target.value })}
-                    >
-                      <option value="">Sélectionner</option>
-                      <option value="1ère">1ère</option>
-                      <option value="2ème">2ème</option>
-                      <option value="3ème">3ème</option>
-                      <option value="4ème">4ème</option>
-                      <option value="5ème">5ème</option>
-                      <option value="6ème">6ème</option>
-                      <option value="7ème">7ème</option>
-                      <option value="8ème">8ème</option>
-                    </select>
-                  </div>
-                  <div>
                     <label className={`block ${textColor} mb-1`}>Section *</label>
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.section}
-                      onChange={(e) => setForm({ ...form, section: e.target.value })}
+                      onChange={(e) => setForm({ ...form, section: e.target.value, level: "", stream: "" })}
                     >
                       <option value="">Sélectionner</option>
+                      <option value="Maternelle">Maternelle</option>
                       <option value="Primaire">Primaire</option>
                       <option value="Secondaire">Secondaire</option>
                       <option value="Supérieur">Supérieur</option>
                     </select>
                   </div>
                   <div>
-                    <label className={`block ${textColor} mb-1`}>Lettre *</label>
+                    <label className={`block ${textColor} mb-1`}>Niveau *</label>
+                    <select
+                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
+                      value={form.level}
+                      onChange={(e) => setForm({ ...form, level: e.target.value })}
+                      disabled={!form.section}
+                    >
+                      <option value="">{form.section ? "Sélectionner" : "Choisir une section d'abord"}</option>
+                      {(LEVELS_BY_SECTION[form.section] ?? []).map((lvl) => (
+                        <option key={lvl} value={lvl}>{lvl}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block ${textColor} mb-1`}>
+                      Lettre{form.section === "Maternelle" ? " (optionnelle)" : " *"}
+                    </label>
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.letter}
                       onChange={(e) => setForm({ ...form, letter: e.target.value })}
                     >
-                      <option value="">Sélectionner</option>
+                      <option value="">{form.section === "Maternelle" ? "Aucune" : "Sélectionner"}</option>
                       <option value="A">A</option>
                       <option value="B">B</option>
                       <option value="C">C</option>
