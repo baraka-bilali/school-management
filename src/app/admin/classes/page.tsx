@@ -451,19 +451,51 @@ export default function ClassesPage() {
                     </select>
                   </div>
                   <div>
-                    <label className={`block ${textColor} mb-1`}>Filière</label>
+                    <label className={`block ${textColor} mb-1`}>Filière / Option</label>
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.stream}
                       onChange={(e) => setForm({ ...form, stream: e.target.value })}
                       disabled={form.section !== "Humanités"}
                     >
-                      <option value="">Aucune</option>
-                      <option value="Scientifique">Scientifique</option>
-                      <option value="Littéraire">Littéraire</option>
-                      <option value="Technique">Technique</option>
-                      <option value="Commerciale">Commerciale</option>
-                      <option value="Économique">Économique</option>
+                      <option value="">— Aucune —</option>
+                      <optgroup label="Humanités Générales">
+                        <option value="Pédagogie Générale">Pédagogie Générale</option>
+                        <option value="Latin-Philosophie">Latin-Philosophie</option>
+                        <option value="Math-Physique">Math-Physique</option>
+                        <option value="Chimie-Biologie">Chimie-Biologie</option>
+                      </optgroup>
+                      <optgroup label="Commercial et Administratif">
+                        <option value="Commerciale et Gestion">Commerciale et Gestion</option>
+                        <option value="Secrétariat">Secrétariat</option>
+                      </optgroup>
+                      <optgroup label="Industriel">
+                        <option value="Électricité">Électricité</option>
+                        <option value="Mécanique Générale">Mécanique Générale</option>
+                        <option value="Mécanique Automobile">Mécanique Automobile</option>
+                        <option value="Électronique">Électronique</option>
+                        <option value="Aviation">Aviation</option>
+                      </optgroup>
+                      <optgroup label="Bâtiment et Travaux Publics">
+                        <option value="Construction">Construction</option>
+                        <option value="Menuiserie">Menuiserie</option>
+                        <option value="Dessin de Bâtiment">Dessin de Bâtiment</option>
+                      </optgroup>
+                      <optgroup label="Agricole">
+                        <option value="Agriculture Générale">Agriculture Générale</option>
+                        <option value="Vétérinaire">Vétérinaire</option>
+                        <option value="Pêche et Forêt">Pêche et Forêt</option>
+                      </optgroup>
+                      <optgroup label="Social et Artistique">
+                        <option value="Sociale">Sociale</option>
+                        <option value="Arts Plastiques">Arts Plastiques</option>
+                        <option value="Musique">Musique</option>
+                        <option value="Coupe et Couture">Coupe et Couture</option>
+                      </optgroup>
+                      <optgroup label="Santé">
+                        <option value="Nutrition">Nutrition</option>
+                        <option value="Santé Publique">Santé Publique</option>
+                      </optgroup>
                     </select>
                   </div>
                 </div>
