@@ -4,9 +4,136 @@ import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
+type TimelineBucket = {
+  label: string
+  count: number
+}
+
 type JwtPayload = {
   userId: number
   role: string
+}
+
+function normalizePlan(plan: string | null | undefined) {
+  const value = plan?.trim().toUpperCase()
+
+  if (!value) return null
+  if (value === "BASIC") return "Basic"
+  if (value === "PREMIUM" || value === "PRO") return "Premium"
+  if (value === "ENTERPRISE") return "Enterprise"
+
+  return null
+}
+
+function getPeriodRange(periodParam: string | null) {
+  const now = new Date()
+  const period = periodParam === "30" || periodParam === "365" ? periodParam : "7"
+
+  if (period === "365") {
+    const start = new Date(now.getFullYear(), 0, 1)
+    const previousStart = new Date(now.getFullYear() - 1, 0, 1)
+    const previousEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+    return {
+      period,
+      start,
+      end: now,
+      previousStart,
+      previousEnd,
+      bucketCount: 12,
+    }
+  }
+
+  const days = Number(period)
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - (days - 1))
+
+  const previousEnd = new Date(start)
+  previousEnd.setMilliseconds(previousEnd.getMilliseconds() - 1)
+
+  const previousStart = new Date(start)
+  previousStart.setDate(previousStart.getDate() - days)
+
+  return {
+    period,
+    start,
+    end: now,
+    previousStart,
+    previousEnd,
+    bucketCount: period === "30" ? 6 : 7,
+  }
+}
+
+function getSchoolEventDate(school: {
+  dateDebutAbonnement: Date | null
+  dateCreation: Date
+  dateInscription: Date
+}) {
+  return school.dateDebutAbonnement ?? school.dateCreation ?? school.dateInscription
+}
+
+function isWithinRange(date: Date, start: Date, end: Date) {
+  return date >= start && date <= end
+}
+
+function calculateChange(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? "100" : "0"
+  return (((current - previous) / previous) * 100).toFixed(1)
+}
+
+function buildTimeline(
+  period: string,
+  start: Date,
+  end: Date,
+  bucketCount: number,
+  schools: Array<{ dateDebutAbonnement: Date | null; dateCreation: Date; dateInscription: Date }>
+) {
+  const buckets: TimelineBucket[] = []
+
+  if (period === "365") {
+    for (let index = 0; index < 12; index += 1) {
+      const monthStart = new Date(start.getFullYear(), index, 1)
+      const monthEnd = new Date(start.getFullYear(), index + 1, 0, 23, 59, 59, 999)
+      const count = schools.filter((school) => {
+        const eventDate = getSchoolEventDate(school)
+        return eventDate >= monthStart && eventDate <= monthEnd && eventDate <= end
+      }).length
+
+      buckets.push({
+        label: monthStart.toLocaleDateString("fr-FR", { month: "short" }).replace(".", ""),
+        count,
+      })
+    }
+
+    return buckets
+  }
+
+  const totalDuration = end.getTime() - start.getTime()
+  const bucketDuration = Math.max(1, Math.ceil(totalDuration / bucketCount))
+
+  for (let index = 0; index < bucketCount; index += 1) {
+    const bucketStart = new Date(start.getTime() + index * bucketDuration)
+    const bucketEnd =
+      index === bucketCount - 1
+        ? end
+        : new Date(start.getTime() + (index + 1) * bucketDuration - 1)
+
+    const count = schools.filter((school) => {
+      const eventDate = getSchoolEventDate(school)
+      return eventDate >= bucketStart && eventDate <= bucketEnd
+    }).length
+
+    buckets.push({
+      label:
+        period === "7"
+          ? bucketStart.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")
+          : bucketStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }).replace(".", ""),
+      count,
+    })
+  }
+
+  return buckets
 }
 
 export async function GET(request: NextRequest) {
@@ -27,140 +154,102 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
     }
 
-    // Statistiques générales
-    const totalSchools = await prisma.school.count()
-    const activeSchools = await prisma.school.count({
-      where: { etatCompte: "ACTIF" }
-    })
-    const suspendedSchools = await prisma.school.count({
-      where: { etatCompte: "SUSPENDU" }
-    })
+    const searchParams = request.nextUrl.searchParams
+    const { period, start, end, previousStart, previousEnd, bucketCount } = getPeriodRange(searchParams.get("period"))
 
-    // Statistiques des utilisateurs
-    const totalUsers = await prisma.user.count()
-    const totalTeachers = await prisma.user.count({
-      where: { role: "PROFESSEUR" }
-    })
-    const totalStudents = await prisma.user.count({
-      where: { role: "ELEVE" }
-    })
-    const totalAdmins = await prisma.user.count({
-      where: { role: "ADMIN" }
-    })
+    const [
+      totalSchools,
+      activeSchools,
+      suspendedSchools,
+      totalUsers,
+      totalTeachers,
+      totalStudents,
+      totalAdmins,
+      totalClasses,
+      unreadNotifications,
+      schoolsByType,
+      schoolsByProvince,
+      schoolsForMetrics,
+    ] = await Promise.all([
+      prisma.school.count(),
+      prisma.school.count({ where: { etatCompte: "ACTIF" } }),
+      prisma.school.count({ where: { etatCompte: "SUSPENDU" } }),
+      prisma.user.count(),
+      prisma.teacher.count(),
+      prisma.student.count(),
+      prisma.user.count({ where: { role: "ADMIN" } }),
+      prisma.class.count(),
+      prisma.notification.count({ where: { isRead: false } }),
+      prisma.school.groupBy({
+        by: ["typeEtablissement"],
+        _count: { typeEtablissement: true },
+      }),
+      prisma.school.groupBy({
+        by: ["province"],
+        _count: { province: true },
+        orderBy: { _count: { province: "desc" } },
+        take: 5,
+      }),
+      prisma.school.findMany({
+        select: {
+          id: true,
+          etatCompte: true,
+          planAbonnement: true,
+          montantPaye: true,
+          dateCreation: true,
+          dateInscription: true,
+          dateDebutAbonnement: true,
+        },
+      }),
+    ])
 
-    // Statistiques des classes
-    const totalClasses = await prisma.class.count()
+    const currentPeriodSchools = schoolsForMetrics.filter((school) =>
+      isWithinRange(getSchoolEventDate(school), start, end)
+    )
+    const previousPeriodSchools = schoolsForMetrics.filter((school) =>
+      isWithinRange(getSchoolEventDate(school), previousStart, previousEnd)
+    )
 
-    // Écoles créées récemment (derniers 7 jours)
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const recentSchools = await prisma.school.count({
-      where: {
-        dateCreation: {
-          gte: sevenDaysAgo
+    const recentSchools = currentPeriodSchools.length
+    const schoolsGrowth = calculateChange(recentSchools, previousPeriodSchools.length)
+
+    const activePlanCounts = schoolsForMetrics.reduce(
+      (accumulator, school) => {
+        if (school.etatCompte !== "ACTIF") return accumulator
+
+        const normalized = normalizePlan(school.planAbonnement)
+        if (!normalized) {
+          accumulator.unassigned += 1
+          return accumulator
         }
-      }
-    })
 
-    // Écoles par type
-    const schoolsByType = await prisma.school.groupBy({
-      by: ['typeEtablissement'],
-      _count: {
-        typeEtablissement: true
-      }
-    })
-
-    // Écoles par province (top 5)
-    const schoolsByProvince = await prisma.school.groupBy({
-      by: ['province'],
-      _count: {
-        province: true
+        accumulator[normalized] += 1
+        return accumulator
       },
-      orderBy: {
-        _count: {
-          province: 'desc'
-        }
-      },
-      take: 5
-    })
+      { Basic: 0, Premium: 0, Enterprise: 0, unassigned: 0 }
+    )
 
-    // Notifications non lues
-    const unreadNotifications = await prisma.notification.count({
-      where: { isRead: false }
-    })
+    const currentRevenue = currentPeriodSchools.reduce(
+      (sum, school) => sum + (school.montantPaye ?? 0),
+      0
+    )
+    const previousRevenue = previousPeriodSchools.reduce(
+      (sum, school) => sum + (school.montantPaye ?? 0),
+      0
+    )
+    const totalRecordedRevenue = schoolsForMetrics.reduce(
+      (sum, school) => sum + (school.montantPaye ?? 0),
+      0
+    )
 
-    // Calculer les tendances (comparaison avec période précédente)
-    const fourteenDaysAgo = new Date()
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14)
-    
-    const previousPeriodSchools = await prisma.school.count({
-      where: {
-        dateCreation: {
-          gte: fourteenDaysAgo,
-          lt: sevenDaysAgo
-        }
-      }
-    })
-
-    // Calcul du pourcentage de changement
-    const schoolsGrowth = previousPeriodSchools > 0 
-      ? ((recentSchools - previousPeriodSchools) / previousPeriodSchools * 100).toFixed(1)
-      : recentSchools > 0 ? "100" : "0"
-
-    // Abonnements par formule (compter les vraies valeurs depuis la base de données)
-    const basicCount = await prisma.school.count({
-      where: { 
-        etatCompte: "ACTIF",
-        OR: [
-          { planAbonnement: "basic" },
-          { planAbonnement: "Basic" },
-          { planAbonnement: "BASIC" },
-          { planAbonnement: null } // Considérer les écoles sans plan comme Basic
-        ]
-      }
-    })
-
-    const premiumCount = await prisma.school.count({
-      where: { 
-        etatCompte: "ACTIF",
-        OR: [
-          { planAbonnement: "premium" },
-          { planAbonnement: "Premium" },
-          { planAbonnement: "PREMIUM" },
-          { planAbonnement: "pro" } // Certaines écoles utilisent "pro"
-        ]
-      }
-    })
-
-    const enterpriseCount = await prisma.school.count({
-      where: { 
-        etatCompte: "ACTIF",
-        OR: [
-          { planAbonnement: "enterprise" },
-          { planAbonnement: "Enterprise" },
-          { planAbonnement: "ENTERPRISE" }
-        ]
-      }
-    })
-
-    const subscriptionsByPlan = {
-      Basic: basicCount,
-      Premium: premiumCount,
-      Enterprise: enterpriseCount
-    }
-
-    // Calcul des revenus mensuels (prix supposés par formule)
-    const basicPrice = 49.99  // Prix Basic par mois
-    const premiumPrice = 99.99  // Prix Premium par mois
-    const enterprisePrice = 199.99  // Prix Enterprise par mois
-
-    const monthlyRevenue = (basicCount * basicPrice) + (premiumCount * premiumPrice) + (enterpriseCount * enterprisePrice)
-    
-    // Calcul de la variation du revenu (comparaison avec le mois précédent - simulation)
-    const previousMonthRevenue = monthlyRevenue * 0.985 // Simulation: -1.5% de variation
-    const revenueChange = ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue * 100).toFixed(1)
+    const subscriptionTimeline = buildTimeline(period, start, end, bucketCount, schoolsForMetrics)
+    const maxTimelineCount = subscriptionTimeline.reduce(
+      (max, item) => Math.max(max, item.count),
+      0
+    )
 
     return NextResponse.json({
+      period,
       totalSchools,
       activeSchools,
       suspendedSchools,
@@ -171,8 +260,9 @@ export async function GET(request: NextRequest) {
       totalClasses,
       recentSchools,
       schoolsGrowth,
-      monthlyRevenue: Math.round(monthlyRevenue),
-      revenueChange,
+      monthlyRevenue: Number(currentRevenue.toFixed(2)),
+      totalRecordedRevenue: Number(totalRecordedRevenue.toFixed(2)),
+      revenueChange: calculateChange(currentRevenue, previousRevenue),
       schoolsByType: schoolsByType.map((item: any) => ({
         type: item.typeEtablissement,
         count: item._count.typeEtablissement
@@ -182,7 +272,14 @@ export async function GET(request: NextRequest) {
         count: item._count.province
       })),
       unreadNotifications,
-      subscriptionsByPlan
+      subscriptionsByPlan: {
+        Basic: activePlanCounts.Basic,
+        Premium: activePlanCounts.Premium,
+        Enterprise: activePlanCounts.Enterprise,
+      },
+      unassignedSubscriptions: activePlanCounts.unassigned,
+      subscriptionTimeline,
+      maxTimelineCount,
     })
 
   } catch (error) {
