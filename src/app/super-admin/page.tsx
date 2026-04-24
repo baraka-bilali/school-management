@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check, AlertTriangle, CalendarX } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check, AlertTriangle, CalendarX, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
@@ -21,8 +21,10 @@ type School = {
   etatCompte: string;
   dateCreation: string;
   dateFinAbonnement?: string | null;
+  planAbonnement?: string | null;
 }
 type User = { id: number; name: string; email: string; role: string }
+type PlatformSettings = { currency: "USD" | "CDF"; exchangeRate: number; updatedAt?: string }
 
 export default function SuperAdminHome() {
   const router = useRouter()
@@ -54,14 +56,6 @@ export default function SuperAdminHome() {
     email: "",
     siteWeb: "",
     
-    // Direction
-    directeurNom: "",
-    directeurTelephone: "",
-    directeurEmail: "",
-    secretaireAcademique: "",
-    comptable: "",
-    personnelAdministratifTotal: "",
-    
     // Informations légales
     rccm: "",
     idNat: "",
@@ -69,17 +63,10 @@ export default function SuperAdminHome() {
     agrementMinisteriel: "",
     dateAgrement: "",
     
-    // Académique
-    cycles: "",
-    nombreClasses: "",
-    nombreEleves: "",
-    nombreEnseignants: "",
+    // Configuration académique
     langueEnseignement: "",
     programmes: "",
     joursOuverture: "",
-    
-    // Abonnement (étape finale)
-    formule: "Basic" as "Basic" | "Premium" | "Enterprise"
   })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState("")
@@ -100,6 +87,7 @@ export default function SuperAdminHome() {
   const [deleting, setDeleting] = useState(false)
   const [initialFormData, setInitialFormData] = useState<typeof form | null>(null)
   const [stats, setStats] = useState({
+    period: "7",
     totalSchools: 0,
     activeSchools: 0,
     suspendedSchools: 0,
@@ -111,12 +99,20 @@ export default function SuperAdminHome() {
     recentSchools: 0,
     schoolsGrowth: "0",
     monthlyRevenue: 0,
+    totalRecordedRevenue: 0,
     revenueChange: "0",
     schoolsByType: [] as { type: string, count: number }[],
     schoolsByProvince: [] as { province: string, count: number }[],
     unreadNotifications: 0,
-    subscriptionsByPlan: { Basic: 0, Premium: 0, Enterprise: 0 }
+    subscriptionsByPlan: { Basic: 0, Premium: 0, Enterprise: 0 },
+    unassignedSubscriptions: 0,
+    subscriptionTimeline: [] as { label: string, count: number }[],
+    maxTimelineCount: 0,
   })
+  const [settings, setSettings] = useState<PlatformSettings>({ currency: "USD", exchangeRate: 2800 })
+  const [settingsForm, setSettingsForm] = useState<PlatformSettings>({ currency: "USD", exchangeRate: 2800 })
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsMessage, setSettingsMessage] = useState("")
   const [hasChanges, setHasChanges] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
@@ -209,12 +205,16 @@ export default function SuperAdminHome() {
       const userData = await loadUser()
       if (userData) {
         loadSchools()
-        loadStats()
         loadAdmins()
+        loadSettings()
       }
     }
     initData()
   }, [])
+
+  useEffect(() => {
+    loadStats()
+  }, [period])
 
   const loadUser = async () => {
     try {
@@ -238,7 +238,7 @@ export default function SuperAdminHome() {
 
   const loadStats = async () => {
     try {
-      const res = await fetch('/api/admin/stats', {
+      const res = await fetch(`/api/admin/stats?period=${period}`, {
         credentials: 'include'
       })
       if (res.ok) {
@@ -251,6 +251,53 @@ export default function SuperAdminHome() {
     } catch (e) {
       console.error('Erreur lors du chargement des stats:', e)
       // Garder les valeurs par défaut en cas d'erreur
+    }
+  }
+
+  const loadSettings = async () => {
+    try {
+      const res = await fetch('/api/super-admin/settings', {
+        credentials: 'include'
+      })
+      if (!res.ok) return
+
+      const data = await res.json()
+      setSettings(data)
+      setSettingsForm(data)
+    } catch (e) {
+      console.error('Erreur lors du chargement des paramètres:', e)
+    }
+  }
+
+  const saveSettings = async () => {
+    try {
+      setSavingSettings(true)
+      setSettingsMessage("")
+
+      const res = await fetch('/api/super-admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          currency: settingsForm.currency,
+          exchangeRate: Number(settingsForm.exchangeRate),
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setSettingsMessage(data.error || 'Impossible de sauvegarder les paramètres')
+        return
+      }
+
+      setSettings(data)
+      setSettingsForm(data)
+      setSettingsMessage('Paramètres enregistrés')
+    } catch (e) {
+      console.error('Erreur lors de la sauvegarde des paramètres:', e)
+      setSettingsMessage('Une erreur est survenue lors de la sauvegarde')
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -572,25 +619,14 @@ export default function SuperAdminHome() {
         telephone: "",
         email: "",
         siteWeb: "",
-        directeurNom: "",
-        directeurTelephone: "",
-        directeurEmail: "",
-        secretaireAcademique: "",
-        comptable: "",
-        personnelAdministratifTotal: "",
         rccm: "",
         idNat: "",
         nif: "",
         agrementMinisteriel: "",
         dateAgrement: "",
-        cycles: "",
-        nombreClasses: "",
-        nombreEleves: "",
-        nombreEnseignants: "",
         langueEnseignement: "",
         programmes: "",
         joursOuverture: "",
-        formule: "Basic"
       })
     }, 220)
     return () => clearTimeout(t)
@@ -662,9 +698,6 @@ export default function SuperAdminHome() {
           errors.email = true
         }
       }
-    } else if (currentStep === 3) {
-      if (!form.directeurNom.trim()) errors.directeurNom = true
-      if (!form.directeurTelephone.trim()) errors.directeurTelephone = true
     }
     
     // Si des erreurs, les afficher et arrêter
@@ -675,7 +708,7 @@ export default function SuperAdminHome() {
     
     // Sinon, nettoyer les erreurs et passer à l'étape suivante
     setFieldErrors({})
-    if (currentStep < 6) {
+    if (currentStep < 4) {
       setCurrentStep(prev => prev + 1)
     }
   }
@@ -692,7 +725,7 @@ export default function SuperAdminHome() {
   const handleEditNextStep = () => {
     setError("")
     setFieldErrors({})
-    if (currentStep < 6) {
+    if (currentStep < 5) {
       setIsEditTransitioning(true)
       setTimeout(() => {
         setCurrentStep(prev => prev + 1)
@@ -747,25 +780,14 @@ export default function SuperAdminHome() {
       telephone: s.telephone || "",
       email: s.email || "",
       siteWeb: s.siteWeb || "",
-      directeurNom: s.directeurNom || "",
-      directeurTelephone: s.directeurTelephone || "",
-      directeurEmail: s.directeurEmail || "",
-      secretaireAcademique: s.secretaireAcademique || "",
-      comptable: s.comptable || "",
-      personnelAdministratifTotal: s.personnelAdministratifTotal || "",
       rccm: s.rccm || "",
       idNat: s.idNat || "",
       nif: s.nif || "",
       agrementMinisteriel: s.agrementMinisteriel || "",
       dateAgrement: s.dateAgrement || "",
-      cycles: s.cycles || "",
-      nombreClasses: s.nombreClasses?.toString() || "",
-      nombreEleves: s.nombreEleves?.toString() || "",
-      nombreEnseignants: s.nombreEnseignants?.toString() || "",
       langueEnseignement: s.langueEnseignement || "",
       programmes: s.programmes || "",
       joursOuverture: s.joursOuverture || "",
-      formule: "Basic" as "Basic" | "Premium" | "Enterprise"
     }
     setForm(formData)
     setInitialFormData({ ...formData })
@@ -908,12 +930,8 @@ export default function SuperAdminHome() {
           nomEtablissement: "", typeEtablissement: "PRIVE" as "PUBLIC" | "PRIVE" | "SEMI_PRIVE",
           niveauEnseignement: [] as string[], codeEtablissement: "", anneeCreation: "", slogan: "",
           adresse: "", ville: "", province: "", pays: "RDC", telephone: "", email: "", siteWeb: "",
-          directeurNom: "", directeurTelephone: "", directeurEmail: "",
-          secretaireAcademique: "", comptable: "", personnelAdministratifTotal: "",
           rccm: "", idNat: "", nif: "", agrementMinisteriel: "", dateAgrement: "",
-          cycles: "", nombreClasses: "", nombreEleves: "", nombreEnseignants: "",
           langueEnseignement: "", programmes: "", joursOuverture: "",
-          formule: "Basic" as "Basic" | "Premium" | "Enterprise"
         })
       }, 3000)
     } catch (e: any) {
@@ -999,23 +1017,6 @@ export default function SuperAdminHome() {
     if (form.email) dataRows.push(['Contact', 'Email', form.email])
     if (form.siteWeb) dataRows.push(['Contact', 'Site web', form.siteWeb])
     
-    // Direction
-    if (form.directeurNom) dataRows.push(['Direction', 'Directeur', form.directeurNom])
-    if (form.directeurTelephone) dataRows.push(['Direction', 'Tél. Directeur', form.directeurTelephone])
-    if (form.directeurEmail) dataRows.push(['Direction', 'Email Directeur', form.directeurEmail])
-    if (form.secretaireAcademique) dataRows.push(['Direction', 'Secrétaire', form.secretaireAcademique])
-    if (form.comptable) dataRows.push(['Direction', 'Comptable', form.comptable])
-    if (form.personnelAdministratifTotal) dataRows.push(['Direction', 'Personnel admin.', form.personnelAdministratifTotal])
-    
-    // Académique
-    if (form.cycles) dataRows.push(['Académique', 'Cycles', form.cycles])
-    if (form.nombreClasses) dataRows.push(['Académique', 'Nombre classes', form.nombreClasses])
-    if (form.nombreEleves) dataRows.push(['Académique', 'Nombre élèves', form.nombreEleves])
-    if (form.nombreEnseignants) dataRows.push(['Académique', 'Nombre enseignants', form.nombreEnseignants])
-    if (form.langueEnseignement) dataRows.push(['Académique', 'Langue', form.langueEnseignement])
-    if (form.programmes) dataRows.push(['Académique', 'Programmes', form.programmes])
-    if (form.joursOuverture) dataRows.push(['Académique', 'Jours ouverture', form.joursOuverture])
-    
     // Informations légales
     if (form.rccm) dataRows.push(['Légal', 'RCCM', form.rccm])
     if (form.idNat) dataRows.push(['Légal', 'ID National', form.idNat])
@@ -1023,8 +1024,10 @@ export default function SuperAdminHome() {
     if (form.agrementMinisteriel) dataRows.push(['Légal', 'Agrément', form.agrementMinisteriel])
     if (form.dateAgrement) dataRows.push(['Légal', 'Date agrément', form.dateAgrement])
     
-    // Abonnement
-    if (form.formule) dataRows.push(['Abonnement', 'Formule', form.formule])
+    // Configuration
+    if (form.langueEnseignement) dataRows.push(['Configuration', 'Langue', form.langueEnseignement])
+    if (form.programmes) dataRows.push(['Configuration', 'Programmes', form.programmes])
+    if (form.joursOuverture) dataRows.push(['Configuration', 'Jours ouverture', form.joursOuverture])
     
     // Construire le CSV
     const allRows = [headers, ...dataRows]
@@ -1069,29 +1072,6 @@ export default function SuperAdminHome() {
         ]
       },
       {
-        title: '👥 Direction & Personnel',
-        fields: [
-          { label: 'Directeur', value: form.directeurNom },
-          { label: 'Tél. Directeur', value: form.directeurTelephone },
-          { label: 'Email Directeur', value: form.directeurEmail },
-          { label: 'Secrétaire académique', value: form.secretaireAcademique },
-          { label: 'Comptable', value: form.comptable },
-          { label: 'Personnel administratif', value: form.personnelAdministratifTotal },
-        ]
-      },
-      {
-        title: '📚 Académique',
-        fields: [
-          { label: 'Cycles', value: form.cycles },
-          { label: 'Nombre de classes', value: form.nombreClasses },
-          { label: 'Nombre d\'élèves', value: form.nombreEleves },
-          { label: 'Nombre d\'enseignants', value: form.nombreEnseignants },
-          { label: 'Langue d\'enseignement', value: form.langueEnseignement },
-          { label: 'Programmes', value: form.programmes },
-          { label: 'Jours d\'ouverture', value: form.joursOuverture },
-        ]
-      },
-      {
         title: '⚖️ Informations légales',
         fields: [
           { label: 'RCCM', value: form.rccm },
@@ -1102,11 +1082,13 @@ export default function SuperAdminHome() {
         ]
       },
       {
-        title: '💳 Abonnement',
+        title: '📚 Configuration',
         fields: [
-          { label: 'Formule', value: form.formule },
+          { label: "Langue d'enseignement", value: form.langueEnseignement },
+          { label: 'Programmes', value: form.programmes },
+          { label: "Jours d'ouverture", value: form.joursOuverture },
         ]
-      }
+      },
     ]
     
     let htmlContent = `
@@ -1235,8 +1217,43 @@ export default function SuperAdminHome() {
     { id: "stats", label: "Statistiques Générales" },
     { id: "schools", label: "Gestion des Écoles" },
     { id: "admins", label: "Administrateurs d'Écoles" },
-    { id: "notifications", label: "Notifications" }
+    { id: "notifications", label: "Notifications" },
+    { id: "settings", label: "Paramètres" }
   ]
+
+  const formatPlanLabel = (plan?: string | null) => {
+    if (!plan) return "Non défini"
+
+    const value = plan.toUpperCase()
+    if (value === "BASIC") return "Basic"
+    if (value === "PREMIUM" || value === "PRO") return "Premium"
+    if (value === "ENTERPRISE") return "Enterprise"
+    return plan
+  }
+
+  const formatDisplayAmount = (amount: number) => {
+    const value = settings.currency === "CDF" ? amount * settings.exchangeRate : amount
+    const locale = settings.currency === "CDF" ? "fr-CD" : "en-US"
+
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: settings.currency,
+      maximumFractionDigits: settings.currency === "CDF" ? 0 : 2,
+    }).format(value)
+  }
+
+  const formatUsdAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
+
+  const periodLabel = period === "7" ? "7 derniers jours" : period === "30" ? "30 derniers jours" : "Année en cours"
+  const revenueFootnote = settings.currency === "CDF"
+    ? `Base USD • 1 $ = ${new Intl.NumberFormat('fr-CD').format(settings.exchangeRate)} FC`
+    : "Base USD"
 
   const statsCards = [
     { 
@@ -1264,12 +1281,12 @@ export default function SuperAdminHome() {
       subtitle: "Toutes les écoles"
     },
     { 
-      label: "Revenu mensuel", 
-      value: `€${stats.monthlyRevenue.toLocaleString()}`, 
+      label: "Abonnements encaissés", 
+      value: formatDisplayAmount(stats.monthlyRevenue), 
       change: `${parseFloat(stats.revenueChange) >= 0 ? "+" : ""}${stats.revenueChange}%`, 
       trend: parseFloat(stats.revenueChange) >= 0 ? "up" : "down", 
       icon: DollarSign,
-      subtitle: `${stats.suspendedSchools} suspendues`
+      subtitle: `${periodLabel} • ${revenueFootnote}`
     },
   ]
 
@@ -1284,53 +1301,22 @@ export default function SuperAdminHome() {
   const notificationBg = theme === "dark" ? "hover:bg-[#1a2332]" : "hover:bg-gray-100"
 
   return (
-    <div className={`min-h-screen ${bgColor} ${textColor} p-6 transition-colors duration-300`}>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className={`w-10 h-10 rounded-xl ${theme === "dark" ? "bg-blue-500/10" : "bg-blue-50"} flex items-center justify-center`}>
-            <Building2 className="w-5 h-5 text-blue-500" />
-          </div>
-          <h1 className="text-3xl font-bold">Tableau de bord Super Admin</h1>
-        </div>
-        <p className={textSecondary}>Gérez les écoles, les utilisateurs et visualisez les statistiques de la plateforme.</p>
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className={`mb-6 border-b ${borderColor}`}>
-        <div className="flex items-center justify-between">
-          {/* Spacer gauche */}
-          <div className="flex-1"></div>
-          
-          {/* Onglets centrés */}
-          <div className="flex gap-8">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setIsTransitioning(true)
-                  setTimeout(() => {
-                    setActiveTab(tab.id)
-                    setTimeout(() => setIsTransitioning(false), 10)
-                  }, 150)
-                }}
-                className={`pb-4 px-1 text-sm font-medium transition-colors relative ${
-                  activeTab === tab.id
-                    ? "text-blue-500"
-                    : `${textSecondary} ${theme === "dark" ? "hover:text-gray-300" : "hover:text-gray-900"}`
-                }`}
-              >
-                {tab.label}
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
-                )}
-              </button>
-            ))}
+    <div className={`min-h-screen ${bgColor} ${textColor} transition-colors duration-300`}>
+      <div className="mx-auto w-full max-w-[1180px] px-4 py-4 sm:px-6 sm:py-6 xl:max-w-[1240px]">
+      <div className={`${cardBg} mb-6 rounded-[28px] border ${borderColor} px-5 py-5 shadow-[0_30px_80px_rgba(15,23,41,0.18)]`}>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-3 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-blue-400">
+              <Building2 className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">Console compacte</span>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Tableau de bord Super Admin</h1>
+            <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
+              Gerez les ecoles, les administrateurs et les abonnements dans une interface plus dense, centree et synchronisee avec la base.
+            </p>
           </div>
 
-          {/* Section droite : Utilisateur et notifications */}
-          <div className="flex-1 flex items-center justify-end gap-4 pb-4">
-            {/* Notification */}
+          <div className="flex items-center justify-between gap-3 lg:justify-end">
             <button 
               onClick={() => {
                 setIsTransitioning(true)
@@ -1339,7 +1325,7 @@ export default function SuperAdminHome() {
                   setTimeout(() => setIsTransitioning(false), 10)
                 }, 150)
               }}
-              className={`relative p-2 ${notificationBg} rounded-lg transition-colors`}
+              className={`relative rounded-2xl border ${borderColor} p-3 ${notificationBg} transition-colors`}
             >
               <Bell className={`w-5 h-5 ${unreadNotifications > 0 ? 'text-yellow-400 animate-pulse' : textSecondary}`} />
               {unreadNotifications > 0 && (
@@ -1349,12 +1335,11 @@ export default function SuperAdminHome() {
               )}
             </button>
 
-            {/* Utilisateur */}
             {user && user.name && (
               <div className="relative" ref={userMenuRef}>
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className={`flex items-center gap-3 pl-4 border-l ${borderColor} hover:opacity-80 transition-opacity`}
+                  className={`flex items-center gap-3 rounded-2xl border ${borderColor} px-3 py-2 hover:opacity-80 transition-opacity`}
                 >
                   <div className="text-right">
                     <div className={`text-sm font-medium ${textColor}`}>{user.name}</div>
@@ -1368,16 +1353,13 @@ export default function SuperAdminHome() {
                   </div>
                 </button>
 
-                {/* Menu Dropdown */}
                 {showUserMenu && (
                   <div className={`absolute right-0 mt-2 w-56 ${cardBg} rounded-lg shadow-xl border ${borderColor} overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200`}>
-                    {/* User Info */}
                     <div className={`px-4 py-3 border-b ${borderColor}`}>
                       <div className={`text-sm font-medium ${textColor}`}>{user.name}</div>
                       <div className={`text-xs ${textSecondary}`}>{user.email}</div>
                     </div>
 
-                    {/* Theme Toggle */}
                     <button
                       onClick={toggleTheme}
                       className={`w-full px-4 py-3 flex items-center gap-3 ${hoverBg} transition-colors text-left`}
@@ -1395,7 +1377,6 @@ export default function SuperAdminHome() {
                       </div>
                     </button>
 
-                    {/* Logout */}
                     <button
                       onClick={handleLogoutClick}
                       className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left border-t ${borderColor}`}
@@ -1411,6 +1392,28 @@ export default function SuperAdminHome() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className={`mt-5 flex flex-wrap items-center gap-2 border-t ${borderColor} pt-4`}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setIsTransitioning(true)
+                  setTimeout(() => {
+                    setActiveTab(tab.id)
+                    setTimeout(() => setIsTransitioning(false), 10)
+                  }, 150)
+                }}
+                className={`rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.id
+                    ? `${theme === "dark" ? "bg-[#0f1729] text-blue-400 border border-blue-500/30" : "bg-blue-50 text-blue-600 border border-blue-200"}`
+                    : `${textSecondary} border ${borderColor} ${theme === "dark" ? "hover:text-gray-300 hover:bg-[#111827]" : "hover:text-gray-900 hover:bg-gray-50"}`
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -1447,7 +1450,7 @@ export default function SuperAdminHome() {
             <div className="flex items-center justify-between mb-3">
               <span className={`${textSecondary} text-sm font-medium`}>{stat.label}</span>
               <stat.icon className={`w-5 h-5 ${
-                stat.label === "Revenu mensuel" 
+                stat.label === "Abonnements encaissés" 
                   ? theme === "dark" ? "text-green-400" : "text-green-500"
                   : theme === "dark" ? "text-blue-400" : "text-blue-500"
               }`} />
@@ -1455,7 +1458,7 @@ export default function SuperAdminHome() {
             <div className={`text-3xl font-bold ${textColor} mb-2`}>{stat.value}</div>
             <div className="flex items-center justify-between">
               <span className={`text-xs ${textSecondary}`}>{stat.subtitle}</span>
-              {stat.label === "Revenu mensuel" ? (
+              {stat.label === "Abonnements encaissés" ? (
                 <span className={`text-xs font-medium flex items-center gap-1 ${
                   stat.trend === "up" ? "text-green-500" : "text-red-500"
                 }`}>
@@ -1487,18 +1490,25 @@ export default function SuperAdminHome() {
             <span className={`${textSecondary} text-sm`}>sur les 30 derniers jours</span>
           </div>
           <div className="h-48 flex items-end justify-between gap-2">
-            {[65, 85, 75, 95, 70, 80, 90, 75, 85, 95, 80, 90, 85, 95, 75, 85, 95, 85, 75, 95].map((height, i) => (
-              <div 
-                key={i} 
-                className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-700 ease-out hover:from-blue-600 hover:to-blue-500 cursor-pointer" 
-                style={{ 
-                  height: `${height}%`,
-                  animation: `growBar 0.8s ease-out ${i * 0.05}s forwards`,
-                  transform: 'scaleY(0)',
-                  transformOrigin: 'bottom'
-                }} 
-              />
-            ))}
+            {(stats.subscriptionTimeline.length > 0 ? stats.subscriptionTimeline : [{ label: periodLabel, count: 0 }]).map((item, i) => {
+              const height = stats.maxTimelineCount > 0 ? Math.max(12, (item.count / stats.maxTimelineCount) * 100) : 10
+
+              return (
+                <div key={item.label + i} className="flex h-full flex-1 flex-col justify-end gap-2">
+                  <div 
+                    className="w-full bg-gradient-to-t from-blue-500 to-sky-400 rounded-t-xl transition-all duration-700 ease-out hover:from-blue-600 hover:to-sky-500 cursor-pointer" 
+                    style={{ 
+                      height: `${height}%`,
+                      animation: `growBar 0.8s ease-out ${i * 0.05}s forwards`,
+                      transform: 'scaleY(0)',
+                      transformOrigin: 'bottom'
+                    }}
+                    title={`${item.label} • ${item.count} abonnement(s)`}
+                  />
+                  <span className={`text-center text-[11px] ${textSecondary}`}>{item.label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -1509,9 +1519,9 @@ export default function SuperAdminHome() {
             <div className="relative w-40 h-40">
               {(() => {
                 const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                const basicPercent = total > 0 ? (stats.subscriptionsByPlan.Basic / total) * 100 : 40
-                const premiumPercent = total > 0 ? (stats.subscriptionsByPlan.Premium / total) * 100 : 35
-                const enterprisePercent = total > 0 ? (stats.subscriptionsByPlan.Enterprise / total) * 100 : 25
+                const basicPercent = total > 0 ? (stats.subscriptionsByPlan.Basic / total) * 100 : 0
+                const premiumPercent = total > 0 ? (stats.subscriptionsByPlan.Premium / total) * 100 : 0
+                const enterprisePercent = total > 0 ? (stats.subscriptionsByPlan.Enterprise / total) * 100 : 0
                 
                 const circumference = 440
                 const basicDash = (basicPercent / 100) * circumference
@@ -1573,8 +1583,8 @@ export default function SuperAdminHome() {
                 )
               })()}
               <div className="absolute inset-0 flex flex-col items-center justify-center animate-fadeIn">
-                <div className={`text-3xl font-bold ${textColor}`}>{stats.activeSchools > 0 ? stats.activeSchools.toLocaleString() : schools.length.toLocaleString()}</div>
-                <div className={`text-xs ${textSecondary}`}>Écoles</div>
+                <div className={`text-3xl font-bold ${textColor}`}>{stats.activeSchools.toLocaleString()}</div>
+                <div className={`text-xs ${textSecondary}`}>Actives</div>
               </div>
             </div>
           </div>
@@ -1584,7 +1594,7 @@ export default function SuperAdminHome() {
                 <div className="w-3 h-3 rounded-full bg-blue-500 group-hover:scale-110 transition-transform"></div>
                 <span className={textSecondary}>Basic ({(() => {
                   const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Basic / total) * 100) : 40
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Basic / total) * 100) : 0
                 })()}%)</span>
               </div>
               <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Basic}</span>
@@ -1594,7 +1604,7 @@ export default function SuperAdminHome() {
                 <div className="w-3 h-3 rounded-full bg-purple-500 group-hover:scale-110 transition-transform"></div>
                 <span className={textSecondary}>Premium ({(() => {
                   const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Premium / total) * 100) : 35
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Premium / total) * 100) : 0
                 })()}%)</span>
               </div>
               <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Premium}</span>
@@ -1604,10 +1614,14 @@ export default function SuperAdminHome() {
                 <div className="w-3 h-3 rounded-full bg-pink-500 group-hover:scale-110 transition-transform"></div>
                 <span className={textSecondary}>Enterprise ({(() => {
                   const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Enterprise / total) * 100) : 25
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Enterprise / total) * 100) : 0
                 })()}%)</span>
               </div>
               <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Enterprise}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm p-2">
+              <span className={textSecondary}>Sans formule</span>
+              <span className={`font-semibold ${textColor}`}>{stats.unassignedSubscriptions}</span>
             </div>
           </div>
         </div>
@@ -1707,7 +1721,7 @@ export default function SuperAdminHome() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
-                      {school.typeEtablissement}
+                      {formatPlanLabel(school.planAbonnement)}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
@@ -1817,7 +1831,7 @@ export default function SuperAdminHome() {
                         )}
                       </td>
                       <td className={`px-6 py-4 text-sm ${textColor}`}>
-                        {school.typeEtablissement}
+                        {formatPlanLabel(school.planAbonnement)}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
@@ -2300,6 +2314,84 @@ export default function SuperAdminHome() {
         <NotificationsSection theme={theme} />
       )}
 
+      {activeTab === "settings" && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className={`${cardBg} rounded-2xl border ${borderColor} p-6 shadow-sm`}>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
+                  <Settings2 className="h-3.5 w-3.5" /> Paramètres de plateforme
+                </div>
+                <h3 className={`text-xl font-semibold ${textColor}`}>Devise d'affichage</h3>
+                <p className={`mt-2 max-w-xl text-sm ${textSecondary}`}>
+                  Les montants restent enregistrés en dollars américains dans la base. Cet écran contrôle la devise d'affichage du dashboard et le taux de conversion USD vers franc congolais.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${textColor}`}>Devise du dashboard</span>
+                <select
+                  value={settingsForm.currency}
+                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, currency: e.target.value as "USD" | "CDF" }))}
+                  className={`w-full rounded-xl border ${borderColor} ${inputBg} px-4 py-3 ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                >
+                  <option value="USD">Dollar américain (USD)</option>
+                  <option value="CDF">Franc congolais (CDF)</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className={`mb-2 block text-sm font-medium ${textColor}`}>Taux de change</span>
+                <Input
+                  autoComplete="off"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={settingsForm.exchangeRate}
+                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, exchangeRate: Number(e.target.value) || 0 }))}
+                  className={`w-full ${inputBg} border ${borderColor} rounded-xl px-4 py-3 ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                <p className={`mt-2 text-xs ${textSecondary}`}>1 USD = {new Intl.NumberFormat('fr-CD').format(settingsForm.exchangeRate || 0)} CDF</p>
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button onClick={saveSettings} disabled={savingSettings} className="rounded-xl bg-blue-600 px-5 py-2.5 text-white hover:bg-blue-700">
+                {savingSettings ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+              </Button>
+              {settingsMessage && <span className={`text-sm ${settingsMessage.includes('enregistrés') ? 'text-emerald-500' : 'text-red-500'}`}>{settingsMessage}</span>}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className={`${cardBg} rounded-2xl border ${borderColor} p-6 shadow-sm`}>
+              <h3 className={`text-lg font-semibold ${textColor}`}>Aperçu de conversion</h3>
+              <div className="mt-5 space-y-4">
+                {[49.99, 99.99, stats.monthlyRevenue].map((amount, index) => (
+                  <div key={index} className={`rounded-xl border ${borderColor} p-4`}>
+                    <div className={`text-xs uppercase tracking-[0.18em] ${textSecondary}`}>{index < 2 ? 'Exemple' : 'Revenu courant'}</div>
+                    <div className={`mt-2 text-2xl font-semibold ${textColor}`}>{formatDisplayAmount(amount)}</div>
+                    <div className={`mt-1 text-sm ${textSecondary}`}>{formatUsdAmount(amount)} en base</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={`${cardBg} rounded-2xl border ${borderColor} p-6 shadow-sm`}>
+              <h3 className={`text-lg font-semibold ${textColor}`}>Règle métier</h3>
+              <ul className={`mt-4 space-y-3 text-sm ${textSecondary}`}>
+                <li>Toutes les données financières sont stockées en USD dans la base.</li>
+                <li>Le dashboard peut s'afficher en USD ou en CDF selon le paramètre enregistré.</li>
+                <li>Le taux appliqué actuellement est 1 USD = {new Intl.NumberFormat('fr-CD').format(settings.exchangeRate)} CDF.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+
       {/* Create School Modal */}
       {modalMounted && (
         <Portal>
@@ -2328,10 +2420,8 @@ export default function SuperAdminHome() {
                   {[
                     { num: 1, label: "Général", Icon: Building2 },
                     { num: 2, label: "Contact", Icon: MapPin },
-                    { num: 3, label: "Direction", Icon: UserCheck },
-                    { num: 4, label: "Académique", Icon: GraduationCap },
-                    { num: 5, label: "Abonnement", Icon: CreditCard },
-                    { num: 6, label: "Récapitulatif", Icon: FileText }
+                    { num: 3, label: "Légal", Icon: FileText },
+                    { num: 4, label: "Récapitulatif", Icon: Check }
                   ].map((step, idx) => (
                     <div key={step.num} className="flex items-center flex-1">
                       <div className="flex flex-col items-center flex-1">
@@ -2346,7 +2436,7 @@ export default function SuperAdminHome() {
                           {step.label}
                         </span>
                       </div>
-                      {idx < 5 && (
+                      {idx < 3 && (
                         <div className={`h-0.5 flex-1 mx-0.5 -mt-4 ${
                           currentStep > step.num ? "bg-blue-500" : `${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`
                         }`} />
@@ -2573,91 +2663,9 @@ export default function SuperAdminHome() {
                   </div>
                 )}
 
-                {/* Étape 3: Direction & Personnel */}
+                {/* Étape 3: Informations légales & Configuration */}
                 {currentStep === 3 && (
                   <div className="space-y-3">
-                    <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nom du directeur *</label>
-                      <Input autoComplete="off" value={form.directeurNom}
-                        onChange={(e) => {
-                          setForm(prev => ({ ...prev, directeurNom: e.target.value }))
-                          clearFieldError('directeurNom')
-                        }}
-                        className={`h-9 text-sm ${inputBg} ${
-                          fieldErrors.directeurNom 
-                            ? "border-red-400/60 border-2" 
-                            : theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"
-                        }`}
-                        placeholder="Nom complet du directeur"
-                      />
-                      {fieldErrors.directeurNom && (
-                        <p className="text-[10px] text-red-400/80 mt-1">Ce champ est requis</p>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Téléphone directeur *</label>
-                        <Input autoComplete="off" value={form.directeurTelephone}
-                          onChange={(e) => {
-                            setForm(prev => ({ ...prev, directeurTelephone: e.target.value }))
-                            clearFieldError('directeurTelephone')
-                          }}
-                          className={`h-9 text-sm ${inputBg} ${
-                            fieldErrors.directeurTelephone 
-                              ? "border-red-400/60 border-2" 
-                              : theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"
-                          }`}
-                          placeholder="+243 XXX XXX XXX"
-                        />
-                        {fieldErrors.directeurTelephone && (
-                          <p className="text-[10px] text-red-400/80 mt-1">Ce champ est requis</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Email directeur</label>
-                        <Input autoComplete="off" type="email"
-                          value={form.directeurEmail}
-                          onChange={(e) => setForm(prev => ({ ...prev, directeurEmail: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="directeur@ecole.cd"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Secrétaire académique</label>
-                        <Input autoComplete="off" value={form.secretaireAcademique}
-                          onChange={(e) => setForm(prev => ({ ...prev, secretaireAcademique: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Nom du secrétaire"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Comptable</label>
-                        <Input autoComplete="off" value={form.comptable}
-                          onChange={(e) => setForm(prev => ({ ...prev, comptable: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Nom du comptable"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Personnel administratif total</label>
-                      <Input autoComplete="off" type="number"
-                        value={form.personnelAdministratifTotal}
-                        onChange={(e) => setForm(prev => ({ ...prev, personnelAdministratifTotal: e.target.value }))}
-                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                        placeholder="Ex: 15"
-                      />
-                    </div>
-
-                    <div className={`pt-2 pb-1 border-t ${borderColor}`}>
-                      <h4 className={`text-xs font-semibold ${textColor}`}>Informations légales</h4>
-                    </div>
-
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <label className={`block text-xs font-medium ${textColor} mb-1.5`}>RCCM</label>
@@ -2703,117 +2711,67 @@ export default function SuperAdminHome() {
                         />
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Étape 4: Informations académiques */}
-                {currentStep === 4 && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Cycles d'enseignement</label>
-                      <Input autoComplete="off" value={form.cycles}
-                        onChange={(e) => setForm(prev => ({ ...prev, cycles: e.target.value }))}
-                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                        placeholder="Ex: Maternel, Primaire, Secondaire"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre de classes</label>
-                        <Input autoComplete="off" type="number"
-                          value={form.nombreClasses}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreClasses: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 24"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'élèves</label>
-                        <Input autoComplete="off" type="number"
-                          value={form.nombreEleves}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreEleves: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 600"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'enseignants</label>
-                        <Input autoComplete="off" type="number"
-                          value={form.nombreEnseignants}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreEnseignants: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 35"
-                        />
-                      </div>
+                    <div className={`pt-2 pb-1 border-t ${borderColor}`}>
+                      <h4 className={`text-xs font-semibold ${textColor}`}>Configuration</h4>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Langue d'enseignement</label>
-                        <Input autoComplete="off" value={form.langueEnseignement}
+                        <select
+                          value={form.langueEnseignement}
                           onChange={(e) => setForm(prev => ({ ...prev, langueEnseignement: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: Français"
-                        />
+                          className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        >
+                          <option value="">-- Choisir --</option>
+                          <option value="Français">Français</option>
+                          <option value="Anglais">Anglais</option>
+                          <option value="Français & Anglais">Français &amp; Anglais</option>
+                          <option value="Swahili">Swahili</option>
+                          <option value="Lingala">Lingala</option>
+                          <option value="Kikongo">Kikongo</option>
+                          <option value="Tshiluba">Tshiluba</option>
+                        </select>
                       </div>
                       <div>
                         <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Jours d'ouverture</label>
-                        <Input autoComplete="off" value={form.joursOuverture}
+                        <select
+                          value={form.joursOuverture}
                           onChange={(e) => setForm(prev => ({ ...prev, joursOuverture: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: Lundi - Vendredi"
-                        />
+                          className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        >
+                          <option value="">-- Choisir --</option>
+                          <option value="Lundi - Vendredi">Lundi - Vendredi</option>
+                          <option value="Lundi - Samedi">Lundi - Samedi</option>
+                          <option value="Lundi - Jeudi">Lundi - Jeudi</option>
+                          <option value="Lundi - Vendredi + Samedi matin">Lundi - Vendredi + Samedi matin</option>
+                        </select>
                       </div>
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Programmes</label>
-                      <textarea
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Programme d'enseignement</label>
+                      <select
                         value={form.programmes}
                         onChange={(e) => setForm(prev => ({ ...prev, programmes: e.target.value }))}
-                        className={`w-full px-3 py-2 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-none`}
-                        placeholder="Programmes d'enseignement suivis"
-                      />
+                        className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                      >
+                        <option value="">-- Choisir --</option>
+                        <option value="Programme national (EPSP)">Programme national (EPSP)</option>
+                        <option value="Programme IB">Programme IB (International Baccalaureate)</option>
+                        <option value="Programme français (AEFE)">Programme français (AEFE)</option>
+                        <option value="Programme belge">Programme belge</option>
+                        <option value="Programme américain">Programme américain</option>
+                        <option value="Programme Cambridge">Programme Cambridge</option>
+                        <option value="Mixte national & international">Mixte national &amp; international</option>
+                      </select>
                     </div>
                   </div>
                 )}
 
-                {/* Étape 5: Abonnement */}
-                {currentStep === 5 && (
-                  <div className="space-y-3">
-                    <h4 className={`text-sm font-semibold ${textColor} mb-3`}>Choisissez une formule d'abonnement</h4>
-                    
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { name: "Basic", price: "50$", features: ["10 utilisateurs", "Support email", "Stockage 5GB"] },
-                        { name: "Premium", price: "150$", features: ["50 utilisateurs", "Support prioritaire", "Stockage 50GB"] },
-                        { name: "Enterprise", price: "300$", features: ["Utilisateurs illimités", "Support 24/7", "Stockage illimité"] }
-                      ].map((plan) => (
-                        <div
-                          key={plan.name}
-                          onClick={() => setForm(prev => ({ ...prev, formule: plan.name as any }))}
-                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                            form.formule === plan.name
-                              ? "border-blue-500 bg-blue-500/10"
-                              : `${borderColor} ${hoverBg}`
-                          }`}
-                        >
-                          <h5 className={`text-sm font-semibold ${textColor} mb-1`}>{plan.name}</h5>
-                          <p className="text-xl font-bold text-blue-500 mb-2">{plan.price}/mois</p>
-                          <ul className={`space-y-0.5 text-[11px] ${textSecondary}`}>
-                            {plan.features.map((f, i) => (
-                              <li key={i}>✓ {f}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Étape 6: Récapitulatif */}
-                {currentStep === 6 && (
+                {/* Étape 4: Récapitulatif */}
+                {currentStep === 4 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className={`text-sm font-semibold ${textColor}`}>Récapitulatif des informations</h4>
@@ -2873,30 +2831,6 @@ export default function SuperAdminHome() {
 
                       <div>
                         <h5 className={`text-xs font-semibold ${textColor} mb-2 flex items-center gap-2`}>
-                          <UserCheck className="w-4 h-4" /> Direction
-                        </h5>
-                        <div className={`space-y-1 text-xs ${textSecondary}`}>
-                          <p><span className="font-medium">Directeur:</span> {form.directeurNom || "-"}</p>
-                          <p><span className="font-medium">Tél:</span> {form.directeurTelephone || "-"}</p>
-                          <p><span className="font-medium">Secrétaire:</span> {form.secretaireAcademique || "-"}</p>
-                          <p><span className="font-medium">Comptable:</span> {form.comptable || "-"}</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h5 className={`text-xs font-semibold ${textColor} mb-2 flex items-center gap-2`}>
-                          <GraduationCap className="w-4 h-4" /> Académique
-                        </h5>
-                        <div className={`space-y-1 text-xs ${textSecondary}`}>
-                          <p><span className="font-medium">Classes:</span> {form.nombreClasses || "-"}</p>
-                          <p><span className="font-medium">Élèves:</span> {form.nombreEleves || "-"}</p>
-                          <p><span className="font-medium">Enseignants:</span> {form.nombreEnseignants || "-"}</p>
-                          <p><span className="font-medium">Langue:</span> {form.langueEnseignement || "-"}</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h5 className={`text-xs font-semibold ${textColor} mb-2 flex items-center gap-2`}>
                           <FileText className="w-4 h-4" /> Légal
                         </h5>
                         <div className={`space-y-1 text-xs ${textSecondary}`}>
@@ -2909,15 +2843,12 @@ export default function SuperAdminHome() {
 
                       <div>
                         <h5 className={`text-xs font-semibold ${textColor} mb-2 flex items-center gap-2`}>
-                          <CreditCard className="w-4 h-4" /> Abonnement
+                          <GraduationCap className="w-4 h-4" /> Configuration
                         </h5>
                         <div className={`space-y-1 text-xs ${textSecondary}`}>
-                          <p><span className="font-medium">Formule:</span> {form.formule}</p>
-                          <p><span className="font-medium">Prix:</span> {
-                            form.formule === "Basic" ? "50$/mois" :
-                            form.formule === "Premium" ? "150$/mois" :
-                            "300$/mois"
-                          }</p>
+                          <p><span className="font-medium">Langue:</span> {form.langueEnseignement || "-"}</p>
+                          <p><span className="font-medium">Jours:</span> {form.joursOuverture || "-"}</p>
+                          <p><span className="font-medium">Programmes:</span> {form.programmes || "-"}</p>
                         </div>
                       </div>
                     </div>
@@ -2961,7 +2892,7 @@ export default function SuperAdminHome() {
                     </button>
                   )}
                   
-                  {currentStep < 6 ? (
+                  {currentStep < 4 ? (
                     <button
                       type="submit"
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-all border flex items-center gap-1.5 ${
@@ -3329,7 +3260,7 @@ export default function SuperAdminHome() {
               <div className={`flex items-center justify-between px-6 py-4 border-b ${borderColor}`}>
                 <div>
                   <h2 className={`text-xl font-bold ${textColor}`}>Modifier l'école</h2>
-                  <p className={`text-sm ${textSecondary} mt-1`}>Étape {currentStep} sur 6</p>
+                  <p className={`text-sm ${textSecondary} mt-1`}>Étape {currentStep} sur 5</p>
                 </div>
                 <button
                   onClick={() => {
@@ -3348,7 +3279,7 @@ export default function SuperAdminHome() {
               <div className={`h-2 ${theme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}>
                 <div 
                   className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
-                  style={{ width: `${(currentStep / 6) * 100}%` }}
+                  style={{ width: `${(currentStep / 5) * 100}%` }}
                 />
               </div>
 
@@ -3520,69 +3451,8 @@ export default function SuperAdminHome() {
                   </div>
                 )}
 
-                {/* Étape 3: Direction */}
+                {/* Étape 3: Informations légales */}
                 {currentStep === 3 && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nom du directeur</label>
-                      <Input autoComplete="off" value={form.directeurNom}
-                        onChange={(e) => setForm(prev => ({ ...prev, directeurNom: e.target.value }))}
-                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                        placeholder="Ex: Jean Dupont"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Téléphone directeur</label>
-                        <Input autoComplete="off" value={form.directeurTelephone}
-                          onChange={(e) => setForm(prev => ({ ...prev, directeurTelephone: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="+243 XX XXX XXXX"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Email directeur</label>
-                        <Input autoComplete="off" type="email" value={form.directeurEmail}
-                          onChange={(e) => setForm(prev => ({ ...prev, directeurEmail: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="directeur@ecole.cd"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Secrétaire académique</label>
-                        <Input autoComplete="off" value={form.secretaireAcademique}
-                          onChange={(e) => setForm(prev => ({ ...prev, secretaireAcademique: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Nom du secrétaire"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Comptable</label>
-                        <Input autoComplete="off" value={form.comptable}
-                          onChange={(e) => setForm(prev => ({ ...prev, comptable: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Nom du comptable"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Personnel administratif total</label>
-                      <Input autoComplete="off" type="number" value={form.personnelAdministratifTotal}
-                        onChange={(e) => setForm(prev => ({ ...prev, personnelAdministratifTotal: e.target.value }))}
-                        className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                        placeholder="Ex: 15"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Étape 4: Informations légales */}
-                {currentStep === 4 && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -3632,80 +3502,65 @@ export default function SuperAdminHome() {
                   </div>
                 )}
 
-                {/* Étape 5: Informations académiques */}
-                {currentStep === 5 && (
+                {/* Étape 4: Configuration */}
+                {currentStep === 4 && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Cycles d'enseignement</label>
-                        <Input autoComplete="off" value={form.cycles}
-                          onChange={(e) => setForm(prev => ({ ...prev, cycles: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: Primaire, Secondaire"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre de classes</label>
-                        <Input autoComplete="off" type="number" value={form.nombreClasses}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreClasses: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 12"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'élèves</label>
-                        <Input autoComplete="off" type="number" value={form.nombreEleves}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreEleves: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 450"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Nombre d'enseignants</label>
-                        <Input autoComplete="off" type="number" value={form.nombreEnseignants}
-                          onChange={(e) => setForm(prev => ({ ...prev, nombreEnseignants: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: 25"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
                         <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Langue d'enseignement</label>
-                        <Input autoComplete="off" value={form.langueEnseignement}
+                        <select
+                          value={form.langueEnseignement}
                           onChange={(e) => setForm(prev => ({ ...prev, langueEnseignement: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: Français"
-                        />
+                          className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        >
+                          <option value="">-- Choisir --</option>
+                          <option value="Français">Français</option>
+                          <option value="Anglais">Anglais</option>
+                          <option value="Français & Anglais">Français &amp; Anglais</option>
+                          <option value="Swahili">Swahili</option>
+                          <option value="Lingala">Lingala</option>
+                          <option value="Kikongo">Kikongo</option>
+                          <option value="Tshiluba">Tshiluba</option>
+                        </select>
                       </div>
                       <div>
                         <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Jours d'ouverture</label>
-                        <Input autoComplete="off" value={form.joursOuverture}
+                        <select
+                          value={form.joursOuverture}
                           onChange={(e) => setForm(prev => ({ ...prev, joursOuverture: e.target.value }))}
-                          className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900 dark:!text-white"}`}
-                          placeholder="Ex: Lundi - Vendredi"
-                        />
+                          className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                        >
+                          <option value="">-- Choisir --</option>
+                          <option value="Lundi - Vendredi">Lundi - Vendredi</option>
+                          <option value="Lundi - Samedi">Lundi - Samedi</option>
+                          <option value="Lundi - Jeudi">Lundi - Jeudi</option>
+                          <option value="Lundi - Vendredi + Samedi matin">Lundi - Vendredi + Samedi matin</option>
+                        </select>
                       </div>
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Programmes enseignés</label>
-                      <textarea
+                      <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Programme d'enseignement</label>
+                      <select
                         value={form.programmes}
                         onChange={(e) => setForm(prev => ({ ...prev, programmes: e.target.value }))}
-                        className={`w-full px-3 py-2 text-sm rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-none`}
-                        placeholder="Ex: Programme national congolais"
-                      />
+                        className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}
+                      >
+                        <option value="">-- Choisir --</option>
+                        <option value="Programme national (EPSP)">Programme national (EPSP)</option>
+                        <option value="Programme IB">Programme IB (International Baccalaureate)</option>
+                        <option value="Programme français (AEFE)">Programme français (AEFE)</option>
+                        <option value="Programme belge">Programme belge</option>
+                        <option value="Programme américain">Programme américain</option>
+                        <option value="Programme Cambridge">Programme Cambridge</option>
+                        <option value="Mixte national & international">Mixte national &amp; international</option>
+                      </select>
                     </div>
                   </div>
                 )}
 
-                {/* Étape 6: Récapitulatif */}
-                {currentStep === 6 && (
+                {/* Étape 5: Récapitulatif */}
+                {currentStep === 5 && (
                   <div className="space-y-4">
                     <p className={`text-sm ${textSecondary} mb-4`}>
                       Vérifiez les modifications avant de mettre à jour l'école.
@@ -3802,7 +3657,7 @@ export default function SuperAdminHome() {
                     </button>
                   )}
                   
-                  {currentStep < 6 ? (
+                  {currentStep < 5 ? (
                     <button
                       type="button"
                       onClick={handleEditNextStep}
