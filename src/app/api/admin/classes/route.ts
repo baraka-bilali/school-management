@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       className = letter ? `${level} ${letter} Maternelle` : `${level} Maternelle`
     } else {
       className = `${level} ${letter} ${section}`
-      if (stream && (section === "Secondaire" || section === "Supérieur")) {
+      if (stream && section === "Humanités") {
         className += ` ${stream}`
       }
     }

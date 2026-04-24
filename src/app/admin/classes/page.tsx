@@ -210,16 +210,16 @@ export default function ClassesPage() {
   const LEVELS_BY_SECTION: Record<string, string[]> = {
     Maternelle: ["Petite Section", "Moyenne Section", "Grande Section"],
     Primaire: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"],
-    Secondaire: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème", "7ème"],
-    Supérieur: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème", "7ème", "8ème"],
+    "Education de Base": ["7ème", "8ème"],
+    Humanités: ["1ère", "2ème", "3ème", "4ème"],
   }
 
-  const SECTION_ORDER = ["Maternelle", "Primaire", "Secondaire", "Supérieur"]
+  const SECTION_ORDER = ["Maternelle", "Primaire", "Education de Base", "Humanités"]
   const SECTION_LABELS: Record<string, string> = {
     Maternelle: "Maternelle — Préscolaire",
     Primaire: "Primaire",
-    Secondaire: "Secondaire — Humanités",
-    Supérieur: "Supérieur / Université",
+    "Education de Base": "Éducation de Base — 7ème & 8ème",
+    Humanités: "Humanités",
   }
   const sectionStyles: Record<string, { bg: string; text: string }> = {
     Maternelle: {
@@ -230,13 +230,13 @@ export default function ClassesPage() {
       bg: theme === "dark" ? "bg-blue-900/20 border-l-4 border-blue-500" : "bg-blue-50 border-l-4 border-blue-400",
       text: theme === "dark" ? "text-blue-300 font-semibold" : "text-blue-700 font-semibold",
     },
-    Secondaire: {
+    "Education de Base": {
+      bg: theme === "dark" ? "bg-orange-900/20 border-l-4 border-orange-500" : "bg-orange-50 border-l-4 border-orange-400",
+      text: theme === "dark" ? "text-orange-300 font-semibold" : "text-orange-700 font-semibold",
+    },
+    Humanités: {
       bg: theme === "dark" ? "bg-green-900/20 border-l-4 border-green-500" : "bg-green-50 border-l-4 border-green-400",
       text: theme === "dark" ? "text-green-300 font-semibold" : "text-green-700 font-semibold",
-    },
-    Supérieur: {
-      bg: theme === "dark" ? "bg-purple-900/20 border-l-4 border-purple-500" : "bg-purple-50 border-l-4 border-purple-400",
-      text: theme === "dark" ? "text-purple-300 font-semibold" : "text-purple-700 font-semibold",
     },
   }
 
@@ -247,7 +247,7 @@ export default function ClassesPage() {
     }
     if (!form.letter) return ""
     let name = `${form.level} ${form.letter} ${form.section}`
-    if (form.stream && (form.section === "Secondaire" || form.section === "Supérieur")) {
+    if (form.stream && form.section === "Humanités") {
       name += ` ${form.stream}`
     }
     return name
@@ -414,8 +414,8 @@ export default function ClassesPage() {
                       <option value="">Sélectionner</option>
                       <option value="Maternelle">Maternelle</option>
                       <option value="Primaire">Primaire</option>
-                      <option value="Secondaire">Secondaire</option>
-                      <option value="Supérieur">Supérieur</option>
+                      <option value="Education de Base">Éducation de Base</option>
+                      <option value="Humanités">Humanités</option>
                     </select>
                   </div>
                   <div>
@@ -456,7 +456,7 @@ export default function ClassesPage() {
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.stream}
                       onChange={(e) => setForm({ ...form, stream: e.target.value })}
-                      disabled={form.section !== "Secondaire" && form.section !== "Supérieur"}
+                      disabled={form.section !== "Humanités"}
                     >
                       <option value="">Aucune</option>
                       <option value="Scientifique">Scientifique</option>
