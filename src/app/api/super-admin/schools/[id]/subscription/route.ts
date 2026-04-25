@@ -3,99 +3,80 @@ import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
+const SUBSCRIPTION_PRICE_USD = 70
+const SUBSCRIPTION_MONTHS = 1
 
 async function requireSuperAdmin(req: NextRequest) {
-  const cookieHeader = req.headers.get('Cookie') || ''
-  const tokenMatch = cookieHeader.match(/token=([^;]+)/)
-  
-  if (!tokenMatch) {
-    return null
-  }
-
+  const cookieHeader = req.headers.get("Cookie") || req.headers.get("cookie") || ""
+  const match = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
+  if (!match) return null
   try {
-    const token = tokenMatch[1]
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    
-    if (decoded.role !== 'SUPER_ADMIN') {
-      return null
-    }
-    
-    return decoded
-  } catch (e: any) {
+    const decoded = jwt.verify(match[1], JWT_SECRET) as any
+    return decoded.role === "SUPER_ADMIN" ? decoded : null
+  } catch {
     return null
   }
 }
 
-// PUT: Mettre à jour l'abonnement d'une école
+// PUT: Activer / renouveler l'abonnement mensuel d'une école (70 USD, 1 mois)
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireSuperAdmin(req)
-    if (!user) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
 
-    const params = await context.params
-    const schoolId = parseInt(params.id)
-    if (isNaN(schoolId)) {
-      return NextResponse.json({ error: "ID invalide" }, { status: 400 })
-    }
+    const { id } = await context.params
+    const schoolId = parseInt(id)
+    if (isNaN(schoolId)) return NextResponse.json({ error: "ID invalide" }, { status: 400 })
 
-    // Vérifier que l'école existe
-    const existingSchool = await prisma.school.findUnique({
-      where: { id: schoolId }
-    })
-
-    if (!existingSchool) {
-      return NextResponse.json({ error: "École non trouvée" }, { status: 404 })
-    }
+    const existingSchool = await prisma.school.findUnique({ where: { id: schoolId } })
+    if (!existingSchool) return NextResponse.json({ error: "École non trouvée" }, { status: 404 })
 
     const body = await req.json()
-    const {
-      dateDebutAbonnement,
-      dateFinAbonnement,
-      periodeAbonnement,
-      planAbonnement,
-      typePaiement,
-      montantPaye
-    } = body
+    const { dateDebutAbonnement, typePaiement, montantPaye } = body
 
-    // Mettre à jour l'abonnement
+    // Calculate start date: if provided use it, otherwise today
+    const startDate = dateDebutAbonnement ? new Date(dateDebutAbonnement) : new Date()
+    startDate.setHours(0, 0, 0, 0)
+
+    // End date = start + 1 month
+    const endDate = new Date(startDate)
+    endDate.setMonth(endDate.getMonth() + SUBSCRIPTION_MONTHS)
+    endDate.setHours(23, 59, 59, 999)
+
     const updatedSchool = await prisma.school.update({
       where: { id: schoolId },
       data: {
-        dateDebutAbonnement: dateDebutAbonnement ? new Date(dateDebutAbonnement) : null,
-        dateFinAbonnement: dateFinAbonnement ? new Date(dateFinAbonnement) : null,
-        periodeAbonnement: periodeAbonnement || null,
-        planAbonnement: planAbonnement || null,
-        typePaiement: typePaiement || null,
-        montantPaye: montantPaye !== null && montantPaye !== undefined ? parseFloat(montantPaye) : null
+        dateDebutAbonnement: startDate,
+        dateFinAbonnement: endDate,
+        periodeAbonnement: "MENSUEL",
+        planAbonnement: "Mensuel",
+        typePaiement: typePaiement || "MOBILE_MONEY",
+        montantPaye: montantPaye != null ? parseFloat(String(montantPaye)) : SUBSCRIPTION_PRICE_USD,
+        etatCompte: "ACTIF",
       },
       select: {
         id: true,
         nomEtablissement: true,
+        etatCompte: true,
         dateDebutAbonnement: true,
         dateFinAbonnement: true,
         periodeAbonnement: true,
         planAbonnement: true,
         typePaiement: true,
-        montantPaye: true
-      }
+        montantPaye: true,
+      },
     })
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       school: updatedSchool,
-      message: "Abonnement mis à jour avec succès"
+      message: `Abonnement activé jusqu'au ${endDate.toLocaleDateString("fr-FR")}`,
     })
-
   } catch (e: any) {
-    console.error("Erreur lors de la mise à jour de l'abonnement:", e)
-    return NextResponse.json(
-      { error: "Erreur lors de la mise à jour de l'abonnement", details: e.message }, 
-      { status: 500 }
-    )
+    console.error("Erreur abonnement:", e)
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

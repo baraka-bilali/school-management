@@ -11,11 +11,15 @@ type JwtPayload = {
   role: string
 }
 
+function getToken(request: NextRequest): string | null {
+  const cookieHeader = request.headers.get("Cookie") || request.headers.get("cookie") || ""
+  const match = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/)
+  return match ? match[1] : null
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const cookieHeader = request.headers.get("cookie")
-    const token = cookieHeader?.split("; ").find(row => row.startsWith("token="))?.split("=")[1]
-
+    const token = getToken(request)
     if (!token) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
@@ -60,9 +64,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieHeader = request.headers.get("cookie")
-    const token = cookieHeader?.split("; ").find(row => row.startsWith("token="))?.split("=")[1]
-
+    const token = getToken(request)
     if (!token) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }

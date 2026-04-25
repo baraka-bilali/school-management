@@ -640,6 +640,37 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
 
+  const exportStudents = () => {
+    if (!items.length) return
+    const selectedYear = years.find((y) => String(y.id) === filters.yearId)
+    const yearLabel = selectedYear?.name || "annee-inconnue"
+    const date = new Date().toISOString().slice(0, 10)
+    const BOM = "\uFEFF"
+    const header = ["Code", "Nom", "Post-nom", "Prénom", "Sexe", "Date naissance", "Classe", "Année", "Statut"]
+    const rows = items.map((s) => {
+      const enr = s.enrollments?.[0]
+      return [
+        s.code ?? "",
+        s.lastName ?? "",
+        s.middleName ?? "",
+        s.firstName ?? "",
+        s.gender ?? "",
+        s.birthDate ? new Date(s.birthDate).toLocaleDateString("fr-FR") : "",
+        enr?.class?.name ?? "",
+        enr?.year?.name ?? "",
+        enr?.status ?? "",
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")
+    })
+    const csv = BOM + [header.join(";"), ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `eleves-${yearLabel.replace(/\s+/g, "-")}-${date}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <Card theme={theme}>
       <CardHeader>

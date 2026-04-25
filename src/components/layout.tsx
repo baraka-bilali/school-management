@@ -14,6 +14,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false)
 
   useEffect(() => {
     // Charger le thème depuis localStorage
@@ -57,7 +58,7 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [])
 
-  // Fetch role from server cookie or fallback to localStorage
+  // Fetch role + subscription status from server
   useEffect(() => {
     const fetchRole = async () => {
       try {
@@ -65,6 +66,9 @@ export default function Layout({ children }: LayoutProps) {
         if (res.ok) {
           const data = await res.json()
           setRole(data.user?.role || null)
+          if (data.subscription) {
+            setSubscriptionExpired(data.subscription.expired === true)
+          }
           return
         }
       } catch {}
@@ -90,6 +94,7 @@ export default function Layout({ children }: LayoutProps) {
       <Sidebar 
         isOpen={sidebarOpen} 
         onToggle={toggleSidebar}
+        subscriptionExpired={subscriptionExpired}
       />
       
       {/* Main Content */}

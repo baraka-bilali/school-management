@@ -16,7 +16,8 @@ import {
   Calendar,
   FileText,
   Wallet,
-  Landmark
+  Landmark,
+  Lock
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -24,9 +25,13 @@ import { usePathname, useRouter } from "next/navigation"
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
+  subscriptionExpired?: boolean
 }
 
-export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
+// Routes always accessible regardless of subscription
+const ALWAYS_ALLOWED = ["/admin/subscription", "/admin/settings"]
+
+export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -180,11 +185,29 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           </div>
           {/* Navigation (scrollable) */}
           <nav className="px-4 py-6 flex-1 overflow-y-auto overflow-x-hidden">
+            {subscriptionExpired && (
+              <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                <Lock className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-red-400 leading-snug">
+                  Abonnement expiré.<br />
+                  <span className="opacity-80">Renouvelez pour débloquer l'accès.</span>
+                </p>
+              </div>
+            )}
             <div className="mb-6">
               <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
               <ul className="space-y-1">
-                {navItems.map((item, index) => (
+                {navItems.map((item, index) => {
+                  const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
+                  return (
                   <li key={index}>
+                    {locked ? (
+                      <span className={`flex items-center px-3 py-2.5 rounded-lg opacity-40 cursor-not-allowed select-none ${textSecondary}`}>
+                        <item.icon className="w-5 h-5 mr-3" />
+                        <span className="flex-1">{item.label}</span>
+                        <Lock className="w-3 h-3 opacity-60" />
+                      </span>
+                    ) : (
                     <Link 
                       href={item.href}
                       className={`
@@ -199,8 +222,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                       <item.icon className="w-5 h-5 mr-3" />
                       <span>{item.label}</span>
                     </Link>
+                    )}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           </nav>
@@ -313,13 +338,41 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           {/* Logo Section - Removed */}
           {/* Navigation (scrollable) */}
           <nav className="px-4 py-6 flex-1 overflow-y-auto overflow-x-hidden">
+            {/* Subscription expired banner */}
+            {subscriptionExpired && isOpen && (
+              <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                <Lock className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-red-400 leading-snug">
+                  Abonnement expiré. Accès limité.<br />
+                  <span className="opacity-80">Renouvelez pour débloquer.</span>
+                </p>
+              </div>
+            )}
             <div className="mb-6">
               <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2 transition-all duration-300 ease-out ${
                 isOpen ? 'opacity-100 max-h-10' : 'opacity-0 max-h-0 overflow-hidden'
               }`}>Menu principal</h3>
               <ul className="space-y-1">
-                {navItems.map((item, index) => (
+                {navItems.map((item, index) => {
+                  const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
+                  return (
                   <li key={index}>
+                    {locked ? (
+                      <span className={`
+                        flex items-center rounded-lg
+                        ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
+                        opacity-40 cursor-not-allowed select-none
+                        ${textSecondary}
+                      `} title={!isOpen ? item.label : undefined}>
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {isOpen && (
+                          <>
+                            <span className="ml-3 flex-1">{item.label}</span>
+                            <Lock className="w-3 h-3 ml-1 opacity-60" />
+                          </>
+                        )}
+                      </span>
+                    ) : (
                     <Link 
                       href={item.href}
                       className={`
@@ -342,8 +395,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         </div>
                       )}
                     </Link>
+                    )}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           </nav>

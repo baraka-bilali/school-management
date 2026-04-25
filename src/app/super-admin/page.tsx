@@ -25,6 +25,21 @@ type School = {
 }
 type User = { id: number; name: string; email: string; role: string }
 type PlatformSettings = { currency: "USD" | "CDF"; exchangeRate: number; updatedAt?: string }
+type SchoolDetails = {
+  school: {
+    adresse?: string | null; pays?: string | null; rccm?: string | null; idNat?: string | null
+    nif?: string | null; agrementMinisteriel?: string | null; dateAgrement?: string | null
+    langueEnseignement?: string | null; programmes?: string | null; joursOuverture?: string | null
+    anneeCreation?: number | null; slogan?: string | null; siteWeb?: string | null
+    dateDebutAbonnement?: string | null; dateFinAbonnement?: string | null
+    periodeAbonnement?: string | null; planAbonnement?: string | null
+    typePaiement?: string | null; montantPaye?: number | null
+  }
+  admins: { id: number; name: string; email: string; role: string; nom?: string | null; prenom?: string | null; telephone?: string | null; fonction?: string | null; isActive: boolean; dateCreation?: string | null }[]
+  studentsByYear: { yearId: number; yearName: string; isCurrent: boolean; count: number }[]
+  totalClasses: number
+  totalStudents: number
+}
 
 export default function SuperAdminHome() {
   const router = useRouter()
@@ -118,6 +133,21 @@ export default function SuperAdminHome() {
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [isEditTransitioning, setIsEditTransitioning] = useState(false)
   const [isDetailsTransitioning, setIsDetailsTransitioning] = useState(false)
+  const [detailsTab, setDetailsTab] = useState<"info" | "abonnement" | "admins" | "eleves">("info")
+  const [schoolDetails, setSchoolDetails] = useState<SchoolDetails | null>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [selectedDetailsYear, setSelectedDetailsYear] = useState<string>("all")
+
+  // States pour le modal abonnement
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [subscriptionForm, setSubscriptionForm] = useState({
+    dateDebutAbonnement: "", dateFinAbonnement: "",
+    periodeAbonnement: "MENSUEL", planAbonnement: "BASIC",
+    typePaiement: "MOBILE_MONEY", montantPaye: ""
+  })
+  const [savingSubscription, setSavingSubscription] = useState(false)
+  const [subscriptionSuccess, setSubscriptionSuccess] = useState(false)
+  const [subscriptionError, setSubscriptionError] = useState("")
   
   // States pour les administrateurs
   const [admins, setAdmins] = useState<any[]>([])
@@ -754,12 +784,67 @@ export default function SuperAdminHome() {
     })
   }
 
-  const handleViewDetails = (school: School) => {
-    router.push(`/super-admin/schools/${school.id}`)
+  const handleViewDetails = async (school: School) => {
+    setSelectedSchool(school)
+    setSchoolDetails(null)
+    setLoadingDetails(true)
+    setDetailsTab("info")
+    setSelectedDetailsYear("all")
+    setShowDetailsModal(true)
+    try {
+      const res = await fetch(`/api/super-admin/schools/${school.id}/details`)
+      if (res.ok) {
+        const data = await res.json()
+        setSchoolDetails(data)
+      }
+    } catch {}
+    finally { setLoadingDetails(false) }
   }
 
   const handleManageSubscription = (school: School) => {
-    router.push(`/super-admin/schools/${school.id}/subscription`)
+    setSelectedSchool(school)
+    setSubscriptionError("")
+    setSubscriptionSuccess(false)
+    const s = school as any
+    setSubscriptionForm({
+      dateDebutAbonnement: s.dateDebutAbonnement ? new Date(s.dateDebutAbonnement).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      dateFinAbonnement: "",
+      periodeAbonnement: "MENSUEL",
+      planAbonnement: "Mensuel",
+      typePaiement: s.typePaiement || "MOBILE_MONEY",
+      montantPaye: "70",
+    })
+    setShowSubscriptionModal(true)
+  }
+
+  const handleSaveSubscription = async () => {
+    if (!selectedSchool) return
+    setSavingSubscription(true)
+    setSubscriptionError("")
+    setSubscriptionSuccess(false)
+    try {
+      const res = await fetch(`/api/super-admin/schools/${selectedSchool.id}/subscription`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dateDebutAbonnement: subscriptionForm.dateDebutAbonnement || null,
+          typePaiement: subscriptionForm.typePaiement,
+          montantPaye: 70,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || "Erreur lors de la mise à jour")
+      }
+      const data = await res.json()
+      setSubscriptionSuccess(true)
+      loadSchools()
+      setTimeout(() => { setShowSubscriptionModal(false); setSubscriptionSuccess(false) }, 2000)
+    } catch (e: any) {
+      setSubscriptionError(e.message)
+    } finally {
+      setSavingSubscription(false)
+    }
   }
 
   const handleEditClick = (school: School) => {
@@ -3053,128 +3138,390 @@ export default function SuperAdminHome() {
       )}
 
       {/* Modal Détails École */}
-      {showDetailsModal && selectedSchool && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200" onClick={() => setShowDetailsModal(false)}>
-            <div 
-              className={`${theme === "dark" ? "bg-gray-900" : "bg-white"} rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200`}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className={`sticky top-0 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"} border-b px-6 py-4 flex items-center justify-between z-10`}>
-                <div>
-                  <h2 className={`text-xl font-bold ${textColor}`}>Détails de l'école</h2>
-                  <p className={`text-sm ${textSecondary} mt-1`}>{selectedSchool.nomEtablissement}</p>
+      {showDetailsModal && selectedSchool && (() => {
+        const endDate = schoolDetails?.school?.dateFinAbonnement
+          ? new Date(schoolDetails.school.dateFinAbonnement)
+          : selectedSchool.dateFinAbonnement ? new Date(selectedSchool.dateFinAbonnement) : null
+        const daysLeft = endDate ? Math.ceil((endDate.getTime() - new Date().getTime()) / 86400000) : null
+        const planName = schoolDetails?.school?.planAbonnement || selectedSchool.planAbonnement || "—"
+        const maxStudents = Math.max(...(schoolDetails?.studentsByYear.map(y => y.count) || []), 1)
+        const filteredYears = selectedDetailsYear === "all"
+          ? (schoolDetails?.studentsByYear || [])
+          : (schoolDetails?.studentsByYear || []).filter(y => String(y.yearId) === selectedDetailsYear)
+        return (
+          <Portal>
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-150" onClick={() => setShowDetailsModal(false)}>
+              <div className={`${theme === "dark" ? "bg-[#0d1117] border-gray-800" : "bg-white border-gray-200"} rounded-xl shadow-2xl border max-w-3xl w-full max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-150`} onClick={e => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className={`px-6 pt-5 pb-4 border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"} shrink-0`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${theme === "dark" ? "bg-blue-500/10" : "bg-blue-50"}`}>
+                        <Building2 className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <h2 className={`text-lg font-bold ${textColor} leading-tight`}>{selectedSchool.nomEtablissement}</h2>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {selectedSchool.codeEtablissement && (
+                            <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${theme === "dark" ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-600"}`}>{selectedSchool.codeEtablissement}</span>
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${selectedSchool.etatCompte === "ACTIF" ? "bg-green-500/10 text-green-500" : selectedSchool.etatCompte === "EN_ATTENTE" ? "bg-yellow-500/10 text-yellow-500" : "bg-red-500/10 text-red-500"}`}>
+                            • {selectedSchool.etatCompte === "ACTIF" ? "Actif" : selectedSchool.etatCompte === "EN_ATTENTE" ? "En attente" : "Suspendu"}
+                          </span>
+                          <span className={`text-xs ${textSecondary}`}>{selectedSchool.typeEtablissement}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowDetailsModal(false)} className={`p-1.5 rounded-md shrink-0 transition-all ${theme === "dark" ? "hover:bg-gray-800 text-gray-400 hover:text-gray-200" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}>✕</button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className={`p-2 rounded-md transition-all ${
-                    theme === "dark"
-                      ? "hover:bg-gray-800 text-gray-400 hover:text-gray-200"
-                      : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  ✕
-                </button>
+
+                {/* Tabs */}
+                <div className={`flex border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"} px-2 shrink-0 overflow-x-auto`}>
+                  {([
+                    { id: "info" as const, Icon: Building2, label: "Informations" },
+                    { id: "abonnement" as const, Icon: CreditCard, label: "Abonnement" },
+                    { id: "admins" as const, Icon: Users, label: `Admins${schoolDetails ? ` (${schoolDetails.admins.length})` : ""}` },
+                    { id: "eleves" as const, Icon: GraduationCap, label: `Élèves${schoolDetails ? ` (${schoolDetails.totalStudents})` : ""}` },
+                  ]).map(({ id, Icon, label }) => (
+                    <button key={id} onClick={() => setDetailsTab(id)}
+                      className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${detailsTab === id ? `border-blue-500 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}` : `border-transparent ${textSecondary}`}`}>
+                      <Icon className="w-3.5 h-3.5" />{label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Content */}
+                <div className="overflow-y-auto flex-1 p-5">
+
+                  {/* ── TAB INFORMATIONS ── */}
+                  {detailsTab === "info" && (
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                        <h4 className={`text-xs font-semibold ${textSecondary} uppercase tracking-wider mb-3`}>Contact & Localisation</h4>
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                          <div><p className={`text-xs ${textSecondary} mb-0.5`}>Ville</p><p className={`font-medium ${textColor}`}>{selectedSchool.ville}</p></div>
+                          <div><p className={`text-xs ${textSecondary} mb-0.5`}>Province</p><p className={`font-medium ${textColor}`}>{selectedSchool.province}</p></div>
+                          <div><p className={`text-xs ${textSecondary} mb-0.5`}>Téléphone</p><p className={`font-medium ${textColor}`}>{selectedSchool.telephone}</p></div>
+                          <div><p className={`text-xs ${textSecondary} mb-0.5`}>Email</p><p className={`font-medium ${textColor} truncate`}>{selectedSchool.email}</p></div>
+                          {schoolDetails?.school?.adresse && <div className="col-span-2"><p className={`text-xs ${textSecondary} mb-0.5`}>Adresse</p><p className={`font-medium ${textColor}`}>{schoolDetails.school.adresse}</p></div>}
+                          {schoolDetails?.school?.siteWeb && <div className="col-span-2"><p className={`text-xs ${textSecondary} mb-0.5`}>Site web</p><a href={schoolDetails.school.siteWeb} target="_blank" className="text-blue-400 text-sm font-medium hover:underline">{schoolDetails.school.siteWeb}</a></div>}
+                        </div>
+                      </div>
+                      {loadingDetails && (
+                        <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"} animate-pulse space-y-2`}>
+                          {[1,2,3].map(i => <div key={i} className={`h-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} style={{width:`${50+i*15}%`}} />)}
+                        </div>
+                      )}
+                      {schoolDetails && (<>
+                        <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                          <h4 className={`text-xs font-semibold ${textSecondary} uppercase tracking-wider mb-3`}>Informations légales</h4>
+                          <div className="grid grid-cols-3 gap-y-3 gap-x-4 text-sm">
+                            {([
+                              { label: "RCCM", value: schoolDetails.school.rccm },
+                              { label: "ID National", value: schoolDetails.school.idNat },
+                              { label: "NIF", value: schoolDetails.school.nif },
+                              { label: "Agrément", value: schoolDetails.school.agrementMinisteriel },
+                              { label: "Date agrément", value: schoolDetails.school.dateAgrement ? new Date(schoolDetails.school.dateAgrement).toLocaleDateString("fr-FR") : null },
+                              { label: "Année création", value: schoolDetails.school.anneeCreation?.toString() },
+                            ] as {label:string; value:string|null|undefined}[]).filter(f => f.value).map(({ label, value }) => (
+                              <div key={label}><p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p><p className={`font-medium ${textColor}`}>{value}</p></div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                          <h4 className={`text-xs font-semibold ${textSecondary} uppercase tracking-wider mb-3`}>Configuration</h4>
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                            {([
+                              { label: "Langue d'enseignement", value: schoolDetails.school.langueEnseignement },
+                              { label: "Jours d'ouverture", value: schoolDetails.school.joursOuverture },
+                              { label: "Programme", value: schoolDetails.school.programmes },
+                              { label: "Classes", value: schoolDetails.totalClasses > 0 ? `${schoolDetails.totalClasses} classe(s)` : null },
+                            ] as {label:string; value:string|null|undefined}[]).filter(f => f.value).map(({ label, value }) => (
+                              <div key={label}><p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p><p className={`font-medium ${textColor}`}>{value}</p></div>
+                            ))}
+                          </div>
+                        </div>
+                      </>)}
+                    </div>
+                  )}
+
+                  {/* ── TAB ABONNEMENT ── */}
+                  {detailsTab === "abonnement" && (
+                    <div className="space-y-4">
+                      <div className={`p-5 rounded-xl border ${theme === "dark" ? "bg-gray-800/40 border-gray-700/50" : "bg-gray-50 border-gray-200"}`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <p className={`text-xs ${textSecondary} mb-1`}>Plan actuel</p>
+                            <span className={`text-lg font-bold px-3 py-1 rounded-lg border inline-block ${
+                              planName === "Enterprise" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                              planName === "Premium"    ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                              planName === "Basic"      ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                              theme === "dark" ? "bg-gray-700 text-gray-400 border-gray-600" : "bg-gray-200 text-gray-500 border-gray-300"
+                            }`}>{planName}</span>
+                          </div>
+                          {daysLeft !== null && (
+                            <div className="text-right">
+                              <p className={`text-xs ${textSecondary} mb-1`}>Jours restants</p>
+                              <p className={`text-3xl font-bold ${daysLeft > 30 ? "text-green-400" : daysLeft > 10 ? "text-yellow-400" : "text-red-400"}`}>{Math.max(0, daysLeft)}</p>
+                            </div>
+                          )}
+                        </div>
+                        {daysLeft !== null && (
+                          <div>
+                            <div className={`w-full h-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                              <div className={`h-2 rounded-full ${daysLeft > 30 ? "bg-green-500" : daysLeft > 10 ? "bg-yellow-500" : "bg-red-500"}`} style={{width:`${Math.min(100, Math.max(0, (daysLeft/365)*100))}%`}} />
+                            </div>
+                            <p className={`text-xs ${textSecondary} mt-1.5`}>{daysLeft <= 0 ? "Abonnement expiré" : daysLeft <= 10 ? "⚠ Expiration imminente" : daysLeft <= 30 ? "Renouvellement bientôt recommandé" : "Abonnement actif"}</p>
+                          </div>
+                        )}
+                      </div>
+                      {loadingDetails && (
+                        <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"} animate-pulse space-y-2`}>
+                          {[1,2,3,4].map(i => <div key={i} className={`h-7 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />)}
+                        </div>
+                      )}
+                      {schoolDetails && (
+                        <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                          <h4 className={`text-xs font-semibold ${textSecondary} uppercase tracking-wider mb-3`}>Détails</h4>
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                            {([
+                              { label: "Début abonnement", value: schoolDetails.school.dateDebutAbonnement ? new Date(schoolDetails.school.dateDebutAbonnement).toLocaleDateString("fr-FR") : null },
+                              { label: "Fin abonnement", value: schoolDetails.school.dateFinAbonnement ? new Date(schoolDetails.school.dateFinAbonnement).toLocaleDateString("fr-FR") : null },
+                              { label: "Période", value: schoolDetails.school.periodeAbonnement },
+                              { label: "Type de paiement", value: schoolDetails.school.typePaiement },
+                              { label: "Montant payé", value: schoolDetails.school.montantPaye != null ? `${schoolDetails.school.montantPaye.toLocaleString("fr-FR")} ${settings.currency}` : null },
+                              { label: "Inscrit le", value: new Date(selectedSchool.dateCreation).toLocaleDateString("fr-FR") },
+                            ] as {label:string; value:string|null|undefined}[]).map(({ label, value }) => (
+                              <div key={label}><p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p><p className={`font-medium text-sm ${value ? textColor : textSecondary}`}>{value || "—"}</p></div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── TAB ADMINS ── */}
+                  {detailsTab === "admins" && (
+                    <div>
+                      {loadingDetails ? (
+                        <div className="space-y-2">
+                          {[1,2,3].map(i => (
+                            <div key={i} className={`p-3.5 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"} animate-pulse flex items-center gap-3`}>
+                              <div className={`w-9 h-9 rounded-full shrink-0 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                              <div className="flex-1 space-y-2"><div className={`h-3.5 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} style={{width:"45%"}} /><div className={`h-3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} style={{width:"65%"}} /></div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : !schoolDetails || schoolDetails.admins.length === 0 ? (
+                        <div className={`text-center py-14 ${textSecondary}`}>
+                          <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                          <p className="text-sm">Aucun administrateur assigné à cette école</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {schoolDetails.admins.map(admin => {
+                            const fullName = [admin.prenom, admin.nom].filter(Boolean).join(" ") || admin.name
+                            const roleLabel = ({"ADMIN":"Administrateur","DIRECTEUR_ETUDES":"Dir. des études","DIRECTEUR_DISCIPLINE":"Dir. de discipline","COMPTABLE":"Comptable","PROFESSEUR":"Professeur"} as Record<string,string>)[admin.role] || admin.role
+                            const roleClass = ({"ADMIN":"bg-blue-500/15 text-blue-400","DIRECTEUR_ETUDES":"bg-purple-500/15 text-purple-400","DIRECTEUR_DISCIPLINE":"bg-orange-500/15 text-orange-400","COMPTABLE":"bg-green-500/15 text-green-400","PROFESSEUR":"bg-teal-500/15 text-teal-400"} as Record<string,string>)[admin.role] || "bg-gray-500/15 text-gray-400"
+                            const initials = fullName.split(" ").map((w:string)=>w[0]).slice(0,2).join("").toUpperCase() || "?"
+                            return (
+                              <div key={admin.id} className={`flex items-center gap-3 p-3.5 rounded-lg transition-colors ${theme === "dark" ? "bg-gray-800/40 hover:bg-gray-800/70" : "bg-gray-50 hover:bg-gray-100"}`}>
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${theme === "dark" ? "bg-gray-700 text-gray-200" : "bg-gray-200 text-gray-700"}`}>{initials}</div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className={`text-sm font-semibold ${textColor} truncate`}>{fullName}</p>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${roleClass}`}>{roleLabel}</span>
+                                    {!admin.isActive && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium shrink-0">Inactif</span>}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                    <span className={`text-xs ${textSecondary} flex items-center gap-1`}><Mail className="w-3 h-3" />{admin.email}</span>
+                                    {admin.telephone && <span className={`text-xs ${textSecondary} flex items-center gap-1`}><Phone className="w-3 h-3" />{admin.telephone}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── TAB ÉLÈVES ── */}
+                  {detailsTab === "eleves" && (
+                    <div className="space-y-4">
+                      {loadingDetails ? (
+                        <div className="space-y-3">
+                          {[1,2,3].map(i => (
+                            <div key={i} className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"} animate-pulse`}>
+                              <div className="flex justify-between mb-2"><div className={`h-4 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} style={{width:`${40+i*15}%`}} /><div className={`h-4 w-16 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} /></div>
+                              <div className={`h-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} style={{width:`${60+i*10}%`}} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : !schoolDetails || schoolDetails.studentsByYear.length === 0 ? (
+                        <div className={`text-center py-14 ${textSecondary}`}>
+                          <GraduationCap className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                          <p className="text-sm">Aucune inscription trouvée</p>
+                          <p className="text-xs mt-1 opacity-60">Les élèves apparaîtront ici une fois les années scolaires et inscriptions créées</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <label className={`text-xs font-medium ${textSecondary} shrink-0`}>Filtrer par année :</label>
+                            <select value={selectedDetailsYear} onChange={e => setSelectedDetailsYear(e.target.value)}
+                              className={`h-8 px-2 text-xs rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${theme === "dark" ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"}`}>
+                              <option value="all">Toutes les années</option>
+                              {schoolDetails.studentsByYear.map(y => <option key={y.yearId} value={String(y.yearId)}>{y.yearName}{y.isCurrent ? " (actuelle)" : ""}</option>)}
+                            </select>
+                            <span className={`text-xs ${textSecondary} ml-auto`}>Total : <strong className={textColor}>{filteredYears.reduce((s,y) => s+y.count, 0).toLocaleString()}</strong> élève(s)</span>
+                          </div>
+                          <div className="space-y-2">
+                            {filteredYears.map(year => (
+                              <div key={year.yearId} className={`p-3.5 rounded-lg ${theme === "dark" ? "bg-gray-800/40" : "bg-gray-50"}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <p className={`text-sm font-semibold ${textColor}`}>{year.yearName}</p>
+                                    {year.isCurrent && <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">Actuelle</span>}
+                                  </div>
+                                  <p className={`text-sm font-bold ${textColor}`}>{year.count.toLocaleString()} élève{year.count > 1 ? "s" : ""}</p>
+                                </div>
+                                <div className={`w-full h-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                                  <div className={`h-2 rounded-full ${year.isCurrent ? "bg-blue-500" : "bg-blue-400/50"}`} style={{width:`${Math.round((year.count/maxStudents)*100)}%`}} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-blue-500/5 border border-blue-500/10" : "bg-blue-50 border border-blue-100"}`}>
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                              <div><p className={`text-xl font-bold ${textColor}`}>{schoolDetails.totalStudents.toLocaleString()}</p><p className={`text-xs ${textSecondary} mt-0.5`}>Élèves (année en cours)</p></div>
+                              <div><p className={`text-xl font-bold ${textColor}`}>{schoolDetails.totalClasses}</p><p className={`text-xs ${textSecondary} mt-0.5`}>Classes total</p></div>
+                              <div><p className={`text-xl font-bold ${textColor}`}>{schoolDetails.studentsByYear.length}</p><p className={`text-xs ${textSecondary} mt-0.5`}>Années scolaires</p></div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Footer */}
+                <div className={`px-5 py-4 border-t ${theme === "dark" ? "border-gray-800" : "border-gray-200"} flex justify-end gap-2 shrink-0`}>
+                  <button onClick={() => setShowDetailsModal(false)} className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${theme === "dark" ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 text-gray-300 hover:text-gray-100" : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 text-gray-700 hover:text-gray-900"}`}>Fermer</button>
+                  <button onClick={() => { setShowDetailsModal(false); handleEditClick(selectedSchool) }} className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" />Modifier</button>
+                </div>
+
+              </div>
+            </div>
+          </Portal>
+        )
+      })()}
+
+      {/* Modal Abonnement */}
+      {showSubscriptionModal && selectedSchool && (
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 animate-in fade-in duration-150" onClick={() => !savingSubscription && setShowSubscriptionModal(false)}>
+            <div className={`${theme === "dark" ? "bg-[#0d1117] border-gray-800" : "bg-white border-gray-200"} rounded-xl shadow-2xl border max-w-lg w-full max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-150`} onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className={`px-6 pt-5 pb-4 border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"} shrink-0`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${theme === "dark" ? "bg-emerald-500/10" : "bg-emerald-50"}`}>
+                      <CreditCard className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <div>
+                      <h2 className={`text-base font-bold ${textColor}`}>Gestion de l'abonnement</h2>
+                      <p className={`text-xs ${textSecondary} mt-0.5`}>{selectedSchool.nomEtablissement}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => !savingSubscription && setShowSubscriptionModal(false)} className={`p-1.5 rounded-md transition-all ${theme === "dark" ? "hover:bg-gray-800 text-gray-400 hover:text-gray-200" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}>✕</button>
+                </div>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Informations générales */}
-                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
-                  <h3 className={`text-sm font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <Building2 className="w-4 h-4" /> Informations générales
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className={textSecondary}>Nom:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.nomEtablissement}</p>
-                    </div>
-                    {selectedSchool.codeEtablissement && (
+              {/* Body */}
+              <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                {subscriptionSuccess && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                    <Check className="w-4 h-4 shrink-0" /> Abonnement activé avec succès !
+                  </div>
+                )}
+                {subscriptionError && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> {subscriptionError}
+                  </div>
+                )}
+
+                {/* Plan info — fixed */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${theme === "dark" ? "bg-emerald-500/5 border-emerald-500/20" : "bg-emerald-50 border-emerald-200"}`}>
+                  <div>
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>Plan unique</p>
+                    <p className={`text-lg font-bold mt-0.5 ${textColor}`}>Abonnement Mensuel</p>
+                    <p className={`text-xs mt-0.5 ${textSecondary}`}>Accès complet à toutes les fonctionnalités</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-2xl font-bold ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>70 USD</p>
+                    <p className={`text-xs ${textSecondary}`}>/ mois</p>
+                  </div>
+                </div>
+
+                {/* Date de début */}
+                <div>
+                  <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Date de début d'abonnement</label>
+                  <Input type="date" value={subscriptionForm.dateDebutAbonnement}
+                    onChange={e => setSubscriptionForm(p => ({ ...p, dateDebutAbonnement: e.target.value }))}
+                    className={`h-9 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`} />
+                </div>
+
+                {/* Date de fin — calculée automatiquement */}
+                {subscriptionForm.dateDebutAbonnement && (() => {
+                  const start = new Date(subscriptionForm.dateDebutAbonnement)
+                  const end = new Date(start)
+                  end.setMonth(end.getMonth() + 1)
+                  end.setDate(end.getDate() - 1)
+                  const days = Math.ceil((end.getTime() - new Date().getTime()) / 86400000)
+                  return (
+                    <div className={`p-3 rounded-lg border flex items-center justify-between ${theme === "dark" ? "bg-blue-500/5 border-blue-500/20" : "bg-blue-50 border-blue-200"}`}>
                       <div>
-                        <span className={textSecondary}>Code:</span>
-                        <p className={textColor + " font-medium"}>{selectedSchool.codeEtablissement}</p>
+                        <p className={`text-xs font-medium ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>Date de fin calculée</p>
+                        <p className={`text-sm font-bold ${textColor} mt-0.5`}>{end.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
                       </div>
-                    )}
-                    <div>
-                      <span className={textSecondary}>Type:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.typeEtablissement}</p>
-                    </div>
-                    <div>
-                      <span className={textSecondary}>État:</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        selectedSchool.etatCompte === "ACTIF" ? "bg-green-500/10 text-green-500" :
-                        selectedSchool.etatCompte === "EN_ATTENTE" ? "bg-yellow-500/10 text-yellow-500" :
-                        "bg-red-500/10 text-red-500"
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        days < 0 ? "bg-red-500/15 text-red-400" : days <= 7 ? "bg-yellow-500/15 text-yellow-400" : "bg-green-500/15 text-green-400"
                       }`}>
-                        • {selectedSchool.etatCompte === "ACTIF" ? "Actif" : selectedSchool.etatCompte === "EN_ATTENTE" ? "En attente" : "Suspendu"}
+                        {days < 0 ? `Expiré` : `${days}j restants`}
                       </span>
                     </div>
-                  </div>
-                </div>
+                  )
+                })()}
 
-                {/* Localisation */}
-                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
-                  <h3 className={`text-sm font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <MapPin className="w-4 h-4" /> Localisation
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className={textSecondary}>Ville:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.ville}</p>
-                    </div>
-                    <div>
-                      <span className={textSecondary}>Province:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.province}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact */}
-                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
-                  <h3 className={`text-sm font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <FileText className="w-4 h-4" /> Contact
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className={textSecondary}>Téléphone:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.telephone}</p>
-                    </div>
-                    <div>
-                      <span className={textSecondary}>Email:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.email}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Direction */}
-                <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"}`}>
-                  <h3 className={`text-sm font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <UserCheck className="w-4 h-4" /> Direction
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <span className={textSecondary}>Directeur:</span>
-                      <p className={textColor + " font-medium"}>{selectedSchool.directeurNom}</p>
-                    </div>
-                    <div>
-                      <span className={textSecondary}>Date création:</span>
-                      <p className={textColor + " font-medium"}>{new Date(selectedSchool.dateCreation).toLocaleDateString('fr-FR')}</p>
-                    </div>
-                  </div>
+                {/* Type de paiement */}
+                <div>
+                  <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Mode de paiement</label>
+                  <select value={subscriptionForm.typePaiement} onChange={e => setSubscriptionForm(p => ({ ...p, typePaiement: e.target.value }))}
+                    className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}>
+                    <option value="MOBILE_MONEY">Mobile Money</option>
+                    <option value="VIREMENT">Virement bancaire</option>
+                    <option value="ESPECES">Espèces</option>
+                    <option value="CARTE">Carte bancaire</option>
+                  </select>
                 </div>
               </div>
 
-              <div className={`sticky bottom-0 ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"} border-t px-6 py-4 flex justify-end gap-3`}>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    theme === "dark"
-                      ? "bg-[#21262d] hover:bg-[#30363d] border border-gray-700/50 hover:border-gray-600 text-gray-300 hover:text-gray-100"
-                      : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-900"
-                  }`}
-                >
-                  Fermer
+              {/* Footer */}
+              <div className={`px-5 py-4 border-t ${theme === "dark" ? "border-gray-800" : "border-gray-200"} flex justify-end gap-2 shrink-0`}>
+                <button onClick={() => setShowSubscriptionModal(false)} disabled={savingSubscription}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all disabled:opacity-50 ${theme === "dark" ? "bg-[#21262d] hover:bg-[#30363d] border-gray-700/50 text-gray-300" : "bg-[#f6f8fa] hover:bg-[#f3f4f6] border-gray-300 text-gray-700"}`}>
+                  Annuler
+                </button>
+                <button onClick={handleSaveSubscription} disabled={savingSubscription}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 disabled:opacity-50">
+                  {savingSubscription ? <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sauvegarde...</> : <><Check className="w-3.5 h-3.5" />Enregistrer</>}
                 </button>
               </div>
+
             </div>
           </div>
         </Portal>
