@@ -33,10 +33,26 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q') || ''
     const classId = searchParams.get('classId')
-    const yearId = searchParams.get('yearId')
+    const yearIdParam = searchParams.get('yearId')
     const sort = searchParams.get('sort') || 'name_asc'
     const page = parseInt(searchParams.get('page') || '1')
     const pageSize = parseInt(searchParams.get('pageSize') || '10')
+
+    // Déterminer l'année active : paramètre fourni ou année en cours par défaut
+    let activeYearId: number | undefined
+    if (yearIdParam) {
+      if (yearIdParam !== 'all') {
+        activeYearId = parseInt(yearIdParam)
+      }
+      // yearIdParam === 'all' => pas de filtre année
+    } else {
+      // Défaut : année scolaire en cours
+      const currentYear = await prisma.academicYear.findFirst({
+        where: { current: true },
+        select: { id: true }
+      })
+      activeYearId = currentYear?.id
+    }
 
     // Construire les filtres
     const where: any = {}
@@ -83,10 +99,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Filtre par classe et/ou année académique
-    if (classId || yearId) {
+    if (classId || activeYearId) {
       const enrollmentWhere: any = {}
       if (classId) enrollmentWhere.classId = parseInt(classId)
-      if (yearId) enrollmentWhere.yearId = parseInt(yearId)
+      if (activeYearId) enrollmentWhere.yearId = activeYearId
 
       where.enrollments = {
         some: enrollmentWhere
@@ -115,13 +131,13 @@ export async function GET(req: NextRequest) {
 
     // Debug logging for incoming query and constructed filters
     const perfLabel = `[API-PERF] Students query (q="${q}", page=${page})`
-    console.log('GET /api/admin/students params:', { q, classId, yearId, sort, page, pageSize })
+    console.log('GET /api/admin/students params:', { q, classId, yearId: activeYearId, sort, page, pageSize })
     console.log('Constructed where:', JSON.stringify(where))
     console.log('Constructed orderBy:', JSON.stringify(orderBy))
     console.time(perfLabel)
 
     // Clé de cache unique basée sur les paramètres de recherche ET le schoolId
-    const cacheKey = `students-${adminSchoolId || 'all'}-${q || 'all'}-${classId || 'all'}-${yearId || 'all'}-${sort}-${page}-${pageSize}`
+    const cacheKey = `students-${adminSchoolId || 'all'}-${q || 'all'}-${classId || 'all'}-${activeYearId || 'all'}-${sort}-${page}-${pageSize}`
     
     // Utiliser le cache pour cette requête (5 minutes de cache)
     const result = await getCached(cacheKey, async () => {
@@ -150,6 +166,7 @@ export async function GET(req: NextRequest) {
             gender: true,
             birthDate: true,
             enrollments: {
+              where: activeYearId ? { yearId: activeYearId } : undefined,
               select: {
                 id: true,
                 classId: true,

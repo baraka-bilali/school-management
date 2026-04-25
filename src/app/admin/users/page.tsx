@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
 import Portal from "@/components/portal"
-import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User } from "lucide-react"
+import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
@@ -673,6 +673,14 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
             )}
           </div>
           <button
+            onClick={exportStudents}
+            aria-label="Télécharger CSV"
+            title="Télécharger la liste en CSV"
+            className="inline-flex items-center justify-center rounded-full bg-green-600 p-2 text-white hover:bg-green-700 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => setShowCreate(true)}
             aria-label="Ajouter"
             title="Ajouter"
@@ -699,10 +707,10 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
               </select>
               <select
                 className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
-                value={filters.yearId || ""}
-                onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
+                value={filters.yearId || "all"}
+                onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value === "all" ? "all" : e.target.value }))}
               >
-                <option value="">Toutes les années</option>
+                <option value="all">Toutes les années</option>
                 {years.map((y) => (
                   <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
                 ))}
@@ -733,10 +741,10 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
             </select>
             <select
               className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
-              value={filters.yearId || ""}
-              onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value || undefined }))}
+              value={filters.yearId || "all"}
+              onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value === "all" ? "all" : e.target.value }))}
             >
-              <option value="">Toutes les années</option>
+              <option value="all">Toutes les années</option>
               {years.map((y) => (
                 <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
               ))}
