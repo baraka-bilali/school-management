@@ -76,6 +76,28 @@ model Student {
   firstName   String
   gender      String
   birthDate   DateTime
+  // Informations complémentaires
+  birthPlace  String?
+  nationality String?
+  address     String?      @db.Text
+  photoUrl    String?      @db.Text
+  // Parent / Tuteur 1
+  parentName1  String?
+  parentPhone1 String?
+  parentJob1   String?
+  parentEmail1 String?
+  // Parent / Tuteur 2
+  parentName2  String?
+  parentPhone2 String?
+  parentJob2   String?
+  parentEmail2 String?
+  // Informations médicales
+  bloodGroup         String?
+  allergies          String?   @db.Text
+  medicalNotes       String?   @db.Text
+  emergencyContact   String?
+  emergencyPhone     String?
+
   enrollments Enrollment[]
   paiements   Paiement[]
   user        User         @relation(fields: [userId], references: [id])
