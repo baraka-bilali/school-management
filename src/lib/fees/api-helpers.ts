@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { FeeError } from "@/lib/fees"
+import { prisma } from "@/lib/prisma"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -87,4 +88,29 @@ export function handleApiError(error: unknown): NextResponse {
     { error: "Erreur interne du serveur" },
     { status: 500 }
   )
+}
+
+/**
+ * Récupérer l'année scolaire courante pour une école (depuis school_settings ou la globale).
+ */
+export async function getSchoolCurrentYearId(schoolId: number): Promise<number | null> {
+  try {
+    // D'abord, vérifier si l'école a configuré son année courante
+    const rows = await prisma.$queryRawUnsafe<Array<{ current_year_id: number | null }>>(
+      `SELECT current_year_id FROM school_settings WHERE school_id = $1 LIMIT 1`,
+      schoolId
+    )
+    if (rows[0]?.current_year_id) {
+      return rows[0].current_year_id
+    }
+  } catch {
+    // Table n'existe pas encore, on utilise l'année globale
+  }
+
+  // Fallback : année globale marquée current
+  const year = await prisma.academicYear.findFirst({
+    where: { current: true },
+    select: { id: true },
+  })
+  return year?.id || null
 }

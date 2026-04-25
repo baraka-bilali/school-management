@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -42,15 +43,13 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'desc' }
     })
 
-    // Récupérer l'année académique courante
-    const currentYear = await prisma.academicYear.findFirst({
-      where: { current: true }
-    })
+    // Récupérer l'année courante de l'école
+    const currentYearId = await getSchoolCurrentYearId(schoolId)
 
     return NextResponse.json({
       classes,
       years,
-      currentYearId: currentYear?.id || null
+      currentYearId: currentYearId || null
     })
   } catch (error) {
     console.error('Erreur lors de la récupération des métadonnées:', error)

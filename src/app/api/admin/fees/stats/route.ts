@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 
 // GET /api/admin/fees/stats - Statistiques globales des frais
 export async function GET(req: NextRequest) {
@@ -16,11 +16,7 @@ export async function GET(req: NextRequest) {
     if (yearId) {
       activeYearId = parseInt(yearId)
     } else {
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { current: true },
-        select: { id: true },
-      })
-      activeYearId = currentYear?.id
+      activeYearId = (await getSchoolCurrentYearId(user.schoolId)) ?? undefined
     }
 
     if (!activeYearId) {

@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/prisma"
 import { getCached } from "@/lib/cache"
 import jwt from "jsonwebtoken"
+import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
         teachersCount,
         classes,
         genderGroups,
-        currentYear,
+        currentYearId,
         monthlyStudents,
         monthlyTeachers,
         monthlyPayments,
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
           where: { user: { schoolId } },
           _count: { gender: true },
         }),
-        prisma.academicYear.findFirst({ where: { current: true } }),
+        getSchoolCurrentYearId(schoolId),
         Promise.all(
           months.map(month => {
             const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59)
@@ -83,13 +84,13 @@ export async function GET(request: NextRequest) {
       ])
 
       let sectionStats = { Primaire: 0, Secondaire: 0 }
-      if (currentYear) {
+      if (currentYearId) {
         const [primaire, secondaire] = await Promise.all([
           prisma.enrollment.count({
-            where: { yearId: currentYear.id, status: "ACTIVE", class: { schoolId, section: "Primaire" } },
+            where: { yearId: currentYearId, status: "ACTIVE", class: { schoolId, section: "Primaire" } },
           }),
           prisma.enrollment.count({
-            where: { yearId: currentYear.id, status: "ACTIVE", class: { schoolId, section: "Secondaire" } },
+            where: { yearId: currentYearId, status: "ACTIVE", class: { schoolId, section: "Secondaire" } },
           }),
         ])
         sectionStats = { Primaire: primaire, Secondaire: secondaire }

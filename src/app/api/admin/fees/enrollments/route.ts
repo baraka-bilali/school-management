@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 
 // GET /api/admin/fees/enrollments?yearId=X&q=search
 // Recherche d'élèves inscrits pour le formulaire de paiement
@@ -18,14 +18,11 @@ export async function GET(req: NextRequest) {
     if (yearId) {
       activeYearId = parseInt(yearId)
     } else {
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { current: true },
-        select: { id: true },
-      })
-      if (!currentYear) {
+      const yId = await getSchoolCurrentYearId(user.schoolId)
+      if (!yId) {
         return NextResponse.json({ data: [] })
       }
-      activeYearId = currentYear.id
+      activeYearId = yId
     }
 
     const where: Record<string, unknown> = {

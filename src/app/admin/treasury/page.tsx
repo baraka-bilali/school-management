@@ -100,6 +100,18 @@ const MODES_PAIEMENT = [
 
 export default function AdminTreasuryPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [currency, setCurrency] = useState<"USD" | "CDF">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("schoolCurrency") as "USD" | "CDF") || "USD"
+    }
+    return "USD"
+  })
+  const [exchangeRate, setExchangeRate] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Number(localStorage.getItem("schoolExchangeRate")) || 2800
+    }
+    return 2800
+  })
 
   // Trésorerie
   const [treasury, setTreasury] = useState<TreasuryData | null>(null)
@@ -143,6 +155,33 @@ export default function AdminTreasuryPage() {
       window.removeEventListener("storage", handleThemeChange)
       window.removeEventListener("themeChange", handleThemeChange)
     }
+  }, [])
+
+  // Charger les paramètres devise (sync avec API + localStorage)
+  useEffect(() => {
+    const loadSchoolSettings = async () => {
+      try {
+        const res = await fetch("/api/admin/settings")
+        if (res.ok) {
+          const data = await res.json()
+          const c = data.currency || "USD"
+          const r = Number(data.exchangeRate) || 2800
+          setCurrency(c)
+          setExchangeRate(r)
+          localStorage.setItem("schoolCurrency", c)
+          localStorage.setItem("schoolExchangeRate", String(r))
+        }
+      } catch { /* ignore */ }
+    }
+    loadSchoolSettings()
+    const handleSettingsChange = () => {
+      const c = localStorage.getItem("schoolCurrency") as "USD" | "CDF" | null
+      const r = localStorage.getItem("schoolExchangeRate")
+      if (c) setCurrency(c)
+      if (r) setExchangeRate(Number(r))
+    }
+    window.addEventListener("schoolSettingsChange", handleSettingsChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleSettingsChange)
   }, [])
 
   // Charger la trésorerie au montage
@@ -301,6 +340,10 @@ export default function AdminTreasuryPage() {
   const headerBg = theme === "dark" ? "bg-gray-700" : "bg-gray-50"
 
   const formatCurrency = (amount: number) => {
+    if (currency === "CDF") {
+      const converted = amount * exchangeRate
+      return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(converted) + " FC"
+    }
     return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " $"
   }
 

@@ -189,6 +189,20 @@ export default function AdminFeesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
+  // Devise
+  const [currency, setCurrency] = useState<"USD" | "CDF">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("schoolCurrency") as "USD" | "CDF") || "USD"
+    }
+    return "USD"
+  })
+  const [exchangeRate, setExchangeRate] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Number(localStorage.getItem("schoolExchangeRate")) || 2800
+    }
+    return 2800
+  })
+
   // Données
   const [stats, setStats] = useState<FeeStats | null>(null)
   const [typesFrais, setTypesFrais] = useState<TypeFrais[]>([])
@@ -229,6 +243,33 @@ export default function AdminFeesPage() {
       window.removeEventListener("themeChange", handleThemeChange)
       window.removeEventListener("storage", handleThemeChange)
     }
+  }, [])
+
+  // Charger les paramètres devise (sync avec API + localStorage)
+  useEffect(() => {
+    const loadSchoolSettings = async () => {
+      try {
+        const res = await fetch("/api/admin/settings")
+        if (res.ok) {
+          const data = await res.json()
+          const c = data.currency || "USD"
+          const r = Number(data.exchangeRate) || 2800
+          setCurrency(c)
+          setExchangeRate(r)
+          localStorage.setItem("schoolCurrency", c)
+          localStorage.setItem("schoolExchangeRate", String(r))
+        }
+      } catch { /* ignore */ }
+    }
+    loadSchoolSettings()
+    const handleSettingsChange = () => {
+      const c = localStorage.getItem("schoolCurrency") as "USD" | "CDF" | null
+      const r = localStorage.getItem("schoolExchangeRate")
+      if (c) setCurrency(c)
+      if (r) setExchangeRate(Number(r))
+    }
+    window.addEventListener("schoolSettingsChange", handleSettingsChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleSettingsChange)
   }, [])
 
   // Charger les données initiales
@@ -280,6 +321,7 @@ export default function AdminFeesPage() {
   }, [fetchAll])
 
   // Charger les élèves quand l'onglet "students" est actif
+  const [studentFeesFetched, setStudentFeesFetched] = useState(false)
   const fetchStudentFees = useCallback(async () => {
     setStudentFeesLoading(true)
     try {
@@ -292,14 +334,15 @@ export default function AdminFeesPage() {
       console.error("Erreur chargement élèves:", error)
     } finally {
       setStudentFeesLoading(false)
+      setStudentFeesFetched(true)
     }
   }, [])
 
   useEffect(() => {
-    if (activeTab === "students" && studentFees.length === 0 && !studentFeesLoading) {
+    if (activeTab === "students" && !studentFeesFetched && !studentFeesLoading) {
       fetchStudentFees()
     }
-  }, [activeTab, studentFees.length, studentFeesLoading, fetchStudentFees])
+  }, [activeTab, studentFeesFetched, studentFeesLoading, fetchStudentFees])
 
   // Filtrer et trier les élèves
   const filteredStudentFees = (() => {
@@ -411,6 +454,10 @@ export default function AdminFeesPage() {
   const headerBg = theme === "dark" ? "bg-gray-700" : "bg-gray-50"
 
   const formatCurrency = (amount: number) => {
+    if (currency === "CDF") {
+      const converted = amount * exchangeRate
+      return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(converted) + " FC"
+    }
     return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " $"
   }
 
@@ -852,6 +899,12 @@ export default function AdminFeesPage() {
                   {studentFeesLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                    </div>
+                  ) : studentFeesFetched && studentFees.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <Users className={`w-12 h-12 ${textSecondary} opacity-40`} />
+                      <p className={`text-base font-medium ${textSecondary}`}>Aucun élève inscrit pour cette année scolaire</p>
+                      <p className={`text-sm ${textSecondary} opacity-70`}>Inscrivez des élèves pour voir leurs informations de paiement ici.</p>
                     </div>
                   ) : (
                     <div className="space-y-4">

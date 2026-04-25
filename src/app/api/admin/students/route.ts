@@ -6,6 +6,7 @@ import { buildStudentEmailWithSchool, generatePassword } from "@/lib/generateCre
 import { getCached, invalidateCachePattern } from "@/lib/cache"
 import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
+import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -47,11 +48,7 @@ export async function GET(req: NextRequest) {
       // yearIdParam === 'all' => pas de filtre année
     } else {
       // Défaut : année scolaire en cours
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { current: true },
-        select: { id: true }
-      })
-      activeYearId = currentYear?.id
+      activeYearId = (await getSchoolCurrentYearId(adminSchoolId || 0)) ?? undefined
     }
 
     // Construire les filtres
