@@ -4,6 +4,15 @@ import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
+const STREAM_LETTER_OPTIONAL = new Set([
+  "Commerciale et Gestion", "Secrétariat",
+  "Électricité", "Mécanique Générale", "Mécanique Automobile", "Électronique", "Aviation",
+  "Construction", "Menuiserie", "Dessin de Bâtiment",
+  "Agriculture Générale", "Vétérinaire", "Pêche et Forêt",
+  "Sociale", "Arts Plastiques", "Musique", "Coupe et Couture", "Imprimerie",
+  "Nutrition", "Santé Publique",
+])
+
 interface JwtPayload {
   id: number
   role: string
@@ -44,10 +53,13 @@ export async function PUT(
       )
     }
     if (section !== "Maternelle" && !letter) {
-      return NextResponse.json(
-        { error: 'La Lettre est obligatoire pour cette section' },
-        { status: 400 }
-      )
+      const isSpecializedStream = section === "Humanités" && STREAM_LETTER_OPTIONAL.has(stream)
+      if (!isSpecializedStream) {
+        return NextResponse.json(
+          { error: 'La Lettre est obligatoire pour cette section' },
+          { status: 400 }
+        )
+      }
     }
 
     // ✅ Vérifier que la classe existe ET appartient à cette école
@@ -69,6 +81,8 @@ export async function PUT(
     let className: string
     if (section === "Maternelle") {
       className = letter ? `${level} ${letter} Maternelle` : `${level} Maternelle`
+    } else if (section === "Humanités" && STREAM_LETTER_OPTIONAL.has(stream) && !letter) {
+      className = `${level} Humanités${stream ? ` ${stream}` : ""}`
     } else {
       className = `${level} ${letter} ${section}`
       if (stream && section === "Humanités") {

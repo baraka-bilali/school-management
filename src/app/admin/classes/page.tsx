@@ -7,6 +7,16 @@ import { Plus, Pencil, Trash2 } from "lucide-react"
 import Portal from "@/components/portal"
 import { cn } from "@/lib/utils"
 
+// Options spécialisées où la lettre est optionnelle (une seule classe par option)
+const STREAM_LETTER_OPTIONAL = new Set([
+  "Commerciale et Gestion", "Secrétariat",
+  "Électricité", "Mécanique Générale", "Mécanique Automobile", "Électronique", "Aviation",
+  "Construction", "Menuiserie", "Dessin de Bâtiment",
+  "Agriculture Générale", "Vétérinaire", "Pêche et Forêt",
+  "Sociale", "Arts Plastiques", "Musique", "Coupe et Couture", "Imprimerie",
+  "Nutrition", "Santé Publique",
+])
+
 interface Class {
   id: number
   name: string
@@ -150,7 +160,8 @@ export default function ClassesPage() {
   }
 
   const handleSubmit = async () => {
-    if (!form.level || !form.section || (form.section !== "Maternelle" && !form.letter)) {
+    const letterRequired = form.section !== "Maternelle" && !(form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))
+    if (!form.level || !form.section || (letterRequired && !form.letter)) {
       alert("Niveau, Section et Lettre sont obligatoires")
       return
     }
@@ -244,6 +255,10 @@ export default function ClassesPage() {
     if (!form.level || !form.section) return ""
     if (form.section === "Maternelle") {
       return form.letter ? `${form.level} ${form.letter} Maternelle` : `${form.level} Maternelle`
+    }
+    // Filière spécialisée sans lettre
+    if (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream) && !form.letter) {
+      return `${form.level} Humanités ${form.stream}`
     }
     if (!form.letter) return ""
     let name = `${form.level} ${form.letter} ${form.section}`
@@ -434,14 +449,14 @@ export default function ClassesPage() {
                   </div>
                   <div>
                     <label className={`block ${textColor} mb-1`}>
-                      Lettre{form.section === "Maternelle" ? " (optionnelle)" : " *"}
+                      Lettre{(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? " (optionnelle)" : " *"}
                     </label>
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.letter}
                       onChange={(e) => setForm({ ...form, letter: e.target.value })}
                     >
-                      <option value="">{form.section === "Maternelle" ? "Aucune" : "Sélectionner"}</option>
+                      <option value="">{(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? "Aucune" : "Sélectionner"}</option>
                       <option value="A">A</option>
                       <option value="B">B</option>
                       <option value="C">C</option>
@@ -491,6 +506,7 @@ export default function ClassesPage() {
                         <option value="Arts Plastiques">Arts Plastiques</option>
                         <option value="Musique">Musique</option>
                         <option value="Coupe et Couture">Coupe et Couture</option>
+                        <option value="Imprimerie">Imprimerie</option>
                       </optgroup>
                       <optgroup label="Santé">
                         <option value="Nutrition">Nutrition</option>
