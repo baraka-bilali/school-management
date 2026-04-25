@@ -46,6 +46,7 @@ export default function ClassesPage() {
     stream: ""
   })
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingClass, setDeletingClass] = useState<Class | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -121,6 +122,7 @@ export default function ClassesPage() {
     if (showModal && !editingClass) {
       setForm({ level: "", section: "", letter: "", stream: "" })
       setSubmitting(false)
+      setFormError(null)
     }
   }, [showModal, editingClass])
 
@@ -162,11 +164,12 @@ export default function ClassesPage() {
   const handleSubmit = async () => {
     const letterRequired = form.section !== "Maternelle" && !(form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))
     if (!form.level || !form.section || (letterRequired && !form.letter)) {
-      alert("Niveau, Section et Lettre sont obligatoires")
+      setFormError("Veuillez remplir tous les champs obligatoires.")
       return
     }
 
     setSubmitting(true)
+    setFormError(null)
     try {
       const url = editingClass 
         ? `/api/admin/classes/${editingClass.id}`
@@ -182,13 +185,14 @@ export default function ClassesPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || "Erreur")
+        setFormError(error.error || "Une erreur est survenue.")
+        return
       }
 
       setShowModal(false)
       fetchClasses()
-    } catch (error) {
-      alert((error as Error).message)
+    } catch {
+      setFormError("Une erreur réseau est survenue. Réessayez.")
     } finally {
       setSubmitting(false)
     }
@@ -424,7 +428,7 @@ export default function ClassesPage() {
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.section}
-                      onChange={(e) => setForm({ ...form, section: e.target.value, level: "", stream: "" })}
+                      onChange={(e) => { setForm({ ...form, section: e.target.value, level: "", stream: "" }); setFormError(null) }}
                     >
                       <option value="">Sélectionner</option>
                       <option value="Maternelle">Maternelle</option>
@@ -438,7 +442,7 @@ export default function ClassesPage() {
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.level}
-                      onChange={(e) => setForm({ ...form, level: e.target.value })}
+                      onChange={(e) => { setForm({ ...form, level: e.target.value }); setFormError(null) }}
                       disabled={!form.section}
                     >
                       <option value="">{form.section ? "Sélectionner" : "Choisir une section d'abord"}</option>
@@ -454,7 +458,7 @@ export default function ClassesPage() {
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.letter}
-                      onChange={(e) => setForm({ ...form, letter: e.target.value })}
+                      onChange={(e) => { setForm({ ...form, letter: e.target.value }); setFormError(null) }}
                     >
                       <option value="">{(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? "Aucune" : "Sélectionner"}</option>
                       <option value="A">A</option>
@@ -470,7 +474,7 @@ export default function ClassesPage() {
                     <select
                       className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
                       value={form.stream}
-                      onChange={(e) => setForm({ ...form, stream: e.target.value })}
+                      onChange={(e) => { setForm({ ...form, stream: e.target.value }); setFormError(null) }}
                       disabled={form.section !== "Humanités"}
                     >
                       <option value="">— Aucune —</option>
@@ -520,6 +524,13 @@ export default function ClassesPage() {
                   <div className={`text-sm ${textSecondary} mb-1`}>Aperçu du nom de la classe:</div>
                   <div className={`font-medium text-lg ${textColor}`}>{generatePreviewName() || "..."}</div>
                 </div>
+
+                {formError && (
+                  <div className="flex items-start gap-2 rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
+                    <span className="mt-0.5">&#9888;</span>
+                    <span>{formError}</span>
+                  </div>
+                )}
               </div>
               <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
                 <button className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`} onClick={() => setShowModal(false)}>
