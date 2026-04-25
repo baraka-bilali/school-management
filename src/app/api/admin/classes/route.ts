@@ -140,23 +140,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Vérifier l'unicité de la combinaison level + section + letter DANS CETTE ÉCOLE
-    const existingCombination = await prisma.class.findFirst({
-      where: {
-        level,
-        section,
-        letter,
-        schoolId: schoolId
-      }
-    })
-
-    if (existingCombination) {
-      return NextResponse.json(
-        { error: 'Une classe avec cette combinaison Niveau + Section + Lettre existe déjà dans votre école' },
-        { status: 400 }
-      )
-    }
-
     // ✅ Créer la classe avec le schoolId
     const newClass = await prisma.class.create({
       data: {

@@ -106,24 +106,6 @@ export async function PUT(
       )
     }
 
-    // Vérifier l'unicité de la combinaison level + section + letter DANS CETTE ÉCOLE (exclure la classe actuelle)
-    const duplicateCombination = await prisma.class.findFirst({
-      where: {
-        level,
-        section,
-        letter,
-        schoolId: schoolId,
-        id: { not: id }
-      }
-    })
-
-    if (duplicateCombination) {
-      return NextResponse.json(
-        { error: 'Une classe avec cette combinaison Niveau + Section + Lettre existe déjà dans votre école' },
-        { status: 400 }
-      )
-    }
-
     // Mettre à jour la classe
     const updatedClass = await prisma.class.update({
       where: { id },
