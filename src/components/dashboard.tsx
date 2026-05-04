@@ -136,7 +136,7 @@ export default function Dashboard() {
     const savedTheme = localStorage.getItem("theme") as Theme | null
     if (savedTheme) setTheme(savedTheme)
 
-    const savedRate = localStorage.getItem("usdToCdfRate")
+    const savedRate = localStorage.getItem("schoolExchangeRate")
     if (savedRate) {
       const parsedRate = Number(savedRate)
       if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
@@ -148,7 +148,7 @@ export default function Dashboard() {
     }
 
     const onRateChange = () => {
-      const nextRate = localStorage.getItem("usdToCdfRate")
+      const nextRate = localStorage.getItem("schoolExchangeRate")
       if (!nextRate) return
       const parsedRate = Number(nextRate)
       if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
@@ -156,11 +156,11 @@ export default function Dashboard() {
 
     window.addEventListener("storage", onThemeChange)
     window.addEventListener("themeChange", onThemeChange)
-    window.addEventListener("exchangeRateChange", onRateChange)
+    window.addEventListener("schoolSettingsChange", onRateChange)
     return () => {
       window.removeEventListener("storage", onThemeChange)
       window.removeEventListener("themeChange", onThemeChange)
-      window.removeEventListener("exchangeRateChange", onRateChange)
+      window.removeEventListener("schoolSettingsChange", onRateChange)
     }
   }, [])
 
@@ -276,7 +276,7 @@ export default function Dashboard() {
                 <AreaChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
+                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} allowDecimals={false} domain={[1, 100]} />
                   <Tooltip
                     formatter={(value: number) => [value, "Eleves cumules"]}
                     labelFormatter={(label: string) => `Mois: ${label}`}
@@ -301,7 +301,7 @@ export default function Dashboard() {
                 <BarChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tickFormatter={(v) => `$${Math.round(v)}`} />
+                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tickFormatter={(v) => `$${Math.round(v)}`} domain={[0, 500]} />
                   <Tooltip
                     formatter={(value: number) => [`${formatUsd(value)} (≈ ${formatCdf(value * usdToCdfRate)})`, "Montant collecte"]}
                     labelFormatter={(label: string) => `Mois: ${label}`}
