@@ -408,6 +408,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
   } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [editForm, setEditForm] = useState({
     code: "",
     lastName: "",
@@ -499,7 +500,12 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
   }
 
   const handleSaveEdit = async (studentId: number) => {
+    // Empêcher les soumissions multiples
+    if (submitting) return
+    
     try {
+      setSubmitting(true)
+      
       // avoid sending update when nothing changed
       const original = items.find((it) => it.id === studentId)
       const originalClassId = original?.enrollments?.[0]?.classId?.toString() || ""
@@ -515,6 +521,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
 
       if (!changed) {
         setEditingId(null)
+        setSubmitting(false)
         setBanner({ message: "Aucune modification détectée.", type: "success", notificationType: "update" })
         setTimeout(() => setBanner(null), 2500)
         return
@@ -563,6 +570,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
       }))
 
       setEditingId(null)
+      setSubmitting(false)
       // show loading while we refresh the list
       setLoading(true)
       setBanner({ 
@@ -574,6 +582,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
       setPagination((p) => ({ ...p }))
       setTimeout(() => setBanner(null), 3000)
     } catch (error) {
+      setSubmitting(false)
       setBanner({ 
         message: "Une erreur est survenue lors de la modification de l'étudiant", 
         type: "error",
@@ -964,22 +973,39 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                           {editingId === s.id ? (
                             <>
                               <button 
-                                className="text-green-600 hover:text-green-700 transition-colors cursor-pointer relative group" 
+                                disabled={submitting}
+                                className={`transition-colors cursor-pointer relative group ${
+                                  submitting 
+                                    ? 'text-gray-400 cursor-not-allowed' 
+                                    : 'text-green-600 hover:text-green-700'
+                                }`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
-                                  handleSaveEdit(s.id);
+                                  if (!submitting) handleSaveEdit(s.id);
                                 }}
                               >
-                                <Check className="h-4 w-4" />
+                                {submitting ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-green-600"></div>
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
                                 <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Valider
+                                  {submitting ? 'Enregistrement...' : 'Valider'}
                                 </span>
                               </button>
                               <button 
-                                className="text-red-600 hover:text-red-700 transition-colors cursor-pointer relative group" 
+                                disabled={submitting}
+                                className={`transition-colors cursor-pointer relative group ${
+                                  submitting
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-600 hover:text-red-700'
+                                }`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
-                                  setEditingId(null);
+                                  if (!submitting) {
+                                    setEditingId(null);
+                                    setSubmitting(false);
+                                  }
                                 }}
                               >
                                 <X className="h-4 w-4" />
@@ -1319,6 +1345,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [editForm, setEditForm] = useState({
     lastName: "",
     middleName: "",
@@ -1384,6 +1411,89 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+
+  const handleSaveEditTeacher = async (teacherId: number) => {
+    // Empêcher les soumissions multiples
+    if (submitting) return
+
+    const teacher = items.find(t => t.id === teacherId)
+    if (!teacher) return
+
+    try {
+      setSubmitting(true)
+
+      // Vérifier si des changements ont été effectués
+      const changed = (
+        teacher.lastName !== editForm.lastName ||
+        teacher.middleName !== editForm.middleName ||
+        teacher.firstName !== editForm.firstName ||
+        teacher.gender !== editForm.gender ||
+        (teacher.birthDate ? teacher.birthDate.split('T')[0] : '') !== editForm.birthDate ||
+        (teacher.specialty || '') !== editForm.specialty ||
+        (teacher.phone || '') !== editForm.phone
+      )
+
+      if (!changed) {
+        setEditingId(null)
+        setSubmitting(false)
+        setBanner({ message: "Aucune modification détectée.", type: 'success', notificationType: 'update' })
+        setTimeout(() => setBanner(null), 2500)
+        return
+      }
+
+      const res = await authFetch(`/api/admin/teachers/${teacherId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lastName: editForm.lastName,
+          middleName: editForm.middleName,
+          firstName: editForm.firstName,
+          gender: editForm.gender,
+          birthDate: editForm.birthDate,
+          specialty: editForm.specialty,
+          phone: editForm.phone,
+        }),
+      })
+
+      const text = await res.text()
+      let data: any = {}
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch (e) {
+        data = { error: text }
+      }
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || text || 'Erreur lors de la modification')
+      }
+
+      setItems(items.map(item => item.id === teacherId ? { 
+        ...item,
+        ...editForm,
+        ...(data.teacher || data)
+      } : item))
+      
+      setEditingId(null)
+      setSubmitting(false)
+      setLoading(true)
+      setBanner({ 
+        message: "L'enseignant a été", 
+        type: 'success',
+        notificationType: 'update'
+      })
+      setPagination(p => ({ ...p }))
+      setTimeout(() => setBanner(null), 3000)
+    } catch (err) {
+      setSubmitting(false)
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
+      setBanner({ 
+        message: `Une erreur est survenue lors de la modification de l'enseignant: ${errorMessage}`, 
+        type: 'error',
+        notificationType: 'update'
+      })
+      setTimeout(() => setBanner(null), 5000)
+    }
+  }
 
   return (
     <Card theme={theme}>
@@ -1528,93 +1638,46 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                         <div className="flex items-center gap-2">
                           {editingId === t.id ? (
                             <>
-                              <button className="text-green-600 hover:text-green-700 transition-colors cursor-pointer relative group" onClick={async (e) => { e.stopPropagation();
-                                // avoid calling API if nothing changed
-                                const changed = (
-                                  t.lastName !== editForm.lastName ||
-                                  t.middleName !== editForm.middleName ||
-                                  t.firstName !== editForm.firstName ||
-                                  t.gender !== editForm.gender ||
-                                  (t.birthDate ? t.birthDate.split('T')[0] : '') !== editForm.birthDate ||
-                                  (t.specialty || '') !== editForm.specialty ||
-                                  (t.phone || '') !== editForm.phone
-                                )
-
-                                if (!changed) {
-                                  setEditingId(null)
-                                  setBanner({ message: "Aucune modification détectée.", type: 'success', notificationType: 'update' })
-                                  setTimeout(() => setBanner(null), 2500)
-                                  return
-                                }
-
-                                // handle save
-                                try {
-                                  const res = await authFetch(`/api/admin/teachers/${t.id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      lastName: editForm.lastName,
-                                      middleName: editForm.middleName,
-                                      firstName: editForm.firstName,
-                                      gender: editForm.gender,
-                                      birthDate: editForm.birthDate,
-                                      specialty: editForm.specialty,
-                                      phone: editForm.phone,
-                                    }),
-                                  })
-
-                                  const text = await res.text()
-                                  console.log('Server response:', { status: res.status, text })
-                                  
-                                  let data: any = {}
-                                  try {
-                                    data = text ? JSON.parse(text) : {}
-                                    console.log('Parsed response:', data)
-                                  } catch (e) {
-                                    console.warn('Failed to parse response as JSON:', text)
-                                    data = { error: text }
-                                  }
-
-                                  if (!res.ok) {
-                                    console.error('Server returned error status:', res.status)
-                                    const errorMsg = data.message || data.error || text || 'Erreur lors de la modification'
-                                    throw new Error(errorMsg)
-                                  }
-
-                                  if (!data || typeof data !== 'object') {
-                                    console.warn('Unexpected response format:', data)
-                                    throw new Error('Format de réponse invalide')
-                                  }
-
-                                  setItems(items.map(item => item.id === t.id ? { 
-                                    ...item,
-                                    ...editForm,
-                                    // preserve other fields that might exist on the server response
-                                    ...(data.teacher || data)
-                                  } : item))
-                                  setEditingId(null)
-                                  setLoading(true)
-                                  setBanner({ 
-                                    message: "L'enseignant a été", 
-                                    type: 'success',
-                                    notificationType: 'update'
-                                  })
-                                  setPagination(p => ({ ...p }))
-                                  setTimeout(() => setBanner(null), 3000)
-                                } catch (err) {
-                                  console.error('Teacher update failed:', err)
-                                  const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue'
-                                  setBanner({ 
-                                    message: `Une erreur est survenue lors de la modification de l'enseignant: ${errorMessage}`, 
-                                    type: 'error',
-                                  })
-                                  setTimeout(() => setBanner(null), 5000) // longer timeout for error messages
-                                }
-                              }}>
-                                <Check className="h-4 w-4" />
+                              <button 
+                                disabled={submitting}
+                                className={`transition-colors cursor-pointer relative group ${
+                                  submitting 
+                                    ? 'text-gray-400 cursor-not-allowed' 
+                                    : 'text-green-600 hover:text-green-700'
+                                }`}
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  if (!submitting) handleSaveEditTeacher(t.id);
+                                }}
+                              >
+                                {submitting ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-green-600"></div>
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
+                                  {submitting ? 'Enregistrement...' : 'Valider'}
+                                </span>
                               </button>
-                              <button className="text-red-600 hover:text-red-700 transition-colors cursor-pointer relative group" onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>
+                              <button 
+                                disabled={submitting}
+                                className={`transition-colors cursor-pointer relative group ${
+                                  submitting
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-600 hover:text-red-700'
+                                }`}
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  if (!submitting) {
+                                    setEditingId(null);
+                                    setSubmitting(false);
+                                  }
+                                }}
+                              >
                                 <X className="h-4 w-4" />
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
+                                  Annuler
+                                </span>
                               </button>
                             </>
                           ) : (
