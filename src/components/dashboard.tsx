@@ -197,6 +197,20 @@ export default function Dashboard() {
     }
   }, [handleThemeChange, handleRateChange]) // ✅ Dépendances stables
 
+  // ✅ Safe stats fallback
+  const safeStats = stats ?? {
+    students: 0,
+    teachers: 0,
+    classes: 0,
+    attendance: "--",
+    monthLabels: [],
+    monthlyStudents: [],
+    monthlyTeachers: [],
+    monthlyPayments: [],
+    genderStats: { male: 0, female: 0 },
+    sectionStats: { Primaire: 0, Secondaire: 0 },
+  }
+
   const palette = {
     students: "#4f46e5",
     teachers: "#0ea5e9",
