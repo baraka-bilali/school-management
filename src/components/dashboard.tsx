@@ -150,16 +150,6 @@ export default function Dashboard() {
       return res.json() as Promise<DashboardStatsResponse>
     },
     ...QUERY_CONFIGS.dashboard, // ✅ Config optimisée centralisée
-    },
-    placeholderData: {
-      students: 0,
-      teachers: 0,
-      classes: 0,
-      attendance: "--",
-      monthLabels: [],
-      monthlyStudents: [],
-      monthlyTeachers: [],
-    ...QUERY_CONFIGS.dashboard, // ✅ Config optimisée centralisée
     placeholderData: {
       students: 0,
       teachers: 0,
@@ -172,13 +162,7 @@ export default function Dashboard() {
       genderStats: { male: 0, female: 0 },
       sectionStats: { Primaire: 0, Secondaire: 0 },
     },
-    monthLabels: [],
-    monthlyStudents: [],
-    monthlyTeachers: [],
-    monthlyPayments: [],
-    genderStats: { male: 0, female: 0 },
-    sectionStats: { Primaire: 0, Secondaire: 0 },
-  }
+  })
 
   // ✅ OPTIMISÉ - Callbacks memoïzés pour éviter re-créations
   const handleThemeChange = useCallback(() => {
