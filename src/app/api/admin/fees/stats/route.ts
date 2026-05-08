@@ -134,34 +134,44 @@ export async function GET(req: NextRequest) {
       take: 10,
     })
 
-    // 5. Résumé par tarification
-    const tarificationsSummary = await Promise.all(
-      tarifications.map(async (t) => {
-        const agg = await prisma.paiement.aggregate({
-          where: {
-            tarificationId: t.id,
-            isAnnule: false,
-          },
-          _sum: { montant: true },
-          _count: { id: true },
-        })
+    // 5. Résumé par tarification - ✅ OPTIMISÉ (1 seule requête au lieu de N)
+    const paymentsGroupedByTarif = await prisma.paiement.groupBy({
+      by: ["tarificationId"],
+      where: {
+        tarificationId: { in: tarifications.map(t => t.id) },
+        isAnnule: false,
+      },
+      _sum: { montant: true },
+      _count: { id: true },
+    })
 
-        const applicableStudents = enrollments.filter(
-          (e) => t.classId === null || t.classId === e.classId
-        ).length
-
-        return {
-          id: t.id,
-          typeFrais: t.typeFrais.nom,
-          classe: t.class?.name || "Toutes les classes",
-          montant: t.montant,
-          totalAttendu: t.montant * applicableStudents,
-          totalPercu: agg._sum.montant ?? 0,
-          nombrePaiements: agg._count.id,
-          nombreEleves: applicableStudents,
-        }
-      })
+    // Créer une map pour accès O(1)
+    const paymentsMap = new Map(
+      paymentsGroupedByTarif.map(p => [
+        p.tarificationId, 
+        { total: p._sum.montant ?? 0, count: p._count.id }
+      ])
     )
+
+    // Calculer le summary en mémoire (ultra rapide)
+    const tarificationsSummary = tarifications.map(t => {
+      const applicableStudents = enrollments.filter(
+        (e) => t.classId === null || t.classId === e.classId
+      ).length
+
+      const payments = paymentsMap.get(t.id) || { total: 0, count: 0 }
+
+      return {
+        id: t.id,
+        typeFrais: t.typeFrais.nom,
+        classe: t.class?.name || "Toutes les classes",
+        montant: t.montant,
+        totalAttendu: t.montant * applicableStudents,
+        totalPercu: payments.total,
+        nombrePaiements: payments.count,
+        nombreEleves: applicableStudents,
+      }
+    })
 
     return NextResponse.json({
       data: {

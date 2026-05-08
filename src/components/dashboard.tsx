@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ComponentType } from "react"
+import { useEffect, useMemo, useState, useCallback, type ComponentType } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { QUERY_CONFIGS } from "@/lib/react-query-config"
 import {
   Activity,
   BarChart3,
@@ -120,35 +121,36 @@ export default function Dashboard() {
   const [theme, setTheme] = useState<Theme>("light")
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
 
-  // Utiliser React Query pour le cache automatique - OPTIMISATION CRITIQUE
+  // ✅ OPTIMISÉ - React Query avec config centralisée
   const { data: stats, isLoading: loading, error } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      console.log('[DEBUG] Fetching dashboard stats...')
       const res = await fetch("/api/admin/dashboard-stats-simple", { 
         credentials: "include" 
       })
       
-      console.log('[DEBUG] Response status:', res.status)
-      
-      // Vérifier si la réponse est bien du JSON
       const contentType = res.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error('[ERROR] Invalid content type:', contentType)
-        const text = await res.text()
-        console.error('[ERROR] Response body:', text.substring(0, 200))
+      if (!contentType?.includes("application/json")) {
         throw new Error('Not authenticated or invalid response')
       }
       
       if (!res.ok) {
-        console.error('[ERROR] Response not OK:', res.status)
         throw new Error('Failed to fetch dashboard stats')
       }
       
-      const data = await res.json()
-      console.log('[DEBUG] Data received:', data)
-      return data as DashboardStatsResponse
+      return res.json() as Promise<DashboardStatsResponse>
     },
+    ...QUERY_CONFIGS.dashboard, // ✅ Config optimisée centralisée
+    },
+    placeholderData: {
+      students: 0,
+      teachers: 0,
+      classes: 0,
+      attendance: "--",
+      monthLabels: [],
+      monthlyStudents: [],
+      monthlyTeachers: [],
+    ...QUERY_CONFIGS.dashboard, // ✅ Config optimisée centralisée
     placeholderData: {
       students: 0,
       teachers: 0,
@@ -161,18 +163,6 @@ export default function Dashboard() {
       genderStats: { male: 0, female: 0 },
       sectionStats: { Primaire: 0, Secondaire: 0 },
     },
-    staleTime: 5 * 60 * 1000, // Les données restent fraîches pendant 5 minutes
-    gcTime: 10 * 60 * 1000, // Garde en cache pendant 10 minutes
-    retry: false,
-    refetchOnWindowFocus: false, // Ne pas refetch quand on revient sur l'onglet
-  })
-
-  // Garantir que stats n'est jamais undefined
-  const safeStats: DashboardStatsResponse = stats || {
-    students: 0,
-    teachers: 0,
-    classes: 0,
-    attendance: "--",
     monthLabels: [],
     monthlyStudents: [],
     monthlyTeachers: [],
@@ -180,6 +170,19 @@ export default function Dashboard() {
     genderStats: { male: 0, female: 0 },
     sectionStats: { Primaire: 0, Secondaire: 0 },
   }
+
+  // ✅ OPTIMISÉ - Callbacks memoïzés pour éviter re-créations
+  const handleThemeChange = useCallback(() => {
+    const currentTheme = localStorage.getItem("theme") as Theme | null
+    if (currentTheme) setTheme(currentTheme)
+  }, [])
+
+  const handleRateChange = useCallback(() => {
+    const nextRate = localStorage.getItem("schoolExchangeRate")
+    if (!nextRate) return
+    const parsedRate = Number(nextRate)
+    if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
+  }, [])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null
@@ -191,27 +194,15 @@ export default function Dashboard() {
       if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
     }
 
-    const onThemeChange = () => {
-      const currentTheme = localStorage.getItem("theme") as Theme | null
-      if (currentTheme) setTheme(currentTheme)
-    }
-
-    const onRateChange = () => {
-      const nextRate = localStorage.getItem("schoolExchangeRate")
-      if (!nextRate) return
-      const parsedRate = Number(nextRate)
-      if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
-    }
-
-    window.addEventListener("storage", onThemeChange)
-    window.addEventListener("themeChange", onThemeChange)
-    window.addEventListener("schoolSettingsChange", onRateChange)
+    window.addEventListener("storage", handleThemeChange)
+    window.addEventListener("themeChange", handleThemeChange)
+    window.addEventListener("schoolSettingsChange", handleRateChange)
     return () => {
-      window.removeEventListener("storage", onThemeChange)
-      window.removeEventListener("themeChange", onThemeChange)
-      window.removeEventListener("schoolSettingsChange", onRateChange)
+      window.removeEventListener("storage", handleThemeChange)
+      window.removeEventListener("themeChange", handleThemeChange)
+      window.removeEventListener("schoolSettingsChange", handleRateChange)
     }
-  }, [])
+  }, [handleThemeChange, handleRateChange]) // ✅ Dépendances stables
 
   const palette = {
     students: "#4f46e5",
@@ -232,6 +223,7 @@ export default function Dashboard() {
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const gridColor = theme === "dark" ? "#374151" : "#e5e7eb"
 
+  // ✅ OPTIMISÉ - Calculs memoïzés (évite recalcul à chaque render)
   const monthlySeries = useMemo(() => {
     const labels = safeStats.monthLabels ?? []
     const students = safeStats.monthlyStudents ?? []
@@ -247,24 +239,35 @@ export default function Dashboard() {
     }))
   }, [safeStats.monthLabels, safeStats.monthlyStudents, safeStats.monthlyTeachers, safeStats.monthlyPayments])
 
-  const genderData = [
+  const genderData = useMemo(() => [
     { name: "Garcons", value: safeStats.genderStats?.male ?? 0, color: palette.male },
     { name: "Filles", value: safeStats.genderStats?.female ?? 0, color: palette.female },
-  ]
+  ], [safeStats.genderStats, palette.male, palette.female])
 
-  const sectionData = [
+  const sectionData = useMemo(() => [
     { name: "Primaire", value: safeStats.sectionStats?.Primaire ?? 0, color: palette.primaire },
     { name: "Secondaire", value: safeStats.sectionStats?.Secondaire ?? 0, color: palette.secondaire },
-  ]
+  ], [safeStats.sectionStats, palette.primaire, palette.secondaire])
 
-  const cardStudentsData = monthlySeries.map((r) => ({ name: r.month, value: r.students }))
-  const cardTeachersData = monthlySeries.map((r) => ({ name: r.month, value: r.teachers }))
-  const cardClassesData = monthlySeries.map((r, idx) => ({
-    name: r.month,
-    value: idx === monthlySeries.length - 1 ? safeStats.classes : safeStats.classes,
-  }))
-  const cardPaymentsData = monthlySeries.map((r) => ({ name: r.month, value: r.payments }))
-  const currentMonthPayment = monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].payments : 0
+  const cardStudentsData = useMemo(() => 
+    monthlySeries.map((r) => ({ name: r.month, value: r.students }))
+  , [monthlySeries])
+
+  const cardTeachersData = useMemo(() => 
+    monthlySeries.map((r) => ({ name: r.month, value: r.teachers }))
+  , [monthlySeries])
+
+  const cardClassesData = useMemo(() => 
+    monthlySeries.map((r) => ({ name: r.month, value: r.students + r.teachers }))
+  , [monthlySeries])
+
+  const cardPaymentsData = useMemo(() => 
+    monthlySeries.map((r) => ({ name: r.month, value: r.payments }))
+  , [monthlySeries])
+  
+  const currentMonthPayment = useMemo(() => 
+    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].payments : 0
+  , [monthlySeries])
 
   return (
     <div className={`min-h-screen ${bgPage}`}>

@@ -30,6 +30,8 @@ model User {
   school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
 
   @@index([schoolId])
+  @@index([schoolId, isActive])
+  @@index([schoolId, role, isActive])
 }
 
 model AcademicYear {
@@ -142,6 +144,8 @@ model Enrollment {
   @@unique([studentId, classId, yearId])
   @@index([classId])
   @@index([yearId])
+  @@index([studentId, yearId, status])
+  @@index([yearId, status])
 }
 
 model School {
@@ -262,6 +266,8 @@ model Tarification {
   @@unique([typeFraisId, yearId, classId, schoolId])
   @@index([schoolId])
   @@index([yearId])
+  @@index([schoolId, yearId, isActive])
+  @@index([yearId, isActive, classId])
   @@index([classId])
   @@index([typeFraisId])
 }
@@ -309,6 +315,10 @@ model Paiement {
   @@index([schoolId])
   @@index([studentId])
   @@index([enrollmentId])
+  @@index([schoolId, isAnnule])
+  @@index([enrollmentId, isAnnule])
+  @@index([tarificationId, isAnnule])
+  @@index([studentId, isAnnule])
   @@index([tarificationId])
   @@index([numeroRecu])
   @@index([datePaiement])
