@@ -126,12 +126,10 @@ export default function Dashboard() {
     queryFn: async () => {
       console.log('[DEBUG] Fetching dashboard stats...')
       const res = await fetch("/api/admin/dashboard-stats-simple", { 
-        cache: "no-store",
         credentials: "include" 
       })
       
       console.log('[DEBUG] Response status:', res.status)
-      console.log('[DEBUG] Response headers:', Object.fromEntries(res.headers.entries()))
       
       // Vérifier si la réponse est bien du JSON
       const contentType = res.headers.get("content-type")
@@ -163,8 +161,10 @@ export default function Dashboard() {
       genderStats: { male: 0, female: 0 },
       sectionStats: { Primaire: 0, Secondaire: 0 },
     },
-    retry: false, // Ne pas retry si pas authentifié
-    enabled: true, // Désactiver si besoin
+    staleTime: 5 * 60 * 1000, // Les données restent fraîches pendant 5 minutes
+    gcTime: 10 * 60 * 1000, // Garde en cache pendant 10 minutes
+    retry: false,
+    refetchOnWindowFocus: false, // Ne pas refetch quand on revient sur l'onglet
   })
 
   // Garantir que stats n'est jamais undefined
