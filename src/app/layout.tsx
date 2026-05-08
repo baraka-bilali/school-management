@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./no-translate.css";
 import ClientOnly from "@/components/client-only";
+import { ReactQueryProvider } from "@/lib/react-query";
 
 export const metadata: Metadata = {
   title: "digiSchool",
@@ -20,9 +21,11 @@ export default function RootLayout({
         <meta name="google" content="notranslate" />
       </head>
       <body className="bg-gray-50 font-sans antialiased notranslate" suppressHydrationWarning>
-        <ClientOnly>
-          {children}
-        </ClientOnly>
+        <ReactQueryProvider>
+          <ClientOnly>
+            {children}
+          </ClientOnly>
+        </ReactQueryProvider>
       </body>
     </html>
   );

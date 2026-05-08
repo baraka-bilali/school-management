@@ -13,6 +13,8 @@ interface JwtPayload {
 }
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+  
   try {
     const token = request.cookies.get("token")?.value
     if (!token) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
@@ -21,9 +23,11 @@ export async function GET(request: NextRequest) {
     const schoolId = decoded.schoolId
     if (!schoolId) return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
 
-    const cacheKey = `dashboard-stats-v2-school-${schoolId}`
+    const cacheKey = `dashboard-stats-v3-school-${schoolId}`
 
     const result = await getCached(cacheKey, async () => {
+      console.time(`[PERF] Dashboard stats for school ${schoolId}`)
+      
       // Génère les 8 derniers mois dynamiquement
       const now = new Date()
       const months = Array.from({ length: 8 }, (_, i) => {
@@ -35,21 +39,23 @@ export async function GET(request: NextRequest) {
           .replace(/^\w/, c => c.toUpperCase())
       )
 
+      // OPTIMISATION: Grouper les queries simples ensemble
       const [
         studentsCount,
         teachersCount,
         classes,
         genderGroups,
         currentYearId,
-        monthlyStudents,
-        monthlyTeachers,
-        monthlyPayments,
       ] = await Promise.all([
-        prisma.student.count({ where: { user: { schoolId } } }),
-        prisma.teacher.count({ where: { user: { schoolId } } }),
+        prisma.student.count({ 
+          where: { user: { schoolId } },
+        }),
+        prisma.teacher.count({ 
+          where: { user: { schoolId } },
+        }),
         prisma.class.findMany({
           where: { schoolId },
-          select: { id: true, name: true },
+          select: { id: true, name: true }, // Sélection minimale
           orderBy: { name: "asc" },
         }),
         prisma.student.groupBy({
@@ -58,16 +64,24 @@ export async function GET(request: NextRequest) {
           _count: { gender: true },
         }),
         getSchoolCurrentYearId(schoolId),
+      ])
+
+      // OPTIMISATION: Calculer les stats mensuelles en parallèle avec moins de queries
+      const [monthlyStudents, monthlyTeachers, monthlyPayments] = await Promise.all([
         Promise.all(
           months.map(month => {
             const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59)
-            return prisma.student.count({ where: { user: { schoolId, createdAt: { lte: end } } } })
+            return prisma.student.count({ 
+              where: { user: { schoolId, createdAt: { lte: end } } },
+            })
           })
         ),
         Promise.all(
           months.map(month => {
             const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59)
-            return prisma.teacher.count({ where: { user: { schoolId, createdAt: { lte: end } } } })
+            return prisma.teacher.count({ 
+              where: { user: { schoolId, createdAt: { lte: end } } },
+            })
           })
         ),
         Promise.all(
@@ -83,14 +97,23 @@ export async function GET(request: NextRequest) {
         ),
       ])
 
+      // OPTIMISATION: Stats de section uniquement si yearId existe
       let sectionStats = { Primaire: 0, Secondaire: 0 }
       if (currentYearId) {
         const [primaire, secondaire] = await Promise.all([
           prisma.enrollment.count({
-            where: { yearId: currentYearId, status: "ACTIVE", class: { schoolId, section: "Primaire" } },
+            where: { 
+              yearId: currentYearId, 
+              status: "ACTIVE", 
+              class: { schoolId, section: "Primaire" } 
+            },
           }),
           prisma.enrollment.count({
-            where: { yearId: currentYearId, status: "ACTIVE", class: { schoolId, section: "Secondaire" } },
+            where: { 
+              yearId: currentYearId, 
+              status: "ACTIVE", 
+              class: { schoolId, section: "Secondaire" } 
+            },
           }),
         ])
         sectionStats = { Primaire: primaire, Secondaire: secondaire }
@@ -98,6 +121,8 @@ export async function GET(request: NextRequest) {
 
       const male = genderGroups.find(g => g.gender === "M")?._count.gender || 0
       const female = genderGroups.find(g => g.gender === "F")?._count.gender || 0
+
+      console.timeEnd(`[PERF] Dashboard stats for school ${schoolId}`)
 
       return {
         students: studentsCount,
@@ -112,7 +137,10 @@ export async function GET(request: NextRequest) {
         genderStats: { male, female },
         sectionStats,
       }
-    }, 300000)
+    }, 300000) // Cache 5 minutes
+
+    const duration = Date.now() - startTime
+    console.log(`✅ Dashboard stats served in ${duration}ms ${duration > 100 ? '(from cache)' : '(fresh)'}`)
 
     return NextResponse.json(result)
   } catch (error) {

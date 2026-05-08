@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type ComponentType } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
   Activity,
   BarChart3,
@@ -118,8 +119,56 @@ function TrendCard({
 export default function Dashboard() {
   const [theme, setTheme] = useState<Theme>("light")
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<DashboardStatsResponse>({
+
+  // Utiliser React Query pour le cache automatique - OPTIMISATION CRITIQUE
+  const { data: stats, isLoading: loading, error } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      console.log('[DEBUG] Fetching dashboard stats...')
+      const res = await fetch("/api/admin/dashboard-stats-simple", { 
+        cache: "no-store",
+        credentials: "include" 
+      })
+      
+      console.log('[DEBUG] Response status:', res.status)
+      console.log('[DEBUG] Response headers:', Object.fromEntries(res.headers.entries()))
+      
+      // Vérifier si la réponse est bien du JSON
+      const contentType = res.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error('[ERROR] Invalid content type:', contentType)
+        const text = await res.text()
+        console.error('[ERROR] Response body:', text.substring(0, 200))
+        throw new Error('Not authenticated or invalid response')
+      }
+      
+      if (!res.ok) {
+        console.error('[ERROR] Response not OK:', res.status)
+        throw new Error('Failed to fetch dashboard stats')
+      }
+      
+      const data = await res.json()
+      console.log('[DEBUG] Data received:', data)
+      return data as DashboardStatsResponse
+    },
+    placeholderData: {
+      students: 0,
+      teachers: 0,
+      classes: 0,
+      attendance: "--",
+      monthLabels: [],
+      monthlyStudents: [],
+      monthlyTeachers: [],
+      monthlyPayments: [],
+      genderStats: { male: 0, female: 0 },
+      sectionStats: { Primaire: 0, Secondaire: 0 },
+    },
+    retry: false, // Ne pas retry si pas authentifié
+    enabled: true, // Désactiver si besoin
+  })
+
+  // Garantir que stats n'est jamais undefined
+  const safeStats: DashboardStatsResponse = stats || {
     students: 0,
     teachers: 0,
     classes: 0,
@@ -130,7 +179,7 @@ export default function Dashboard() {
     monthlyPayments: [],
     genderStats: { male: 0, female: 0 },
     sectionStats: { Primaire: 0, Secondaire: 0 },
-  })
+  }
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null
@@ -164,33 +213,6 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch("/api/admin/dashboard-stats", { cache: "no-store" })
-        const data = (await res.json()) as DashboardStatsResponse
-        setStats({
-          students: data.students ?? 0,
-          teachers: data.teachers ?? 0,
-          classes: data.classes ?? 0,
-          attendance: data.attendance ?? "--",
-          monthLabels: data.monthLabels ?? [],
-          monthlyStudents: data.monthlyStudents ?? [],
-          monthlyTeachers: data.monthlyTeachers ?? [],
-          monthlyPayments: data.monthlyPayments ?? [],
-          genderStats: data.genderStats ?? { male: 0, female: 0 },
-          sectionStats: data.sectionStats ?? { Primaire: 0, Secondaire: 0 },
-        })
-      } catch {
-        setStats((prev) => ({ ...prev, attendance: "--" }))
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [])
-
   const palette = {
     students: "#4f46e5",
     teachers: "#0ea5e9",
@@ -211,10 +233,10 @@ export default function Dashboard() {
   const gridColor = theme === "dark" ? "#374151" : "#e5e7eb"
 
   const monthlySeries = useMemo(() => {
-    const labels = stats.monthLabels ?? []
-    const students = stats.monthlyStudents ?? []
-    const teachers = stats.monthlyTeachers ?? []
-    const payments = stats.monthlyPayments ?? []
+    const labels = safeStats.monthLabels ?? []
+    const students = safeStats.monthlyStudents ?? []
+    const teachers = safeStats.monthlyTeachers ?? []
+    const payments = safeStats.monthlyPayments ?? []
 
     const max = Math.max(labels.length, students.length, teachers.length, payments.length)
     return Array.from({ length: max }, (_, i) => ({
@@ -223,23 +245,23 @@ export default function Dashboard() {
       teachers: teachers[i] ?? 0,
       payments: payments[i] ?? 0,
     }))
-  }, [stats.monthLabels, stats.monthlyStudents, stats.monthlyTeachers, stats.monthlyPayments])
+  }, [safeStats.monthLabels, safeStats.monthlyStudents, safeStats.monthlyTeachers, safeStats.monthlyPayments])
 
   const genderData = [
-    { name: "Garcons", value: stats.genderStats?.male ?? 0, color: palette.male },
-    { name: "Filles", value: stats.genderStats?.female ?? 0, color: palette.female },
+    { name: "Garcons", value: safeStats.genderStats?.male ?? 0, color: palette.male },
+    { name: "Filles", value: safeStats.genderStats?.female ?? 0, color: palette.female },
   ]
 
   const sectionData = [
-    { name: "Primaire", value: stats.sectionStats?.Primaire ?? 0, color: palette.primaire },
-    { name: "Secondaire", value: stats.sectionStats?.Secondaire ?? 0, color: palette.secondaire },
+    { name: "Primaire", value: safeStats.sectionStats?.Primaire ?? 0, color: palette.primaire },
+    { name: "Secondaire", value: safeStats.sectionStats?.Secondaire ?? 0, color: palette.secondaire },
   ]
 
   const cardStudentsData = monthlySeries.map((r) => ({ name: r.month, value: r.students }))
   const cardTeachersData = monthlySeries.map((r) => ({ name: r.month, value: r.teachers }))
   const cardClassesData = monthlySeries.map((r, idx) => ({
     name: r.month,
-    value: idx === monthlySeries.length - 1 ? stats.classes : stats.classes,
+    value: idx === monthlySeries.length - 1 ? safeStats.classes : safeStats.classes,
   }))
   const cardPaymentsData = monthlySeries.map((r) => ({ name: r.month, value: r.payments }))
   const currentMonthPayment = monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].payments : 0
@@ -256,9 +278,9 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-          <TrendCard title="Eleves" value={stats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
-          <TrendCard title="Enseignants" value={stats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
-          <TrendCard title="Classes" value={stats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
+          <TrendCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
+          <TrendCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
+          <TrendCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
           <TrendCard title="Paiements (mois)" value={formatUsd(currentMonthPayment)} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
         </div>
 
