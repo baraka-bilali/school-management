@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
+const Input = React.memo(React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     const innerRef = React.useRef<HTMLInputElement>(null)
     const combinedRef = (ref || innerRef) as React.RefObject<HTMLInputElement>
@@ -67,7 +67,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       />
     )
   }
-)
+))
 Input.displayName = "Input"
 
 export { Input }

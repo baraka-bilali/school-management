@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-function Badge({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+const Badge = React.memo(function Badge({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
@@ -11,6 +11,8 @@ function Badge({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
       {...props}
     />
   )
-}
+})
+
+Badge.displayName = "Badge"
 
 export { Badge }
