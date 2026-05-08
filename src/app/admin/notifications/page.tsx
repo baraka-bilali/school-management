@@ -40,6 +40,7 @@ export default function NotificationsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -76,6 +77,24 @@ export default function NotificationsPage() {
       console.error("Erreur lors de la récupération des notifications:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkSubscriptions = async () => {
+    try {
+      setChecking(true)
+      const res = await authFetch("/api/notifications/check", {
+        method: "POST",
+        credentials: "include",
+      })
+      if (res.ok) {
+        // Rafraîchir les notifications après vérification
+        await fetchNotifications()
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification:", error)
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -244,17 +263,40 @@ export default function NotificationsPage() {
                 </button>
                 <h1 className={`text-xl font-bold ${textColor}`}>Notifications</h1>
               </div>
-              <button className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${textColor}`}>
-                <Settings className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={checkSubscriptions}
+                  disabled={checking}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    checking
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : theme === "dark"
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                  title="Vérifier les abonnements et générer les alertes"
+                >
+                  {checking ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Vérification...
+                    </div>
+                  ) : (
+                    'Vérifier les abonnements'
+                  )}
+                </button>
+                <button className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${textColor}`}>
+                  <Settings className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Sous-header */}
             <div className="pb-4">
               <div className="mb-4">
-                <h2 className={`text-lg font-semibold ${textColor}`}>Notifications history</h2>
+                <h2 className={`text-lg font-semibold ${textColor}`}>Historique des notifications</h2>
                 <p className={`text-sm ${textSecondary}`}>
-                  You have <span className="font-semibold text-indigo-600">{unreadCount} unread</span> messages
+                  Vous avez <span className="font-semibold text-indigo-600">{unreadCount} {unreadCount > 1 ? 'messages non lus' : 'message non lu'}</span>
                 </p>
               </div>
 
@@ -296,15 +338,15 @@ export default function NotificationsPage() {
                       showUnreadOnly ? "translate-x-5" : ""
                     }`}></div>
                   </div>
-                  <span className={`text-sm font-medium ${textColor}`}>Unread only</span>
+                  <span className={`text-sm font-medium ${textColor}`}>Non lus uniquement</span>
                 </label>
 
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
-                    className="text-sm font-medium text-red-500 hover:text-red-600 transition-colors"
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
                   >
-                    Mark all as read
+                    Tout marquer comme lu
                   </button>
                 )}
               </div>

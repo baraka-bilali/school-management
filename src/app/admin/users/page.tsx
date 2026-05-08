@@ -551,19 +551,27 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
         throw new Error(data.error || text || 'Erreur lors de la modification')
       }
 
-      // Mettre à jour la liste des étudiants
+      // Trouver le nom de la classe sélectionnée
+      const selectedClass = classes.find(c => c.id === Number(editForm.classId))
+
+      // Mettre à jour la liste des étudiants LOCALEMENT avec les nouvelles données
       setItems(items.map(item => {
         if (item.id === studentId) {
           return {
             ...item,
-            ...editForm,
-            enrollments: [
-              {
-                ...item.enrollments[0],
-                classId: editForm.classId ? Number(editForm.classId) : item.enrollments[0]?.classId,
-              },
-              ...item.enrollments.slice(1),
-            ],
+            code: editForm.code,
+            lastName: editForm.lastName,
+            middleName: editForm.middleName,
+            firstName: editForm.firstName,
+            gender: editForm.gender,
+            birthDate: editForm.birthDate,
+            enrollments: item.enrollments.map((enr, idx) => 
+              idx === 0 ? {
+                ...enr,
+                classId: editForm.classId ? Number(editForm.classId) : enr.classId,
+                class: selectedClass ? { ...enr.class, name: selectedClass.name } : enr.class
+              } : enr
+            ),
           }
         }
         return item
@@ -571,15 +579,11 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
 
       setEditingId(null)
       setSubmitting(false)
-      // show loading while we refresh the list
-      setLoading(true)
       setBanner({ 
-        message: "L'étudiant a été", 
+        message: "L'étudiant a été mis à jour avec succès", 
         type: "success",
         notificationType: "update"
       })
-      // refresh list to get the latest data
-      setPagination((p) => ({ ...p }))
       setTimeout(() => setBanner(null), 3000)
     } catch (error) {
       setSubmitting(false)
@@ -1467,21 +1471,26 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
         throw new Error(data.message || data.error || text || 'Erreur lors de la modification')
       }
 
+      // Mettre à jour la liste localement avec les nouvelles données
       setItems(items.map(item => item.id === teacherId ? { 
         ...item,
-        ...editForm,
-        ...(data.teacher || data)
+        lastName: editForm.lastName,
+        middleName: editForm.middleName,
+        firstName: editForm.firstName,
+        gender: editForm.gender,
+        birthDate: editForm.birthDate,
+        specialty: editForm.specialty,
+        phone: editForm.phone,
+        ...(data.teacher || {})
       } : item))
       
       setEditingId(null)
       setSubmitting(false)
-      setLoading(true)
       setBanner({ 
-        message: "L'enseignant a été", 
+        message: "L'enseignant a été mis à jour avec succès", 
         type: 'success',
         notificationType: 'update'
       })
-      setPagination(p => ({ ...p }))
       setTimeout(() => setBanner(null), 3000)
     } catch (err) {
       setSubmitting(false)
