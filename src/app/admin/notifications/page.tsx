@@ -1,23 +1,20 @@
 "use client"
 
-import { useState, useEffect, Fragment } from "react"
+import { useState, useEffect } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
-import { 
-  Bell, 
-  ArrowLeft, 
-  Settings, 
-  MoreVertical, 
-  Check, 
-  Trash2, 
-  AlertCircle, 
-  Clock, 
-  DollarSign,
+import { supabaseBrowser } from "@/lib/supabase-client"
+import {
+  Bell,
+  ArrowLeft,
+  MoreVertical,
+  Check,
+  Trash2,
+  AlertCircle,
+  Clock,
   Calendar,
   Info,
-  Megaphone,
   CreditCard,
-  GraduationCap
 } from "lucide-react"
 
 interface Notification {
@@ -40,7 +37,6 @@ export default function NotificationsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -63,6 +59,29 @@ export default function NotificationsPage() {
     fetchNotifications()
   }, [])
 
+  useEffect(() => {
+    let cleanup: (() => void) | undefined
+    const initRealtime = async () => {
+      try {
+        const res = await authFetch("/api/auth/me", { credentials: "include" })
+        if (!res.ok) return
+        const { user } = await res.json()
+        const channelName = user.role === "SUPER_ADMIN"
+          ? "notifications:super-admin"
+          : `notifications:user:${user.id}`
+        const channel = supabaseBrowser
+          .channel(channelName)
+          .on("broadcast", { event: "new_notification" }, () => {
+            fetchNotifications()
+          })
+          .subscribe()
+        cleanup = () => supabaseBrowser.removeChannel(channel)
+      } catch {}
+    }
+    initRealtime()
+    return () => { if (cleanup) cleanup() }
+  }, [])
+
   const fetchNotifications = async () => {
     try {
       setLoading(true)
@@ -77,24 +96,6 @@ export default function NotificationsPage() {
       console.error("Erreur lors de la récupération des notifications:", error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const checkSubscriptions = async () => {
-    try {
-      setChecking(true)
-      const res = await authFetch("/api/notifications/check", {
-        method: "POST",
-        credentials: "include",
-      })
-      if (res.ok) {
-        // Rafraîchir les notifications après vérification
-        await fetchNotifications()
-      }
-    } catch (error) {
-      console.error("Erreur lors de la vérification:", error)
-    } finally {
-      setChecking(false)
     }
   }
 
@@ -144,7 +145,6 @@ export default function NotificationsPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    const now = new Date()
     const time = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
     const dateStr = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
     return `${time} • ${dateStr}`
@@ -160,7 +160,7 @@ export default function NotificationsPage() {
     if (type.includes("PAYMENT")) return <CreditCard className="w-5 h-5" />
     if (type.includes("DAY")) return <Clock className="w-5 h-5" />
     if (type.includes("EVENT")) return <Calendar className="w-5 h-5" />
-    if (type.includes("SYSTEM")) return <Settings className="w-5 h-5" />
+    if (type.includes("SYSTEM")) return <Info className="w-5 h-5" />
     return <Bell className="w-5 h-5" />
   }
 
@@ -192,23 +192,14 @@ export default function NotificationsPage() {
   }
 
   const filteredNotifications = notifications.filter((n) => {
-    // Filtre par catégorie
-    if (categoryFilter !== "all" && getNotificationCategory(n.type) !== categoryFilter) {
-      return false
-    }
-    // Filtre non lues
-    if (showUnreadOnly && n.isRead) {
-      return false
-    }
+    if (categoryFilter !== "all" && getNotificationCategory(n.type) !== categoryFilter) return false
+    if (showUnreadOnly && n.isRead) return false
     return true
   })
 
-  // Grouper par mois
   const groupedByMonth = filteredNotifications.reduce((acc, notification) => {
     const monthYear = getMonthYear(notification.createdAt)
-    if (!acc[monthYear]) {
-      acc[monthYear] = []
-    }
+    if (!acc[monthYear]) acc[monthYear] = []
     acc[monthYear].push(notification)
     return acc
   }, {} as Record<string, Notification[]>)
@@ -216,13 +207,13 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
   const categories = [
-    { key: "all" as CategoryFilter, label: "Tout", icon: null },
-    { key: "subscription" as CategoryFilter, label: "Alertes abonnement", icon: AlertCircle },
-    { key: "payment" as CategoryFilter, label: "Paiements", icon: CreditCard },
-    { key: "reminder" as CategoryFilter, label: "Rappels", icon: Clock },
-    { key: "info" as CategoryFilter, label: "Informations", icon: Info },
-    { key: "system" as CategoryFilter, label: "Mises à jour système", icon: Settings },
-    { key: "event" as CategoryFilter, label: "Événements", icon: Calendar },
+    { key: "all" as CategoryFilter, label: "Tout" },
+    { key: "subscription" as CategoryFilter, label: "Alertes abonnement" },
+    { key: "payment" as CategoryFilter, label: "Paiements" },
+    { key: "reminder" as CategoryFilter, label: "Rappels" },
+    { key: "info" as CategoryFilter, label: "Informations" },
+    { key: "system" as CategoryFilter, label: "Mises à jour système" },
+    { key: "event" as CategoryFilter, label: "Événements" },
   ]
 
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -253,42 +244,14 @@ export default function NotificationsPage() {
         <div className={`sticky top-0 z-10 ${bgCard} border-b ${borderColor}`}>
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Navigation */}
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => window.history.back()}
-                  className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${textColor}`}
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <h1 className={`text-xl font-bold ${textColor}`}>Notifications</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={checkSubscriptions}
-                  disabled={checking}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    checking
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : theme === "dark"
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  }`}
-                  title="Vérifier les abonnements et générer les alertes"
-                >
-                  {checking ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Vérification...
-                    </div>
-                  ) : (
-                    'Vérifier les abonnements'
-                  )}
-                </button>
-                <button className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${textColor}`}>
-                  <Settings className="w-5 h-5" />
-                </button>
-              </div>
+            <div className="flex items-center h-16">
+              <button
+                onClick={() => window.history.back()}
+                className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${textColor} mr-4`}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h1 className={`text-xl font-bold ${textColor}`}>Notifications</h1>
             </div>
 
             {/* Sous-header */}
@@ -330,8 +293,8 @@ export default function NotificationsPage() {
                       className="sr-only peer"
                     />
                     <div className={`w-11 h-6 rounded-full transition-colors ${
-                      showUnreadOnly 
-                        ? "bg-indigo-600" 
+                      showUnreadOnly
+                        ? "bg-indigo-600"
                         : theme === "dark" ? "bg-gray-600" : "bg-gray-300"
                     }`}></div>
                     <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform ${
@@ -361,7 +324,7 @@ export default function NotificationsPage() {
               <Bell className={`w-16 h-16 mx-auto mb-4 ${theme === "dark" ? "text-gray-600" : "text-gray-300"}`} />
               <p className={`text-lg font-medium ${textColor}`}>Aucune notification</p>
               <p className={`mt-1 ${textSecondary}`}>
-                {showUnreadOnly 
+                {showUnreadOnly
                   ? "Vous êtes à jour ! Aucune notification non lue."
                   : "Vous n'avez pas encore de notifications."
                 }
@@ -371,36 +334,31 @@ export default function NotificationsPage() {
             <div className="space-y-6">
               {Object.entries(groupedByMonth).map(([monthYear, monthNotifications]) => (
                 <div key={monthYear}>
-                  {/* Séparateur de mois */}
                   <div className="mb-3">
                     <h3 className={`text-sm font-semibold ${textSecondary}`}>{monthYear}</h3>
                   </div>
 
-                  {/* Notifications du mois */}
                   <div className={`${bgCard} rounded-xl border ${borderColor} divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                     {monthNotifications.map((notification) => (
                       <div
                         key={notification.id}
                         className={`p-4 transition-colors relative ${
-                          !notification.isRead && theme === "dark" 
-                            ? "bg-indigo-500/5" 
-                            : !notification.isRead 
-                            ? "bg-indigo-50/50" 
+                          !notification.isRead && theme === "dark"
+                            ? "bg-indigo-500/5"
+                            : !notification.isRead
+                            ? "bg-indigo-50/50"
                             : ""
                         } hover:bg-gray-50 dark:hover:bg-gray-700/30`}
                       >
                         <div className="flex items-start gap-4">
-                          {/* Indicateur non lu */}
                           {!notification.isRead && (
                             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 bg-red-500 rounded-r"></div>
                           )}
 
-                          {/* Icône */}
                           <div className={`p-3 rounded-full flex-shrink-0 ${getNotificationColor(notification.type)}`}>
                             {getNotificationIcon(notification.type)}
                           </div>
 
-                          {/* Contenu */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
@@ -412,7 +370,6 @@ export default function NotificationsPage() {
                                 </p>
                               </div>
 
-                              {/* Menu actions */}
                               <div className="relative">
                                 <button
                                   onClick={() => setOpenMenuId(openMenuId === notification.id ? null : notification.id)}
@@ -421,11 +378,10 @@ export default function NotificationsPage() {
                                   <MoreVertical className="w-4 h-4" />
                                 </button>
 
-                                {/* Dropdown menu */}
                                 {openMenuId === notification.id && (
                                   <>
-                                    <div 
-                                      className="fixed inset-0 z-10" 
+                                    <div
+                                      className="fixed inset-0 z-10"
                                       onClick={() => setOpenMenuId(null)}
                                     ></div>
                                     <div className={`absolute right-0 mt-1 w-48 ${bgCard} rounded-lg shadow-lg border ${borderColor} py-1 z-20`}>
@@ -457,7 +413,6 @@ export default function NotificationsPage() {
                               </div>
                             </div>
 
-                            {/* Date/Heure */}
                             <p className={`text-xs mt-2 ${textSecondary}`}>
                               {formatDate(notification.createdAt)}
                             </p>

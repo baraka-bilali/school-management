@@ -21,21 +21,38 @@ interface NotificationBellProps {
   onNotificationClick?: () => void
 }
 
-// Son "bing" généré via Web Audio API — pas de fichier externe
+// Son "ting dong" généré via Web Audio API — pas de fichier externe
 function playBing() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = "sine"
-    osc.frequency.setValueAtTime(880, ctx.currentTime)
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15)
-    gain.gain.setValueAtTime(0.25, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.6)
+    const t = ctx.currentTime
+
+    // "Ting" — note aiguë courte
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    osc1.type = "sine"
+    osc1.frequency.setValueAtTime(1400, t)
+    osc1.frequency.exponentialRampToValueAtTime(1200, t + 0.08)
+    gain1.gain.setValueAtTime(0.3, t)
+    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
+    osc1.start(t)
+    osc1.stop(t + 0.35)
+
+    // "Dong" — note grave résonante, décalée de 180ms
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.type = "sine"
+    osc2.frequency.setValueAtTime(700, t + 0.18)
+    osc2.frequency.exponentialRampToValueAtTime(550, t + 0.5)
+    gain2.gain.setValueAtTime(0.0, t)
+    gain2.gain.setValueAtTime(0.25, t + 0.18)
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.9)
+    osc2.start(t)
+    osc2.stop(t + 0.9)
   } catch {}
 }
 
@@ -163,7 +180,25 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   }, [])
 
   useEffect(() => {
-    if (isOpen) fetchNotifications()
+    if (!isOpen) return
+    const loadAndMarkRead = async () => {
+      setLoading(true)
+      try {
+        const [notifRes] = await Promise.all([
+          authFetch("/api/notifications?page=1&limit=5", { credentials: "include" }),
+          authFetch("/api/notifications", { method: "POST", credentials: "include" }),
+        ])
+        if (notifRes.ok) {
+          const data = await notifRes.json()
+          setNotifications(data.notifications.map((n: Notification) => ({ ...n, isRead: true })))
+        }
+        setUnreadCount(0)
+        prevUnreadRef.current = 0
+      } catch {} finally {
+        setLoading(false)
+      }
+    }
+    loadAndMarkRead()
   }, [isOpen])
 
   const getNotificationColor = (type: string) => {
