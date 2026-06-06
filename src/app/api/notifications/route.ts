@@ -37,8 +37,10 @@ export async function GET(req: NextRequest) {
             ],
           }
         : {
-            userId: userId,
-            targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] },
+            OR: [
+              { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+              { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+            ],
           }
 
     const [notifications, total] = await Promise.all([
@@ -88,7 +90,13 @@ export async function POST(req: NextRequest) {
       })
     } else {
       await prisma.notification.updateMany({
-        where: { userId: userId, isRead: false },
+        where: {
+          isRead: false,
+          OR: [
+            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+            { userId: userId },
+          ],
+        },
         data: { isRead: true },
       })
     }

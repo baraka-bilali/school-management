@@ -40,9 +40,11 @@ export async function GET(req: NextRequest) {
     } else {
       count = await prisma.notification.count({
         where: {
-          userId: userId,
           isRead: false,
-          targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] },
+          OR: [
+            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+            { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+          ],
         },
       })
     }
