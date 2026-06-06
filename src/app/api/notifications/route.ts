@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
+const DEFAULT_LIMIT = 10
 
 interface JwtPayload {
   id: number
@@ -10,7 +11,7 @@ interface JwtPayload {
   schoolId?: number
 }
 
-// GET /api/notifications - Récupérer les notifications
+// GET /api/notifications?page=1&limit=10
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value
@@ -22,40 +23,43 @@ export async function GET(req: NextRequest) {
     const userId = decoded.id
     const userRole = decoded.role
 
-    let notifications
+    const { searchParams } = new URL(req.url)
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT)))
+    const skip = (page - 1) * limit
 
-    if (userRole === "SUPER_ADMIN") {
-      // Super Admin : voit uniquement les notifications SUPER_ADMIN_ONLY (globales)
-      // et ses notifications personnelles — pas les messages destinés aux écoles
-      notifications = await prisma.notification.findMany({
-        where: {
-          OR: [
-            {
-              userId: null,
-              targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] },
-            },
-            { userId: userId },
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      })
-    } else {
-      // Utilisateurs école : voient uniquement leurs notifications personnelles
-      // SCHOOL_USER_ONLY ou ALL
-      notifications = await prisma.notification.findMany({
-        where: {
-          userId: userId,
-          targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      })
-    }
+    const where =
+      userRole === "SUPER_ADMIN"
+        ? {
+            OR: [
+              { userId: null, targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] } },
+              { userId: userId },
+            ],
+          }
+        : {
+            userId: userId,
+            targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] },
+          }
 
-    return NextResponse.json({ notifications })
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.notification.count({ where }),
+    ])
+
+    return NextResponse.json({
+      notifications,
+      total,
+      page,
+      limit,
+      hasMore: skip + notifications.length < total,
+    })
   } catch (error) {
-    console.error("❌ Erreur lors de la récupération des notifications:", error)
+    console.error("❌ Erreur récupération notifications:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }
@@ -73,15 +77,10 @@ export async function POST(req: NextRequest) {
     const userRole = decoded.role
 
     if (userRole === "SUPER_ADMIN") {
-      // Marquer comme lues toutes les notifications globales + personnelles du super admin
       await prisma.notification.updateMany({
         where: {
           OR: [
-            {
-              userId: null,
-              targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] },
-              isRead: false,
-            },
+            { userId: null, targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] }, isRead: false },
             { userId: userId, isRead: false },
           ],
         },
@@ -96,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("❌ Erreur lors de la mise à jour des notifications:", error)
+    console.error("❌ Erreur mise à jour notifications:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }

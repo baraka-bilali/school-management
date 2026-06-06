@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Bell, X, Check, AlertCircle, Clock, BellOff } from "lucide-react"
+import { Bell, X, Check, AlertCircle, Clock, BellOff, Megaphone } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
 import { supabaseBrowser } from "@/lib/supabase-client"
@@ -21,6 +21,24 @@ interface NotificationBellProps {
   onNotificationClick?: () => void
 }
 
+// Son "bing" généré via Web Audio API — pas de fichier externe
+function playBing() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15)
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.6)
+  } catch {}
+}
+
 export default function NotificationBell({ onNotificationClick }: NotificationBellProps = {}) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -28,22 +46,19 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const isOpenRef = useRef(isOpen)
+  const prevUnreadRef = useRef(0)
 
-  // Garder isOpenRef synchronisé pour l'utiliser dans le callback Realtime
-  useEffect(() => {
-    isOpenRef.current = isOpen
-  }, [isOpen])
+  useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) setTheme(savedTheme)
-
     const handleThemeChange = () => {
-      const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
-      if (newTheme) setTheme(newTheme)
+      const t = localStorage.getItem("theme") as "light" | "dark" | null
+      if (t) setTheme(t)
     }
-
     window.addEventListener("themeChange", handleThemeChange)
     window.addEventListener("storage", handleThemeChange)
     return () => {
@@ -57,24 +72,26 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
       const res = await authFetch("/api/notifications/count", { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
-        setUnreadCount(data.count)
+        const newCount: number = data.count
+        // Jouer le son si nouvelles notifications arrivées
+        if (newCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
+          playBing()
+        }
+        prevUnreadRef.current = newCount
+        setUnreadCount(newCount)
       }
-    } catch (error) {
-      console.error("Erreur comptage notifications:", error)
-    }
+    } catch {}
   }
 
   const fetchNotifications = async () => {
     setLoading(true)
     try {
-      const res = await authFetch("/api/notifications", { credentials: "include" })
+      const res = await authFetch("/api/notifications?page=1&limit=5", { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
-        setNotifications(data.notifications.slice(0, 5))
+        setNotifications(data.notifications)
       }
-    } catch (error) {
-      console.error("Erreur récupération notifications:", error)
-    } finally {
+    } catch {} finally {
       setLoading(false)
     }
   }
@@ -87,102 +104,70 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
 
   const markAsRead = async (id: number) => {
     try {
-      const res = await authFetch(`/api/notifications/${id}`, {
-        method: "PATCH",
-        credentials: "include",
-      })
+      const res = await authFetch(`/api/notifications/${id}`, { method: "PATCH", credentials: "include" })
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
         setUnreadCount((prev) => Math.max(0, prev - 1))
       }
-    } catch (error) {
-      console.error("Erreur mise à jour notification:", error)
-    }
+    } catch {}
   }
 
   const deleteNotification = async (id: number) => {
     try {
-      const res = await authFetch(`/api/notifications/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
+      const res = await authFetch(`/api/notifications/${id}`, { method: "DELETE", credentials: "include" })
       if (res.ok) {
-        const notification = notifications.find((n) => n.id === id)
+        const notif = notifications.find((n) => n.id === id)
         setNotifications((prev) => prev.filter((n) => n.id !== id))
-        if (notification && !notification.isRead) {
-          setUnreadCount((prev) => Math.max(0, prev - 1))
-        }
+        if (notif && !notif.isRead) setUnreadCount((prev) => Math.max(0, prev - 1))
+        setConfirmDeleteId(null)
       }
-    } catch (error) {
-      console.error("Erreur suppression notification:", error)
-    }
+    } catch {}
   }
 
   const markAllAsRead = async () => {
     try {
-      const res = await authFetch("/api/notifications", {
-        method: "POST",
-        credentials: "include",
-      })
+      const res = await authFetch("/api/notifications", { method: "POST", credentials: "include" })
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
         setUnreadCount(0)
       }
-    } catch (error) {
-      console.error("Erreur mise à jour toutes notifications:", error)
-    }
+    } catch {}
   }
 
-  // Initialiser le compteur + abonnement Supabase Realtime au montage
   useEffect(() => {
     let cleanup: (() => void) | undefined
-
     const initRealtime = async () => {
-      // Charger le compteur initial
       fetchUnreadCount()
-
-      // Récupérer l'utilisateur courant pour choisir le bon canal
       try {
         const res = await authFetch("/api/auth/me", { credentials: "include" })
         if (!res.ok) return
         const { user } = await res.json()
 
-        const channelName =
-          user.role === "SUPER_ADMIN"
-            ? "notifications:super-admin"
-            : `notifications:user:${user.id}`
+        const channelName = user.role === "SUPER_ADMIN"
+          ? "notifications:super-admin"
+          : `notifications:user:${user.id}`
 
         const channel = supabaseBrowser
           .channel(channelName)
           .on("broadcast", { event: "new_notification" }, () => {
-            // Mettre à jour le badge en temps réel
             fetchUnreadCount()
-            // Si le panneau est ouvert, recharger la liste
             if (isOpenRef.current) fetchNotifications()
           })
           .subscribe()
 
-        cleanup = () => {
-          supabaseBrowser.removeChannel(channel)
-        }
-      } catch (error) {
-        console.error("Erreur initialisation Realtime:", error)
-      }
+        cleanup = () => supabaseBrowser.removeChannel(channel)
+      } catch {}
     }
-
     initRealtime()
-
-    return () => {
-      if (cleanup) cleanup()
-    }
+    return () => { if (cleanup) cleanup() }
   }, [])
 
-  // Charger les notifications quand on ouvre le panneau
   useEffect(() => {
     if (isOpen) fetchNotifications()
   }, [isOpen])
 
   const getNotificationColor = (type: string) => {
+    if (type === "SYSTEM_MESSAGE") return "text-purple-400"
     if (type.includes("EXPIRED")) return "text-red-400"
     if (type.includes("1_DAY") || type.includes("2_DAYS")) return "text-orange-400"
     if (type.includes("5_DAYS")) return "text-yellow-400"
@@ -190,8 +175,9 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   }
 
   const getNotificationIcon = (type: string) => {
-    if (type.includes("EXPIRED")) return <AlertCircle className="w-5 h-5" />
-    return <Clock className="w-5 h-5" />
+    if (type === "SYSTEM_MESSAGE") return <Megaphone className="w-4 h-4" />
+    if (type.includes("EXPIRED")) return <AlertCircle className="w-4 h-4" />
+    return <Clock className="w-4 h-4" />
   }
 
   const formatDate = (dateString: string) => {
@@ -201,7 +187,6 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
-
     if (diffMins < 1) return "À l'instant"
     if (diffMins < 60) return `Il y a ${diffMins} min`
     if (diffHours < 24) return `Il y a ${diffHours}h`
@@ -209,23 +194,15 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
     return date.toLocaleDateString("fr-FR")
   }
 
+  const isDark = theme === "dark"
+
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative p-2 rounded-lg transition-colors ${
-          theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-100"
-        }`}
+        className={`relative p-2 rounded-lg transition-colors ${isDark ? "hover:bg-gray-700/50" : "hover:bg-gray-100"}`}
       >
-        <Bell
-          className={`w-6 h-6 ${
-            unreadCount > 0
-              ? "text-indigo-500 animate-pulse"
-              : theme === "dark"
-              ? "text-gray-300"
-              : "text-gray-600"
-          }`}
-        />
+        <Bell className={`w-6 h-6 ${unreadCount > 0 ? "text-indigo-500 animate-pulse" : isDark ? "text-gray-300" : "text-gray-600"}`} />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-bounce">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -235,134 +212,98 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-
-          <div
-            className={`absolute right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden border ${
-              theme === "dark"
-                ? "bg-gray-800 border-gray-700"
-                : "bg-white border-gray-200"
-            }`}
-          >
-            <div
-              className={`px-4 py-3 flex items-center justify-between ${
-                theme === "dark" ? "bg-indigo-600" : "bg-indigo-500"
-              }`}
-            >
+          <div className="fixed inset-0 z-40" onClick={() => { setIsOpen(false); setConfirmDeleteId(null) }} />
+          <div className={`absolute right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden border ${isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+            {/* Header */}
+            <div className={`px-4 py-3 flex items-center justify-between ${isDark ? "bg-indigo-700" : "bg-indigo-600"}`}>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-white">Notifications</h3>
+                <h3 className="font-semibold text-white text-sm">Notifications</h3>
                 {unreadCount > 0 && (
-                  <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                    {unreadCount} non lues
+                  <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {unreadCount} non lu{unreadCount > 1 ? "es" : "e"}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="text-white/80 hover:text-white transition-colors"
-                    title="Tout marquer comme lu"
-                  >
+                  <button onClick={markAllAsRead} title="Tout marquer comme lu" className="text-white/80 hover:text-white p-1 transition-colors">
                     <Check className="w-4 h-4" />
                   </button>
                 )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-white/80 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
+                <button onClick={() => { setIsOpen(false); setConfirmDeleteId(null) }} className="text-white/80 hover:text-white transition-colors p-1">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
+            {/* Corps */}
             <div className="overflow-y-auto max-h-80">
               {loading ? (
                 <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto" />
-                  <p className={`mt-2 text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                    Chargement...
-                  </p>
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-indigo-500 mx-auto" />
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="p-8 text-center">
-                  <BellOff
-                    className={`w-12 h-12 mx-auto mb-3 ${
-                      theme === "dark" ? "text-gray-600" : "text-gray-300"
-                    }`}
-                  />
-                  <p className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                    Aucune notification
-                  </p>
-                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-                    Vous êtes à jour.
-                  </p>
+                  <BellOff className={`w-10 h-10 mx-auto mb-3 ${isDark ? "text-gray-600" : "text-gray-300"}`} />
+                  <p className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>Aucune notification</p>
                 </div>
               ) : (
-                <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`p-4 transition-colors cursor-pointer ${
-                        !notification.isRead
-                          ? theme === "dark"
-                            ? "bg-indigo-900/20"
-                            : "bg-indigo-50"
-                          : ""
-                      } ${theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={getNotificationColor(notification.type)}>
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span
-                              className={`text-xs ${
-                                theme === "dark" ? "text-gray-400" : "text-gray-500"
-                              }`}
-                            >
-                              {formatDate(notification.createdAt)}
-                            </span>
-                            {notification.daysLeft !== null && (
-                              <span
-                                className={`text-xs font-semibold ${
-                                  notification.daysLeft === 0
-                                    ? "text-red-500"
-                                    : notification.daysLeft <= 2
-                                    ? "text-orange-500"
-                                    : notification.daysLeft <= 5
-                                    ? "text-yellow-500"
-                                    : "text-blue-500"
-                                }`}
-                              >
-                                {notification.daysLeft === 0
-                                  ? "Expiré"
-                                  : `${notification.daysLeft}j restants`}
-                              </span>
-                            )}
+                <div className={`divide-y ${isDark ? "divide-gray-700" : "divide-gray-100"}`}>
+                  {notifications.map((n) => (
+                    <div key={n.id} className={`px-4 py-3 transition-colors relative ${
+                      !n.isRead
+                        ? isDark ? "bg-indigo-900/25 border-l-2 border-l-indigo-400" : "bg-indigo-50 border-l-2 border-l-indigo-500"
+                        : isDark ? "hover:bg-gray-700/30" : "hover:bg-gray-50"
+                    }`}>
+                      {/* Confirmation suppression inline */}
+                      {confirmDeleteId === n.id ? (
+                        <div className="flex items-center justify-between gap-2 py-1">
+                          <span className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>Supprimer cette notification ?</span>
+                          <div className="flex gap-2">
+                            <button onClick={() => setConfirmDeleteId(null)} className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-600 text-gray-200" : "bg-gray-200 text-gray-700"} hover:opacity-80`}>
+                              Annuler
+                            </button>
+                            <button onClick={() => deleteNotification(n.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">
+                              Supprimer
+                            </button>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="flex items-start gap-3" onClick={() => handleNotificationClick(n)}>
+                          <div className={`mt-0.5 flex-shrink-0 ${getNotificationColor(n.type)}`}>
+                            {getNotificationIcon(n.type)}
+                          </div>
+                          <div className="flex-1 min-w-0 cursor-pointer">
+                            <p className={`text-xs leading-snug ${!n.isRead ? `font-semibold ${isDark ? "text-gray-100" : "text-gray-800"}` : isDark ? "text-gray-300" : "text-gray-600"}`}>
+                              {n.message}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>{formatDate(n.createdAt)}</span>
+                              {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                              {n.isRead && <span className={`text-[10px] ${isDark ? "text-gray-600" : "text-gray-400"} flex items-center gap-0.5`}><Check className="w-2.5 h-2.5" /> Lu</span>}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(n.id) }}
+                            className={`flex-shrink-0 p-1 rounded transition-colors ${isDark ? "text-gray-600 hover:text-red-400" : "text-gray-300 hover:text-red-400"}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className={`p-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-100"}`}>
+            {/* Footer */}
+            <div className={`p-3 border-t ${isDark ? "border-gray-700" : "border-gray-100"}`}>
               <button
-                onClick={() => {
-                  setIsOpen(false)
-                  router.push("/admin/notifications")
-                }}
-                className="w-full py-2 text-sm font-medium text-indigo-500 hover:text-indigo-600 flex items-center justify-center gap-2 transition-colors"
+                onClick={() => { setIsOpen(false); router.push("/admin/notifications") }}
+                className="w-full py-2 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition-colors"
               >
-                Voir toutes les notifications
+                Voir toutes les notifications →
               </button>
             </div>
           </div>
