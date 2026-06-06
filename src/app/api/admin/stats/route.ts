@@ -18,9 +18,8 @@ function normalizePlan(plan: string | null | undefined) {
   const value = plan?.trim().toUpperCase()
 
   if (!value) return null
-  if (value === "BASIC") return "Basic"
-  if (value === "PREMIUM" || value === "PRO") return "Premium"
-  if (value === "ENTERPRISE") return "Enterprise"
+  if (value === "BASIC" || value === "STARTER") return "Starter"
+  if (value === "PREMIUM" || value === "PRO" || value === "ENTERPRISE") return "Pro"
 
   return null
 }
@@ -226,7 +225,7 @@ export async function GET(request: NextRequest) {
         accumulator[normalized] += 1
         return accumulator
       },
-      { Basic: 0, Premium: 0, Enterprise: 0, unassigned: 0 }
+      { Starter: 0, Pro: 0, unassigned: 0 } as Record<string, number>
     )
 
     const currentRevenue = currentPeriodSchools.reduce(
@@ -273,9 +272,8 @@ export async function GET(request: NextRequest) {
       })),
       unreadNotifications,
       subscriptionsByPlan: {
-        Basic: activePlanCounts.Basic,
-        Premium: activePlanCounts.Premium,
-        Enterprise: activePlanCounts.Enterprise,
+        Starter: activePlanCounts.Starter,
+        Pro: activePlanCounts.Pro,
       },
       unassignedSubscriptions: activePlanCounts.unassigned,
       subscriptionTimeline,

@@ -119,7 +119,7 @@ export default function SuperAdminHome() {
     schoolsByType: [] as { type: string, count: number }[],
     schoolsByProvince: [] as { province: string, count: number }[],
     unreadNotifications: 0,
-    subscriptionsByPlan: { Basic: 0, Premium: 0, Enterprise: 0 },
+    subscriptionsByPlan: { Starter: 0, Pro: 0 },
     unassignedSubscriptions: 0,
     subscriptionTimeline: [] as { label: string, count: number }[],
     maxTimelineCount: 0,
@@ -1308,11 +1308,9 @@ export default function SuperAdminHome() {
 
   const formatPlanLabel = (plan?: string | null) => {
     if (!plan) return "Non défini"
-
     const value = plan.toUpperCase()
-    if (value === "BASIC") return "Basic"
-    if (value === "PREMIUM" || value === "PRO") return "Premium"
-    if (value === "ENTERPRISE") return "Enterprise"
+    if (value === "BASIC" || value === "STARTER") return "Starter"
+    if (value === "PREMIUM" || value === "PRO" || value === "ENTERPRISE") return "Pro"
     return plan
   }
 
@@ -1603,66 +1601,33 @@ export default function SuperAdminHome() {
           <div className="flex items-center justify-center mb-6">
             <div className="relative w-40 h-40">
               {(() => {
-                const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                const basicPercent = total > 0 ? (stats.subscriptionsByPlan.Basic / total) * 100 : 0
-                const premiumPercent = total > 0 ? (stats.subscriptionsByPlan.Premium / total) * 100 : 0
-                const enterprisePercent = total > 0 ? (stats.subscriptionsByPlan.Enterprise / total) * 100 : 0
-                
+                const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
+                const starterPercent = total > 0 ? (stats.subscriptionsByPlan.Starter / total) * 100 : 0
+                const proPercent = total > 0 ? (stats.subscriptionsByPlan.Pro / total) * 100 : 0
+
                 const circumference = 440
-                const basicDash = (basicPercent / 100) * circumference
-                const premiumDash = (premiumPercent / 100) * circumference
-                const enterpriseDash = (enterprisePercent / 100) * circumference
-                
+                const starterDash = (starterPercent / 100) * circumference
+                const proDash = (proPercent / 100) * circumference
+
                 return (
                   <svg className="w-full h-full -rotate-90">
-                    {/* Background circles */}
                     <circle cx="80" cy="80" r="70" fill="none" stroke={theme === "dark" ? "#1a2332" : "#f3f4f6"} strokeWidth="20" />
-                    
-                    {/* Animated circles avec transitions - SANS strokeLinecap pour garder les bords carrés */}
-                    <circle 
-                      cx="80" 
-                      cy="80" 
-                      r="70" 
-                      fill="none" 
-                      stroke="#3b82f6" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${basicDash} ${circumference}`}
+                    <circle
+                      cx="80" cy="80" r="70" fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="20"
+                      strokeDasharray={`${starterDash} ${circumference}`}
                       className="transition-all duration-1000 ease-out"
-                      style={{
-                        animation: 'drawCircle 1.5s ease-out forwards'
-                      }}
+                      style={{ animation: 'drawCircle 1.5s ease-out forwards' }}
                     />
-                    <circle 
-                      cx="80" 
-                      cy="80" 
-                      r="70" 
-                      fill="none" 
-                      stroke="#a855f7" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${premiumDash} ${circumference}`} 
-                      strokeDashoffset={`-${basicDash}`}
+                    <circle
+                      cx="80" cy="80" r="70" fill="none"
+                      stroke="#a855f7"
+                      strokeWidth="20"
+                      strokeDasharray={`${proDash} ${circumference}`}
+                      strokeDashoffset={`-${starterDash}`}
                       className="transition-all duration-1000 ease-out"
-                      style={{
-                        animation: 'drawCircle 1.5s ease-out 0.2s forwards',
-                        opacity: 0,
-                        animationFillMode: 'forwards'
-                      }}
-                    />
-                    <circle 
-                      cx="80" 
-                      cy="80" 
-                      r="70" 
-                      fill="none" 
-                      stroke="#ec4899" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${enterpriseDash} ${circumference}`} 
-                      strokeDashoffset={`-${basicDash + premiumDash}`}
-                      className="transition-all duration-1000 ease-out"
-                      style={{
-                        animation: 'drawCircle 1.5s ease-out 0.4s forwards',
-                        opacity: 0,
-                        animationFillMode: 'forwards'
-                      }}
+                      style={{ animation: 'drawCircle 1.5s ease-out 0.2s forwards', opacity: 0, animationFillMode: 'forwards' }}
                     />
                   </svg>
                 )
@@ -1677,32 +1642,22 @@ export default function SuperAdminHome() {
             <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-blue-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500 group-hover:scale-110 transition-transform"></div>
-                <span className={textSecondary}>Basic ({(() => {
-                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Basic / total) * 100) : 0
+                <span className={textSecondary}>Starter ({(() => {
+                  const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Starter / total) * 100) : 0
                 })()}%)</span>
               </div>
-              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Basic}</span>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Starter}</span>
             </div>
             <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-purple-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-purple-500 group-hover:scale-110 transition-transform"></div>
-                <span className={textSecondary}>Premium ({(() => {
-                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Premium / total) * 100) : 0
+                <span className={textSecondary}>Pro ({(() => {
+                  const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
+                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Pro / total) * 100) : 0
                 })()}%)</span>
               </div>
-              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Premium}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-pink-500/5 p-2 rounded-lg transition-colors">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-pink-500 group-hover:scale-110 transition-transform"></div>
-                <span className={textSecondary}>Enterprise ({(() => {
-                  const total = stats.subscriptionsByPlan.Basic + stats.subscriptionsByPlan.Premium + stats.subscriptionsByPlan.Enterprise
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Enterprise / total) * 100) : 0
-                })()}%)</span>
-              </div>
-              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Enterprise}</span>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Pro}</span>
             </div>
             <div className="flex items-center justify-between text-sm p-2">
               <span className={textSecondary}>Sans formule</span>

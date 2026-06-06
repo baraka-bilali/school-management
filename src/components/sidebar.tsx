@@ -85,8 +85,8 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  type NavItem = { icon: LucideIcon; label: string; href: string }
-  
+  type NavItem = { icon: LucideIcon; label: string; href: string; proOnly?: boolean }
+
   // Menu pour les administrateurs
   const adminNavItems: NavItem[] = [
     { icon: BarChart3, label: "Tableau de bord", href: "/admin" },
@@ -94,8 +94,8 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
     { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
     { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
-    { icon: Calendar, label: "Horaire", href: "/admin/schedule" },
-    { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades" },
+    { icon: Calendar, label: "Horaire", href: "/admin/schedule", proOnly: true },
+    { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
     { icon: Bell, label: "Notifications", href: "/admin/notifications" },
   ]
@@ -199,6 +199,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
               <ul className="space-y-1">
                 {navItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
+                  const proLocked = !!(item as NavItem).proOnly
                   return (
                   <li key={index}>
                     {locked ? (
@@ -206,6 +207,15 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                         <item.icon className="w-5 h-5 mr-3" />
                         <span className="flex-1">{item.label}</span>
                         <Lock className="w-3 h-3 opacity-60" />
+                      </span>
+                    ) : proLocked ? (
+                      <span
+                        className={`flex items-center px-3 py-2.5 rounded-lg cursor-not-allowed select-none opacity-60 ${textSecondary}`}
+                        title="Disponible avec le plan Pro"
+                      >
+                        <item.icon className="w-5 h-5 mr-3" />
+                        <span className="flex-1">{item.label}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
                       </span>
                     ) : (
                     <Link 
@@ -355,6 +365,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
               <ul className="space-y-1">
                 {navItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
+                  const proLocked = !!(item as NavItem).proOnly
                   return (
                   <li key={index}>
                     {locked ? (
@@ -369,6 +380,23 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                           <>
                             <span className="ml-3 flex-1">{item.label}</span>
                             <Lock className="w-3 h-3 ml-1 opacity-60" />
+                          </>
+                        )}
+                      </span>
+                    ) : proLocked ? (
+                      <span
+                        className={`
+                          flex items-center rounded-lg opacity-60 cursor-not-allowed select-none
+                          ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
+                          ${textSecondary}
+                        `}
+                        title={!isOpen ? `${item.label} (Plan Pro)` : undefined}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {isOpen && (
+                          <>
+                            <span className="ml-3 flex-1">{item.label}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
                           </>
                         )}
                       </span>
