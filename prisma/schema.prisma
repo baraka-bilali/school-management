@@ -213,17 +213,19 @@ model School {
 }
 
 model Notification {
-  id        Int              @id @default(autoincrement())
-  type      NotificationType
-  message   String           @db.Text
-  schoolId  Int?
-  userId    Int?
-  isRead    Boolean          @default(false)
-  daysLeft  Int?
-  createdAt DateTime         @default(now())
+  id         Int                @id @default(autoincrement())
+  type       NotificationType
+  message    String             @db.Text
+  schoolId   Int?
+  userId     Int?
+  targetRole NotificationTarget @default(ALL)
+  isRead     Boolean            @default(false)
+  daysLeft   Int?
+  createdAt  DateTime           @default(now())
 
   @@index([userId, isRead])
   @@index([schoolId, isRead])
+  @@index([targetRole, isRead])
   @@index([createdAt])
 }
 
@@ -450,6 +452,12 @@ enum NotificationType {
   SUBSCRIPTION_EXPIRING_2_DAYS
   SUBSCRIPTION_EXPIRING_1_DAY
   SUBSCRIPTION_EXPIRED
+}
+
+enum NotificationTarget {
+  SUPER_ADMIN_ONLY
+  SCHOOL_USER_ONLY
+  ALL
 }
 
 enum ModePaiement {
