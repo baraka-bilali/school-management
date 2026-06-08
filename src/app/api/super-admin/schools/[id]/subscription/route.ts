@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { supabaseAdmin } from "@/lib/supabase-server"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
-const SUBSCRIPTION_PRICE_USD = 70
-const SUBSCRIPTION_MONTHS = 1
 
 async function requireSuperAdmin(req: NextRequest) {
   const cookieHeader = req.headers.get("Cookie") || req.headers.get("cookie") || ""
@@ -18,7 +17,17 @@ async function requireSuperAdmin(req: NextRequest) {
   }
 }
 
-// PUT: Activer / renouveler l'abonnement mensuel d'une école (70 USD, 1 mois)
+async function generateInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear()
+  const counter = await prisma.subscriptionInvoiceCounter.upsert({
+    where: { year },
+    update: { counter: { increment: 1 } },
+    create: { year, counter: 1 },
+  })
+  return `FAC-${year}-${String(counter.counter).padStart(4, "0")}`
+}
+
+// PUT: Activer / renouveler l'abonnement d'une école
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -35,45 +44,139 @@ export async function PUT(
     if (!existingSchool) return NextResponse.json({ error: "École non trouvée" }, { status: 404 })
 
     const body = await req.json()
-    const { dateDebutAbonnement, typePaiement, montantPaye } = body
+    const {
+      dateDebutAbonnement,
+      dateFinAbonnement,
+      periodeAbonnement,
+      planAbonnement,
+      typePaiement,
+      montantPaye,
+      notes,
+      reference,
+    } = body
 
-    // Calculate start date: if provided use it, otherwise today
     const startDate = dateDebutAbonnement ? new Date(dateDebutAbonnement) : new Date()
     startDate.setHours(0, 0, 0, 0)
 
-    // End date = start + 1 month
-    const endDate = new Date(startDate)
-    endDate.setMonth(endDate.getMonth() + SUBSCRIPTION_MONTHS)
-    endDate.setHours(23, 59, 59, 999)
+    let endDate: Date
+    if (dateFinAbonnement) {
+      endDate = new Date(dateFinAbonnement)
+      endDate.setHours(23, 59, 59, 999)
+    } else {
+      endDate = new Date(startDate)
+      endDate.setMonth(endDate.getMonth() + 1)
+      endDate.setHours(23, 59, 59, 999)
+    }
 
-    const updatedSchool = await prisma.school.update({
-      where: { id: schoolId },
+    const periode = periodeAbonnement || "MENSUEL"
+    const plan = planAbonnement || "BASIC"
+    const montant = montantPaye != null ? parseFloat(String(montantPaye)) : 70
+    const devise = "USD"
+
+    const numeroFacture = await generateInvoiceNumber()
+
+    const [updatedSchool, payment] = await prisma.$transaction([
+      prisma.school.update({
+        where: { id: schoolId },
+        data: {
+          dateDebutAbonnement: startDate,
+          dateFinAbonnement: endDate,
+          periodeAbonnement: periode,
+          planAbonnement: plan,
+          typePaiement: typePaiement || "MOBILE_MONEY",
+          montantPaye: montant,
+          etatCompte: "ACTIF",
+        },
+        select: {
+          id: true,
+          nomEtablissement: true,
+          etatCompte: true,
+          dateDebutAbonnement: true,
+          dateFinAbonnement: true,
+          periodeAbonnement: true,
+          planAbonnement: true,
+          typePaiement: true,
+          montantPaye: true,
+          creeParId: true,
+        },
+      }),
+      prisma.subscriptionPayment.create({
+        data: {
+          schoolId,
+          montant,
+          devise,
+          typePaiement: typePaiement || "MOBILE_MONEY",
+          reference: reference || null,
+          dateDebut: startDate,
+          dateFin: endDate,
+          periode,
+          plan,
+          numeroFacture,
+          notes: notes || null,
+          statut: "ACTIF",
+          createdById: user.id || null,
+        },
+      }),
+    ])
+
+    // Notification pour l'admin de l'école
+    const schoolAdminMessage = `✅ Votre abonnement a été renouvelé. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
+
+    await prisma.notification.create({
       data: {
-        dateDebutAbonnement: startDate,
-        dateFinAbonnement: endDate,
-        periodeAbonnement: "MENSUEL",
-        planAbonnement: "Mensuel",
-        typePaiement: typePaiement || "MOBILE_MONEY",
-        montantPaye: montantPaye != null ? parseFloat(String(montantPaye)) : SUBSCRIPTION_PRICE_USD,
-        etatCompte: "ACTIF",
+        type: "SUBSCRIPTION_PAYMENT_RECEIVED",
+        message: schoolAdminMessage,
+        schoolId,
+        userId: existingSchool.creeParId,
+        targetRole: "SCHOOL_USER_ONLY",
       },
-      select: {
-        id: true,
-        nomEtablissement: true,
-        etatCompte: true,
-        dateDebutAbonnement: true,
-        dateFinAbonnement: true,
-        periodeAbonnement: true,
-        planAbonnement: true,
-        typePaiement: true,
-        montantPaye: true,
+    })
+
+    // Notification pour le super-admin
+    await prisma.notification.create({
+      data: {
+        type: "SUBSCRIPTION_PAYMENT_RECEIVED",
+        message: `💳 Paiement enregistré pour l'école "${existingSchool.nomEtablissement}" — Facture ${numeroFacture} — ${montant} ${devise}.`,
+        schoolId,
+        userId: null,
+        targetRole: "SUPER_ADMIN_ONLY",
+      },
+    })
+
+    // Push Realtime → admin de l'école
+    if (existingSchool.creeParId) {
+      await supabaseAdmin
+        .channel(`notifications:user:${existingSchool.creeParId}`)
+        .send({
+          type: "broadcast",
+          event: "new_notification",
+          payload: {
+            type: "SUBSCRIPTION_PAYMENT_RECEIVED",
+            numeroFacture,
+            montant,
+            devise,
+          },
+        })
+    }
+
+    // Push Realtime → super-admin
+    await supabaseAdmin.channel("notifications:super-admin").send({
+      type: "broadcast",
+      event: "new_notification",
+      payload: {
+        type: "SUBSCRIPTION_PAYMENT_RECEIVED",
+        schoolName: existingSchool.nomEtablissement,
+        numeroFacture,
+        montant,
       },
     })
 
     return NextResponse.json({
       success: true,
       school: updatedSchool,
-      message: `Abonnement activé jusqu'au ${endDate.toLocaleDateString("fr-FR")}`,
+      payment,
+      numeroFacture,
+      message: `Abonnement activé jusqu'au ${endDate.toLocaleDateString("fr-FR")} — Facture ${numeroFacture}`,
     })
   } catch (e: any) {
     console.error("Erreur abonnement:", e)

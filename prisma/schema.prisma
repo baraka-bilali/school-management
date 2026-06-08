@@ -28,6 +28,7 @@ model User {
   student           Student?
   teacher           Teacher?
   school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
+  subscriptionPayments SubscriptionPayment[] @relation("SubscriptionPayments")
 
   @@index([schoolId])
   @@index([schoolId, isActive])
@@ -203,9 +204,10 @@ model School {
   planAbonnement              String?
   typePaiement                String?
   montantPaye                 Float?
-  createdBy                   User?             @relation("SchoolsCreated", fields: [creeParId], references: [id])
-  admins                      User[]            @relation("SchoolAdmins")
+  createdBy                   User?                  @relation("SchoolsCreated", fields: [creeParId], references: [id])
+  admins                      User[]                 @relation("SchoolAdmins")
   classes                     Class[]
+  subscriptionPayments        SubscriptionPayment[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -453,6 +455,8 @@ enum NotificationType {
   SUBSCRIPTION_EXPIRING_1_DAY
   SUBSCRIPTION_EXPIRED
   SYSTEM_MESSAGE
+  SUBSCRIPTION_PAYMENT_RECEIVED
+  SUBSCRIPTION_CANCELLED
 }
 
 enum NotificationTarget {
@@ -467,6 +471,41 @@ enum ModePaiement {
   MOBILE_MONEY
   CHEQUE
   AUTRE
+}
+
+// ============================================================
+// MODULE ABONNEMENTS — PAIEMENTS & FACTURES
+// ============================================================
+
+model SubscriptionPayment {
+  id            Int      @id @default(autoincrement())
+  schoolId      Int
+  montant       Float
+  devise        String   @default("USD")
+  typePaiement  String
+  reference     String?
+  dateDebut     DateTime
+  dateFin       DateTime
+  periode       String
+  plan          String
+  numeroFacture String   @unique
+  notes         String?  @db.Text
+  statut        String   @default("ACTIF")
+  createdAt     DateTime @default(now())
+  createdById   Int?
+  school        School   @relation(fields: [schoolId], references: [id])
+  createdBy     User?    @relation("SubscriptionPayments", fields: [createdById], references: [id])
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@index([numeroFacture])
+}
+
+model SubscriptionInvoiceCounter {
+  id        Int      @id @default(autoincrement())
+  year      Int      @unique
+  counter   Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================

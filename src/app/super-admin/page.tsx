@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check, AlertTriangle, CalendarX, Settings2 } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Building2, CreditCard, DollarSign, Search, Plus, Pencil, Trash2, Bell, Moon, Sun, LogOut, MapPin, UserCheck, GraduationCap, FileText, Download, Printer, Eye, UserPlus, Mail, Phone, Briefcase, User, KeyRound, Lock, Copy, Check, AlertTriangle, CalendarX, Settings2, Receipt } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
@@ -802,19 +802,7 @@ export default function SuperAdminHome() {
   }
 
   const handleManageSubscription = (school: School) => {
-    setSelectedSchool(school)
-    setSubscriptionError("")
-    setSubscriptionSuccess(false)
-    const s = school as any
-    setSubscriptionForm({
-      dateDebutAbonnement: s.dateDebutAbonnement ? new Date(s.dateDebutAbonnement).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-      dateFinAbonnement: "",
-      periodeAbonnement: "MENSUEL",
-      planAbonnement: "Mensuel",
-      typePaiement: s.typePaiement || "MOBILE_MONEY",
-      montantPaye: "70",
-    })
-    setShowSubscriptionModal(true)
+    router.push(`/super-admin/schools/${school.id}/subscription`)
   }
 
   const handleSaveSubscription = async () => {
@@ -1442,6 +1430,17 @@ export default function SuperAdminHome() {
                       <div className={`text-sm font-medium ${textColor}`}>{user.name}</div>
                       <div className={`text-xs ${textSecondary}`}>{user.email}</div>
                     </div>
+
+                    <a
+                      href="/super-admin/subscription-payments"
+                      className={`w-full px-4 py-3 flex items-center gap-3 ${hoverBg} transition-colors text-left border-b ${borderColor}`}
+                    >
+                      <Receipt className="w-5 h-5 text-emerald-500" />
+                      <div>
+                        <div className={`text-sm font-medium ${textColor}`}>Journal des paiements</div>
+                        <div className={`text-xs ${textSecondary}`}>Abonnements & factures</div>
+                      </div>
+                    </a>
 
                     <button
                       onClick={toggleTheme}
