@@ -9,6 +9,7 @@ import {
   Mail, Phone, Receipt, FileText, ChevronLeft,
   ChevronRight, Download, MessageCircle
 } from "lucide-react"
+import InvoiceDownloadButton from "@/components/invoice-download-button"
 
 interface School {
   id: number
@@ -218,13 +219,22 @@ function InvoicePrintModal({
 
         {/* Actions */}
         <div className="flex gap-3 px-8 pb-8">
-          <button
-            onClick={() => window.print()}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Imprimer / Télécharger
-          </button>
+          <InvoiceDownloadButton
+            data={{
+              numeroFacture: payment.numeroFacture,
+              createdAt: payment.createdAt,
+              plan: payment.plan,
+              periode: payment.periode,
+              dateDebut: payment.dateDebut,
+              dateFin: payment.dateFin,
+              montant: payment.montant,
+              devise: payment.devise,
+              typePaiement: payment.typePaiement,
+              reference: payment.reference,
+              notes: payment.notes,
+              schoolName: school.nomEtablissement,
+            }}
+          />
           <button
             onClick={onClose}
             className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"

@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, Building2, Calendar,
   Download, TrendingUp, Receipt, XCircle, FileText
 } from "lucide-react"
+import InvoiceDownloadButton from "@/components/invoice-download-button"
 
 type School = {
   id: number
@@ -414,13 +415,26 @@ export default function SuperAdminSubscriptionPayments() {
             </div>
 
             <div className="flex gap-3 px-8 pb-8">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Imprimer / Télécharger
-              </button>
+              <InvoiceDownloadButton
+                data={{
+                  numeroFacture: selectedPayment.numeroFacture,
+                  createdAt: selectedPayment.createdAt,
+                  plan: selectedPayment.plan,
+                  periode: selectedPayment.periode,
+                  dateDebut: selectedPayment.dateDebut,
+                  dateFin: selectedPayment.dateFin,
+                  montant: selectedPayment.montant,
+                  devise: selectedPayment.devise,
+                  typePaiement: selectedPayment.typePaiement,
+                  reference: selectedPayment.reference,
+                  notes: selectedPayment.notes,
+                  schoolName: selectedPayment.school.nomEtablissement,
+                  schoolCode: selectedPayment.school.codeEtablissement,
+                  createdByName: selectedPayment.createdBy
+                    ? `${selectedPayment.createdBy.prenom} ${selectedPayment.createdBy.nom}`
+                    : null,
+                }}
+              />
               <button
                 onClick={() => setSelectedPayment(null)}
                 className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
