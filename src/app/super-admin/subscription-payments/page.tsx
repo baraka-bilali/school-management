@@ -431,7 +431,6 @@ export default function SuperAdminSubscriptionPayments() {
           </div>
         </div>
       )}
-      </div>
     </SuperAdminLayout>
   )
 }
