@@ -99,14 +99,20 @@ export default function NotificationsPage() {
   const markAsRead = async (id: number) => {
     try {
       const res = await authFetch(`/api/notifications/${id}`, { method: "PATCH", credentials: "include" })
-      if (res.ok) setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+        window.dispatchEvent(new Event("notificationsMarkedRead"))
+      }
     } catch {}
   }
 
   const markAllAsRead = async () => {
     try {
       const res = await authFetch("/api/notifications", { method: "POST", credentials: "include" })
-      if (res.ok) setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+        window.dispatchEvent(new Event("notificationsMarkedRead"))
+      }
     } catch {}
   }
 

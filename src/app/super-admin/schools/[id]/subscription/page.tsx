@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import SuperAdminLayout from "@/components/super-admin-layout"
 import {
-  ArrowLeft, Building2, CreditCard, Calendar, Clock, DollarSign,
+  ArrowLeft, Building2, CreditCard, Calendar, DollarSign,
   CheckCircle, AlertTriangle, CalendarX, Save, RefreshCw, XCircle,
-  FileText, Receipt, ChevronLeft, ChevronRight, Hash
+  FileText, Receipt, ChevronLeft, ChevronRight, Hash, ArrowRight,
+  Clock, TrendingUp, ShieldOff
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,7 +58,6 @@ export default function SubscriptionManagement() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [cancelMotif, setCancelMotif] = useState("")
 
-  // Payments history
   const [payments, setPayments] = useState<SubscriptionPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -65,12 +65,9 @@ export default function SubscriptionManagement() {
   const [totalPayments, setTotalPayments] = useState(0)
 
   const [form, setForm] = useState({
-    dateDebutAbonnement: "",
-    dateFinAbonnement: "",
-    periodeAbonnement: "MENSUEL",
     planAbonnement: "STARTER",
     typePaiement: "MOBILE_MONEY",
-    montantPaye: "",
+    montantPaye: "70",
     reference: "",
     notes: "",
   })
@@ -92,24 +89,12 @@ export default function SubscriptionManagement() {
       if (!res.ok) throw new Error("École non trouvée")
       const data = await res.json()
       setSchool(data.school)
-      const today = new Date().toISOString().split("T")[0]
-      const isInactive = data.school.etatCompte === "SUSPENDU" ||
-        (data.school.dateFinAbonnement && new Date(data.school.dateFinAbonnement) < new Date())
-      setForm({
-        dateDebutAbonnement: isInactive ? today :
-          (data.school.dateDebutAbonnement
-            ? new Date(data.school.dateDebutAbonnement).toISOString().split("T")[0]
-            : today),
-        dateFinAbonnement: data.school.dateFinAbonnement && !isInactive
-          ? new Date(data.school.dateFinAbonnement).toISOString().split("T")[0]
-          : "",
-        periodeAbonnement: data.school.periodeAbonnement || "MENSUEL",
+      setForm(prev => ({
+        ...prev,
         planAbonnement: data.school.planAbonnement || "STARTER",
         typePaiement: data.school.typePaiement || "MOBILE_MONEY",
-        montantPaye: data.school.montantPaye?.toString() || "",
-        reference: "",
-        notes: "",
-      })
+        montantPaye: data.school.montantPaye?.toString() || "70",
+      }))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -133,6 +118,29 @@ export default function SubscriptionManagement() {
     }
   }
 
+  // Calcul des dates prévisionnelles (identique à l'API)
+  const getPreviewDates = () => {
+    const now = new Date()
+    const isActive =
+      school?.etatCompte === "ACTIF" &&
+      school.dateFinAbonnement !== null &&
+      new Date(school.dateFinAbonnement!) > now
+
+    let startDate: Date
+    if (isActive) {
+      startDate = new Date(school!.dateFinAbonnement!)
+    } else {
+      startDate = new Date()
+    }
+    startDate.setHours(0, 0, 0, 0)
+
+    const endDate = new Date(startDate)
+    endDate.setDate(endDate.getDate() + 30)
+    endDate.setHours(23, 59, 59, 999)
+
+    return { startDate, endDate, isExtension: isActive }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -145,9 +153,6 @@ export default function SubscriptionManagement() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dateDebutAbonnement: form.dateDebutAbonnement || null,
-          dateFinAbonnement: form.dateFinAbonnement || null,
-          periodeAbonnement: form.periodeAbonnement,
           planAbonnement: form.planAbonnement,
           typePaiement: form.typePaiement,
           montantPaye: form.montantPaye ? parseFloat(form.montantPaye) : null,
@@ -164,9 +169,9 @@ export default function SubscriptionManagement() {
       const data = await res.json()
       setSuccess(true)
       setSuccessMsg(data.message || "Abonnement enregistré !")
-      fetchSchool()
       setForm(prev => ({ ...prev, reference: "", notes: "" }))
-      setTimeout(() => setSuccess(false), 5000)
+      fetchSchool()
+      setTimeout(() => setSuccess(false), 6000)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -203,9 +208,7 @@ export default function SubscriptionManagement() {
   const getSubscriptionStatus = () => {
     if (!school?.dateFinAbonnement) return { status: "undefined", label: "Non défini", color: "gray" }
     if (school.etatCompte === "SUSPENDU") return { status: "suspended", label: "Résilié / Suspendu", color: "red", days: 0 }
-    const endDate = new Date(school.dateFinAbonnement)
-    const today = new Date()
-    const daysLeft = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    const daysLeft = Math.floor((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     if (daysLeft <= 0) return { status: "expired", label: "Expiré", color: "red", days: 0 }
     if (daysLeft <= 7) return { status: "warning", label: `${daysLeft} jours restants`, color: "orange", days: daysLeft }
     if (daysLeft <= 30) return { status: "soon", label: `${daysLeft} jours restants`, color: "yellow", days: daysLeft }
@@ -213,6 +216,7 @@ export default function SubscriptionManagement() {
   }
 
   const subscriptionStatus = getSubscriptionStatus()
+  const preview = school ? getPreviewDates() : null
 
   const bgMain = theme === "dark" ? "bg-[#0d1117]" : "bg-gray-50"
   const cardBg = theme === "dark" ? "bg-[#161b22]" : "bg-white"
@@ -222,16 +226,11 @@ export default function SubscriptionManagement() {
   const inputBg = theme === "dark" ? "bg-[#0d1117]" : "bg-white"
   const tableRowHover = theme === "dark" ? "hover:bg-gray-800/50" : "hover:bg-gray-50"
 
-  const formatDate = (d: string) =>
+  const formatDate = (d: string | Date) =>
     new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
 
   const formatMoney = (m: number, devise = "USD") =>
     `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(m)} ${devise}`
-
-  const periodeLabel: Record<string, string> = {
-    MENSUEL: "Mensuel", TRIMESTRIEL: "Trimestriel",
-    SEMESTRIEL: "Semestriel", ANNUEL: "Annuel",
-  }
 
   if (loading) {
     return (
@@ -287,47 +286,58 @@ export default function SubscriptionManagement() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Status Badge */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                subscriptionStatus.color === "red" ? "bg-red-500/10 border border-red-500/30" :
-                subscriptionStatus.color === "orange" ? "bg-orange-500/10 border border-orange-500/30" :
-                subscriptionStatus.color === "yellow" ? "bg-yellow-500/10 border border-yellow-500/30" :
-                subscriptionStatus.color === "green" ? "bg-green-500/10 border border-green-500/30" :
-                "bg-gray-500/10 border border-gray-500/30"
-              }`}>
-                {subscriptionStatus.status === "expired" || subscriptionStatus.status === "suspended" ? (
-                  <CalendarX className="w-5 h-5 text-red-500" />
-                ) : subscriptionStatus.status === "warning" ? (
-                  <AlertTriangle className="w-5 h-5 text-orange-500" />
-                ) : subscriptionStatus.status === "active" || subscriptionStatus.status === "soon" ? (
-                  <CheckCircle className={`w-5 h-5 ${subscriptionStatus.color === "yellow" ? "text-yellow-500" : "text-green-500"}`} />
-                ) : (
-                  <Clock className="w-5 h-5 text-gray-500" />
-                )}
-                <span className={`font-medium text-sm ${
-                  subscriptionStatus.color === "red" ? "text-red-500" :
-                  subscriptionStatus.color === "orange" ? "text-orange-500" :
-                  subscriptionStatus.color === "yellow" ? "text-yellow-500" :
-                  subscriptionStatus.color === "green" ? "text-green-500" :
-                  "text-gray-500"
-                }`}>
-                  {subscriptionStatus.label}
-                </span>
-              </div>
-
-              {/* Bouton résiliation — uniquement si abonnement actif */}
-              {["active", "warning", "soon"].includes(subscriptionStatus.status) && (
-                <button
-                  onClick={() => setShowCancelConfirm(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors text-sm font-medium"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Résilier
-                </button>
+            {/* Statut abonnement */}
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              subscriptionStatus.color === "red" ? "bg-red-500/10 border border-red-500/30" :
+              subscriptionStatus.color === "orange" ? "bg-orange-500/10 border border-orange-500/30" :
+              subscriptionStatus.color === "yellow" ? "bg-yellow-500/10 border border-yellow-500/30" :
+              subscriptionStatus.color === "green" ? "bg-green-500/10 border border-green-500/30" :
+              "bg-gray-500/10 border border-gray-500/30"
+            }`}>
+              {subscriptionStatus.status === "expired" || subscriptionStatus.status === "suspended" ? (
+                <CalendarX className="w-5 h-5 text-red-500" />
+              ) : subscriptionStatus.status === "warning" ? (
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+              ) : subscriptionStatus.status === "active" || subscriptionStatus.status === "soon" ? (
+                <CheckCircle className={`w-5 h-5 ${subscriptionStatus.color === "yellow" ? "text-yellow-500" : "text-green-500"}`} />
+              ) : (
+                <Clock className="w-5 h-5 text-gray-500" />
               )}
+              <span className={`font-medium text-sm ${
+                subscriptionStatus.color === "red" ? "text-red-500" :
+                subscriptionStatus.color === "orange" ? "text-orange-500" :
+                subscriptionStatus.color === "yellow" ? "text-yellow-500" :
+                subscriptionStatus.color === "green" ? "text-green-500" :
+                "text-gray-500"
+              }`}>
+                {subscriptionStatus.label}
+              </span>
             </div>
           </div>
+
+          {/* Infos abonnement actuel */}
+          {school.dateDebutAbonnement && school.dateFinAbonnement && (
+            <div className={`mt-4 pt-4 border-t ${borderColor} grid grid-cols-2 sm:grid-cols-4 gap-4`}>
+              <div>
+                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Début</p>
+                <p className={`text-sm font-medium ${textColor}`}>{formatDate(school.dateDebutAbonnement)}</p>
+              </div>
+              <div>
+                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Expiration</p>
+                <p className={`text-sm font-medium ${subscriptionStatus.color === "red" ? "text-red-400" : subscriptionStatus.color === "orange" ? "text-orange-400" : textColor}`}>
+                  {formatDate(school.dateFinAbonnement)}
+                </p>
+              </div>
+              <div>
+                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Plan</p>
+                <p className={`text-sm font-medium ${textColor}`}>{school.planAbonnement || "—"}</p>
+              </div>
+              <div>
+                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Dernier paiement</p>
+                <p className={`text-sm font-medium ${textColor}`}>{school.montantPaye ? `${school.montantPaye} USD` : "—"}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -335,28 +345,22 @@ export default function SubscriptionManagement() {
           <button
             onClick={() => setActiveTab("form")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "form"
-                ? `${cardBg} ${textColor} shadow`
-                : textSecondary
+              activeTab === "form" ? `${cardBg} ${textColor} shadow` : textSecondary
             }`}
           >
             <CreditCard className="w-4 h-4" />
-            Gestion abonnement
+            Enregistrer un paiement
           </button>
           <button
             onClick={() => setActiveTab("history")}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "history"
-                ? `${cardBg} ${textColor} shadow`
-                : textSecondary
+              activeTab === "history" ? `${cardBg} ${textColor} shadow` : textSecondary
             }`}
           >
             <Receipt className="w-4 h-4" />
             Journal des paiements
             {totalPayments > 0 && (
-              <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {totalPayments}
-              </span>
+              <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">{totalPayments}</span>
             )}
           </button>
         </div>
@@ -369,149 +373,203 @@ export default function SubscriptionManagement() {
           </div>
         )}
         {error && (
-          <div className="flex items-center gap-2 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 mb-4">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            {error}
+          <div className="flex items-start gap-2 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 mb-4">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <span className="text-sm">{error}</span>
           </div>
         )}
 
-        {/* TAB: Formulaire */}
+        {/* TAB: Formulaire paiement */}
         {activeTab === "form" && (
-          <div className={`${cardBg} rounded-xl border ${borderColor} overflow-hidden`}>
-            <div className={`px-6 py-4 border-b ${borderColor} flex items-center gap-3`}>
-              <CreditCard className="w-5 h-5 text-emerald-500" />
-              <h2 className={`text-lg font-semibold ${textColor}`}>Enregistrer un paiement</h2>
+          <div className="space-y-4">
+
+            {/* Preview : ce qui va se passer */}
+            {preview && (
+              <div className={`${cardBg} rounded-xl border ${
+                preview.isExtension ? "border-blue-500/30" : "border-emerald-500/30"
+              } p-5`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    preview.isExtension ? "bg-blue-500/10" : "bg-emerald-500/10"
+                  }`}>
+                    {preview.isExtension
+                      ? <TrendingUp className="w-5 h-5 text-blue-400" />
+                      : <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    }
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${textColor}`}>
+                      {preview.isExtension ? "Prolongation de l'abonnement" : "Activation d'un nouvel abonnement"}
+                    </p>
+                    <p className={`text-xs ${textSecondary}`}>
+                      {preview.isExtension
+                        ? "Le nouveau mois débutera à l'expiration de l'abonnement en cours"
+                        : "L'abonnement démarrera dès aujourd'hui"
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}>
+                    <Calendar className="w-4 h-4 text-blue-400" />
+                    <div>
+                      <p className={`text-xs ${textSecondary}`}>Début</p>
+                      <p className={`text-sm font-semibold ${textColor}`}>{formatDate(preview.startDate)}</p>
+                    </div>
+                  </div>
+
+                  <ArrowRight className={`w-4 h-4 ${textSecondary} flex-shrink-0`} />
+
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}>
+                    <Calendar className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <p className={`text-xs ${textSecondary}`}>Nouvelle expiration</p>
+                      <p className={`text-sm font-semibold text-emerald-400`}>{formatDate(preview.endDate)}</p>
+                    </div>
+                  </div>
+
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20`}>
+                    <Clock className="w-4 h-4 text-emerald-400" />
+                    <p className="text-sm font-bold text-emerald-400">+ 30 jours</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Formulaire paiement */}
+            <div className={`${cardBg} rounded-xl border ${borderColor} overflow-hidden`}>
+              <div className={`px-6 py-4 border-b ${borderColor} flex items-center gap-3`}>
+                <CreditCard className="w-5 h-5 text-emerald-500" />
+                <h2 className={`text-lg font-semibold ${textColor}`}>Détails du paiement</h2>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                {/* Plan + Montant */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={`block text-sm font-medium ${textColor} mb-2`}>Plan d'abonnement</label>
+                    <select
+                      value={form.planAbonnement}
+                      onChange={(e) => setForm(prev => ({ ...prev, planAbonnement: e.target.value }))}
+                      className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    >
+                      <option value="STARTER">Starter — Fonctionnalités de base</option>
+                      <option value="PRO">Pro — Toutes les fonctionnalités</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${textColor} mb-2`}>
+                      <DollarSign className="w-4 h-4 inline mr-1" />
+                      Montant encaissé (USD)
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.montantPaye}
+                      onChange={(e) => setForm(prev => ({ ...prev, montantPaye: e.target.value }))}
+                      placeholder="70.00"
+                      required
+                      className={`${inputBg} border ${borderColor} ${textColor}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Mode de règlement */}
+                <div>
+                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Mode de règlement</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { value: "MOBILE_MONEY", label: "Mobile Money" },
+                      { value: "VIREMENT", label: "Virement bancaire" },
+                      { value: "ESPECES", label: "Espèces" },
+                      { value: "CARTE", label: "Carte bancaire" },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, typePaiement: opt.value }))}
+                        className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                          form.typePaiement === opt.value
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : `${inputBg} border ${borderColor} ${textSecondary} hover:border-blue-500`
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Référence + Notes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className={`block text-sm font-medium ${textColor} mb-2`}>
+                      <Hash className="w-4 h-4 inline mr-1" />
+                      Référence / N° de transaction
+                    </label>
+                    <Input
+                      type="text"
+                      value={form.reference}
+                      onChange={(e) => setForm(prev => ({ ...prev, reference: e.target.value }))}
+                      placeholder="Ex: TXN-2026-XXXXX"
+                      className={`${inputBg} border ${borderColor} ${textColor}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${textColor} mb-2`}>Observations</label>
+                    <Input
+                      type="text"
+                      value={form.notes}
+                      onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Remarques, contexte..."
+                      className={`${inputBg} border ${borderColor} ${textColor}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8"
+                  >
+                    {saving ? (
+                      <><RefreshCw className="w-4 h-4 animate-spin" />Enregistrement...</>
+                    ) : (
+                      <><Save className="w-4 h-4" />Valider le paiement</>
+                    )}
+                  </Button>
+                </div>
+              </form>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* Dates */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>
-                    <Calendar className="w-4 h-4 inline mr-2" />
-                    Date de début
-                  </label>
-                  <Input
-                    type="date"
-                    value={form.dateDebutAbonnement}
-                    onChange={(e) => setForm(prev => ({ ...prev, dateDebutAbonnement: e.target.value }))}
-                    className={`${inputBg} border ${borderColor} ${textColor}`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>
-                    <Calendar className="w-4 h-4 inline mr-2" />
-                    Date de fin
-                  </label>
-                  <Input
-                    type="date"
-                    value={form.dateFinAbonnement}
-                    onChange={(e) => setForm(prev => ({ ...prev, dateFinAbonnement: e.target.value }))}
-                    className={`${inputBg} border ${borderColor} ${textColor}`}
-                  />
-                </div>
-              </div>
-
-              {/* Plan & Period */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Plan d'abonnement</label>
-                  <select
-                    value={form.planAbonnement}
-                    onChange={(e) => setForm(prev => ({ ...prev, planAbonnement: e.target.value }))}
-                    className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            {/* Zone de résiliation — uniquement si abonnement actif */}
+            {["active", "warning", "soon"].includes(subscriptionStatus.status) && (
+              <div className={`${cardBg} rounded-xl border border-red-500/20 overflow-hidden`}>
+                <div className="px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                      <ShieldOff className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${textColor}`}>Résiliation du contrat</p>
+                      <p className={`text-xs ${textSecondary}`}>
+                        Suspend immédiatement l'accès de l'école. Action irréversible sans nouveau paiement.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/40 text-red-500 hover:bg-red-500/20 transition-colors text-sm font-medium whitespace-nowrap"
                   >
-                    <option value="STARTER">Starter</option>
-                    <option value="PRO">Pro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Période</label>
-                  <select
-                    value={form.periodeAbonnement}
-                    onChange={(e) => setForm(prev => ({ ...prev, periodeAbonnement: e.target.value }))}
-                    className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  >
-                    <option value="MENSUEL">Mensuel</option>
-                    <option value="TRIMESTRIEL">Trimestriel</option>
-                    <option value="SEMESTRIEL">Semestriel</option>
-                    <option value="ANNUEL">Annuel</option>
-                  </select>
+                    <XCircle className="w-4 h-4" />
+                    Résilier l'abonnement
+                  </button>
                 </div>
               </div>
-
-              {/* Payment */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Type de paiement</label>
-                  <select
-                    value={form.typePaiement}
-                    onChange={(e) => setForm(prev => ({ ...prev, typePaiement: e.target.value }))}
-                    className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  >
-                    <option value="MOBILE_MONEY">Mobile Money</option>
-                    <option value="VIREMENT">Virement bancaire</option>
-                    <option value="ESPECES">Espèces</option>
-                    <option value="CARTE">Carte bancaire</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>
-                    <DollarSign className="w-4 h-4 inline mr-2" />
-                    Montant payé (USD)
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.montantPaye}
-                    onChange={(e) => setForm(prev => ({ ...prev, montantPaye: e.target.value }))}
-                    placeholder="0.00"
-                    className={`${inputBg} border ${borderColor} ${textColor}`}
-                  />
-                </div>
-              </div>
-
-              {/* Reference & Notes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>
-                    <Hash className="w-4 h-4 inline mr-2" />
-                    Référence de paiement
-                  </label>
-                  <Input
-                    type="text"
-                    value={form.reference}
-                    onChange={(e) => setForm(prev => ({ ...prev, reference: e.target.value }))}
-                    placeholder="N° transaction, reçu..."
-                    className={`${inputBg} border ${borderColor} ${textColor}`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-sm font-medium ${textColor} mb-2`}>Notes</label>
-                  <Input
-                    type="text"
-                    value={form.notes}
-                    onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Remarques..."
-                    className={`${inputBg} border ${borderColor} ${textColor}`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-4">
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6"
-                >
-                  {saving ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" />Enregistrement...</>
-                  ) : (
-                    <><Save className="w-4 h-4" />Enregistrer le paiement</>
-                  )}
-                </Button>
-              </div>
-            </form>
+            )}
           </div>
         )}
 
@@ -542,11 +600,11 @@ export default function SubscriptionManagement() {
                     <thead>
                       <tr className={`border-b ${borderColor}`}>
                         <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Facture</th>
-                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Date</th>
-                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Période</th>
+                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Enregistré le</th>
+                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Période couverte</th>
                         <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Plan</th>
                         <th className={`px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Montant</th>
-                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Type</th>
+                        <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Règlement</th>
                         <th className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${textSecondary}`}>Réf.</th>
                       </tr>
                     </thead>
@@ -560,14 +618,19 @@ export default function SubscriptionManagement() {
                             {new Date(p.createdAt).toLocaleDateString("fr-FR")}
                           </td>
                           <td className={`px-6 py-4 text-sm ${textColor}`}>
-                            <div>{formatDate(p.dateDebut)}</div>
-                            <div className={`text-xs ${textSecondary}`}>→ {formatDate(p.dateFin)}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span>{new Date(p.dateDebut).toLocaleDateString("fr-FR")}</span>
+                              <ArrowRight className={`w-3 h-3 ${textSecondary}`} />
+                              <span>{new Date(p.dateFin).toLocaleDateString("fr-FR")}</span>
+                            </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              p.plan === "PRO"
+                                ? "bg-purple-500/10 text-purple-400"
+                                : "bg-blue-500/10 text-blue-400"
                             }`}>
-                              {p.plan} · {periodeLabel[p.periode] || p.periode}
+                              {p.plan}
                             </span>
                           </td>
                           <td className={`px-6 py-4 text-right font-semibold ${textColor}`}>
@@ -585,7 +648,6 @@ export default function SubscriptionManagement() {
                   </table>
                 </div>
 
-                {/* Pagination */}
                 {totalPages > 1 && (
                   <div className={`flex items-center justify-between px-6 py-4 border-t ${borderColor}`}>
                     <span className={`text-sm ${textSecondary}`}>Page {page} / {totalPages}</span>
@@ -619,28 +681,29 @@ export default function SubscriptionManagement() {
           <div className={`${cardBg} rounded-2xl border border-red-500/30 p-6 max-w-md w-full shadow-2xl`}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                <XCircle className="w-6 h-6 text-red-500" />
+                <ShieldOff className="w-6 h-6 text-red-500" />
               </div>
               <div>
-                <h3 className={`text-lg font-bold ${textColor}`}>Résilier l'abonnement</h3>
+                <h3 className={`text-lg font-bold ${textColor}`}>Confirmer la résiliation</h3>
                 <p className={`text-sm ${textSecondary}`}>{school.nomEtablissement}</p>
               </div>
             </div>
 
-            <p className={`${textSecondary} text-sm mb-4`}>
-              Cette action va suspendre immédiatement l'accès de l'école à la plateforme.
-              L'administrateur de l'école en sera notifié.
-            </p>
+            <div className={`p-3 rounded-lg ${theme === "dark" ? "bg-red-500/5 border border-red-500/20" : "bg-red-50 border border-red-200"} mb-4`}>
+              <p className={`text-sm ${theme === "dark" ? "text-red-400" : "text-red-700"}`}>
+                ⚠️ Cette action suspend immédiatement l'accès de l'école à la plateforme. L'administrateur de l'école en sera notifié. Un nouveau paiement sera nécessaire pour rétablir l'accès.
+              </p>
+            </div>
 
             <div className="mb-4">
               <label className={`block text-sm font-medium ${textColor} mb-2`}>
-                Motif de résiliation (optionnel)
+                Motif de résiliation <span className={`${textSecondary} font-normal`}>(optionnel)</span>
               </label>
               <textarea
                 value={cancelMotif}
                 onChange={(e) => setCancelMotif(e.target.value)}
                 rows={3}
-                placeholder="Ex : Facture impayée, fin de contrat..."
+                placeholder="Ex : Facture impayée, fin de contrat, demande de l'établissement..."
                 className={`w-full px-3 py-2 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-red-500 text-sm resize-none`}
               />
             </div>
@@ -660,7 +723,7 @@ export default function SubscriptionManagement() {
                 {cancelling ? (
                   <><RefreshCw className="w-4 h-4 animate-spin" />Résiliation...</>
                 ) : (
-                  <><XCircle className="w-4 h-4" />Confirmer la résiliation</>
+                  <><ShieldOff className="w-4 h-4" />Confirmer la résiliation</>
                 )}
               </button>
             </div>

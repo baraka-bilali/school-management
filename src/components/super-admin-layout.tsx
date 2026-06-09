@@ -86,6 +86,13 @@ export default function SuperAdminLayout({
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Rafraîchit le compteur quand une page marque des notifications comme lues
+  useEffect(() => {
+    const handleRead = () => fetchUnreadCount()
+    window.addEventListener("notificationsMarkedRead", handleRead)
+    return () => window.removeEventListener("notificationsMarkedRead", handleRead)
+  }, [])
+
   const fetchUnreadCount = async () => {
     try {
       const res = await fetch("/api/notifications/count", { credentials: "include" })

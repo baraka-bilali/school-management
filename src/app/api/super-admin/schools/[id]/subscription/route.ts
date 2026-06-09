@@ -20,7 +20,6 @@ async function requireSuperAdmin(req: NextRequest) {
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear()
 
-  // Auto-création de la table si elle n'existe pas encore en production
   await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS "SubscriptionInvoiceCounter" (
       "id"        SERIAL PRIMARY KEY,
@@ -30,7 +29,6 @@ async function generateInvoiceNumber(): Promise<string> {
     )
   `
 
-  // INSERT ou INCREMENT via SQL brut — fonctionne indépendamment du client Prisma généré
   const rows = await prisma.$queryRaw<[{ counter: number }]>`
     INSERT INTO "SubscriptionInvoiceCounter" ("year", "counter", "updatedAt")
     VALUES (${year}, 1, NOW())
@@ -44,7 +42,38 @@ async function generateInvoiceNumber(): Promise<string> {
   return `FAC-${year}-${String(counter).padStart(4, "0")}`
 }
 
-// PUT: Activer / renouveler l'abonnement d'une école
+// Calcule les dates de début et de fin selon l'état actuel de l'abonnement
+// - Si actif avec dateFinAbonnement dans le futur : prolonge à partir de la fin actuelle
+// - Sinon : commence aujourd'hui
+function calculateSubscriptionDates(school: {
+  etatCompte: string
+  dateFinAbonnement: Date | null
+}): { startDate: Date; endDate: Date } {
+  const now = new Date()
+  const isActive =
+    school.etatCompte === "ACTIF" &&
+    school.dateFinAbonnement !== null &&
+    new Date(school.dateFinAbonnement) > now
+
+  let startDate: Date
+  if (isActive) {
+    // Prolongation : nouveau mois commence à la fin de l'abonnement en cours
+    startDate = new Date(school.dateFinAbonnement!)
+    startDate.setHours(0, 0, 0, 0)
+  } else {
+    // Nouvelle activation : commence aujourd'hui
+    startDate = new Date()
+    startDate.setHours(0, 0, 0, 0)
+  }
+
+  const endDate = new Date(startDate)
+  endDate.setDate(endDate.getDate() + 30)
+  endDate.setHours(23, 59, 59, 999)
+
+  return { startDate, endDate }
+}
+
+// PUT: Activer / prolonger l'abonnement d'une école (toujours 30 jours)
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -61,32 +90,12 @@ export async function PUT(
     if (!existingSchool) return NextResponse.json({ error: "École non trouvée" }, { status: 404 })
 
     const body = await req.json()
-    const {
-      dateDebutAbonnement,
-      dateFinAbonnement,
-      periodeAbonnement,
-      planAbonnement,
-      typePaiement,
-      montantPaye,
-      notes,
-      reference,
-    } = body
+    const { planAbonnement, typePaiement, montantPaye, notes, reference } = body
 
-    const startDate = dateDebutAbonnement ? new Date(dateDebutAbonnement) : new Date()
-    startDate.setHours(0, 0, 0, 0)
+    // Dates auto-calculées — toujours 30 jours, prolongement si déjà actif
+    const { startDate, endDate } = calculateSubscriptionDates(existingSchool)
 
-    let endDate: Date
-    if (dateFinAbonnement) {
-      endDate = new Date(dateFinAbonnement)
-      endDate.setHours(23, 59, 59, 999)
-    } else {
-      endDate = new Date(startDate)
-      endDate.setMonth(endDate.getMonth() + 1)
-      endDate.setHours(23, 59, 59, 999)
-    }
-
-    const periode = periodeAbonnement || "MENSUEL"
-    const plan = planAbonnement || "BASIC"
+    const plan = planAbonnement || "STARTER"
     const montant = montantPaye != null ? parseFloat(String(montantPaye)) : 70
     const devise = "USD"
 
@@ -98,7 +107,7 @@ export async function PUT(
         data: {
           dateDebutAbonnement: startDate,
           dateFinAbonnement: endDate,
-          periodeAbonnement: periode,
+          periodeAbonnement: "MENSUEL",
           planAbonnement: plan,
           typePaiement: typePaiement || "MOBILE_MONEY",
           montantPaye: montant,
@@ -126,7 +135,7 @@ export async function PUT(
           reference: reference || null,
           dateDebut: startDate,
           dateFin: endDate,
-          periode,
+          periode: "MENSUEL",
           plan,
           numeroFacture,
           notes: notes || null,
@@ -136,8 +145,12 @@ export async function PUT(
       }),
     ])
 
-    // Notification pour tous les admins de l'école (broadcast via schoolId)
-    const schoolAdminMessage = `✅ Votre abonnement a été activé. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
+    const isExtension = existingSchool.etatCompte === "ACTIF" &&
+      existingSchool.dateFinAbonnement !== null &&
+      new Date(existingSchool.dateFinAbonnement) > new Date()
+
+    const actionLabel = isExtension ? "prolongé" : "activé"
+    const schoolAdminMessage = `✅ Votre abonnement a été ${actionLabel}. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
 
     await prisma.notification.create({
       data: {
@@ -149,7 +162,6 @@ export async function PUT(
       },
     })
 
-    // Notification pour le super-admin
     await prisma.notification.create({
       data: {
         type: "SUBSCRIPTION_PAYMENT_RECEIVED",
@@ -160,7 +172,6 @@ export async function PUT(
       },
     })
 
-    // Push Realtime → tous les admins de l'école
     const adminUsers = await prisma.user.findMany({
       where: { schoolId, role: "ADMIN", isActive: true },
       select: { id: true },
@@ -171,16 +182,10 @@ export async function PUT(
         .send({
           type: "broadcast",
           event: "new_notification",
-          payload: {
-            type: "SUBSCRIPTION_PAYMENT_RECEIVED",
-            numeroFacture,
-            montant,
-            devise,
-          },
+          payload: { type: "SUBSCRIPTION_PAYMENT_RECEIVED", numeroFacture, montant, devise },
         })
     }
 
-    // Push Realtime → super-admin
     await supabaseAdmin.channel("notifications:super-admin").send({
       type: "broadcast",
       event: "new_notification",
@@ -197,7 +202,10 @@ export async function PUT(
       school: updatedSchool,
       payment,
       numeroFacture,
-      message: `Abonnement activé jusqu'au ${endDate.toLocaleDateString("fr-FR")} — Facture ${numeroFacture}`,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      isExtension,
+      message: `Abonnement ${actionLabel} jusqu'au ${endDate.toLocaleDateString("fr-FR")} — Facture ${numeroFacture}`,
     })
   } catch (e: any) {
     console.error("Erreur abonnement:", e)
