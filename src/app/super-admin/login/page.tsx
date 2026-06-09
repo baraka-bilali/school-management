@@ -33,7 +33,6 @@ export default function SuperAdminLoginPage() {
       if (!res.ok) throw new Error(data.error || "Erreur inconnue")
       if (data.token) {
         localStorage.setItem("token", data.token)
-        // Nettoyer le cache du nom de l'école (super admin n'en a pas besoin)
         localStorage.removeItem("schoolName")
         const payload = JSON.parse(atob(data.token.split(".")[1]))
         if (payload.role !== "SUPER_ADMIN") {
@@ -41,8 +40,12 @@ export default function SuperAdminLoginPage() {
           setLoading(false)
           return
         }
-        // Attendre un peu pour montrer l'animation
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Pré-remplir le user dans localStorage pour affichage immédiat
+        localStorage.setItem("user", JSON.stringify({
+          name: payload.name || data.user?.nom || "Super Admin",
+          email: payload.email || "",
+        }))
+        await new Promise(resolve => setTimeout(resolve, 800))
         router.push("/super-admin")
       }
     } catch (err: any) {

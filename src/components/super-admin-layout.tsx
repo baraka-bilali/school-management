@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, Moon, Sun, LogOut, Receipt } from "lucide-react"
 
@@ -27,22 +27,54 @@ export default function SuperAdminLayout({
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const isLoggingOutRef = useRef(false)
+
+  // Déconnexion forcée (expiration de session ou rôle invalide)
+  const forceLogout = useCallback(() => {
+    if (isLoggingOutRef.current) return
+    isLoggingOutRef.current = true
+    localStorage.removeItem("user")
+    localStorage.removeItem("token")
+    fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
+      window.location.href = "/super-admin/login"
+    })
+  }, [])
+
+  // Vérification de session + récupération des infos utilisateur
+  const checkSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" })
+      if (res.status === 401 || res.status === 403) {
+        forceLogout()
+        return
+      }
+      if (res.ok) {
+        const data = await res.json()
+        if (data.user?.role !== "SUPER_ADMIN") {
+          forceLogout()
+          return
+        }
+        const userInfo = { name: data.user.name, email: data.user.email }
+        setUser(userInfo)
+        localStorage.setItem("user", JSON.stringify(userInfo))
+      }
+    } catch {
+      // Erreur réseau temporaire — ne pas déconnecter
+    }
+  }, [forceLogout])
 
   useEffect(() => {
     const saved = localStorage.getItem("theme")
     if (saved === "light" || saved === "dark") setTheme(saved)
 
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch (e) {
-        console.error("Error parsing user:", e)
-      }
-    }
+    // Vérification immédiate + polling toutes les 60 secondes
+    checkSession()
+    const interval = setInterval(checkSession, 60 * 1000)
 
     fetchUnreadCount()
-  }, [])
+
+    return () => clearInterval(interval)
+  }, [checkSession])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -56,10 +88,11 @@ export default function SuperAdminLayout({
 
   const fetchUnreadCount = async () => {
     try {
-      const res = await fetch("/api/notifications/count", {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      })
+      const res = await fetch("/api/notifications/count", { credentials: "include" })
+      if (res.status === 401 || res.status === 403) {
+        forceLogout()
+        return
+      }
       if (!res.ok) return
       const data = await res.json()
       setUnreadNotifications(data.count || 0)
@@ -76,12 +109,16 @@ export default function SuperAdminLayout({
   }
 
   const handleLogout = async () => {
+    if (isLoggingOutRef.current) return
+    isLoggingOutRef.current = true
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
       localStorage.removeItem("user")
-      router.push("/super-admin/login")
+      localStorage.removeItem("token")
     } catch (e) {
       console.error("Erreur déconnexion:", e)
+    } finally {
+      window.location.href = "/super-admin/login"
     }
   }
 
