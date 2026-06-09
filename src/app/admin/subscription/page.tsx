@@ -10,6 +10,7 @@ import {
   ChevronRight, Download, MessageCircle, X, Building2, User
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
+import Portal from "@/components/portal"
 
 interface School {
   id: number
@@ -147,6 +148,7 @@ function InvoicePrintModal({
   }
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay flou — même pattern que le modal de déconnexion */}
       <div
@@ -276,6 +278,7 @@ function InvoicePrintModal({
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 

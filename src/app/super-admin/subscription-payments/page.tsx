@@ -9,6 +9,7 @@ import {
   Download, TrendingUp, Receipt, XCircle, FileText, X, User
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
+import Portal from "@/components/portal"
 
 type School = {
   id: number
@@ -320,6 +321,7 @@ export default function SuperAdminSubscriptionPayments() {
 
       {/* Modal facture */}
       {selectedPayment && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Overlay flou */}
           <div
@@ -471,6 +473,7 @@ export default function SuperAdminSubscriptionPayments() {
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </SuperAdminLayout>
   )
