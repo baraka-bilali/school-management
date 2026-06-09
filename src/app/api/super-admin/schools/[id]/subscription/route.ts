@@ -19,12 +19,29 @@ async function requireSuperAdmin(req: NextRequest) {
 
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear()
-  const counter = await prisma.subscriptionInvoiceCounter.upsert({
-    where: { year },
-    update: { counter: { increment: 1 } },
-    create: { year, counter: 1 },
-  })
-  return `FAC-${year}-${String(counter.counter).padStart(4, "0")}`
+
+  // Auto-création de la table si elle n'existe pas encore en production
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS "SubscriptionInvoiceCounter" (
+      "id"        SERIAL PRIMARY KEY,
+      "year"      INTEGER NOT NULL UNIQUE,
+      "counter"   INTEGER NOT NULL DEFAULT 0,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `
+
+  // INSERT ou INCREMENT via SQL brut — fonctionne indépendamment du client Prisma généré
+  const rows = await prisma.$queryRaw<[{ counter: number }]>`
+    INSERT INTO "SubscriptionInvoiceCounter" ("year", "counter", "updatedAt")
+    VALUES (${year}, 1, NOW())
+    ON CONFLICT ("year") DO UPDATE
+      SET "counter"   = "SubscriptionInvoiceCounter"."counter" + 1,
+          "updatedAt" = NOW()
+    RETURNING "counter"
+  `
+
+  const counter = rows[0]?.counter ?? 1
+  return `FAC-${year}-${String(counter).padStart(4, "0")}`
 }
 
 // PUT: Activer / renouveler l'abonnement d'une école
