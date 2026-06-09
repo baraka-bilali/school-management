@@ -105,25 +105,31 @@ const CircularProgress = ({
 }
 
 function InvoicePrintModal({
-  payment, school, onClose,
+  payment, school, onClose, theme,
 }: {
   payment: SubscriptionPayment
   school: School
   onClose: () => void
   theme: "light" | "dark"
 }) {
-  const formatDate = (d: string) =>
+  const fmt = (d: string) =>
     new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
 
   const periodeLabel: Record<string, string> = {
     MENSUEL: "Mensuel", TRIMESTRIEL: "Trimestriel",
     SEMESTRIEL: "Semestriel", ANNUEL: "Annuel",
   }
-
   const typePaiementLabel: Record<string, string> = {
     MOBILE_MONEY: "Mobile Money", VIREMENT: "Virement bancaire",
     ESPECES: "Espèces", CARTE: "Carte bancaire",
   }
+
+  const bg     = theme === "dark" ? "bg-[#1a1f2e]"    : "bg-white"
+  const border = theme === "dark" ? "border-gray-700"  : "border-gray-200"
+  const text   = theme === "dark" ? "text-white"       : "text-gray-900"
+  const sub    = theme === "dark" ? "text-gray-400"    : "text-gray-500"
+  const rowBg  = theme === "dark" ? "bg-gray-800/50"   : "bg-gray-50"
+  const totalBg= theme === "dark" ? "bg-teal-900/30"   : "bg-teal-50"
 
   const invoiceData = {
     numeroFacture: payment.numeroFacture,
@@ -141,125 +147,129 @@ function InvoicePrintModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Overlay flou — même pattern que le modal de déconnexion */}
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col"
-        style={{ maxHeight: "88vh" }}
-      >
-        {/* ── Header fixe ── */}
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Carte du modal */}
+      <div className={`relative ${bg} rounded-2xl border ${border} shadow-2xl w-full max-w-md flex flex-col animate-scale-up`}
+        style={{ maxHeight: "88vh" }}>
+
+        {/* Header */}
+        <div className={`p-5 border-b ${border} flex items-center justify-between flex-shrink-0`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
-              <Receipt className="w-5 h-5 text-teal-600" />
+            <div className="p-2 bg-teal-500/20 rounded-lg">
+              <Receipt className="w-5 h-5 text-teal-500" />
             </div>
             <div>
-              <p className="font-bold text-gray-900 text-sm tracking-widest uppercase">Facture</p>
-              <p className="text-xs text-blue-600 font-mono font-semibold">{payment.numeroFacture}</p>
+              <h3 className={`text-base font-bold ${text}`}>Facture</h3>
+              <p className="text-xs text-blue-500 font-mono">{payment.numeroFacture}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-500 text-xs font-bold">
               Payé
             </span>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                theme === "dark" ? "bg-gray-700 hover:bg-gray-600 text-gray-400" : "bg-gray-100 hover:bg-gray-200 text-gray-500"
+              }`}
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* ── Contenu scrollable ── */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        {/* Contenu scrollable */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-          {/* Date d'émission */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-400">Date d'émission</span>
-            <span className="font-semibold text-gray-700">{formatDate(payment.createdAt)}</span>
+          {/* Date */}
+          <div className={`flex items-center justify-between text-sm border-b ${border} pb-3`}>
+            <span className={sub}>Date d'émission</span>
+            <span className={`font-semibold ${text}`}>{fmt(payment.createdAt)}</span>
           </div>
 
           {/* Émetteur / Destinataire */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Building2 className="w-3.5 h-3.5 text-gray-400" />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Émetteur</p>
-              </div>
-              <p className="font-bold text-gray-900 text-sm">DigiSchool Platform</p>
-              <p className="text-xs text-gray-500 mt-0.5">support@digischool.com</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${rowBg} rounded-xl p-3`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1.5`}>Émetteur</p>
+              <p className={`font-bold ${text} text-sm`}>DigiSchool Platform</p>
+              <p className={`text-xs ${sub} mt-0.5`}>support@digischool.com</p>
             </div>
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <User className="w-3.5 h-3.5 text-gray-400" />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Destinataire</p>
-              </div>
-              <p className="font-bold text-gray-900 text-sm">{school.nomEtablissement}</p>
+            <div className={`${rowBg} rounded-xl p-3`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1.5`}>Destinataire</p>
+              <p className={`font-bold ${text} text-sm`}>{school.nomEtablissement}</p>
             </div>
           </div>
 
-          {/* Ligne de service */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5 border-b border-gray-100">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Description</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Montant</span>
+          {/* Tableau */}
+          <div className={`border ${border} rounded-xl overflow-hidden`}>
+            <div className={`${rowBg} px-4 py-2 flex justify-between border-b ${border}`}>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${sub}`}>Description</span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${sub}`}>Montant</span>
             </div>
-            <div className="flex items-start justify-between px-4 py-4 border-b border-gray-50">
+            <div className={`px-4 py-3 flex justify-between items-start border-b ${border}`}>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">
+                <p className={`font-semibold ${text} text-sm`}>
                   Abonnement {payment.plan} — {periodeLabel[payment.periode] || payment.periode}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {formatDate(payment.dateDebut)} → {formatDate(payment.dateFin)}
+                <p className={`text-xs ${sub} mt-0.5`}>
+                  {fmt(payment.dateDebut)} → {fmt(payment.dateFin)}
                 </p>
               </div>
-              <p className="font-bold text-gray-900 text-sm whitespace-nowrap ml-4">
+              <p className={`font-bold ${text} text-sm whitespace-nowrap ml-3`}>
                 {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
               </p>
             </div>
-            <div className="flex items-center justify-between px-4 py-3 bg-teal-50">
-              <span className="font-bold text-gray-800 text-sm">TOTAL</span>
-              <span className="font-bold text-teal-600 text-base">
+            <div className={`${totalBg} px-4 py-2.5 flex justify-between items-center`}>
+              <span className={`font-bold ${text} text-sm`}>TOTAL</span>
+              <span className="font-bold text-teal-500 text-base">
                 {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
               </span>
             </div>
           </div>
 
-          {/* Mode de paiement + Référence */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* Mode paiement + Référence */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Mode de paiement</p>
-              <p className="font-semibold text-gray-800">{typePaiementLabel[payment.typePaiement] || payment.typePaiement}</p>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1`}>Mode de paiement</p>
+              <p className={`font-semibold ${text}`}>{typePaiementLabel[payment.typePaiement] || payment.typePaiement}</p>
             </div>
             {payment.reference && (
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Référence</p>
-                <p className="font-semibold font-mono text-gray-800">{payment.reference}</p>
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1`}>Référence</p>
+                <p className={`font-semibold font-mono ${text}`}>{payment.reference}</p>
               </div>
             )}
           </div>
 
           {/* Notes */}
           {payment.notes && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Notes</p>
-              <p className="text-sm text-amber-800">{payment.notes}</p>
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1">Notes</p>
+              <p className="text-sm text-amber-400">{payment.notes}</p>
             </div>
           )}
 
-          {/* Footer */}
-          <div className="text-center text-[11px] text-gray-300 pt-2 pb-1 border-t border-gray-100">
-            <p>Merci de votre confiance — DigiSchool Platform</p>
-            <p>Ce document tient lieu de facture officielle</p>
-          </div>
+          <p className={`text-center text-[11px] ${sub} pt-1`}>
+            Merci de votre confiance — DigiSchool Platform
+          </p>
         </div>
 
-        {/* ── Boutons fixés en bas ── */}
-        <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+        {/* Boutons */}
+        <div className={`flex-shrink-0 flex gap-3 p-4 border-t ${border}`}>
           <InvoiceDownloadButton data={invoiceData} />
           <button
             onClick={onClose}
-            className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-colors text-sm"
+            className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors ${
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+            }`}
           >
             Fermer
           </button>
