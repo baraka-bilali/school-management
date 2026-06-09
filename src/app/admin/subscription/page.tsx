@@ -611,7 +611,7 @@ export default function SubscriptionPage() {
                     <span>Envoyer un email</span>
                   </a>
                   <a
-                    href="tel:+243000000000"
+                    href="tel:+243859628644"
                     className="flex items-center justify-center gap-3 px-6 py-4 border-2 border-teal-600 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-all font-semibold"
                   >
                     <Phone className="w-5 h-5" />
@@ -621,8 +621,8 @@ export default function SubscriptionPage() {
                 <div className={`mt-6 p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
                   <p className={`${textSecondary} text-sm leading-relaxed`}>
                     <strong className={textColor}>Email :</strong> support@digischool.com<br />
-                    <strong className={textColor}>Téléphone :</strong> +243 000 000 000<br />
-                    <strong className={textColor}>Horaires :</strong> Lun - Ven : 8h00 - 17h00
+                    <strong className={textColor}>Téléphone :</strong> +243 859 628 644<br />
+                    <strong className={textColor}>Horaires :</strong> Lun - Sam : 7h00 - 15h00 (fermé le dimanche)
                   </p>
                 </div>
               </CardContent>
