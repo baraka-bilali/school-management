@@ -1721,10 +1721,10 @@ export default function SuperAdminHome() {
               ) : (
                 schools.slice(0, 5).map((school) => {
                   const isSuspended = school.etatCompte === "SUSPENDU";
-                  const isExpired = isSuspended || (school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date());
                   const daysUntilExpiry = isSuspended ? 0 : school.dateFinAbonnement
-                    ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                    ? Math.floor((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                     : null;
+                  const isExpired = isSuspended || (daysUntilExpiry !== null && daysUntilExpiry <= 0);
                   const isNearExpiry = !isSuspended && daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
                   
                   return (
@@ -1837,10 +1837,10 @@ export default function SuperAdminHome() {
                 ) : (
                   paginatedSchools.map((school) => {
                     const isSuspended = school.etatCompte === "SUSPENDU";
-                    const isExpired = isSuspended || (school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date());
                     const daysUntilExpiry = isSuspended ? 0 : school.dateFinAbonnement
-                      ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                      ? Math.floor((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                       : null;
+                    const isExpired = isSuspended || (daysUntilExpiry !== null && daysUntilExpiry <= 0);
                     const isNearExpiry = !isSuspended && daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
                     
                     return (

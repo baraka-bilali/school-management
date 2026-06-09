@@ -92,11 +92,15 @@ export default function SubscriptionManagement() {
       if (!res.ok) throw new Error("École non trouvée")
       const data = await res.json()
       setSchool(data.school)
+      const today = new Date().toISOString().split("T")[0]
+      const isInactive = data.school.etatCompte === "SUSPENDU" ||
+        (data.school.dateFinAbonnement && new Date(data.school.dateFinAbonnement) < new Date())
       setForm({
-        dateDebutAbonnement: data.school.dateDebutAbonnement
-          ? new Date(data.school.dateDebutAbonnement).toISOString().split("T")[0]
-          : "",
-        dateFinAbonnement: data.school.dateFinAbonnement
+        dateDebutAbonnement: isInactive ? today :
+          (data.school.dateDebutAbonnement
+            ? new Date(data.school.dateDebutAbonnement).toISOString().split("T")[0]
+            : today),
+        dateFinAbonnement: data.school.dateFinAbonnement && !isInactive
           ? new Date(data.school.dateFinAbonnement).toISOString().split("T")[0]
           : "",
         periodeAbonnement: data.school.periodeAbonnement || "MENSUEL",
@@ -198,11 +202,11 @@ export default function SubscriptionManagement() {
 
   const getSubscriptionStatus = () => {
     if (!school?.dateFinAbonnement) return { status: "undefined", label: "Non défini", color: "gray" }
+    if (school.etatCompte === "SUSPENDU") return { status: "suspended", label: "Résilié / Suspendu", color: "red", days: 0 }
     const endDate = new Date(school.dateFinAbonnement)
     const today = new Date()
-    const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    if (school.etatCompte === "SUSPENDU") return { status: "suspended", label: "Résilié / Suspendu", color: "red", days: 0 }
-    if (daysLeft < 0) return { status: "expired", label: "Expiré", color: "red", days: Math.abs(daysLeft) }
+    const daysLeft = Math.floor((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    if (daysLeft <= 0) return { status: "expired", label: "Expiré", color: "red", days: 0 }
     if (daysLeft <= 7) return { status: "warning", label: `${daysLeft} jours restants`, color: "orange", days: daysLeft }
     if (daysLeft <= 30) return { status: "soon", label: `${daysLeft} jours restants`, color: "yellow", days: daysLeft }
     return { status: "active", label: `${daysLeft} jours restants`, color: "green", days: daysLeft }
@@ -312,8 +316,8 @@ export default function SubscriptionManagement() {
                 </span>
               </div>
 
-              {/* Bouton résiliation */}
-              {school.etatCompte !== "SUSPENDU" && (
+              {/* Bouton résiliation — uniquement si abonnement actif */}
+              {["active", "warning", "soon"].includes(subscriptionStatus.status) && (
                 <button
                   onClick={() => setShowCancelConfirm(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-colors text-sm font-medium"
