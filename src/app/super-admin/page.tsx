@@ -142,7 +142,7 @@ export default function SuperAdminHome() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [subscriptionForm, setSubscriptionForm] = useState({
     dateDebutAbonnement: "", dateFinAbonnement: "",
-    periodeAbonnement: "MENSUEL", planAbonnement: "BASIC",
+    periodeAbonnement: "MENSUEL", planAbonnement: "STARTER",
     typePaiement: "MOBILE_MONEY", montantPaye: ""
   })
   const [savingSubscription, setSavingSubscription] = useState(false)
@@ -817,6 +817,7 @@ export default function SuperAdminHome() {
         body: JSON.stringify({
           dateDebutAbonnement: subscriptionForm.dateDebutAbonnement || null,
           typePaiement: subscriptionForm.typePaiement,
+          planAbonnement: subscriptionForm.planAbonnement,
           montantPaye: 70,
         }),
       })
@@ -1719,11 +1720,12 @@ export default function SuperAdminHome() {
                 <tr><td colSpan={4} className={`px-6 py-8 text-center ${textSecondary}`}>Aucune école enregistrée</td></tr>
               ) : (
                 schools.slice(0, 5).map((school) => {
-                  const isExpired = school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date();
-                  const daysUntilExpiry = school.dateFinAbonnement 
+                  const isSuspended = school.etatCompte === "SUSPENDU";
+                  const isExpired = isSuspended || (school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date());
+                  const daysUntilExpiry = isSuspended ? 0 : school.dateFinAbonnement
                     ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                     : null;
-                  const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+                  const isNearExpiry = !isSuspended && daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
                   
                   return (
                   <tr key={school.id} className={`${hoverBg} transition-colors`}>
@@ -1732,7 +1734,12 @@ export default function SuperAdminHome() {
                       <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                     </td>
                     <td className="px-6 py-4">
-                      {school.dateFinAbonnement ? (
+                      {isSuspended ? (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 w-fit">
+                          <CalendarX className="w-4 h-4 text-red-500" />
+                          <span className="text-sm font-medium text-red-500">Résilié</span>
+                        </div>
+                      ) : school.dateFinAbonnement ? (
                         isExpired ? (
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30">
@@ -1829,11 +1836,12 @@ export default function SuperAdminHome() {
                   </td></tr>
                 ) : (
                   paginatedSchools.map((school) => {
-                    const isExpired = school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date();
-                    const daysUntilExpiry = school.dateFinAbonnement 
+                    const isSuspended = school.etatCompte === "SUSPENDU";
+                    const isExpired = isSuspended || (school.dateFinAbonnement && new Date(school.dateFinAbonnement) < new Date());
+                    const daysUntilExpiry = isSuspended ? 0 : school.dateFinAbonnement
                       ? Math.ceil((new Date(school.dateFinAbonnement).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                       : null;
-                    const isNearExpiry = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
+                    const isNearExpiry = !isSuspended && daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 7;
                     
                     return (
                     <tr key={school.id} className={`${hoverBg} transition-colors`}>
@@ -1842,7 +1850,12 @@ export default function SuperAdminHome() {
                         <div className={`text-sm ${textSecondary}`}>Code: {school.codeEtablissement || "N/A"}</div>
                       </td>
                       <td className="px-6 py-4">
-                        {school.dateFinAbonnement ? (
+                        {isSuspended ? (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 w-fit">
+                            <CalendarX className="w-4 h-4 text-red-500" />
+                            <span className="text-sm font-medium text-red-500">Résilié</span>
+                          </div>
+                        ) : school.dateFinAbonnement ? (
                           isExpired ? (
                             <div className="flex items-center gap-2">
                               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30">
@@ -3408,11 +3421,21 @@ export default function SuperAdminHome() {
                   </div>
                 )}
 
-                {/* Plan info — fixed */}
+                {/* Plan */}
+                <div>
+                  <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Plan d'abonnement</label>
+                  <select value={subscriptionForm.planAbonnement} onChange={e => setSubscriptionForm(p => ({ ...p, planAbonnement: e.target.value }))}
+                    className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}>
+                    <option value="STARTER">Starter</option>
+                    <option value="PRO">Pro</option>
+                  </select>
+                </div>
+
+                {/* Plan info */}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${theme === "dark" ? "bg-emerald-500/5 border-emerald-500/20" : "bg-emerald-50 border-emerald-200"}`}>
                   <div>
-                    <p className={`text-xs font-semibold uppercase tracking-wider ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>Plan unique</p>
-                    <p className={`text-lg font-bold mt-0.5 ${textColor}`}>Abonnement Mensuel</p>
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>Plan sélectionné</p>
+                    <p className={`text-lg font-bold mt-0.5 ${textColor}`}>{subscriptionForm.planAbonnement === "PRO" ? "Pro" : "Starter"}</p>
                     <p className={`text-xs mt-0.5 ${textSecondary}`}>Accès complet à toutes les fonctionnalités</p>
                   </div>
                   <div className="text-right">

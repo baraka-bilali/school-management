@@ -63,7 +63,17 @@ export async function middleware(req: NextRequest) {
 
   // Admin space protection for non-super roles
   if (isAdminArea) {
-    if (!role || (!adminAllowed.has(role) && role !== "ADMIN")) {
+    if (!role) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/login"
+      return NextResponse.redirect(url)
+    }
+    if (role === "SUPER_ADMIN") {
+      const url = req.nextUrl.clone()
+      url.pathname = "/super-admin"
+      return NextResponse.redirect(url)
+    }
+    if (!adminAllowed.has(role)) {
       const url = req.nextUrl.clone()
       url.pathname = "/login"
       return NextResponse.redirect(url)

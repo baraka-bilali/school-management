@@ -68,7 +68,7 @@ export default function SubscriptionManagement() {
     dateDebutAbonnement: "",
     dateFinAbonnement: "",
     periodeAbonnement: "MENSUEL",
-    planAbonnement: "BASIC",
+    planAbonnement: "STARTER",
     typePaiement: "MOBILE_MONEY",
     montantPaye: "",
     reference: "",
@@ -100,7 +100,7 @@ export default function SubscriptionManagement() {
           ? new Date(data.school.dateFinAbonnement).toISOString().split("T")[0]
           : "",
         periodeAbonnement: data.school.periodeAbonnement || "MENSUEL",
-        planAbonnement: data.school.planAbonnement || "BASIC",
+        planAbonnement: data.school.planAbonnement || "STARTER",
         typePaiement: data.school.typePaiement || "MOBILE_MONEY",
         montantPaye: data.school.montantPaye?.toString() || "",
         reference: "",
@@ -417,10 +417,8 @@ export default function SubscriptionManagement() {
                     onChange={(e) => setForm(prev => ({ ...prev, planAbonnement: e.target.value }))}
                     className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   >
-                    <option value="BASIC">Basic</option>
-                    <option value="STANDARD">Standard</option>
-                    <option value="PREMIUM">Premium</option>
-                    <option value="ENTERPRISE">Enterprise</option>
+                    <option value="STARTER">Starter</option>
+                    <option value="PRO">Pro</option>
                   </select>
                 </div>
                 <div>

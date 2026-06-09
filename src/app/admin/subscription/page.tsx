@@ -335,6 +335,7 @@ export default function SubscriptionPage() {
   }
 
   const calculateProgress = () => {
+    if (school?.etatCompte === "SUSPENDU") return 100
     if (!school?.dateDebutAbonnement || !school?.dateFinAbonnement) return 0
     const now = new Date().getTime()
     const start = new Date(school.dateDebutAbonnement).getTime()
@@ -506,7 +507,11 @@ export default function SubscriptionPage() {
                   </div>
                   <div className={`h-2 w-full rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
                     <div
-                      className="h-full bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-1000"
+                      className={`h-full rounded-full transition-all duration-1000 ${
+                        school.etatCompte === "SUSPENDU" || (daysRemaining !== null && daysRemaining <= 0)
+                          ? "bg-gradient-to-r from-red-500 to-red-600"
+                          : "bg-gradient-to-r from-teal-500 to-teal-600"
+                      }`}
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>

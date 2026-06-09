@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
 
@@ -10,6 +10,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(true) // Par défaut ouvert sur desktop
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
@@ -65,7 +66,12 @@ export default function Layout({ children }: LayoutProps) {
         const res = await fetch('/api/auth/me')
         if (res.ok) {
           const data = await res.json()
-          setRole(data.user?.role || null)
+          const userRole = data.user?.role || null
+          setRole(userRole)
+          if (userRole === "SUPER_ADMIN") {
+            router.replace("/super-admin")
+            return
+          }
           if (data.subscription) {
             setSubscriptionExpired(data.subscription.expired === true)
           }

@@ -119,15 +119,15 @@ export async function PUT(
       }),
     ])
 
-    // Notification pour l'admin de l'école
-    const schoolAdminMessage = `✅ Votre abonnement a été renouvelé. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
+    // Notification pour tous les admins de l'école (broadcast via schoolId)
+    const schoolAdminMessage = `✅ Votre abonnement a été activé. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
 
     await prisma.notification.create({
       data: {
         type: "SUBSCRIPTION_PAYMENT_RECEIVED",
         message: schoolAdminMessage,
         schoolId,
-        userId: existingSchool.creeParId,
+        userId: null,
         targetRole: "SCHOOL_USER_ONLY",
       },
     })
@@ -143,10 +143,14 @@ export async function PUT(
       },
     })
 
-    // Push Realtime → admin de l'école
-    if (existingSchool.creeParId) {
+    // Push Realtime → tous les admins de l'école
+    const adminUsers = await prisma.user.findMany({
+      where: { schoolId, role: "ADMIN", isActive: true },
+      select: { id: true },
+    })
+    for (const admin of adminUsers) {
       await supabaseAdmin
-        .channel(`notifications:user:${existingSchool.creeParId}`)
+        .channel(`notifications:user:${admin.id}`)
         .send({
           type: "broadcast",
           event: "new_notification",
