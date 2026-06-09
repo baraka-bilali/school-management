@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     const userId = decoded.id
     const userRole = decoded.role
+    const userSchoolId = decoded.schoolId
 
     let count
 
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
         where: {
           isRead: false,
           OR: [
-            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
             { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
           ],
         },

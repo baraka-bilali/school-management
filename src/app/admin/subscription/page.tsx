@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { authFetch } from "@/lib/auth-fetch"
 import {
   CreditCard, Calendar, AlertCircle, CheckCircle, Clock,
-  Mail, Phone, Sparkles, Receipt, FileText, ChevronLeft,
-  ChevronRight, Download, Hash
+  Mail, Phone, Receipt, FileText, ChevronLeft,
+  ChevronRight, Download, MessageCircle
 } from "lucide-react"
 
 interface School {
@@ -92,7 +92,9 @@ const CircularProgress = ({
           ) : (
             <>
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
-              <div className="text-sm font-medium text-red-500">Expiré</div>
+              <div className="text-sm font-medium text-red-500">
+                {status === "SUSPENDU" ? "Résilié" : "Expiré"}
+              </div>
             </>
           )}
         </div>
@@ -300,6 +302,7 @@ export default function SubscriptionPage() {
 
   const calculateDaysRemaining = () => {
     if (!school?.dateFinAbonnement) return null
+    if (school.etatCompte === "SUSPENDU") return 0
     const today = new Date()
     const endDate = new Date(school.dateFinAbonnement)
     const diffTime = endDate.getTime() - today.getTime()
@@ -480,10 +483,19 @@ export default function SubscriptionPage() {
                       </div>
                     </div>
                     {daysRemaining !== null && daysRemaining <= 30 && (
-                      <button className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                        <Sparkles className="w-5 h-5" />
-                        Renouveler l'abonnement
-                      </button>
+                      <div className={`flex items-start gap-3 p-4 rounded-lg border ${
+                        theme === "dark" ? "bg-blue-900/20 border-blue-700" : "bg-blue-50 border-blue-200"
+                      }`}>
+                        <MessageCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className={`text-sm font-semibold ${theme === "dark" ? "text-blue-300" : "text-blue-800"}`}>
+                            Pour renouveler votre abonnement
+                          </p>
+                          <p className={`text-sm mt-1 ${theme === "dark" ? "text-blue-400" : "text-blue-700"}`}>
+                            Contactez l'équipe DigiSchool via email ou téléphone ci-dessous.
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -534,26 +546,32 @@ export default function SubscriptionPage() {
 
             {/* Besoin d'aide */}
             <Card theme={theme}>
-              <CardHeader><CardTitle>Besoin d'aide ?</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Contacter DigiSchool</CardTitle></CardHeader>
               <CardContent>
                 <p className={`${textSecondary} mb-6`}>
-                  Pour renouveler votre abonnement, modifier vos informations de paiement ou toute autre question,
-                  notre équipe est à votre disposition.
+                  Pour renouveler votre abonnement, signaler un problème ou toute autre question,
+                  contactez directement notre équipe.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button className="flex items-center justify-center gap-3 px-6 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                  <a
+                    href="mailto:support@digischool.com"
+                    className="flex items-center justify-center gap-3 px-6 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
                     <Mail className="w-5 h-5" />
                     <span>Envoyer un email</span>
-                  </button>
-                  <button className="flex items-center justify-center gap-3 px-6 py-4 border-2 border-teal-600 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-all font-semibold">
+                  </a>
+                  <a
+                    href="tel:+243000000000"
+                    className="flex items-center justify-center gap-3 px-6 py-4 border-2 border-teal-600 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-all font-semibold"
+                  >
                     <Phone className="w-5 h-5" />
                     <span>Appeler le support</span>
-                  </button>
+                  </a>
                 </div>
                 <div className={`mt-6 p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
                   <p className={`${textSecondary} text-sm leading-relaxed`}>
                     <strong className={textColor}>Email :</strong> support@digischool.com<br />
-                    <strong className={textColor}>Téléphone :</strong> +243 XXX XXX XXX<br />
+                    <strong className={textColor}>Téléphone :</strong> +243 000 000 000<br />
                     <strong className={textColor}>Horaires :</strong> Lun - Ven : 8h00 - 17h00
                   </p>
                 </div>

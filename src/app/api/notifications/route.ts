@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     const userId = decoded.id
     const userRole = decoded.role
+    const userSchoolId = decoded.schoolId
 
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
           }
         : {
             OR: [
-              { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+              { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
               { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
             ],
           }
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     const userId = decoded.id
     const userRole = decoded.role
+    const userSchoolId = decoded.schoolId
 
     if (userRole === "SUPER_ADMIN") {
       await prisma.notification.updateMany({
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
         where: {
           isRead: false,
           OR: [
-            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
+            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
             { userId: userId },
           ],
         },
