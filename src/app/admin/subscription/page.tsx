@@ -7,7 +7,7 @@ import { authFetch } from "@/lib/auth-fetch"
 import {
   CreditCard, Calendar, AlertCircle, CheckCircle, Clock,
   Mail, Phone, Receipt, FileText, ChevronLeft,
-  ChevronRight, Download, MessageCircle
+  ChevronRight, Download, MessageCircle, X, Building2, User
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
 
@@ -105,7 +105,7 @@ const CircularProgress = ({
 }
 
 function InvoicePrintModal({
-  payment, school, onClose, theme
+  payment, school, onClose,
 }: {
   payment: SubscriptionPayment
   school: School
@@ -125,119 +125,141 @@ function InvoicePrintModal({
     ESPECES: "Espèces", CARTE: "Carte bancaire",
   }
 
+  const invoiceData = {
+    numeroFacture: payment.numeroFacture,
+    createdAt: payment.createdAt,
+    plan: payment.plan,
+    periode: payment.periode,
+    dateDebut: payment.dateDebut,
+    dateFin: payment.dateFin,
+    montant: payment.montant,
+    devise: payment.devise,
+    typePaiement: payment.typePaiement,
+    reference: payment.reference,
+    notes: payment.notes,
+    schoolName: school.nomEtablissement,
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Invoice content */}
-        <div className="p-8" id="invoice-print">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-8 pb-6 border-b border-gray-200">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">FACTURE</h1>
-              <p className="text-lg font-mono text-blue-600 mt-1">{payment.numeroFacture}</p>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col"
+        style={{ maxHeight: "88vh" }}
+      >
+        {/* ── Header fixe ── */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+              <Receipt className="w-5 h-5 text-teal-600" />
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Date d'émission</p>
-              <p className="font-semibold text-gray-900">{formatDate(payment.createdAt)}</p>
+            <div>
+              <p className="font-bold text-gray-900 text-sm tracking-widest uppercase">Facture</p>
+              <p className="text-xs text-blue-600 font-mono font-semibold">{payment.numeroFacture}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+              Payé
+            </span>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Contenu scrollable ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Date d'émission */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Date d'émission</span>
+            <span className="font-semibold text-gray-700">{formatDate(payment.createdAt)}</span>
+          </div>
+
+          {/* Émetteur / Destinataire */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Émetteur</p>
+              </div>
+              <p className="font-bold text-gray-900 text-sm">DigiSchool Platform</p>
+              <p className="text-xs text-gray-500 mt-0.5">support@digischool.com</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <User className="w-3.5 h-3.5 text-gray-400" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Destinataire</p>
+              </div>
+              <p className="font-bold text-gray-900 text-sm">{school.nomEtablissement}</p>
             </div>
           </div>
 
-          {/* Parties */}
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Émetteur</p>
-              <p className="font-bold text-gray-900">DigiSchool Platform</p>
-              <p className="text-sm text-gray-600">support@digischool.com</p>
+          {/* Ligne de service */}
+          <div className="border border-gray-100 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Description</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Montant</span>
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Destinataire</p>
-              <p className="font-bold text-gray-900">{school.nomEtablissement}</p>
+            <div className="flex items-start justify-between px-4 py-4 border-b border-gray-50">
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">
+                  Abonnement {payment.plan} — {periodeLabel[payment.periode] || payment.periode}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {formatDate(payment.dateDebut)} → {formatDate(payment.dateFin)}
+                </p>
+              </div>
+              <p className="font-bold text-gray-900 text-sm whitespace-nowrap ml-4">
+                {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
+              </p>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 bg-teal-50">
+              <span className="font-bold text-gray-800 text-sm">TOTAL</span>
+              <span className="font-bold text-teal-600 text-base">
+                {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
+              </span>
             </div>
           </div>
 
-          {/* Details */}
-          <div className="bg-gray-50 rounded-xl p-6 mb-8">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500 pb-3">Description</th>
-                  <th className="text-right text-xs font-semibold uppercase tracking-wider text-gray-500 pb-3">Montant</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="py-4">
-                    <p className="font-semibold text-gray-900">
-                      Abonnement {payment.plan} — {periodeLabel[payment.periode] || payment.periode}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Période : {formatDate(payment.dateDebut)} → {formatDate(payment.dateFin)}
-                    </p>
-                  </td>
-                  <td className="py-4 text-right font-bold text-gray-900 text-lg">
-                    {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td className="pt-4 font-bold text-gray-900">TOTAL</td>
-                  <td className="pt-4 text-right font-bold text-teal-600 text-xl">
-                    {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(payment.montant)} {payment.devise}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          {/* Payment Info */}
-          <div className="grid grid-cols-2 gap-6 mb-6 text-sm">
+          {/* Mode de paiement + Référence */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-500">Mode de paiement</p>
-              <p className="font-semibold text-gray-900">{typePaiementLabel[payment.typePaiement] || payment.typePaiement}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Mode de paiement</p>
+              <p className="font-semibold text-gray-800">{typePaiementLabel[payment.typePaiement] || payment.typePaiement}</p>
             </div>
             {payment.reference && (
               <div>
-                <p className="text-gray-500">Référence</p>
-                <p className="font-semibold font-mono text-gray-900">{payment.reference}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Référence</p>
+                <p className="font-semibold font-mono text-gray-800">{payment.reference}</p>
               </div>
             )}
           </div>
 
+          {/* Notes */}
           {payment.notes && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wider mb-1">Notes</p>
-              <p className="text-sm text-yellow-800">{payment.notes}</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Notes</p>
+              <p className="text-sm text-amber-800">{payment.notes}</p>
             </div>
           )}
 
-          <div className="text-center text-xs text-gray-400 mt-8 pt-6 border-t border-gray-100">
+          {/* Footer */}
+          <div className="text-center text-[11px] text-gray-300 pt-2 pb-1 border-t border-gray-100">
             <p>Merci de votre confiance — DigiSchool Platform</p>
             <p>Ce document tient lieu de facture officielle</p>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 px-8 pb-8">
-          <InvoiceDownloadButton
-            data={{
-              numeroFacture: payment.numeroFacture,
-              createdAt: payment.createdAt,
-              plan: payment.plan,
-              periode: payment.periode,
-              dateDebut: payment.dateDebut,
-              dateFin: payment.dateFin,
-              montant: payment.montant,
-              devise: payment.devise,
-              typePaiement: payment.typePaiement,
-              reference: payment.reference,
-              notes: payment.notes,
-              schoolName: school.nomEtablissement,
-            }}
-          />
+        {/* ── Boutons fixés en bas ── */}
+        <div className="flex-shrink-0 flex gap-3 px-6 py-4 border-t border-gray-100 bg-white rounded-b-2xl">
+          <InvoiceDownloadButton data={invoiceData} />
           <button
             onClick={onClose}
-            className="flex-1 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+            className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-colors text-sm"
           >
             Fermer
           </button>
