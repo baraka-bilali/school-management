@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
-import { buildStudentEmailWithSchool, generatePassword } from "@/lib/generateCredentials"
+import { buildStudentEmailByCode, generatePassword } from "@/lib/generateCredentials"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
 import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
@@ -242,10 +242,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
     }
 
-    // Récupérer le nom de l'école pour générer l'email
+    // Récupérer le code et le nom de l'école pour générer l'email
     const school = await prisma.school.findUnique({
       where: { id: adminSchoolId },
-      select: { nomEtablissement: true }
+      select: { nomEtablissement: true, codeEtablissement: true }
     })
 
     if (!school) {
@@ -280,13 +280,18 @@ export async function POST(req: NextRequest) {
       yearId = currentYear.id
     }
 
-    // Générer email avec le domaine de l'école et mot de passe
-    const email = buildStudentEmailWithSchool({ 
-      lastName, 
-      middleName, 
-      code, 
-      schoolName: school.nomEtablissement 
-    })
+    // Générer email avec le code de l'école et gestion des doublons
+    const calendarYear = new Date().getFullYear()
+    const schoolCode = school.codeEtablissement || school.nomEtablissement
+
+    let email = buildStudentEmailByCode({ firstName, lastName, year: calendarYear, schoolCode })
+    let suffix = 2
+    while (await prisma.user.findUnique({ where: { email } })) {
+      email = buildStudentEmailByCode({ firstName, lastName, year: calendarYear, schoolCode, suffix })
+      suffix++
+      if (suffix > 100) break
+    }
+
     const plaintextPassword = generatePassword()
     const hashedPassword = await bcrypt.hash(plaintextPassword, 10)
 

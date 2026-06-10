@@ -39,20 +39,46 @@ export function buildStudentEmail({ lastName, middleName, code }: { lastName: st
  * Format: initialNom + initialPostnom + code@nomecole.school
  * Ex: "ab001@ecolesaintjoseph.school"
  */
-export function buildStudentEmailWithSchool({ 
-  lastName, 
-  middleName, 
-  code, 
-  schoolName 
-}: { 
-  lastName: string; 
-  middleName: string; 
+export function buildStudentEmailWithSchool({
+  lastName,
+  middleName,
+  code,
+  schoolName
+}: {
+  lastName: string;
+  middleName: string;
   code: string;
   schoolName: string;
 }): string {
   const left = `${initial(lastName)}${initial(middleName)}${normalize(code)}`
   const domain = buildSchoolDomain(schoolName)
   return `${left}@${domain}`
+}
+
+/**
+ * Génère un email pour un élève avec le code de l'école
+ * Format: prenom + nom + année@codeEcole.com
+ * Ex: "beckerbaraka2026@donbosco.com"
+ * Avec suffixe (doublons): "beckerbaraka22026@donbosco.com"
+ */
+export function buildStudentEmailByCode({
+  firstName,
+  lastName,
+  year,
+  schoolCode,
+  suffix,
+}: {
+  firstName: string
+  lastName: string
+  year: number
+  schoolCode: string
+  suffix?: number
+}): string {
+  const fn = normalize(firstName)
+  const ln = normalize(lastName)
+  const sc = normalize(schoolCode)
+  const sfx = suffix && suffix >= 2 ? String(suffix) : ""
+  return `${fn}${ln}${sfx}${year}@${sc}.com`
 }
 
 export function buildTeacherEmail({ lastName, middleName, suffix }: { lastName: string; middleName: string; suffix?: string }): string {

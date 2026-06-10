@@ -135,6 +135,8 @@ function CreateStudentModal({
     classId: "",
     academicYearId: defaultYearId ? String(defaultYearId) : "",
   })
+  const [autoCode, setAutoCode] = useState(false)
+  const [autoCodeLoading, setAutoCodeLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
@@ -156,9 +158,27 @@ function CreateStudentModal({
         classId: "",
         academicYearId: defaultYearId ? String(defaultYearId) : "",
       })
+      setAutoCode(false)
       setSubmitting(false)
     }
   }, [open, defaultYearId])
+
+  // Auto-fetch next code when autoCode is on and classId changes
+  useEffect(() => {
+    if (!autoCode || !form.classId) return
+    let cancelled = false
+    setAutoCodeLoading(true)
+    const params = new URLSearchParams({ classId: form.classId })
+    if (form.academicYearId) params.set("yearId", form.academicYearId)
+    authFetch(`/api/admin/students/next-code?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!cancelled) setForm(f => ({ ...f, code: String(data.nextCode ?? 1) }))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAutoCodeLoading(false) })
+    return () => { cancelled = true }
+  }, [autoCode, form.classId, form.academicYearId])
 
   // manage mount/visibility so opening animates smoothly
   useEffect(() => {
@@ -235,8 +255,31 @@ function CreateStudentModal({
             <input type="date" className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Code</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <div className="flex items-center justify-between mb-1">
+              <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>Code</label>
+              <label className={`flex items-center gap-1.5 text-xs cursor-pointer ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                <input
+                  type="checkbox"
+                  checked={autoCode}
+                  onChange={(e) => {
+                    setAutoCode(e.target.checked)
+                    if (!e.target.checked) setForm(f => ({ ...f, code: "" }))
+                  }}
+                  className="rounded"
+                />
+                Auto-incrémenter
+              </label>
+            </div>
+            {autoCode ? (
+              <div className={`relative w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-400" : "border-gray-300 bg-gray-50 text-gray-500"} px-3 py-2 flex items-center`}>
+                <span className="flex-1 font-mono">
+                  {autoCodeLoading ? "..." : (form.code || (form.classId ? "Sélectionnez une classe" : "—"))}
+                </span>
+                {autoCodeLoading && <div className="w-3 h-3 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin ml-2" />}
+              </div>
+            ) : (
+              <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            )}
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Classe</label>
@@ -1359,6 +1402,12 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
     specialty: "",
     phone: "",
   })
+  const [showTeacherResetModal, setShowTeacherResetModal] = useState(false)
+  const [selectedTeacherForReset, setSelectedTeacherForReset] = useState<any>(null)
+  const [newTeacherPasswordGenerated, setNewTeacherPasswordGenerated] = useState("")
+  const [resettingTeacherPassword, setResettingTeacherPassword] = useState(false)
+  const [teacherPasswordCopied, setTeacherPasswordCopied] = useState(false)
+  const [teacherEmailCopied, setTeacherEmailCopied] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -1502,6 +1551,47 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
       })
       setTimeout(() => setBanner(null), 5000)
     }
+  }
+
+  const handleResetTeacherPassword = (teacher: any) => {
+    setSelectedTeacherForReset(teacher)
+    setShowTeacherResetModal(true)
+    setNewTeacherPasswordGenerated("")
+    setTeacherPasswordCopied(false)
+    setTeacherEmailCopied(false)
+  }
+
+  const handleConfirmResetTeacherPassword = async () => {
+    if (!selectedTeacherForReset) return
+    try {
+      setResettingTeacherPassword(true)
+      const res = await authFetch(`/api/admin/teachers/${selectedTeacherForReset.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setNewTeacherPasswordGenerated(data.newPassword)
+        setSelectedTeacherForReset({ ...selectedTeacherForReset, email: data.teacher.email })
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || "Erreur lors de la réinitialisation")
+        setShowTeacherResetModal(false)
+      }
+    } catch {
+      toast.error("Une erreur est survenue")
+      setShowTeacherResetModal(false)
+    } finally {
+      setResettingTeacherPassword(false)
+    }
+  }
+
+  const closeTeacherResetModal = () => {
+    setShowTeacherResetModal(false)
+    setSelectedTeacherForReset(null)
+    setNewTeacherPasswordGenerated("")
+    setTeacherPasswordCopied(false)
+    setTeacherEmailCopied(false)
   }
 
   return (
@@ -1705,6 +1795,16 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                               <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); }}>
                                 <Eye className="h-4 w-4" />
                               </button>
+                              <button
+                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer relative group`}
+                                onClick={(e) => { e.stopPropagation(); handleResetTeacherPassword(t) }}
+                                title="Réinitialiser le mot de passe"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
+                                  Réinit. mot de passe
+                                </span>
+                              </button>
                             </>
                           )}
                         </div>
@@ -1759,6 +1859,125 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
             setPagination((p) => ({ ...p }))
           }}
         />
+
+        {/* Modal confirmation reset MDP enseignant */}
+        {showTeacherResetModal && !newTeacherPasswordGenerated && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeTeacherResetModal} />
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-md transform transition-all duration-200`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <h3 className={`text-xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}>
+                    <KeyRound className="w-5 h-5 text-orange-500" />
+                    Réinitialiser le mot de passe
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"}`}>
+                      {selectedTeacherForReset?.firstName?.charAt(0)}{selectedTeacherForReset?.lastName?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                        {selectedTeacherForReset?.lastName} {selectedTeacherForReset?.middleName} {selectedTeacherForReset?.firstName}
+                      </p>
+                      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        {selectedTeacherForReset?.specialty || "Enseignant"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"} mb-2`}>
+                    Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet enseignant ?
+                  </p>
+                  <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Un nouveau mot de passe temporaire sera généré. L'enseignant pourra le changer lors de sa prochaine connexion.
+                  </p>
+                </div>
+                <div className={`p-6 flex gap-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button
+                    onClick={closeTeacherResetModal}
+                    disabled={resettingTeacherPassword}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${theme === "dark" ? "bg-gray-700 hover:bg-gray-600 text-gray-200 border border-gray-600" : "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"} disabled:opacity-50`}
+                  >
+                    <X className="w-4 h-4" />Annuler
+                  </button>
+                  <button
+                    onClick={handleConfirmResetTeacherPassword}
+                    disabled={resettingTeacherPassword}
+                    className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    {resettingTeacherPassword ? "Réinitialisation..." : "Réinitialiser"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+
+        {/* Modal affichage identifiants enseignant */}
+        {newTeacherPasswordGenerated && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeTeacherResetModal} />
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-lg transform transition-all duration-200`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-green-500/20 bg-green-500/5" : "border-green-200 bg-green-50"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <KeyRound className="w-7 h-7 text-green-500" />
+                    </div>
+                    <div>
+                      <h2 className={`text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Identifiants de Connexion</h2>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Mot de passe réinitialisé avec succès</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className={`${theme === "dark" ? "bg-yellow-500/10" : "bg-yellow-50"} border ${theme === "dark" ? "border-yellow-500/30" : "border-yellow-200"} rounded-lg p-4`}>
+                    <p className={`${theme === "dark" ? "text-yellow-400" : "text-yellow-700"} text-sm font-medium flex items-start gap-2`}>
+                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                      <span><strong>Important :</strong> Copiez ces identifiants maintenant ! Ils ne seront plus affichés après la fermeture.</span>
+                    </p>
+                  </div>
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"}`}>
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>{selectedTeacherForReset?.lastName} {selectedTeacherForReset?.firstName}</p>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>{selectedTeacherForReset?.specialty || "Enseignant"}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}><Mail className="w-3.5 h-3.5" />Adresse email</label>
+                    <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${teacherEmailCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-indigo-500 transition-all`}>
+                      <span className={`font-mono text-sm ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>{selectedTeacherForReset?.email}</span>
+                      <button onClick={() => { navigator.clipboard?.writeText(selectedTeacherForReset?.email || ""); setTeacherEmailCopied(true); setTimeout(() => setTeacherEmailCopied(false), 2000) }} className={`transition-colors p-1.5 rounded ${teacherEmailCopied ? "text-green-500 bg-green-500/20" : "text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/10"}`}>
+                        {teacherEmailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}><KeyRound className="w-3.5 h-3.5" />Nouveau mot de passe</label>
+                    <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${teacherPasswordCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
+                      <span className={`font-mono text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>{newTeacherPasswordGenerated}</span>
+                      <button onClick={() => { navigator.clipboard?.writeText(newTeacherPasswordGenerated); setTeacherPasswordCopied(true); setTimeout(() => setTeacherPasswordCopied(false), 2000) }} className={`transition-colors p-1.5 rounded ${teacherPasswordCopied ? "text-green-500 bg-green-500/20" : "text-orange-500 hover:text-orange-400 hover:bg-orange-500/10"}`}>
+                        {teacherPasswordCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className={`p-6 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button onClick={closeTeacherResetModal} className={`w-full px-4 py-2.5 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${teacherPasswordCopied && teacherEmailCopied ? theme === "dark" ? "bg-green-500/30 hover:bg-green-500/40 text-green-300 border border-green-500/70" : "bg-green-100 hover:bg-green-200 text-green-700 border border-green-300" : theme === "dark" ? "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50" : "bg-green-50 hover:bg-green-100 text-green-600 border border-green-200"}`}>
+                    <Check className="w-4 h-4" />
+                    {teacherPasswordCopied && teacherEmailCopied ? "✓ Identifiants copiés !" : "J'ai copié les identifiants"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+
       </CardContent>
     </Card>
   )
