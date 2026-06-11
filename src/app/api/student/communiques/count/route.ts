@@ -11,17 +11,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    if (decoded.role !== "ELEVE") return NextResponse.json({ unread: 0 })
+    if (decoded.role !== "ELEVE" || !decoded.schoolId) return NextResponse.json({ unread: 0 })
 
     const student = await prisma.student.findFirst({
       where: { userId: decoded.id },
-      select: { id: true, schoolId: true },
+      select: { id: true },
     })
     if (!student) return NextResponse.json({ unread: 0 })
 
     const unread = await prisma.communique.count({
       where: {
-        schoolId: student.schoolId,
+        schoolId: decoded.schoolId,
         reads: { none: { studentId: student.id } },
       },
     })

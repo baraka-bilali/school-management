@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       student: {
         id: student.id,
-        schoolId: student.schoolId,
+        schoolId: decoded.schoolId,
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
