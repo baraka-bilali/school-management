@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { supabaseAdmin } from "@/lib/supabase-server"
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,6 +64,15 @@ export async function POST(req: NextRequest) {
         createdBy: { select: { name: true, nom: true, prenom: true } },
       },
     })
+
+    // Broadcast realtime to all students of this school
+    await supabaseAdmin
+      .channel(`communiques:school:${user.schoolId}`)
+      .send({
+        type: "broadcast",
+        event: "new_communique",
+        payload: { communiqueId: communique.id },
+      })
 
     return NextResponse.json({ communique }, { status: 201 })
   } catch (error) {

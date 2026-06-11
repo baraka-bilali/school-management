@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
+import { supabaseBrowser } from "@/lib/supabase-client"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -11,23 +12,22 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(true) // Par défaut ouvert sur desktop
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [subscriptionExpired, setSubscriptionExpired] = useState(false)
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
+  const [studentSchoolId, setStudentSchoolId] = useState<number | null>(null)
 
   useEffect(() => {
-    // Charger le thème depuis localStorage
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) {
       setTheme(savedTheme)
       document.documentElement.classList.toggle("dark", savedTheme === "dark")
     }
 
-    // Écouter les changements de thème
     const handleThemeChange = () => {
       const currentTheme = localStorage.getItem("theme") as "light" | "dark" | null
       if (currentTheme) {
@@ -42,18 +42,13 @@ export default function Layout({ children }: LayoutProps) {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
-      
-      // Sur mobile, le sidebar est fermé par défaut
-      if (mobile) {
-        setSidebarOpen(false)
-      } else {
-        setSidebarOpen(true)
-      }
+      if (mobile) setSidebarOpen(false)
+      else setSidebarOpen(true)
     }
-    
     checkMobile()
     window.addEventListener('resize', checkMobile)
 
+    // Re-fetch count when a communiqué is read (badge decrements)
     const handleCommuniqueRead = async () => {
       try {
         const countRes = await fetch('/api/student/communiques/count', { credentials: 'include' })
@@ -73,7 +68,7 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [])
 
-  // Fetch role + subscription status from server
+  // Fetch role + subscription status
   useEffect(() => {
     const fetchRole = async () => {
       try {
@@ -89,13 +84,15 @@ export default function Layout({ children }: LayoutProps) {
           if (data.subscription) {
             setSubscriptionExpired(data.subscription.expired === true)
           }
-          // For students, fetch isPremium from student/me
           if (userRole === "ELEVE") {
             try {
               const studentRes = await fetch('/api/student/me', { credentials: 'include' })
               if (studentRes.ok) {
                 const studentData = await studentRes.json()
                 setStudentIsPremium(studentData.student?.isPremium === true)
+                if (studentData.student?.schoolId) {
+                  setStudentSchoolId(studentData.student.schoolId)
+                }
               }
             } catch {}
             try {
@@ -109,7 +106,6 @@ export default function Layout({ children }: LayoutProps) {
           return
         }
       } catch {}
-      // Fallback decode client token if available
       try {
         const token = localStorage.getItem('token')
         if (token) {
@@ -121,9 +117,21 @@ export default function Layout({ children }: LayoutProps) {
     fetchRole()
   }, [])
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen)
-  }
+  // Supabase Realtime: listen for new communiqués for this school
+  useEffect(() => {
+    if (!studentSchoolId) return
+
+    const channel = supabaseBrowser
+      .channel(`communiques:school:${studentSchoolId}`)
+      .on("broadcast", { event: "new_communique" }, () => {
+        setUnreadCommuniques(prev => prev + 1)
+      })
+      .subscribe()
+
+    return () => { supabaseBrowser.removeChannel(channel) }
+  }, [studentSchoolId])
+
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
 
   return (
     <div className={`min-h-screen transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -135,12 +143,12 @@ export default function Layout({ children }: LayoutProps) {
         studentIsPremium={studentIsPremium}
         badgeCounts={{ "/student/communiques": unreadCommuniques }}
       />
-      
+
       {/* Main Content */}
       <main className={`
         pt-16 transition-all duration-300 ease-in-out
-        ${isMobile 
-          ? 'ml-0' 
+        ${isMobile
+          ? 'ml-0'
           : sidebarOpen ? 'ml-64' : 'ml-16'
         }
       `}>
@@ -159,7 +167,6 @@ function RouteTransition({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
-    // quick out/in to trigger transition on pathname change
     setVisible(false)
     const id = setTimeout(() => setVisible(true), 20)
     return () => clearTimeout(id)
