@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
-import { Settings, User, Lock, Bell, Palette, Check, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react"
+import { Settings, User, Lock, Bell, Palette, Check, Eye, EyeOff, KeyRound, Loader2, Heart } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
 interface StudentInfo {
@@ -20,6 +20,14 @@ interface StudentInfo {
   parentName1?: string
   parentPhone1?: string
   parentEmail1?: string
+  parentName2?: string
+  parentPhone2?: string
+  parentEmail2?: string
+  bloodGroup?: string
+  allergies?: string
+  medicalNotes?: string
+  emergencyContact?: string
+  emergencyPhone?: string
   email: string
   class?: string
   year?: string
@@ -138,29 +146,89 @@ export default function StudentSettingsPage() {
                 <Loader2 className={`w-6 h-6 animate-spin ${textSecondary}`} />
               </div>
             ) : student ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { label: "Nom complet", value: `${student.lastName} ${student.middleName} ${student.firstName}` },
-                    { label: "Code élève", value: student.code },
-                    { label: "Email", value: student.email },
-                    { label: "Classe", value: student.class || "—" },
-                    { label: "Genre", value: student.gender === "M" || student.gender === "Masculin" ? "Masculin" : student.gender || "—" },
-                    { label: "Date de naissance", value: student.birthDate ? new Date(student.birthDate).toLocaleDateString("fr-FR") : "—" },
-                    { label: "Lieu de naissance", value: student.birthPlace || "—" },
-                    { label: "Nationalité", value: student.nationality || "—" },
-                    { label: "Adresse", value: student.address || "—" },
-                    { label: "Parent / Tuteur", value: student.parentName1 || "—" },
-                    { label: "Tél. parent", value: student.parentPhone1 || "—" },
-                  ].map(({ label, value }) => (
-                    <div key={label} className={`p-3 rounded-lg ${infoBg}`}>
-                      <p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p>
-                      <p className={`text-sm font-medium ${textColor} break-words`}>{value}</p>
-                    </div>
-                  ))}
+              <div className="space-y-5">
+                {/* Admin-set fields */}
+                <div>
+                  <p className={`text-xs font-semibold uppercase ${textSecondary} mb-2`}>Informations officielles</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { label: "Nom complet", value: `${student.lastName} ${student.middleName} ${student.firstName}` },
+                      { label: "Code élève", value: student.code },
+                      { label: "Email", value: student.email },
+                      { label: "Classe", value: student.class || "—" },
+                      { label: "Genre", value: student.gender === "M" || student.gender === "Masculin" ? "Masculin" : student.gender === "F" || student.gender === "Féminin" ? "Féminin" : student.gender || "—" },
+                      { label: "Date de naissance", value: student.birthDate ? new Date(student.birthDate).toLocaleDateString("fr-FR") : "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} className={`p-3 rounded-lg ${infoBg}`}>
+                        <p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p>
+                        <p className={`text-sm font-medium ${textColor} break-words`}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Personal fields */}
+                <div>
+                  <p className={`text-xs font-semibold uppercase ${textSecondary} mb-2`}>Informations personnelles</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { label: "Lieu de naissance", value: student.birthPlace || "—" },
+                      { label: "Nationalité", value: student.nationality || "—" },
+                      { label: "Adresse", value: student.address || "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} className={`p-3 rounded-lg ${infoBg}`}>
+                        <p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p>
+                        <p className={`text-sm font-medium ${textColor} break-words`}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Parents */}
+                <div>
+                  <p className={`text-xs font-semibold uppercase ${textSecondary} mb-2`}>Parents / Tuteurs</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { label: "Parent / Tuteur principal", value: student.parentName1 || "—" },
+                      { label: "Tél. parent 1", value: student.parentPhone1 || "—" },
+                      { label: "Email parent 1", value: student.parentEmail1 || "—" },
+                      { label: "Parent / Tuteur secondaire", value: student.parentName2 || "—" },
+                      { label: "Tél. parent 2", value: student.parentPhone2 || "—" },
+                      { label: "Email parent 2", value: student.parentEmail2 || "—" },
+                      { label: "Contact d'urgence", value: student.emergencyContact || "—" },
+                      { label: "Tél. urgence", value: student.emergencyPhone || "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} className={`p-3 rounded-lg ${infoBg}`}>
+                        <p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p>
+                        <p className={`text-sm font-medium ${textColor} break-words`}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medical */}
+                {(student.bloodGroup || student.allergies || student.medicalNotes) && (
+                  <div>
+                    <p className={`text-xs font-semibold uppercase ${textSecondary} mb-2 flex items-center gap-1`}>
+                      <Heart className="w-3.5 h-3.5 text-rose-400" /> Informations médicales
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { label: "Groupe sanguin", value: student.bloodGroup || "—" },
+                        { label: "Allergies", value: student.allergies || "—" },
+                        { label: "Notes médicales", value: student.medicalNotes || "—" },
+                      ].map(({ label, value }) => (
+                        <div key={label} className={`p-3 rounded-lg ${infoBg}`}>
+                          <p className={`text-xs ${textSecondary} mb-0.5`}>{label}</p>
+                          <p className={`text-sm font-medium ${textColor} break-words`}>{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <p className={`text-xs ${textSecondary} mt-2`}>
-                  Pour modifier ces informations, contactez votre administration.
+                  Pour modifier les informations officielles, contactez votre administration.
                 </p>
               </div>
             ) : (

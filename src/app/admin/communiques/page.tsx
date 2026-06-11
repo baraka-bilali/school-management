@@ -88,6 +88,8 @@ export default function AdminCommuniquesPage() {
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  const [editorEmpty, setEditorEmpty] = useState(true)
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -97,6 +99,9 @@ export default function AdminCommuniquesPage() {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     content: "",
+    onUpdate: ({ editor }) => {
+      setEditorEmpty(editor.getText().trim().length === 0)
+    },
     editorProps: {
       attributes: {
         class: "prose prose-sm dark:prose-invert max-w-none min-h-[180px] p-4 outline-none focus:ring-0",
@@ -140,7 +145,7 @@ export default function AdminCommuniquesPage() {
   useEffect(() => { fetchCommuniques(1, false) }, [fetchCommuniques])
 
   const handleSend = async () => {
-    if (!title.trim() || !editor || editor.isEmpty) return
+    if (!title.trim() || !editor || editorEmpty) return
     setSending(true)
     setSendStatus("idle")
     try {
@@ -245,7 +250,7 @@ export default function AdminCommuniquesPage() {
                 </div>
                 <button
                   onClick={handleSend}
-                  disabled={sending || !title.trim() || !editor || editor.isEmpty}
+                  disabled={sending || !title.trim() || !editor || editorEmpty}
                   className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
                 >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

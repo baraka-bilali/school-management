@@ -28,12 +28,13 @@ interface SidebarProps {
   onToggle: () => void
   subscriptionExpired?: boolean
   studentIsPremium?: boolean
+  badgeCounts?: Record<string, number>
 }
 
 // Routes always accessible regardless of subscription
 const ALWAYS_ALLOWED = ["/admin/subscription", "/admin/settings"]
 
-export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false, studentIsPremium = false }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false, studentIsPremium = false, badgeCounts = {} }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -116,6 +117,11 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   // Sélectionner le menu selon le rôle
   const navItems = userRole === "ELEVE" ? studentNavItems : adminNavItems
   const basePath = userRole === "ELEVE" ? "/student" : "/admin"
+
+  // For non-premium students, completely hide premium-only items
+  const visibleNavItems = navItems.filter(item =>
+    !(item as NavItem).premiumOnly || studentIsPremium
+  )
 
   const isActive = (href: string) => {
     if (href === basePath) return pathname === basePath
@@ -201,10 +207,10 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
             <div className="mb-6">
               <h3 className={`text-xs uppercase font-semibold ${textSecondary} mb-4 px-2`}>Menu principal</h3>
               <ul className="space-y-1">
-                {navItems.map((item, index) => {
+                {visibleNavItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
                   const proLocked = !!(item as NavItem).proOnly
-                  const premiumLocked = !!(item as NavItem).premiumOnly && !studentIsPremium
+                  const badge = badgeCounts[item.href]
                   return (
                   <li key={index}>
                     {locked ? (
@@ -221,15 +227,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                         <item.icon className="w-5 h-5 mr-3" />
                         <span className="flex-1">{item.label}</span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
-                      </span>
-                    ) : premiumLocked ? (
-                      <span
-                        className={`flex items-center px-3 py-2.5 rounded-lg cursor-not-allowed select-none opacity-50 ${textSecondary}`}
-                        title="Disponible avec l'abonnement premium de votre école"
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span className="flex-1">{item.label}</span>
-                        <Lock className="w-3 h-3 opacity-60" />
                       </span>
                     ) : (item as NavItem).premiumOnly ? (
                     <Link
@@ -260,7 +257,12 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                       onClick={onToggle}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
-                      <span>{item.label}</span>
+                      <span className="flex-1">{item.label}</span>
+                      {badge > 0 && (
+                        <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                          {badge > 9 ? "9+" : badge}
+                        </span>
+                      )}
                     </Link>
                     )}
                   </li>
@@ -393,10 +395,10 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                 isOpen ? 'opacity-100 max-h-10' : 'opacity-0 max-h-0 overflow-hidden'
               }`}>Menu principal</h3>
               <ul className="space-y-1">
-                {navItems.map((item, index) => {
+                {visibleNavItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
                   const proLocked = !!(item as NavItem).proOnly
-                  const premiumLocked = !!(item as NavItem).premiumOnly && !studentIsPremium
+                  const badge = badgeCounts[item.href]
                   return (
                   <li key={index}>
                     {locked ? (
@@ -428,23 +430,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                           <>
                             <span className="ml-3 flex-1">{item.label}</span>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
-                          </>
-                        )}
-                      </span>
-                    ) : premiumLocked ? (
-                      <span
-                        className={`
-                          flex items-center rounded-lg opacity-50 cursor-not-allowed select-none
-                          ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
-                          ${textSecondary}
-                        `}
-                        title={!isOpen ? `${item.label} (Premium requis)` : "Disponible avec l'abonnement premium"}
-                      >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        {isOpen && (
-                          <>
-                            <span className="ml-3 flex-1">{item.label}</span>
-                            <Lock className="w-3 h-3 opacity-60" />
                           </>
                         )}
                       </span>
@@ -489,11 +474,19 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       {isOpen && (
-                        <span className="ml-3">{item.label}</span>
+                        <>
+                          <span className="ml-3 flex-1">{item.label}</span>
+                          {badge > 0 && (
+                            <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                              {badge > 9 ? "9+" : badge}
+                            </span>
+                          )}
+                        </>
                       )}
                       {!isOpen && (
                         <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
                           {item.label}
+                          {badge > 0 && ` (${badge})`}
                         </div>
                       )}
                     </Link>

@@ -50,6 +50,7 @@ export default function StudentCommuniqueViewPage() {
         if (res.ok) {
           const data = await res.json()
           setCommunique(data.communique)
+          window.dispatchEvent(new Event("communiqueRead"))
         } else if (res.status === 404) {
           setNotFound(true)
         }

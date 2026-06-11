@@ -17,6 +17,7 @@ export default function Layout({ children }: LayoutProps) {
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [subscriptionExpired, setSubscriptionExpired] = useState(false)
   const [studentIsPremium, setStudentIsPremium] = useState(false)
+  const [unreadCommuniques, setUnreadCommuniques] = useState(0)
 
   useEffect(() => {
     // Charger le thème depuis localStorage
@@ -52,11 +53,23 @@ export default function Layout({ children }: LayoutProps) {
     
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    
+
+    const handleCommuniqueRead = async () => {
+      try {
+        const countRes = await fetch('/api/student/communiques/count', { credentials: 'include' })
+        if (countRes.ok) {
+          const countData = await countRes.json()
+          setUnreadCommuniques(countData.unread || 0)
+        }
+      } catch {}
+    }
+    window.addEventListener('communiqueRead', handleCommuniqueRead)
+
     return () => {
       window.removeEventListener('resize', checkMobile)
       window.removeEventListener('storage', handleThemeChange)
       window.removeEventListener('themeChange', handleThemeChange)
+      window.removeEventListener('communiqueRead', handleCommuniqueRead)
     }
   }, [])
 
@@ -83,6 +96,13 @@ export default function Layout({ children }: LayoutProps) {
               if (studentRes.ok) {
                 const studentData = await studentRes.json()
                 setStudentIsPremium(studentData.student?.isPremium === true)
+              }
+            } catch {}
+            try {
+              const countRes = await fetch('/api/student/communiques/count', { credentials: 'include' })
+              if (countRes.ok) {
+                const countData = await countRes.json()
+                setUnreadCommuniques(countData.unread || 0)
               }
             } catch {}
           }
@@ -113,6 +133,7 @@ export default function Layout({ children }: LayoutProps) {
         onToggle={toggleSidebar}
         subscriptionExpired={subscriptionExpired}
         studentIsPremium={studentIsPremium}
+        badgeCounts={{ "/student/communiques": unreadCommuniques }}
       />
       
       {/* Main Content */}

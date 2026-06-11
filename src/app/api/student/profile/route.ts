@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { birthPlace, nationality, address, parentName1, parentPhone1, parentEmail1, parentName2, parentPhone2, emergencyContact, emergencyPhone, profileCompleted } = body
+    const { birthPlace, nationality, address, parentName1, parentPhone1, parentEmail1, parentName2, parentPhone2, parentEmail2, bloodGroup, allergies, medicalNotes, emergencyContact, emergencyPhone, profileCompleted } = body
 
     const student = await prisma.student.findFirst({
       where: { userId: decoded.id },
@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest) {
         ...(parentEmail1 !== undefined && { parentEmail1 }),
         ...(parentName2 !== undefined && { parentName2 }),
         ...(parentPhone2 !== undefined && { parentPhone2 }),
+        ...(parentEmail2 !== undefined && { parentEmail2 }),
+        ...(bloodGroup !== undefined && { bloodGroup }),
+        ...(allergies !== undefined && { allergies }),
+        ...(medicalNotes !== undefined && { medicalNotes }),
         ...(emergencyContact !== undefined && { emergencyContact }),
         ...(emergencyPhone !== undefined && { emergencyPhone }),
         ...(profileCompleted !== undefined && { profileCompleted }),

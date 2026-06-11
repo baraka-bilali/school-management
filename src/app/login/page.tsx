@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
@@ -42,10 +42,21 @@ export default function LoginPage() {
 		parentName1: "",
 		parentPhone1: "",
 		parentEmail1: "",
+		parentName2: "",
+		parentPhone2: "",
+		parentEmail2: "",
+		bloodGroup: "",
+		allergies: "",
+		medicalNotes: "",
 		emergencyContact: "",
 		emergencyPhone: "",
 	})
 	const [savingProfile, setSavingProfile] = useState(false)
+
+	// Read-only student info (admin-set fields) for profile completion display
+	const [studentReadOnly, setStudentReadOnly] = useState<{
+		code: string; lastName: string; middleName: string; firstName: string; gender: string; birthDate: string; className: string
+	} | null>(null)
 
 	// Welcome
 	const [userName, setUserName] = useState("")
@@ -97,7 +108,7 @@ export default function LoginPage() {
 
 				setPendingRole(payload.role)
 
-				// ELEVE avec mot de passe temporaire → choix
+					// ELEVE avec mot de passe temporaire → choix
 				if (payload.role === "ELEVE" && data.temporaryPassword) {
 					// Pré-charger les infos élève
 					try {
@@ -106,6 +117,15 @@ export default function LoginPage() {
 							const meData = await meRes.json()
 							setUserName(meData.student?.firstName || "")
 							setPendingStudentProfileCompleted(meData.student?.profileCompleted === true)
+							setStudentReadOnly({
+								code: meData.student?.code || "",
+								lastName: meData.student?.lastName || "",
+								middleName: meData.student?.middleName || "",
+								firstName: meData.student?.firstName || "",
+								gender: meData.student?.gender || "",
+								birthDate: meData.student?.birthDate || "",
+								className: meData.student?.class || "",
+							})
 						}
 					} catch {}
 					setStep("password_choice")
@@ -125,6 +145,15 @@ export default function LoginPage() {
 						if (meRes.ok) {
 							const meData = await meRes.json()
 							setUserName(meData.student?.firstName || "")
+							setStudentReadOnly({
+								code: meData.student?.code || "",
+								lastName: meData.student?.lastName || "",
+								middleName: meData.student?.middleName || "",
+								firstName: meData.student?.firstName || "",
+								gender: meData.student?.gender || "",
+								birthDate: meData.student?.birthDate || "",
+								className: meData.student?.class || "",
+							})
 							if (!meData.student?.profileCompleted) {
 								setPendingStudentProfileCompleted(false)
 								setStep("profile_completion")
@@ -450,7 +479,32 @@ export default function LoginPage() {
 									</div>
 								</div>
 							</div>
-							<div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+							<div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+
+								{/* Read-only: admin-set fields */}
+								{studentReadOnly && (
+									<div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+										<p className="text-xs font-semibold text-gray-500 uppercase mb-3">Informations enregistrées par l&apos;école</p>
+										<div className="grid grid-cols-2 gap-2">
+											{[
+												{ label: "Code élève", value: studentReadOnly.code },
+												{ label: "Nom", value: studentReadOnly.lastName },
+												{ label: "Post-nom", value: studentReadOnly.middleName },
+												{ label: "Prénom", value: studentReadOnly.firstName },
+												{ label: "Genre", value: studentReadOnly.gender === "M" || studentReadOnly.gender === "Masculin" ? "Masculin" : studentReadOnly.gender === "F" || studentReadOnly.gender === "Féminin" ? "Féminin" : studentReadOnly.gender || "—" },
+												{ label: "Naissance", value: studentReadOnly.birthDate ? new Date(studentReadOnly.birthDate).toLocaleDateString("fr-FR") : "—" },
+												{ label: "Classe", value: studentReadOnly.className || "—" },
+											].map(({ label, value }) => (
+												<div key={label} className="bg-white rounded-lg p-2.5 border border-gray-100">
+													<p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
+													<p className="text-sm font-medium text-gray-700">{value || "—"}</p>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+
+								{/* Fillable fields */}
 								<div className="grid grid-cols-2 gap-4">
 									<div>
 										<label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -517,8 +571,39 @@ export default function LoginPage() {
 
 								<div className="pt-2 border-t border-gray-100">
 									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+										<User className="w-4 h-4 text-indigo-500" />
+										Parent / Tuteur secondaire <span className="text-xs font-normal text-gray-400">(optionnel)</span>
+									</p>
+									<div className="space-y-3">
+										<Input
+											value={profileForm.parentName2}
+											onChange={(e) => setProfileForm({ ...profileForm, parentName2: e.target.value })}
+											placeholder="Nom complet"
+										/>
+										<div className="grid grid-cols-2 gap-3">
+											<div className="relative">
+												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+												<Input
+													value={profileForm.parentPhone2}
+													onChange={(e) => setProfileForm({ ...profileForm, parentPhone2: e.target.value })}
+													placeholder="Téléphone"
+													className="pl-8"
+												/>
+											</div>
+											<Input
+												type="email"
+												value={profileForm.parentEmail2}
+												onChange={(e) => setProfileForm({ ...profileForm, parentEmail2: e.target.value })}
+												placeholder="Email (optionnel)"
+											/>
+										</div>
+									</div>
+								</div>
+
+								<div className="pt-2 border-t border-gray-100">
+									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
 										<Phone className="w-4 h-4 text-red-500" />
-										Contact d'urgence
+										Contact d&apos;urgence
 									</p>
 									<div className="grid grid-cols-2 gap-3">
 										<Input
@@ -533,6 +618,39 @@ export default function LoginPage() {
 												onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
 												placeholder="Numéro d'urgence"
 												className="pl-8"
+											/>
+										</div>
+									</div>
+								</div>
+
+								<div className="pt-2 border-t border-gray-100">
+									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+										<Heart className="w-4 h-4 text-rose-500" />
+										Informations médicales <span className="text-xs font-normal text-gray-400">(optionnel)</span>
+									</p>
+									<div className="space-y-3">
+										<div>
+											<label className="block text-xs text-gray-500 mb-1">Groupe sanguin</label>
+											<Input
+												value={profileForm.bloodGroup}
+												onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
+												placeholder="Ex : A+, O−"
+											/>
+										</div>
+										<div>
+											<label className="block text-xs text-gray-500 mb-1">Allergies connues</label>
+											<Input
+												value={profileForm.allergies}
+												onChange={(e) => setProfileForm({ ...profileForm, allergies: e.target.value })}
+												placeholder="Ex : pénicilline, arachides..."
+											/>
+										</div>
+										<div>
+											<label className="block text-xs text-gray-500 mb-1">Notes médicales</label>
+											<Input
+												value={profileForm.medicalNotes}
+												onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: e.target.value })}
+												placeholder="Informations importantes pour l'école"
 											/>
 										</div>
 									</div>
