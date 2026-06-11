@@ -5,6 +5,7 @@ import { Bell, X, Check, AlertCircle, Clock, BellOff, Megaphone } from "lucide-r
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
 import { supabaseBrowser } from "@/lib/supabase-client"
+import { playBing } from "@/lib/play-bing"
 
 interface Notification {
   id: number
@@ -21,40 +22,7 @@ interface NotificationBellProps {
   onNotificationClick?: () => void
 }
 
-// Son "ting dong" généré via Web Audio API — pas de fichier externe
-function playBing() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const t = ctx.currentTime
-
-    // "Ting" — note aiguë courte
-    const osc1 = ctx.createOscillator()
-    const gain1 = ctx.createGain()
-    osc1.connect(gain1)
-    gain1.connect(ctx.destination)
-    osc1.type = "sine"
-    osc1.frequency.setValueAtTime(1400, t)
-    osc1.frequency.exponentialRampToValueAtTime(1200, t + 0.08)
-    gain1.gain.setValueAtTime(0.3, t)
-    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
-    osc1.start(t)
-    osc1.stop(t + 0.35)
-
-    // "Dong" — note grave résonante, décalée de 180ms
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.type = "sine"
-    osc2.frequency.setValueAtTime(700, t + 0.18)
-    osc2.frequency.exponentialRampToValueAtTime(550, t + 0.5)
-    gain2.gain.setValueAtTime(0.0, t)
-    gain2.gain.setValueAtTime(0.25, t + 0.18)
-    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.9)
-    osc2.start(t)
-    osc2.stop(t + 0.9)
-  } catch {}
-}
+// Son "ting dong" — importé depuis @/lib/play-bing
 
 export default function NotificationBell({ onNotificationClick }: NotificationBellProps = {}) {
   const router = useRouter()

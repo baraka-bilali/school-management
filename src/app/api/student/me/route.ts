@@ -83,7 +83,8 @@ export async function GET(request: NextRequest) {
     const isPremium = !!(
       school?.etatCompte === "ACTIF" &&
       school?.dateFinAbonnement &&
-      new Date(school.dateFinAbonnement) > now
+      new Date(school.dateFinAbonnement) > now &&
+      (school?.planAbonnement === "PRO" || school?.planAbonnement === "PREMIUM")
     )
 
     return NextResponse.json({
