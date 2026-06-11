@@ -16,6 +16,7 @@ export default function Layout({ children }: LayoutProps) {
   const [role, setRole] = useState<string | null>(null)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [subscriptionExpired, setSubscriptionExpired] = useState(false)
+  const [studentIsPremium, setStudentIsPremium] = useState(false)
 
   useEffect(() => {
     // Charger le thème depuis localStorage
@@ -75,6 +76,16 @@ export default function Layout({ children }: LayoutProps) {
           if (data.subscription) {
             setSubscriptionExpired(data.subscription.expired === true)
           }
+          // For students, fetch isPremium from student/me
+          if (userRole === "ELEVE") {
+            try {
+              const studentRes = await fetch('/api/student/me', { credentials: 'include' })
+              if (studentRes.ok) {
+                const studentData = await studentRes.json()
+                setStudentIsPremium(studentData.student?.isPremium === true)
+              }
+            } catch {}
+          }
           return
         }
       } catch {}
@@ -97,10 +108,11 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className={`min-h-screen transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
       <Header onSidebarToggle={toggleSidebar} role={role} />
-      <Sidebar 
-        isOpen={sidebarOpen} 
+      <Sidebar
+        isOpen={sidebarOpen}
         onToggle={toggleSidebar}
         subscriptionExpired={subscriptionExpired}
+        studentIsPremium={studentIsPremium}
       />
       
       {/* Main Content */}

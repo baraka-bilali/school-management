@@ -3,32 +3,73 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { School, Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
 import Portal from "@/components/portal"
+
+type ModalStep =
+  | "none"
+  | "password_choice"    // ELEVE: choisir changer ou garder
+  | "change_password"    // changer le mot de passe
+  | "profile_completion" // compléter le profil
+  | "welcome"            // modal de bienvenue
 
 export default function LoginPage() {
 	const [showPassword, setShowPassword] = useState(false)
 	const [form, setForm] = useState({ email: "", password: "" })
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState("")
-	const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
-	const [passwordForm, setPasswordForm] = useState({
-		newPassword: "",
-		confirmPassword: ""
-	})
+
+	// Modal step state
+	const [step, setStep] = useState<ModalStep>("none")
+	const [pendingRole, setPendingRole] = useState<string>("")
+	const [pendingStudentProfileCompleted, setPendingStudentProfileCompleted] = useState(true)
+
+	// Password change form
+	const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" })
 	const [changingPassword, setChangingPassword] = useState(false)
 	const [passwordError, setPasswordError] = useState("")
 	const [showNewPassword, setShowNewPassword] = useState(false)
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-	const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+
+	// Profile completion form
+	const [profileForm, setProfileForm] = useState({
+		birthPlace: "",
+		nationality: "",
+		address: "",
+		parentName1: "",
+		parentPhone1: "",
+		parentEmail1: "",
+		emergencyContact: "",
+		emergencyPhone: "",
+	})
+	const [savingProfile, setSavingProfile] = useState(false)
+
+	// Welcome
 	const [userName, setUserName] = useState("")
+
 	const router = useRouter()
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setForm({ ...form, [e.target.name]: e.target.value })
+	}
+
+	const redirectByRole = (role: string) => {
+		switch (role) {
+			case "ADMIN":
+			case "COMPTABLE":
+			case "DIRECTEUR_DISCIPLINE":
+			case "DIRECTEUR_ETUDES":
+				router.push("/admin")
+				break
+			case "ELEVE":
+				router.push("/student")
+				break
+			default:
+				router.push("/")
+		}
 	}
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -43,114 +84,168 @@ export default function LoginPage() {
 			})
 			const data = await res.json()
 			if (!res.ok) throw new Error(data.error || "Erreur inconnue")
-			
-			// Vérifier si le mot de passe est temporaire
-			if (data.temporaryPassword) {
-				// Afficher le modal de changement de mot de passe
-				setShowChangePasswordModal(true)
-				return
-			}
-			
-			// Stocker le token dans le localStorage
+
 			if (data.token) {
 				localStorage.setItem("token", data.token)
-				// Nettoyer l'ancien cache du nom de l'école pour forcer un nouveau chargement
 				localStorage.removeItem("schoolName")
-				// Décoder le token pour obtenir le rôle
 				const payload = JSON.parse(atob(data.token.split(".")[1]))
-				// Bloquer l'accès du SUPER_ADMIN à cette page
+
 				if (payload.role === "SUPER_ADMIN") {
 					setError("Accès réservé: veuillez utiliser la page Super Admin.")
 					return
 				}
-				// Redirections basées sur le rôle
-				switch (payload.role) {
-					case "ADMIN":
-					case "COMPTABLE":
-					case "DIRECTEUR_DISCIPLINE":
-					case "DIRECTEUR_ETUDES":
-						router.push("/admin")
-						break
-					default:
-						router.push("/")
+
+				setPendingRole(payload.role)
+
+				// ELEVE avec mot de passe temporaire → choix
+				if (payload.role === "ELEVE" && data.temporaryPassword) {
+					// Pré-charger les infos élève
+					try {
+						const meRes = await fetch("/api/student/me", { credentials: "include" })
+						if (meRes.ok) {
+							const meData = await meRes.json()
+							setUserName(meData.student?.firstName || "")
+							setPendingStudentProfileCompleted(meData.student?.profileCompleted === true)
+						}
+					} catch {}
+					setStep("password_choice")
+					return
 				}
+
+				// Admin avec mot de passe temporaire → forcer changement
+				if (data.temporaryPassword) {
+					setStep("change_password")
+					return
+				}
+
+				// ELEVE sans mot de passe temporaire → vérifier profil
+				if (payload.role === "ELEVE") {
+					try {
+						const meRes = await fetch("/api/student/me", { credentials: "include" })
+						if (meRes.ok) {
+							const meData = await meRes.json()
+							setUserName(meData.student?.firstName || "")
+							if (!meData.student?.profileCompleted) {
+								setPendingStudentProfileCompleted(false)
+								setStep("profile_completion")
+								return
+							}
+						}
+					} catch {}
+					router.push("/student")
+					return
+				}
+
+				redirectByRole(payload.role)
 			}
-		} catch (err: any) {
-			setError(err.message)
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : "Erreur inconnue")
 		} finally {
 			setLoading(false)
 		}
 	}
 
+	// ELEVE: garder le mot de passe (skip)
+	const handleSkipPasswordChange = async () => {
+		try {
+			await fetch("/api/auth/skip-password-change", { method: "POST", credentials: "include" })
+		} catch {}
+		if (!pendingStudentProfileCompleted) {
+			setStep("profile_completion")
+		} else {
+			setStep("welcome")
+			setTimeout(() => router.push("/student"), 3500)
+		}
+	}
+
+	// ELEVE: changer le mot de passe depuis le choix
+	const handleChooseChangePassword = () => {
+		setStep("change_password")
+	}
+
+	// Changer le mot de passe (admin ou élève)
 	const handleChangePassword = async (e: React.FormEvent) => {
 		e.preventDefault()
 		setChangingPassword(true)
 		setPasswordError("")
-		
 		try {
 			const res = await fetch("/api/auth/change-password", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				credentials: "include",
-				body: JSON.stringify(passwordForm)
+				body: JSON.stringify(passwordForm),
 			})
-			
 			let data
+			try { data = await res.json() } catch { throw new Error("Erreur de communication") }
+			if (!res.ok) throw new Error(data.error || "Erreur lors du changement")
+
+			// Récupérer nom utilisateur
 			try {
-				data = await res.json()
-			} catch (jsonError) {
-				throw new Error("Erreur de communication avec le serveur")
-			}
-			
-			if (!res.ok) {
-				throw new Error(data.error || "Erreur lors du changement de mot de passe")
-			}
-			
-			// Récupérer les informations de l'utilisateur via l'API
-			const meRes = await fetch("/api/auth/me", { credentials: "include" })
-			let userRole = ""
-			if (meRes.ok) {
-				const meData = await meRes.json()
-				setUserName(meData.user?.name || meData.user?.username || "")
-				userRole = meData.user?.role || ""
-			}
-			
-			// Nettoyer l'ancien cache du nom de l'école pour forcer un nouveau chargement
-			localStorage.removeItem("schoolName")
-			
-			// Afficher le modal de bienvenue
-			setShowChangePasswordModal(false)
-			setShowWelcomeModal(true)
-			
-			// Rediriger après 4 secondes
-			setTimeout(() => {
-				switch (userRole) {
-					case "ADMIN":
-					case "COMPTABLE":
-					case "DIRECTEUR_DISCIPLINE":
-					case "DIRECTEUR_ETUDES":
-						router.push("/admin")
-						break
-					default:
-						router.push("/")
+				const meRes = await fetch("/api/auth/me", { credentials: "include" })
+				if (meRes.ok) {
+					const meData = await meRes.json()
+					setUserName(meData.user?.name || meData.user?.prenom || "")
+					if (!pendingRole) setPendingRole(meData.user?.role || "")
 				}
-			}, 4000)
-		} catch (err: any) {
-			setPasswordError(err.message)
+			} catch {}
+
+			localStorage.removeItem("schoolName")
+
+			// Après changement de mot de passe, si ELEVE et profil non complété → compléter profil
+			if ((pendingRole === "ELEVE") && !pendingStudentProfileCompleted) {
+				setStep("profile_completion")
+			} else {
+				setStep("welcome")
+				const role = pendingRole
+				setTimeout(() => redirectByRole(role), 3500)
+			}
+		} catch (err: unknown) {
+			setPasswordError(err instanceof Error ? err.message : "Erreur inconnue")
 		} finally {
 			setChangingPassword(false)
 		}
 	}
 
+	// Sauvegarder le profil étudiant
+	const handleSaveProfile = async () => {
+		setSavingProfile(true)
+		try {
+			const res = await fetch("/api/student/profile", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify({ ...profileForm, profileCompleted: true }),
+			})
+			if (res.ok) {
+				setStep("welcome")
+				setTimeout(() => router.push("/student"), 3500)
+			}
+		} catch {}
+		setSavingProfile(false)
+	}
+
+	const handleSkipProfile = async () => {
+		try {
+			await fetch("/api/student/profile", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify({ profileCompleted: true }),
+			})
+		} catch {}
+		setStep("welcome")
+		setTimeout(() => router.push("/student"), 3500)
+	}
+
 	return (
 		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
 			<div className="w-full max-w-md">
-			<div className="flex flex-col items-center mb-4">
-				<div className="mb-2">
-					<Image src="/DigiSchool.png" alt="digiSchool" width={200} height={80} priority />
+				<div className="flex flex-col items-center mb-4">
+					<div className="mb-2">
+						<Image src="/DigiSchool.png" alt="digiSchool" width={200} height={80} priority />
+					</div>
+					<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
 				</div>
-				<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
-			</div>
 				<Card className="shadow-lg">
 					<CardHeader>
 						<CardTitle>Connexion</CardTitle>
@@ -173,11 +268,7 @@ export default function LoginPage() {
 										<Lock className="w-4 h-4" />
 									</span>
 									<Input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" className="pl-10 pr-10" required value={form.password} onChange={handleChange} />
-									<button
-										type="button"
-										className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-										onClick={() => setShowPassword((v) => !v)}
-									>
+									<button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700" onClick={() => setShowPassword((v) => !v)}>
 										{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 									</button>
 								</div>
@@ -188,13 +279,73 @@ export default function LoginPage() {
 								{loading ? "Connexion..." : "Se connecter"}
 							</Button>
 						</form>
-						{/* Lien d'inscription supprimé - création réservée au SUPER_ADMIN */}
 					</CardContent>
 				</Card>
 			</div>
 
-			{/* Modal de changement de mot de passe obligatoire */}
-			{showChangePasswordModal && (
+			{/* ── Modal : Choix mot de passe (ELEVE première connexion) ── */}
+			{step === "password_choice" && (
+				<Portal>
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+						<div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+							<div className="p-6 bg-gradient-to-br from-indigo-50 to-blue-50 border-b border-indigo-100">
+								<div className="flex items-center gap-3 mb-1">
+									<div className="w-12 h-12 rounded-full bg-indigo-500/15 flex items-center justify-center">
+										<KeyRound className="w-6 h-6 text-indigo-600" />
+									</div>
+									<div>
+										<h2 className="text-xl font-bold text-gray-900">Première connexion</h2>
+										<p className="text-sm text-gray-500">Bienvenue, {userName || "élève"} !</p>
+									</div>
+								</div>
+							</div>
+							<div className="p-6">
+								<p className="text-gray-700 mb-2">
+									Un mot de passe temporaire vous a été attribué par votre école.
+								</p>
+								<p className="text-gray-600 text-sm mb-6">
+									Souhaitez-vous le changer ou continuer avec ce mot de passe ?
+								</p>
+								<div className="space-y-3">
+									<button
+										onClick={handleChooseChangePassword}
+										className="w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 transition-all group"
+									>
+										<div className="flex items-center gap-3">
+											<div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+												<Shield className="w-5 h-5 text-indigo-600" />
+											</div>
+											<div className="text-left">
+												<p className="font-semibold text-gray-900">Oui, créer mon propre mot de passe</p>
+												<p className="text-xs text-gray-500">Recommandé pour votre sécurité</p>
+											</div>
+										</div>
+										<ChevronRight className="w-5 h-5 text-indigo-400" />
+									</button>
+									<button
+										onClick={handleSkipPasswordChange}
+										className="w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all group"
+									>
+										<div className="flex items-center gap-3">
+											<div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+												<Lock className="w-5 h-5 text-gray-500" />
+											</div>
+											<div className="text-left">
+												<p className="font-semibold text-gray-900">Non, garder le mot de passe actuel</p>
+												<p className="text-xs text-gray-500">Vous pourrez le changer plus tard dans Paramètres</p>
+											</div>
+										</div>
+										<ChevronRight className="w-5 h-5 text-gray-400" />
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</Portal>
+			)}
+
+			{/* ── Modal : Changement de mot de passe ── */}
+			{step === "change_password" && (
 				<Portal>
 					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
 						<div className="bg-white rounded-xl max-w-md w-full shadow-2xl">
@@ -204,29 +355,19 @@ export default function LoginPage() {
 										<KeyRound className="w-6 h-6 text-yellow-600" />
 									</div>
 									<div>
-										<h2 className="text-xl font-bold text-gray-900">Changement de mot de passe requis</h2>
+										<h2 className="text-xl font-bold text-gray-900">
+											{pendingRole === "ELEVE" ? "Créer votre mot de passe" : "Changement de mot de passe requis"}
+										</h2>
 										<p className="text-sm text-gray-600">Première connexion détectée</p>
 									</div>
 								</div>
 							</div>
-
 							<form onSubmit={handleChangePassword} className="p-6 space-y-4">
-								<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-									<p className="text-sm text-blue-800">
-										🔒 Pour votre sécurité, vous devez créer un nouveau mot de passe avant de continuer.
-									</p>
-								</div>
-
 								{passwordError && (
-									<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-										{passwordError}
-									</div>
+									<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{passwordError}</div>
 								)}
-
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
-										Nouveau mot de passe <span className="text-red-500">*</span>
-									</label>
+									<label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe <span className="text-red-500">*</span></label>
 									<div className="relative">
 										<Input
 											type={showNewPassword ? "text" : "password"}
@@ -237,20 +378,13 @@ export default function LoginPage() {
 											required
 											minLength={6}
 										/>
-										<button
-											type="button"
-											onClick={() => setShowNewPassword(!showNewPassword)}
-											className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-										>
+										<button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
 											{showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 										</button>
 									</div>
 								</div>
-
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">
-										Confirmer le mot de passe <span className="text-red-500">*</span>
-									</label>
+									<label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe <span className="text-red-500">*</span></label>
 									<div className="relative">
 										<Input
 											type={showConfirmPassword ? "text" : "password"}
@@ -261,35 +395,37 @@ export default function LoginPage() {
 											required
 											minLength={6}
 										/>
-										<button
-											type="button"
-											onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-											className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-										>
+										<button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
 											{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 										</button>
 									</div>
 								</div>
-
-								{passwordForm.newPassword && passwordForm.confirmPassword && 
-									passwordForm.newPassword !== passwordForm.confirmPassword && (
+								{passwordForm.newPassword && passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword && (
 									<p className="text-sm text-red-600">Les mots de passe ne correspondent pas</p>
 								)}
-
-								<div className="pt-4">
+								<div className="flex gap-3 pt-2">
+									{pendingRole === "ELEVE" && (
+										<button
+											type="button"
+											onClick={() => setStep("password_choice")}
+											className="flex-none px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+										>
+											Retour
+										</button>
+									)}
 									<Button
 										type="submit"
-										className="w-full"
+										className="flex-1"
 										disabled={
-											changingPassword || 
-											!passwordForm.newPassword || 
+											changingPassword ||
+											!passwordForm.newPassword ||
 											!passwordForm.confirmPassword ||
 											passwordForm.newPassword !== passwordForm.confirmPassword ||
 											passwordForm.newPassword.length < 6
 										}
 									>
 										<KeyRound className="w-4 h-4 mr-2" />
-										{changingPassword ? "Changement en cours..." : "Confirmer et continuer"}
+										{changingPassword ? "Enregistrement..." : "Confirmer"}
 									</Button>
 								</div>
 							</form>
@@ -298,12 +434,140 @@ export default function LoginPage() {
 				</Portal>
 			)}
 
-			{/* Welcome Modal with Confetti */}
-			{showWelcomeModal && (
+			{/* ── Modal : Complétion du profil (ELEVE) ── */}
+			{step === "profile_completion" && (
+				<Portal>
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+						<div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl my-4">
+							<div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100">
+								<div className="flex items-center gap-3">
+									<div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
+										<User className="w-6 h-6 text-blue-600" />
+									</div>
+									<div>
+										<h2 className="text-xl font-bold text-gray-900">Complétez votre profil</h2>
+										<p className="text-sm text-gray-500">Quelques informations importantes pour votre dossier</p>
+									</div>
+								</div>
+							</div>
+							<div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+								<div className="grid grid-cols-2 gap-4">
+									<div>
+										<label className="block text-sm font-medium text-gray-700 mb-1.5">
+											<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+											Lieu de naissance
+										</label>
+										<Input
+											value={profileForm.birthPlace}
+											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: e.target.value })}
+											placeholder="Ex : Kinshasa"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium text-gray-700 mb-1.5">Nationalité</label>
+										<Input
+											value={profileForm.nationality}
+											onChange={(e) => setProfileForm({ ...profileForm, nationality: e.target.value })}
+											placeholder="Ex : Congolaise"
+										/>
+									</div>
+								</div>
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1.5">
+										<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
+										Adresse résidentielle
+									</label>
+									<Input
+										value={profileForm.address}
+										onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+										placeholder="Ex : Av. de l'Université, Commune de Lingwala"
+									/>
+								</div>
+
+								<div className="pt-2 border-t border-gray-100">
+									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+										<User className="w-4 h-4 text-blue-500" />
+										Parent / Tuteur principal
+									</p>
+									<div className="space-y-3">
+										<Input
+											value={profileForm.parentName1}
+											onChange={(e) => setProfileForm({ ...profileForm, parentName1: e.target.value })}
+											placeholder="Nom complet du parent/tuteur"
+										/>
+										<div className="grid grid-cols-2 gap-3">
+											<div className="relative">
+												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+												<Input
+													value={profileForm.parentPhone1}
+													onChange={(e) => setProfileForm({ ...profileForm, parentPhone1: e.target.value })}
+													placeholder="Téléphone"
+													className="pl-8"
+												/>
+											</div>
+											<Input
+												type="email"
+												value={profileForm.parentEmail1}
+												onChange={(e) => setProfileForm({ ...profileForm, parentEmail1: e.target.value })}
+												placeholder="Email (optionnel)"
+											/>
+										</div>
+									</div>
+								</div>
+
+								<div className="pt-2 border-t border-gray-100">
+									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+										<Phone className="w-4 h-4 text-red-500" />
+										Contact d'urgence
+									</p>
+									<div className="grid grid-cols-2 gap-3">
+										<Input
+											value={profileForm.emergencyContact}
+											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: e.target.value })}
+											placeholder="Nom du contact"
+										/>
+										<div className="relative">
+											<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+											<Input
+												value={profileForm.emergencyPhone}
+												onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
+												placeholder="Numéro d'urgence"
+												className="pl-8"
+											/>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div className="p-6 border-t border-gray-100 flex gap-3">
+								<button
+									onClick={handleSkipProfile}
+									className="flex-none px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+								>
+									Plus tard
+								</button>
+								<button
+									onClick={handleSaveProfile}
+									disabled={savingProfile}
+									className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+								>
+									{savingProfile ? (
+										<span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+									) : (
+										<Check className="w-4 h-4" />
+									)}
+									Enregistrer et continuer
+								</button>
+							</div>
+						</div>
+					</div>
+				</Portal>
+			)}
+
+			{/* ── Welcome Modal ── */}
+			{step === "welcome" && (
 				<Portal>
 					<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
 						<div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative overflow-hidden">
-							{/* Confetti Animation */}
 							<div className="absolute inset-0 pointer-events-none">
 								{Array.from({ length: 50 }).map((_, i) => (
 									<div
@@ -317,31 +581,19 @@ export default function LoginPage() {
 									/>
 								))}
 							</div>
-
-							{/* Modal Content */}
 							<div className="relative z-10 p-8 text-center">
 								<div className="mb-6 flex justify-center">
 									<div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center animate-bounce">
 										<PartyPopper className="w-10 h-10 text-white" />
 									</div>
 								</div>
-
 								<h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
 									{new Date().getHours() < 18 ? 'Bonjour' : 'Bonsoir'} {userName} !
 								</h2>
-
 								<div className="space-y-3 text-gray-600">
-									<p className="text-lg font-medium">
-										🎉 Bienvenue sur votre espace !
-									</p>
-									<p className="text-sm">
-										Votre mot de passe a été modifié avec succès.
-									</p>
-									<p className="text-sm">
-										Vous allez être redirigé dans quelques instants...
-									</p>
+									<p className="text-lg font-medium">🎉 Bienvenue sur votre espace !</p>
+									<p className="text-sm">Vous allez être redirigé dans quelques instants...</p>
 								</div>
-
 								<div className="mt-8 flex gap-2 justify-center">
 									<Sparkles className="w-5 h-5 text-yellow-500 animate-pulse" />
 									<Sparkles className="w-4 h-4 text-blue-500 animate-pulse delay-75" />

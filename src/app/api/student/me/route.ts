@@ -34,9 +34,13 @@ export async function GET(request: NextRequest) {
         user: {
           select: {
             email: true,
+            temporaryPassword: true,
             school: {
               select: {
-                nomEtablissement: true
+                nomEtablissement: true,
+                dateFinAbonnement: true,
+                planAbonnement: true,
+                etatCompte: true,
               }
             }
           }
@@ -74,6 +78,14 @@ export async function GET(request: NextRequest) {
 
     const currentEnrollment = student.enrollments[0]
 
+    const school = student.user.school
+    const now = new Date()
+    const isPremium = !!(
+      school?.etatCompte === "ACTIF" &&
+      school?.dateFinAbonnement &&
+      new Date(school.dateFinAbonnement) > now
+    )
+
     return NextResponse.json({
       student: {
         id: student.id,
@@ -83,8 +95,22 @@ export async function GET(request: NextRequest) {
         code: student.code,
         gender: student.gender,
         birthDate: student.birthDate,
+        birthPlace: student.birthPlace,
+        nationality: student.nationality,
+        address: student.address,
+        parentName1: student.parentName1,
+        parentPhone1: student.parentPhone1,
+        parentEmail1: student.parentEmail1,
+        parentName2: student.parentName2,
+        parentPhone2: student.parentPhone2,
+        bloodGroup: student.bloodGroup,
+        emergencyContact: student.emergencyContact,
+        emergencyPhone: student.emergencyPhone,
+        profileCompleted: student.profileCompleted,
         email: student.user.email,
-        school: student.user.school?.nomEtablissement,
+        temporaryPassword: student.user.temporaryPassword,
+        school: school?.nomEtablissement,
+        isPremium,
         class: currentEnrollment?.class?.name,
         year: currentEnrollment?.year?.name
       }

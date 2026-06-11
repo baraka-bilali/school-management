@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import type { LucideIcon } from "lucide-react"
-import { 
-  BarChart3, 
-  Users, 
-  GraduationCap, 
-  BookOpen, 
-  Settings, 
+import {
+  BarChart3,
+  Users,
+  GraduationCap,
+  BookOpen,
+  Settings,
   LogOut,
   School,
   X,
@@ -17,7 +17,8 @@ import {
   FileText,
   Wallet,
   Landmark,
-  Lock
+  Lock,
+  Megaphone
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -26,12 +27,13 @@ interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
   subscriptionExpired?: boolean
+  studentIsPremium?: boolean
 }
 
 // Routes always accessible regardless of subscription
 const ALWAYS_ALLOWED = ["/admin/subscription", "/admin/settings"]
 
-export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false, studentIsPremium = false }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -85,7 +87,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  type NavItem = { icon: LucideIcon; label: string; href: string; proOnly?: boolean }
+  type NavItem = { icon: LucideIcon; label: string; href: string; proOnly?: boolean; premiumOnly?: boolean }
 
   // Menu pour les administrateurs
   const adminNavItems: NavItem[] = [
@@ -96,6 +98,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
     { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
     { icon: Calendar, label: "Horaire", href: "/admin/schedule", proOnly: true },
     { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
+    { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
     { icon: Bell, label: "Notifications", href: "/admin/notifications" },
   ]
@@ -103,9 +106,10 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
   // Menu pour les élèves
   const studentNavItems: NavItem[] = [
     { icon: BarChart3, label: "Tableau de bord", href: "/student" },
-    { icon: Calendar, label: "Horaire des cours", href: "/student/schedule" },
-    { icon: FileText, label: "Notes & Bulletins", href: "/student/grades" },
+    { icon: Calendar, label: "Horaire des cours", href: "/student/schedule", premiumOnly: true },
+    { icon: FileText, label: "Notes & Bulletins", href: "/student/grades", premiumOnly: true },
     { icon: Wallet, label: "Frais scolaires", href: "/student/fees" },
+    { icon: Megaphone, label: "Communiqués", href: "/student/communiques" },
     { icon: Bell, label: "Notifications", href: "/student/notifications" },
   ]
 
@@ -200,6 +204,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                 {navItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
                   const proLocked = !!(item as NavItem).proOnly
+                  const premiumLocked = !!(item as NavItem).premiumOnly && !studentIsPremium
                   return (
                   <li key={index}>
                     {locked ? (
@@ -217,13 +222,38 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                         <span className="flex-1">{item.label}</span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
                       </span>
-                    ) : (
-                    <Link 
+                    ) : premiumLocked ? (
+                      <span
+                        className={`flex items-center px-3 py-2.5 rounded-lg cursor-not-allowed select-none opacity-50 ${textSecondary}`}
+                        title="Disponible avec l'abonnement premium de votre école"
+                      >
+                        <item.icon className="w-5 h-5 mr-3" />
+                        <span className="flex-1">{item.label}</span>
+                        <Lock className="w-3 h-3 opacity-60" />
+                      </span>
+                    ) : (item as NavItem).premiumOnly ? (
+                    <Link
                       href={item.href}
                       className={`
                         flex items-center px-3 py-2.5 rounded-lg transition-all duration-300 ease-out
-                        ${isActive(item.href) 
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600` 
+                        ${isActive(item.href)
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600`
+                          : `${textSecondary} ${hoverBg}`
+                        }
+                      `}
+                      onClick={onToggle}
+                    >
+                      <item.icon className="w-5 h-5 mr-3" />
+                      <span className="flex-1">{item.label}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-500 border border-green-500/30">New</span>
+                    </Link>
+                    ) : (
+                    <Link
+                      href={item.href}
+                      className={`
+                        flex items-center px-3 py-2.5 rounded-lg transition-all duration-300 ease-out
+                        ${isActive(item.href)
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600`
                           : `${textSecondary} ${hoverBg}`
                         }
                       `}
@@ -366,6 +396,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                 {navItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
                   const proLocked = !!(item as NavItem).proOnly
+                  const premiumLocked = !!(item as NavItem).premiumOnly && !studentIsPremium
                   return (
                   <li key={index}>
                     {locked ? (
@@ -400,14 +431,57 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false 
                           </>
                         )}
                       </span>
-                    ) : (
-                    <Link 
+                    ) : premiumLocked ? (
+                      <span
+                        className={`
+                          flex items-center rounded-lg opacity-50 cursor-not-allowed select-none
+                          ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
+                          ${textSecondary}
+                        `}
+                        title={!isOpen ? `${item.label} (Premium requis)` : "Disponible avec l'abonnement premium"}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {isOpen && (
+                          <>
+                            <span className="ml-3 flex-1">{item.label}</span>
+                            <Lock className="w-3 h-3 opacity-60" />
+                          </>
+                        )}
+                      </span>
+                    ) : (item as NavItem).premiumOnly ? (
+                    <Link
                       href={item.href}
                       className={`
                         flex items-center rounded-lg transition-all duration-300 ease-out group relative
                         ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
-                        ${isActive(item.href) 
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 ${isOpen ? 'border-r-2 border-indigo-600' : ''}` 
+                        ${isActive(item.href)
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 ${isOpen ? 'border-r-2 border-indigo-600' : ''}`
+                          : `${textSecondary} ${hoverBg}`
+                        }
+                      `}
+                      title={!isOpen ? item.label : undefined}
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      {isOpen && (
+                        <>
+                          <span className="ml-3 flex-1">{item.label}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-500 border border-green-500/30">New</span>
+                        </>
+                      )}
+                      {!isOpen && (
+                        <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
+                          {item.label}
+                        </div>
+                      )}
+                    </Link>
+                    ) : (
+                    <Link
+                      href={item.href}
+                      className={`
+                        flex items-center rounded-lg transition-all duration-300 ease-out group relative
+                        ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
+                        ${isActive(item.href)
+                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 ${isOpen ? 'border-r-2 border-indigo-600' : ''}`
                           : `${textSecondary} ${hoverBg}`
                         }
                       `}

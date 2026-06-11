@@ -29,6 +29,7 @@ model User {
   teacher           Teacher?
   school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
   subscriptionPayments SubscriptionPayment[] @relation("SubscriptionPayments")
+  communiques          Communique[]           @relation("CommuniquesCreated")
 
   @@index([schoolId])
   @@index([schoolId, isActive])
@@ -100,10 +101,12 @@ model Student {
   medicalNotes       String?   @db.Text
   emergencyContact   String?
   emergencyPhone     String?
+  profileCompleted   Boolean   @default(false)
 
-  enrollments Enrollment[]
-  paiements   Paiement[]
-  user        User         @relation(fields: [userId], references: [id])
+  enrollments    Enrollment[]
+  paiements      Paiement[]
+  communiqueReads CommuniqueRead[]
+  user           User         @relation(fields: [userId], references: [id])
 
   @@index([lastName])
   @@index([code])
@@ -208,6 +211,7 @@ model School {
   admins                      User[]                 @relation("SchoolAdmins")
   classes                     Class[]
   subscriptionPayments        SubscriptionPayment[]
+  communiques                 Communique[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -602,4 +606,38 @@ enum BreakType {
   INTER_COURS
   DEBUT_VACATION
   FIN_VACATION
+}
+
+// ============================================================
+// MODULE COMMUNIQUÉS
+// ============================================================
+
+model Communique {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String   @db.Text
+  schoolId    Int
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+  createdBy   User     @relation("CommuniquesCreated", fields: [createdById], references: [id])
+  reads       CommuniqueRead[]
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@index([schoolId, createdAt])
+}
+
+model CommuniqueRead {
+  id           Int        @id @default(autoincrement())
+  communiqueId Int
+  studentId    Int
+  readAt       DateTime   @default(now())
+  communique   Communique @relation(fields: [communiqueId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([communiqueId, studentId])
+  @@index([studentId])
+  @@index([communiqueId])
 }
