@@ -71,6 +71,7 @@ export default function StudentCommuniquesPage() {
   useEffect(() => { fetchCommuniques(1, false) }, [fetchCommuniques])
 
   const unreadCount = communiques.filter((c) => !c.isRead).length
+  const latest = communiques[0]
 
   const grouped = communiques.reduce((acc, c) => {
     const key = getMonthYear(c.createdAt)
@@ -90,8 +91,12 @@ export default function StudentCommuniquesPage() {
       <Layout>
         <div className={`min-h-screen ${bgPage} flex items-center justify-center`}>
           <div className="text-center">
-            <Loader2 className={`w-12 h-12 animate-spin mx-auto mb-4 ${textSecondary}`} />
-            <p className={textSecondary}>Chargement des communiqués…</p>
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <p className={textSecondary}>Chargement...</p>
           </div>
         </div>
       </Layout>
@@ -145,6 +150,45 @@ export default function StudentCommuniquesPage() {
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Dernier communiqué */}
+              {latest && (
+                <div className={`${bgCard} border ${borderColor} rounded-xl overflow-hidden shadow-sm`}>
+                  <div className={`px-5 py-3 border-b ${borderColor} flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                      <span className={`text-sm font-semibold ${textColor}`}>Dernier communiqué</span>
+                      {!latest.isRead && (
+                        <span className="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-0.5 rounded-full">Non lu</span>
+                      )}
+                    </div>
+                    <Link
+                      href={`/student/communiques/${latest.id}`}
+                      className="text-xs text-indigo-500 hover:text-indigo-600 flex items-center gap-1"
+                    >
+                      Voir complet <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                  <div className="p-5">
+                    <h3 className={`font-semibold ${textColor} mb-1`}>{latest.title}</h3>
+                    <div
+                      className={`text-sm ${textSecondary} line-clamp-3 prose prose-sm dark:prose-invert max-w-none`}
+                      dangerouslySetInnerHTML={{ __html: latest.content }}
+                    />
+                    <div className="flex items-center gap-3 mt-3">
+                      <span className={`flex items-center gap-1 text-xs ${textSecondary}`}>
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatDate(latest.createdAt)}
+                      </span>
+                      {latest.isRead
+                        ? <span className={`flex items-center gap-1 text-xs ${textSecondary}`}><Check className="w-3 h-3 text-green-500" /> Lu</span>
+                        : <span className="text-xs font-medium text-red-400">• Non lu</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Historique par mois */}
               {Object.entries(grouped).map(([monthYear, monthItems]) => (
                 <div key={monthYear}>
                   <h3 className={`text-sm font-semibold ${textSecondary} mb-3`}>{monthYear}</h3>

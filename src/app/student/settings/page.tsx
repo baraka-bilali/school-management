@@ -142,8 +142,13 @@ export default function StudentSettingsPage() {
           </CardHeader>
           <CardContent>
             {loadingProfile ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className={`w-6 h-6 animate-spin ${textSecondary}`} />
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <p className={`text-sm ${textSecondary}`}>Chargement...</p>
               </div>
             ) : student ? (
               <div className="space-y-5">
