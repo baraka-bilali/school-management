@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     if (!activeYearId) {
       return NextResponse.json({
         data: {
-          totalIncome: 0,
+          totalIncomeUsd: 0,
+          totalIncomeCdf: 0,
           totalTeacherPayments: 0,
           totalExpenses: 0,
           balance: 0,
@@ -33,16 +34,27 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Revenus : total des paiements élèves
-    const incomeAgg = await prisma.paiement.aggregate({
-      where: {
-        schoolId: user.schoolId,
-        tarification: { yearId: activeYearId },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
-    })
-    const totalIncome = incomeAgg._sum.montant ?? 0
+    // Revenus : total des paiements élèves — séparé par devise
+    const [incomeAggUsd, incomeAggCdf] = await Promise.all([
+      prisma.paiement.aggregate({
+        where: {
+          schoolId: user.schoolId,
+          tarification: { yearId: activeYearId, devise: "USD" },
+          isAnnule: false,
+        },
+        _sum: { montant: true },
+      }),
+      prisma.paiement.aggregate({
+        where: {
+          schoolId: user.schoolId,
+          tarification: { yearId: activeYearId, devise: "CDF" },
+          isAnnule: false,
+        },
+        _sum: { montant: true },
+      }),
+    ])
+    const totalIncomeUsd = incomeAggUsd._sum.montant ?? 0
+    const totalIncomeCdf = incomeAggCdf._sum.montant ?? 0
 
     // Salaires professeurs
     const teacherPaymentsAgg = await prisma.teacherPayment.aggregate({
@@ -58,7 +70,7 @@ export async function GET(req: NextRequest) {
     })
     const totalExpenses = expensesAgg._sum.montant ?? 0
 
-    const balance = totalIncome - totalTeacherPayments - totalExpenses
+    const balance = totalIncomeUsd - totalTeacherPayments - totalExpenses
 
     // Derniers paiements profs
     const teacherPayments = await prisma.teacherPayment.findMany({
@@ -88,7 +100,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       data: {
-        totalIncome,
+        totalIncomeUsd,
+        totalIncomeCdf,
         totalTeacherPayments,
         totalExpenses,
         balance,

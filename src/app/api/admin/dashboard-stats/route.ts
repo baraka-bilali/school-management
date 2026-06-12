@@ -88,11 +88,17 @@ export async function GET(request: NextRequest) {
           months.map(async month => {
             const start = new Date(month.getFullYear(), month.getMonth(), 1)
             const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59)
-            const agg = await prisma.paiement.aggregate({
-              where: { schoolId, datePaiement: { gte: start, lte: end }, isAnnule: false },
-              _sum: { montant: true },
-            })
-            return agg._sum.montant || 0
+            const [aggUsd, aggCdf] = await Promise.all([
+              prisma.paiement.aggregate({
+                where: { schoolId, datePaiement: { gte: start, lte: end }, isAnnule: false, tarification: { devise: "USD" } },
+                _sum: { montant: true },
+              }),
+              prisma.paiement.aggregate({
+                where: { schoolId, datePaiement: { gte: start, lte: end }, isAnnule: false, tarification: { devise: "CDF" } },
+                _sum: { montant: true },
+              }),
+            ])
+            return { usd: aggUsd._sum.montant || 0, cdf: aggCdf._sum.montant || 0 }
           })
         ),
       ])
@@ -133,7 +139,8 @@ export async function GET(request: NextRequest) {
         monthLabels,
         monthlyStudents,
         monthlyTeachers,
-        monthlyPayments,
+        monthlyPaymentsUsd: monthlyPayments.map(p => p.usd),
+        monthlyPaymentsCdf: monthlyPayments.map(p => p.cdf),
         genderStats: { male, female },
         sectionStats,
       }

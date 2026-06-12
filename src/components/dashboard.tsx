@@ -47,7 +47,8 @@ interface DashboardStatsResponse {
   monthLabels?: string[]
   monthlyStudents?: number[]
   monthlyTeachers?: number[]
-  monthlyPayments?: number[]
+  monthlyPaymentsUsd?: number[]
+  monthlyPaymentsCdf?: number[]
   genderStats?: {
     male: number
     female: number
@@ -75,6 +76,7 @@ function formatCdf(value: number): string {
 function TrendCard({
   title,
   value,
+  subValue,
   icon,
   color,
   data,
@@ -82,6 +84,7 @@ function TrendCard({
 }: {
   title: string
   value: string | number
+  subValue?: string
   icon: ComponentType<{ className?: string }>
   color: string
   data: Array<{ name: string; value: number }>
@@ -99,6 +102,7 @@ function TrendCard({
         <div>
           <p className={`text-xs uppercase tracking-wider font-semibold ${textSecondary}`}>{title}</p>
           <p className={`text-3xl font-bold mt-1 ${textColor}`}>{value}</p>
+          {subValue && <p className={`text-base font-semibold mt-0.5 ${textColor} opacity-70`}>{subValue}</p>}
         </div>
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}20` }}>
           <Icon className="w-5 h-5" style={{ color }} />
@@ -158,7 +162,8 @@ export default function Dashboard() {
       monthLabels: [],
       monthlyStudents: [],
       monthlyTeachers: [],
-      monthlyPayments: [],
+      monthlyPaymentsUsd: [],
+      monthlyPaymentsCdf: [],
       genderStats: { male: 0, female: 0 },
       sectionStats: { Primaire: 0, Secondaire: 0 },
     },
@@ -235,16 +240,18 @@ export default function Dashboard() {
     const labels = safeStats.monthLabels ?? []
     const students = safeStats.monthlyStudents ?? []
     const teachers = safeStats.monthlyTeachers ?? []
-    const payments = safeStats.monthlyPayments ?? []
+    const paymentsUsd = safeStats.monthlyPaymentsUsd ?? []
+    const paymentsCdf = safeStats.monthlyPaymentsCdf ?? []
 
-    const max = Math.max(labels.length, students.length, teachers.length, payments.length)
+    const max = Math.max(labels.length, students.length, teachers.length, paymentsUsd.length)
     return Array.from({ length: max }, (_, i) => ({
       month: labels[i] ?? `M${i + 1}`,
       students: students[i] ?? 0,
       teachers: teachers[i] ?? 0,
-      payments: payments[i] ?? 0,
+      paymentsUsd: paymentsUsd[i] ?? 0,
+      paymentsCdf: paymentsCdf[i] ?? 0,
     }))
-  }, [safeStats.monthLabels, safeStats.monthlyStudents, safeStats.monthlyTeachers, safeStats.monthlyPayments])
+  }, [safeStats.monthLabels, safeStats.monthlyStudents, safeStats.monthlyTeachers, safeStats.monthlyPaymentsUsd, safeStats.monthlyPaymentsCdf])
 
   const genderData = useMemo(() => [
     { name: "Garcons", value: safeStats.genderStats?.male ?? 0, color: palette.male },
@@ -268,12 +275,16 @@ export default function Dashboard() {
     monthlySeries.map((r) => ({ name: r.month, value: r.students + r.teachers }))
   , [monthlySeries])
 
-  const cardPaymentsData = useMemo(() => 
-    monthlySeries.map((r) => ({ name: r.month, value: r.payments }))
+  const cardPaymentsData = useMemo(() =>
+    monthlySeries.map((r) => ({ name: r.month, value: r.paymentsUsd }))
   , [monthlySeries])
-  
-  const currentMonthPayment = useMemo(() => 
-    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].payments : 0
+
+  const currentMonthUsd = useMemo(() =>
+    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsUsd : 0
+  , [monthlySeries])
+
+  const currentMonthCdf = useMemo(() =>
+    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsCdf : 0
   , [monthlySeries])
 
   return (
@@ -291,7 +302,7 @@ export default function Dashboard() {
           <TrendCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
           <TrendCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
           <TrendCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
-          <TrendCard title="Paiements (mois)" value={formatUsd(currentMonthPayment)} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
+          <TrendCard title="Paiements (mois)" value={formatUsd(currentMonthUsd)} subValue={currentMonthCdf > 0 ? `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC` : undefined} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
@@ -324,7 +335,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Frais collectes</p>
-                <p className={`text-xs ${textSecondary}`}>Somme des paiements non annules par mois (USD)</p>
+                <p className={`text-xs ${textSecondary}`}>Paiements non annulés par mois</p>
               </div>
               <BarChart3 className={`w-4 h-4 ${textSecondary}`} />
             </div>
@@ -333,13 +344,19 @@ export default function Dashboard() {
                 <BarChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tickFormatter={(v) => `$${Math.round(v)}`} domain={[0, 500]} />
+                  <YAxis yAxisId="usd" orientation="left" stroke={palette.payment} tickFormatter={(v) => `$${Math.round(v)}`} />
+                  <YAxis yAxisId="cdf" orientation="right" stroke="#06b6d4" tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}K FC` : `${v} FC`} />
                   <Tooltip
-                    formatter={(value: number) => [`${formatUsd(value)} (≈ ${formatCdf(value * usdToCdfRate)})`, "Montant collecte"]}
+                    formatter={(value: number, name: string) =>
+                      name === "paymentsUsd"
+                        ? [`${formatUsd(value)}`, "USD"]
+                        : [`${new Intl.NumberFormat("fr-FR").format(value)} FC`, "CDF"]
+                    }
                     labelFormatter={(label: string) => `Mois: ${label}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Bar dataKey="payments" radius={[8, 8, 0, 0]} fill={palette.payment} />
+                  <Bar yAxisId="usd" dataKey="paymentsUsd" radius={[6, 6, 0, 0]} fill={palette.payment} name="paymentsUsd" />
+                  <Bar yAxisId="cdf" dataKey="paymentsCdf" radius={[6, 6, 0, 0]} fill="#06b6d4" name="paymentsCdf" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

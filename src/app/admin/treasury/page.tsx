@@ -55,7 +55,8 @@ interface TeacherOption {
 }
 
 interface TreasuryData {
-  totalIncome: number
+  totalIncomeUsd: number
+  totalIncomeCdf: number
   totalTeacherPayments: number
   totalExpenses: number
   balance: number
@@ -388,7 +389,15 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Recettes (frais élèves)</p>
-                      <p className={`text-xl font-bold text-green-600`}>{formatCurrency(treasury.totalIncome)}</p>
+                      {treasury.totalIncomeUsd > 0 && (
+                        <p className={`text-xl font-bold text-green-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeUsd)} $</p>
+                      )}
+                      {treasury.totalIncomeCdf > 0 && (
+                        <p className={`text-base font-semibold text-green-500`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeCdf)} FC</p>
+                      )}
+                      {treasury.totalIncomeUsd === 0 && treasury.totalIncomeCdf === 0 && (
+                        <p className={`text-xl font-bold text-green-600`}>0 $</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -427,7 +436,7 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Solde budget</p>
-                      <p className={`text-xl font-bold ${treasury.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(treasury.balance)}</p>
+                      <p className={`text-xl font-bold ${treasury.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balance)} $</p>
                     </div>
                   </div>
                 </CardContent>
