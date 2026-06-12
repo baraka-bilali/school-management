@@ -260,6 +260,7 @@ model Tarification {
   yearId       Int
   classId      Int?
   montant      Float
+  devise       Devise       @default(USD)
   description  String?      @db.Text
   schoolId     Int
   isActive     Boolean      @default(true)
@@ -475,6 +476,11 @@ enum ModePaiement {
   MOBILE_MONEY
   CHEQUE
   AUTRE
+}
+
+enum Devise {
+  USD
+  CDF
 }
 
 // ============================================================

@@ -11,7 +11,6 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const yearId = searchParams.get("yearId")
 
-    // Trouver l'année scolaire courante si non spécifiée
     let activeYearId: number | undefined
     if (yearId) {
       activeYearId = parseInt(yearId)
@@ -19,23 +18,19 @@ export async function GET(req: NextRequest) {
       activeYearId = (await getSchoolCurrentYearId(user.schoolId)) ?? undefined
     }
 
-    if (!activeYearId) {
-      return NextResponse.json({
-        data: {
-          totalExpected: 0,
-          totalCollected: 0,
-          totalPending: 0,
-          studentsFullyPaid: 0,
-          studentsPartiallyPaid: 0,
-          studentsUnpaid: 0,
-          totalStudents: 0,
-          recentPayments: [],
-          tarificationsSummary: [],
-        },
-      })
+    const emptyResult = {
+      usd: { totalExpected: 0, totalCollected: 0, totalPending: 0, studentsFullyPaid: 0, studentsPartiallyPaid: 0, studentsUnpaid: 0 },
+      cdf: { totalExpected: 0, totalCollected: 0, totalPending: 0, studentsFullyPaid: 0, studentsPartiallyPaid: 0, studentsUnpaid: 0 },
+      totalStudents: 0,
+      recentPayments: [],
+      tarificationsSummary: [],
     }
 
-    // 1. Total attendu : somme des tarifications × nombre d'élèves inscrits concernés
+    if (!activeYearId) {
+      return NextResponse.json({ data: emptyResult })
+    }
+
+    // 1. Tarifications actives avec devise
     const tarifications = await prisma.tarification.findMany({
       where: { schoolId: user.schoolId, yearId: activeYearId, isActive: true },
       include: {
@@ -44,7 +39,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // Inscriptions actives pour cette année
+    // 2. Inscriptions actives
     const enrollments = await prisma.enrollment.findMany({
       where: {
         yearId: activeYearId,
@@ -54,69 +49,102 @@ export async function GET(req: NextRequest) {
       select: { id: true, studentId: true, classId: true },
     })
 
-    // Calculer le total attendu
-    let totalExpected = 0
-    const studentTarifications: Map<number, { total: number; studentId: number }> = new Map()
+    // 3. Calculer les totaux attendus par devise et par élève
+    type StudentBalance = {
+      usdDue: number
+      cdfDue: number
+    }
+    const studentBalances = new Map<number, StudentBalance>()
+
+    let totalExpectedUsd = 0
+    let totalExpectedCdf = 0
 
     for (const enrollment of enrollments) {
-      let studentTotal = 0
+      let usdDue = 0
+      let cdfDue = 0
       for (const tarif of tarifications) {
-        // La tarification s'applique si elle est globale (classId null) ou correspond à la classe
         if (tarif.classId === null || tarif.classId === enrollment.classId) {
-          studentTotal += tarif.montant
+          if (tarif.devise === "CDF") {
+            cdfDue += tarif.montant
+          } else {
+            usdDue += tarif.montant
+          }
         }
       }
-      totalExpected += studentTotal
-      studentTarifications.set(enrollment.studentId, {
-        total: studentTotal,
-        studentId: enrollment.studentId,
-      })
+      studentBalances.set(enrollment.studentId, { usdDue, cdfDue })
+      totalExpectedUsd += usdDue
+      totalExpectedCdf += cdfDue
     }
 
-    // 2. Total perçu
-    const paiementsAgg = await prisma.paiement.aggregate({
+    // 4. Paiements perçus par devise
+    const paiementsUsd = await prisma.paiement.aggregate({
       where: {
         schoolId: user.schoolId,
-        tarification: { yearId: activeYearId },
+        tarification: { yearId: activeYearId, devise: "USD" },
         isAnnule: false,
       },
       _sum: { montant: true },
     })
 
-    const totalCollected = paiementsAgg._sum.montant ?? 0
-    const totalPending = totalExpected - totalCollected
+    const paiementsCdf = await prisma.paiement.aggregate({
+      where: {
+        schoolId: user.schoolId,
+        tarification: { yearId: activeYearId, devise: "CDF" },
+        isAnnule: false,
+      },
+      _sum: { montant: true },
+    })
 
-    // 3. Statut par élève
-    const studentPayments = await prisma.paiement.groupBy({
+    const totalCollectedUsd = paiementsUsd._sum.montant ?? 0
+    const totalCollectedCdf = paiementsCdf._sum.montant ?? 0
+
+    // 5. Statut par élève — paiements groupés par devise
+    const studentPaymentsUsd = await prisma.paiement.groupBy({
       by: ["studentId"],
       where: {
         schoolId: user.schoolId,
-        tarification: { yearId: activeYearId },
+        tarification: { yearId: activeYearId, devise: "USD" },
         isAnnule: false,
       },
       _sum: { montant: true },
     })
 
-    const paymentByStudent = new Map(
-      studentPayments.map((p) => [p.studentId, p._sum.montant ?? 0])
-    )
+    const studentPaymentsCdf = await prisma.paiement.groupBy({
+      by: ["studentId"],
+      where: {
+        schoolId: user.schoolId,
+        tarification: { yearId: activeYearId, devise: "CDF" },
+        isAnnule: false,
+      },
+      _sum: { montant: true },
+    })
 
-    let studentsFullyPaid = 0
-    let studentsPartiallyPaid = 0
-    let studentsUnpaid = 0
+    const paidUsdByStudent = new Map(studentPaymentsUsd.map((p) => [p.studentId, p._sum.montant ?? 0]))
+    const paidCdfByStudent = new Map(studentPaymentsCdf.map((p) => [p.studentId, p._sum.montant ?? 0]))
 
-    for (const [studentId, { total }] of studentTarifications) {
-      const paid = paymentByStudent.get(studentId) ?? 0
-      if (paid >= total) {
-        studentsFullyPaid++
-      } else if (paid > 0) {
-        studentsPartiallyPaid++
-      } else {
-        studentsUnpaid++
+    let usdFullyPaid = 0
+    let usdPartiallyPaid = 0
+    let usdUnpaid = 0
+    let cdfFullyPaid = 0
+    let cdfPartiallyPaid = 0
+    let cdfUnpaid = 0
+
+    for (const [studentId, { usdDue, cdfDue }] of studentBalances) {
+      if (usdDue > 0) {
+        const paid = paidUsdByStudent.get(studentId) ?? 0
+        if (paid >= usdDue) usdFullyPaid++
+        else if (paid > 0) usdPartiallyPaid++
+        else usdUnpaid++
+      }
+      if (cdfDue > 0) {
+        const paid = paidCdfByStudent.get(studentId) ?? 0
+        if (paid >= cdfDue) cdfFullyPaid++
+        else if (paid > 0) cdfPartiallyPaid++
+        else cdfUnpaid++
       }
     }
 
-    // 4. Derniers paiements
+    // 6. Derniers paiements
     const recentPayments = await prisma.paiement.findMany({
       where: {
         schoolId: user.schoolId,
@@ -134,31 +162,23 @@ export async function GET(req: NextRequest) {
       take: 10,
     })
 
-    // 5. Résumé par tarification - ✅ OPTIMISÉ (1 seule requête au lieu de N)
+    // 7. Résumé par tarification
     const paymentsGroupedByTarif = await prisma.paiement.groupBy({
       by: ["tarificationId"],
       where: {
-        tarificationId: { in: tarifications.map(t => t.id) },
+        tarificationId: { in: tarifications.map((t) => t.id) },
         isAnnule: false,
       },
       _sum: { montant: true },
       _count: { id: true },
     })
 
-    // Créer une map pour accès O(1)
     const paymentsMap = new Map(
-      paymentsGroupedByTarif.map(p => [
-        p.tarificationId, 
-        { total: p._sum.montant ?? 0, count: p._count.id }
-      ])
+      paymentsGroupedByTarif.map((p) => [p.tarificationId, { total: p._sum.montant ?? 0, count: p._count.id }])
     )
 
-    // Calculer le summary en mémoire (ultra rapide)
-    const tarificationsSummary = tarifications.map(t => {
-      const applicableStudents = enrollments.filter(
-        (e) => t.classId === null || t.classId === e.classId
-      ).length
-
+    const tarificationsSummary = tarifications.map((t) => {
+      const applicableStudents = enrollments.filter((e) => t.classId === null || t.classId === e.classId).length
       const payments = paymentsMap.get(t.id) || { total: 0, count: 0 }
 
       return {
@@ -166,6 +186,7 @@ export async function GET(req: NextRequest) {
         typeFrais: t.typeFrais.nom,
         classe: t.class?.name || "Toutes les classes",
         montant: t.montant,
+        devise: t.devise,
         totalAttendu: t.montant * applicableStudents,
         totalPercu: payments.total,
         nombrePaiements: payments.count,
@@ -175,12 +196,22 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       data: {
-        totalExpected,
-        totalCollected,
-        totalPending,
-        studentsFullyPaid,
-        studentsPartiallyPaid,
-        studentsUnpaid,
+        usd: {
+          totalExpected: totalExpectedUsd,
+          totalCollected: totalCollectedUsd,
+          totalPending: totalExpectedUsd - totalCollectedUsd,
+          studentsFullyPaid: usdFullyPaid,
+          studentsPartiallyPaid: usdPartiallyPaid,
+          studentsUnpaid: usdUnpaid,
+        },
+        cdf: {
+          totalExpected: totalExpectedCdf,
+          totalCollected: totalCollectedCdf,
+          totalPending: totalExpectedCdf - totalCollectedCdf,
+          studentsFullyPaid: cdfFullyPaid,
+          studentsPartiallyPaid: cdfPartiallyPaid,
+          studentsUnpaid: cdfUnpaid,
+        },
         totalStudents: enrollments.length,
         recentPayments: recentPayments.map((p) => ({
           id: p.id,
@@ -190,6 +221,7 @@ export async function GET(req: NextRequest) {
           className: p.enrollment.class.name,
           typeFrais: p.tarification.typeFrais.nom,
           montant: p.montant,
+          devise: p.tarification.devise,
           datePaiement: p.datePaiement,
           modePaiement: p.modePaiement,
         })),

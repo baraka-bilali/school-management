@@ -14,10 +14,11 @@ export async function calculateBalance(
   totalPaye: number
   solde: number
   nombrePaiements: number
+  devise: "USD" | "CDF"
 }> {
   const tarification = await prisma.tarification.findUnique({
     where: { id: tarificationId },
-    select: { montant: true },
+    select: { montant: true, devise: true },
   })
 
   if (!tarification) {
@@ -42,30 +43,30 @@ export async function calculateBalance(
     totalPaye,
     solde,
     nombrePaiements: aggregate._count.id,
+    devise: tarification.devise as "USD" | "CDF",
   }
 }
 
 /**
  * Calcul du solde global d'un élève pour toutes les tarifications
- * d'une année scolaire donnée.
+ * d'une année scolaire donnée. Les totaux sont séparés par devise.
  */
 export async function calculateStudentYearBalance(
   studentId: number,
   yearId: number,
   schoolId: number
 ): Promise<{
-  totalDu: number
-  totalPaye: number
-  soldeGlobal: number
+  usd: { totalDu: number; totalPaye: number; solde: number }
+  cdf: { totalDu: number; totalPaye: number; solde: number }
   details: Array<{
     tarificationId: number
     typeFrais: string
     montantTotal: number
     totalPaye: number
     solde: number
+    devise: "USD" | "CDF"
   }>
 }> {
-  // Trouver toutes les tarifications applicables à cet élève
   const enrollment = await prisma.enrollment.findFirst({
     where: { studentId, yearId, status: "ACTIVE" },
     select: { classId: true },
@@ -81,8 +82,8 @@ export async function calculateStudentYearBalance(
       schoolId,
       isActive: true,
       OR: [
-        { classId: null },                      // Tarifications globales
-        { classId: enrollment.classId },         // Tarifications spécifiques à la classe
+        { classId: null },
+        { classId: enrollment.classId },
       ],
     },
     include: {
@@ -99,17 +100,25 @@ export async function calculateStudentYearBalance(
         montantTotal: balance.montantTotal,
         totalPaye: balance.totalPaye,
         solde: balance.solde,
+        devise: balance.devise,
       }
     })
   )
 
-  const totalDu = details.reduce((acc, d) => acc + d.montantTotal, 0)
-  const totalPaye = details.reduce((acc, d) => acc + d.totalPaye, 0)
+  const usdDetails = details.filter((d) => d.devise === "USD")
+  const cdfDetails = details.filter((d) => d.devise === "CDF")
 
   return {
-    totalDu,
-    totalPaye,
-    soldeGlobal: totalDu - totalPaye,
+    usd: {
+      totalDu: usdDetails.reduce((acc, d) => acc + d.montantTotal, 0),
+      totalPaye: usdDetails.reduce((acc, d) => acc + d.totalPaye, 0),
+      solde: usdDetails.reduce((acc, d) => acc + d.solde, 0),
+    },
+    cdf: {
+      totalDu: cdfDetails.reduce((acc, d) => acc + d.montantTotal, 0),
+      totalPaye: cdfDetails.reduce((acc, d) => acc + d.totalPaye, 0),
+      solde: cdfDetails.reduce((acc, d) => acc + d.solde, 0),
+    },
     details,
   }
 }

@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
     const classId = searchParams.get("classId")
     const q = searchParams.get("q")?.trim() || ""
 
-    // Année scolaire
     let activeYearId: number | undefined
     if (yearId) {
       activeYearId = parseInt(yearId)
@@ -25,7 +24,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [] })
     }
 
-    // Inscriptions actives
     const enrollmentWhere: Record<string, unknown> = {
       yearId: activeYearId,
       status: "ACTIVE",
@@ -66,18 +64,29 @@ export async function GET(req: NextRequest) {
       orderBy: { student: { lastName: "asc" } },
     })
 
-    // Tarifications actives
+    // Tarifications actives avec devise
     const tarifications = await prisma.tarification.findMany({
       where: { schoolId: user.schoolId, yearId: activeYearId, isActive: true },
-      select: { id: true, montant: true, classId: true, typeFraisId: true, typeFrais: { select: { nom: true } } },
+      select: { id: true, montant: true, classId: true, devise: true, typeFraisId: true, typeFrais: { select: { nom: true } } },
     })
 
-    // Paiements par étudiant
-    const studentPayments = await prisma.paiement.groupBy({
+    // Paiements par étudiant et par devise
+    const studentPaymentsUsd = await prisma.paiement.groupBy({
       by: ["studentId"],
       where: {
         schoolId: user.schoolId,
-        tarification: { yearId: activeYearId },
+        tarification: { yearId: activeYearId, devise: "USD" },
+        isAnnule: false,
+      },
+      _sum: { montant: true },
+      _count: { id: true },
+    })
+
+    const studentPaymentsCdf = await prisma.paiement.groupBy({
+      by: ["studentId"],
+      where: {
+        schoolId: user.schoolId,
+        tarification: { yearId: activeYearId, devise: "CDF" },
         isAnnule: false,
       },
       _sum: { montant: true },
@@ -96,28 +105,41 @@ export async function GET(req: NextRequest) {
       select: { studentId: true, datePaiement: true },
     })
 
-    const paymentMap = new Map(studentPayments.map((p) => [p.studentId, { total: p._sum.montant ?? 0, count: p._count.id }]))
+    const paidUsdMap = new Map(studentPaymentsUsd.map((p) => [p.studentId, { total: p._sum.montant ?? 0, count: p._count.id }]))
+    const paidCdfMap = new Map(studentPaymentsCdf.map((p) => [p.studentId, { total: p._sum.montant ?? 0, count: p._count.id }]))
     const lastPaymentMap = new Map(lastPayments.map((p) => [p.studentId, p.datePaiement]))
 
     const data = enrollments.map((e) => {
-      // Montant attendu pour cet élève (tarifs globaux + tarifs spécifiques à sa classe)
-      let totalExpected = 0
+      let usdExpected = 0
+      let cdfExpected = 0
       for (const t of tarifications) {
         if (t.classId === null || t.classId === e.classId) {
-          totalExpected += t.montant
+          if (t.devise === "CDF") {
+            cdfExpected += t.montant
+          } else {
+            usdExpected += t.montant
+          }
         }
       }
 
-      const paid = paymentMap.get(e.student.id)?.total ?? 0
-      const count = paymentMap.get(e.student.id)?.count ?? 0
-      const remaining = Math.max(0, totalExpected - paid)
-      const percent = totalExpected > 0 ? Math.round((paid / totalExpected) * 100) : 0
+      const usdPaid = paidUsdMap.get(e.student.id)?.total ?? 0
+      const cdfPaid = paidCdfMap.get(e.student.id)?.total ?? 0
+      const paymentCount = (paidUsdMap.get(e.student.id)?.count ?? 0) + (paidCdfMap.get(e.student.id)?.count ?? 0)
       const lastDate = lastPaymentMap.get(e.student.id) || null
 
+      const usdRemaining = Math.max(0, usdExpected - usdPaid)
+      const cdfRemaining = Math.max(0, cdfExpected - cdfPaid)
+
+      const usdPercent = usdExpected > 0 ? Math.round((usdPaid / usdExpected) * 100) : 0
+      const cdfPercent = cdfExpected > 0 ? Math.round((cdfPaid / cdfExpected) * 100) : 0
+
+      // Statut global : soldé uniquement si toutes les devises sont réglées
+      const usdSolde = usdExpected === 0 || usdPaid >= usdExpected
+      const cdfSolde = cdfExpected === 0 || cdfPaid >= cdfExpected
       let status: "solde" | "partiel" | "impaye"
-      if (paid >= totalExpected && totalExpected > 0) {
+      if (usdSolde && cdfSolde && (usdExpected > 0 || cdfExpected > 0)) {
         status = "solde"
-      } else if (paid > 0) {
+      } else if (usdPaid > 0 || cdfPaid > 0) {
         status = "partiel"
       } else {
         status = "impaye"
@@ -133,12 +155,10 @@ export async function GET(req: NextRequest) {
         gender: e.student.gender,
         classId: e.class.id,
         className: e.class.name,
-        totalExpected,
-        totalPaid: paid,
-        remaining,
-        percent,
+        usd: { expected: usdExpected, paid: usdPaid, remaining: usdRemaining, percent: usdPercent },
+        cdf: { expected: cdfExpected, paid: cdfPaid, remaining: cdfRemaining, percent: cdfPercent },
         status,
-        paymentCount: count,
+        paymentCount,
         lastPaymentDate: lastDate,
       }
     })

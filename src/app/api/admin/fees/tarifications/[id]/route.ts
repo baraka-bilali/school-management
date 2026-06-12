@@ -61,6 +61,19 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Tarification introuvable" }, { status: 404 })
     }
 
+    // Protéger le changement de devise si des paiements existent
+    if (data.devise && data.devise !== existing.devise) {
+      const paiementsCount = await prisma.paiement.count({
+        where: { tarificationId: parseInt(id), isAnnule: false },
+      })
+      if (paiementsCount > 0) {
+        return NextResponse.json(
+          { error: "Impossible de changer la devise : des paiements existent pour cette tarification" },
+          { status: 409 }
+        )
+      }
+    }
+
     const updated = await prisma.tarification.update({
       where: { id: parseInt(id) },
       data,

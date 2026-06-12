@@ -43,12 +43,22 @@ import Portal from "@/components/portal"
 // ============================================================
 
 interface FeeStats {
-  totalExpected: number
-  totalCollected: number
-  totalPending: number
-  studentsFullyPaid: number
-  studentsPartiallyPaid: number
-  studentsUnpaid: number
+  usd: {
+    totalExpected: number
+    totalCollected: number
+    totalPending: number
+    studentsFullyPaid: number
+    studentsPartiallyPaid: number
+    studentsUnpaid: number
+  }
+  cdf: {
+    totalExpected: number
+    totalCollected: number
+    totalPending: number
+    studentsFullyPaid: number
+    studentsPartiallyPaid: number
+    studentsUnpaid: number
+  }
   totalStudents: number
   recentPayments: RecentPayment[]
   tarificationsSummary: TarificationSummary[]
@@ -62,6 +72,7 @@ interface RecentPayment {
   className: string
   typeFrais: string
   montant: number
+  devise: "USD" | "CDF"
   datePaiement: string
   modePaiement: string
 }
@@ -71,6 +82,7 @@ interface TarificationSummary {
   typeFrais: string
   classe: string
   montant: number
+  devise: "USD" | "CDF"
   totalAttendu: number
   totalPercu: number
   nombrePaiements: number
@@ -105,6 +117,7 @@ interface Tarification {
   yearId: number
   classId: number | null
   montant: number
+  devise: "USD" | "CDF"
   description: string | null
   isActive: boolean
   typeFrais: { id: number; nom: string; code: string }
@@ -137,6 +150,7 @@ interface PaiementRecord {
   tarification: {
     typeFrais: { nom: string; code: string }
     year: { name: string }
+    devise: "USD" | "CDF"
   }
   enrollment: { class: { name: string } }
 }
@@ -146,6 +160,7 @@ interface BalanceInfo {
   totalPaye: number
   solde: number
   nombrePaiements: number
+  devise: "USD" | "CDF"
 }
 
 interface StudentFeeRow {
@@ -158,10 +173,8 @@ interface StudentFeeRow {
   gender: string
   classId: number
   className: string
-  totalExpected: number
-  totalPaid: number
-  remaining: number
-  percent: number
+  usd: { expected: number; paid: number; remaining: number; percent: number }
+  cdf: { expected: number; paid: number; remaining: number; percent: number }
   status: "solde" | "partiel" | "impaye"
   paymentCount: number
   lastPaymentDate: string | null
@@ -178,6 +191,17 @@ const MODES_PAIEMENT = [
   { value: "CHEQUE", label: "Chèque", icon: FileText, color: "text-orange-500" },
   { value: "AUTRE", label: "Autre", icon: CreditCard, color: "text-gray-500" },
 ]
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function formatMontant(amount: number, devise: "USD" | "CDF"): string {
+  if (devise === "CDF") {
+    return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " FC"
+  }
+  return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " $"
+}
 
 // ============================================================
 // COMPOSANT PRINCIPAL
@@ -375,9 +399,9 @@ export default function AdminFeesPage() {
       const threshold = parseFloat(sfAmountThreshold)
       if (!isNaN(threshold)) {
         if (sfAmountMode === "gte") {
-          list = list.filter((s) => s.totalPaid >= threshold)
+          list = list.filter((s) => (s.usd.paid + s.cdf.paid) >= threshold)
         } else {
-          list = list.filter((s) => s.totalPaid < threshold)
+          list = list.filter((s) => (s.usd.paid + s.cdf.paid) < threshold)
         }
       }
     }
@@ -390,13 +414,13 @@ export default function AdminFeesPage() {
           cmp = a.lastName.localeCompare(b.lastName)
           break
         case "paid":
-          cmp = a.totalPaid - b.totalPaid
+          cmp = (a.usd.paid + a.cdf.paid) - (b.usd.paid + b.cdf.paid)
           break
         case "remaining":
-          cmp = a.remaining - b.remaining
+          cmp = (a.usd.remaining + a.cdf.remaining) - (b.usd.remaining + b.cdf.remaining)
           break
         case "percent":
-          cmp = a.percent - b.percent
+          cmp = getStudentPercent(a) - getStudentPercent(b)
           break
         case "class":
           cmp = a.className.localeCompare(b.className)
@@ -413,7 +437,7 @@ export default function AdminFeesPage() {
     const rows = filteredStudentFees
     if (rows.length === 0) return
 
-    const headers = ["Code", "Nom", "Post-nom", "Prénom", "Sexe", "Classe", "Total Attendu ($)", "Total Payé ($)", "Reste ($)", "Progression (%)", "Statut", "Nb Paiements", "Dernier Paiement"]
+    const headers = ["Code", "Nom", "Post-nom", "Prénom", "Sexe", "Classe", "Attendu USD ($)", "Payé USD ($)", "Reste USD ($)", "Attendu CDF (FC)", "Payé CDF (FC)", "Reste CDF (FC)", "Statut", "Nb Paiements", "Dernier Paiement"]
     const csvRows = [headers.join(";")]
 
     for (const r of rows) {
@@ -424,10 +448,12 @@ export default function AdminFeesPage() {
         r.firstName,
         r.gender === "M" ? "Masculin" : "Féminin",
         r.className,
-        r.totalExpected,
-        r.totalPaid,
-        r.remaining,
-        r.percent,
+        r.usd.expected,
+        r.usd.paid,
+        r.usd.remaining,
+        r.cdf.expected,
+        r.cdf.paid,
+        r.cdf.remaining,
         r.status === "solde" ? "Soldé" : r.status === "partiel" ? "Partiel" : "Impayé",
         r.paymentCount,
         r.lastPaymentDate ? new Date(r.lastPaymentDate).toLocaleDateString("fr-FR") : "—",
@@ -453,12 +479,25 @@ export default function AdminFeesPage() {
   const hoverRow = theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
   const headerBg = theme === "dark" ? "bg-gray-700" : "bg-gray-50"
 
-  const formatCurrency = (amount: number) => {
-    if (currency === "CDF") {
-      const converted = amount * exchangeRate
-      return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(converted) + " FC"
+  const formatStudentAmounts = (row: StudentFeeRow, field: "paid" | "remaining") => {
+    const parts: string[] = []
+    if (row.usd.expected > 0) {
+      parts.push(formatMontant(row.usd[field], "USD"))
     }
-    return new Intl.NumberFormat("fr-FR", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " $"
+    if (row.cdf.expected > 0) {
+      parts.push(formatMontant(row.cdf[field], "CDF"))
+    }
+    if (parts.length === 0) return "—"
+    return parts.join(" + ")
+  }
+
+  const getStudentPercent = (row: StudentFeeRow) => {
+    if (row.usd.expected > 0 && row.cdf.expected === 0) return row.usd.percent
+    if (row.cdf.expected > 0 && row.usd.expected === 0) return row.cdf.percent
+    if (row.usd.expected > 0 && row.cdf.expected > 0) {
+      return Math.round((row.usd.percent + row.cdf.percent) / 2)
+    }
+    return 0
   }
 
   const formatDate = (dateStr: string) => {
@@ -477,7 +516,10 @@ export default function AdminFeesPage() {
     { key: "payments", label: "Paiements", icon: Receipt },
   ]
 
-  const percentPaid = stats ? Math.round((stats.totalCollected / Math.max(stats.totalExpected, 1)) * 100) : 0
+  const percentPaidUsd = stats ? Math.round((stats.usd.totalCollected / Math.max(stats.usd.totalExpected, 1)) * 100) : 0
+  const percentPaidCdf = stats ? Math.round((stats.cdf.totalCollected / Math.max(stats.cdf.totalExpected, 1)) * 100) : 0
+  const hasUsd = stats ? stats.usd.totalExpected > 0 : false
+  const hasCdf = stats ? stats.cdf.totalExpected > 0 : false
 
   return (
     <Layout>
@@ -520,7 +562,9 @@ export default function AdminFeesPage() {
                   </div>
                   <div>
                     <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total attendu</p>
-                    <p className={`text-xl font-bold ${textColor} mt-0.5`}>{formatCurrency(stats.totalExpected)}</p>
+                    {hasUsd && <p className={`text-lg font-bold ${textColor} mt-0.5`}>{formatMontant(stats.usd.totalExpected, "USD")}</p>}
+                    {hasCdf && <p className={`text-lg font-bold ${textColor} ${hasUsd ? "mt-0" : "mt-0.5"}`}>{formatMontant(stats.cdf.totalExpected, "CDF")}</p>}
+                    {!hasUsd && !hasCdf && <p className={`text-lg font-bold ${textColor} mt-0.5`}>—</p>}
                   </div>
                 </div>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
@@ -533,18 +577,32 @@ export default function AdminFeesPage() {
                   <div className="w-12 h-12 bg-green-500/15 rounded-2xl flex items-center justify-center">
                     <CheckCircle className="w-6 h-6 text-green-500" />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total perçu</p>
-                    <p className={`text-xl font-bold text-green-500 mt-0.5`}>{formatCurrency(stats.totalCollected)}</p>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className={textSecondary}>Progression</span>
-                    <span className="text-green-500 font-semibold">{percentPaid}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                    <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${percentPaid}%` }} />
+                    {hasUsd && (
+                      <div>
+                        <p className="text-lg font-bold text-green-500 mt-0.5">{formatMontant(stats.usd.totalCollected, "USD")}</p>
+                        <div className="flex items-center justify-between text-xs mb-0.5">
+                          <span className={textSecondary}>Progression USD</span>
+                          <span className="text-green-500 font-semibold">{percentPaidUsd}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                          <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${percentPaidUsd}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {hasCdf && (
+                      <div className={hasUsd ? "mt-2" : ""}>
+                        <p className={`text-lg font-bold text-green-500 ${hasUsd ? "" : "mt-0.5"}`}>{formatMontant(stats.cdf.totalCollected, "CDF")}</p>
+                        <div className="flex items-center justify-between text-xs mb-0.5">
+                          <span className={textSecondary}>Progression CDF</span>
+                          <span className="text-green-500 font-semibold">{percentPaidCdf}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                          <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${percentPaidCdf}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -558,7 +616,9 @@ export default function AdminFeesPage() {
                   </div>
                   <div>
                     <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>En attente</p>
-                    <p className={`text-xl font-bold text-orange-500 mt-0.5`}>{formatCurrency(stats.totalPending)}</p>
+                    {hasUsd && <p className={`text-lg font-bold text-orange-500 mt-0.5`}>{formatMontant(stats.usd.totalPending, "USD")}</p>}
+                    {hasCdf && <p className={`text-lg font-bold text-orange-500 ${hasUsd ? "" : "mt-0.5"}`}>{formatMontant(stats.cdf.totalPending, "CDF")}</p>}
+                    {!hasUsd && !hasCdf && <p className={`text-lg font-bold text-orange-500 mt-0.5`}>—</p>}
                   </div>
                 </div>
               </CardContent>
@@ -573,21 +633,38 @@ export default function AdminFeesPage() {
                   <div>
                     <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Élèves à jour</p>
                     <p className={`text-xl font-bold ${textColor} mt-0.5`}>
-                      {stats.studentsFullyPaid}
+                      {Math.max(stats.usd.studentsFullyPaid, stats.cdf.studentsFullyPaid)}
                       <span className={`text-sm font-normal ${textSecondary}`}> / {stats.totalStudents}</span>
                     </p>
                   </div>
                 </div>
-                <div className="mt-2 flex gap-1">
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/15 text-green-600 dark:text-green-400">
-                    {stats.studentsFullyPaid} soldés
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
-                    {stats.studentsPartiallyPaid} partiels
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-600 dark:text-red-400">
-                    {stats.studentsUnpaid} impayés
-                  </span>
+                <div className="mt-2 flex gap-1 flex-wrap">
+                  {hasUsd && (
+                    <>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/15 text-green-600 dark:text-green-400">
+                        {stats.usd.studentsFullyPaid} soldés $
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
+                        {stats.usd.studentsPartiallyPaid} partiels $
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-600 dark:text-red-400">
+                        {stats.usd.studentsUnpaid} impayés $
+                      </span>
+                    </>
+                  )}
+                  {hasCdf && (
+                    <>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/15 text-green-600 dark:text-green-400">
+                        {stats.cdf.studentsFullyPaid} soldés FC
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
+                        {stats.cdf.studentsPartiallyPaid} partiels FC
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/15 text-red-600 dark:text-red-400">
+                        {stats.cdf.studentsUnpaid} impayés FC
+                      </span>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -638,24 +715,44 @@ export default function AdminFeesPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-5">
-                      {[
-                        { label: "Soldés", count: stats.studentsFullyPaid, color: "bg-green-500", textColor: "text-green-500" },
-                        { label: "Partiels", count: stats.studentsPartiallyPaid, color: "bg-yellow-500", textColor: "text-yellow-500" },
-                        { label: "Impayés", count: stats.studentsUnpaid, color: "bg-red-500", textColor: "text-red-500" },
-                      ].map((item) => (
-                        <div key={item.label}>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className={`text-sm font-medium ${textSecondary}`}>{item.label}</span>
-                            <span className={`text-sm font-bold ${item.textColor}`}>{item.count} élèves</span>
+                      {(() => {
+                        const items: { label: string; count: number; color: string; textColor: string }[] = []
+                        if (hasUsd && stats) {
+                          items.push(
+                            { label: hasCdf ? "Soldés $" : "Soldés", count: stats.usd.studentsFullyPaid, color: "bg-green-500", textColor: "text-green-500" },
+                            { label: hasCdf ? "Partiels $" : "Partiels", count: stats.usd.studentsPartiallyPaid, color: "bg-yellow-500", textColor: "text-yellow-500" },
+                            { label: hasCdf ? "Impayés $" : "Impayés", count: stats.usd.studentsUnpaid, color: "bg-red-500", textColor: "text-red-500" },
+                          )
+                        }
+                        if (hasCdf && stats) {
+                          items.push(
+                            { label: hasUsd ? "Soldés FC" : "Soldés", count: stats.cdf.studentsFullyPaid, color: "bg-green-500", textColor: "text-green-500" },
+                            { label: hasUsd ? "Partiels FC" : "Partiels", count: stats.cdf.studentsPartiallyPaid, color: "bg-yellow-500", textColor: "text-yellow-500" },
+                            { label: hasUsd ? "Impayés FC" : "Impayés", count: stats.cdf.studentsUnpaid, color: "bg-red-500", textColor: "text-red-500" },
+                          )
+                        }
+                        if (items.length === 0) {
+                          items.push(
+                            { label: "Soldés", count: 0, color: "bg-green-500", textColor: "text-green-500" },
+                            { label: "Partiels", count: 0, color: "bg-yellow-500", textColor: "text-yellow-500" },
+                            { label: "Impayés", count: 0, color: "bg-red-500", textColor: "text-red-500" },
+                          )
+                        }
+                        return items.map((item) => (
+                          <div key={item.label}>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-sm font-medium ${textSecondary}`}>{item.label}</span>
+                              <span className={`text-sm font-bold ${item.textColor}`}>{item.count} élèves</span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                              <div
+                                className={`${item.color} h-2.5 rounded-full transition-all duration-700`}
+                                style={{ width: `${Math.max((item.count / Math.max(stats?.totalStudents ?? 1, 1)) * 100, item.count > 0 ? 4 : 0)}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                            <div
-                              className={`${item.color} h-2.5 rounded-full transition-all duration-700`}
-                              style={{ width: `${Math.max((item.count / Math.max(stats.totalStudents, 1)) * 100, item.count > 0 ? 4 : 0)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      })()}
                     </div>
 
                     {/* Résumé tarifications */}
@@ -673,7 +770,7 @@ export default function AdminFeesPage() {
                                 </div>
                                 <div className="flex items-center justify-between text-xs mb-2">
                                   <span className={textSecondary}>{t.classe} · {t.nombreEleves} élèves</span>
-                                  <span className={textSecondary}>{formatCurrency(t.totalPercu)} / {formatCurrency(t.totalAttendu)}</span>
+                                  <span className={textSecondary}>{formatMontant(t.totalPercu, t.devise)} / {formatMontant(t.totalAttendu, t.devise)}</span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
                                   <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -721,7 +818,7 @@ export default function AdminFeesPage() {
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-3">
-                              <p className="text-sm font-bold text-green-500">+{formatCurrency(payment.montant)}</p>
+                              <p className="text-sm font-bold text-green-500">+{formatMontant(payment.montant, payment.devise)}</p>
                               <p className={`text-xs ${textSecondary}`}>{formatDate(payment.datePaiement)}</p>
                             </div>
                           </div>
@@ -811,7 +908,6 @@ export default function AdminFeesPage() {
                 borderColor={borderColor}
                 headerBg={headerBg}
                 hoverRow={hoverRow}
-                formatCurrency={formatCurrency}
                 onCreateTarif={() => setShowCreateTarifModal(true)}
                 onRefresh={fetchAll}
               />
@@ -854,7 +950,7 @@ export default function AdminFeesPage() {
                               </td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.enrollment.class.name}</td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.tarification.typeFrais.nom}</td>
-                              <td className="px-4 py-3 text-sm font-bold text-green-500">{formatCurrency(p.montant)}</td>
+                              <td className="px-4 py-3 text-sm font-bold text-green-500">{formatMontant(p.montant, p.tarification.devise)}</td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{formatDate(p.datePaiement)}</td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{getModePaiementLabel(p.modePaiement)}</td>
                               <td className="px-4 py-3">
@@ -1042,21 +1138,21 @@ export default function AdminFeesPage() {
                                     <div className={`text-xs ${textSecondary}`}>{s.code}</div>
                                   </td>
                                   <td className={`px-4 py-3 ${textSecondary}`}>{s.className}</td>
-                                  <td className={`px-4 py-3 font-medium ${textColor}`}>{formatCurrency(s.totalPaid)}</td>
-                                  <td className={`px-4 py-3 font-medium ${s.remaining > 0 ? "text-red-500" : "text-green-500"}`}>
-                                    {formatCurrency(s.remaining)}
+                                  <td className={`px-4 py-3 font-medium ${textColor}`}>{formatStudentAmounts(s, "paid")}</td>
+                                  <td className={`px-4 py-3 font-medium ${(s.usd.remaining + s.cdf.remaining) > 0 ? "text-red-500" : "text-green-500"}`}>
+                                    {formatStudentAmounts(s, "remaining")}
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <div className={`w-20 h-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
                                         <div
                                           className={`h-full rounded-full ${
-                                            s.percent >= 100 ? "bg-green-500" : s.percent >= 50 ? "bg-orange-400" : "bg-red-400"
+                                            getStudentPercent(s) >= 100 ? "bg-green-500" : getStudentPercent(s) >= 50 ? "bg-orange-400" : "bg-red-400"
                                           }`}
-                                          style={{ width: `${Math.min(s.percent, 100)}%` }}
+                                          style={{ width: `${Math.min(getStudentPercent(s), 100)}%` }}
                                         />
                                       </div>
-                                      <span className={`text-xs font-medium ${textSecondary}`}>{s.percent}%</span>
+                                      <span className={`text-xs font-medium ${textSecondary}`}>{getStudentPercent(s)}%</span>
                                     </div>
                                   </td>
                                   <td className="px-4 py-3">
@@ -1184,6 +1280,7 @@ function PaymentFormModal({
   const [createdPayment, setCreatedPayment] = useState<{
     numeroRecu: string
     montant: number
+    devise: "USD" | "CDF"
     studentName: string
     id: number
   } | null>(null)
@@ -1287,6 +1384,7 @@ function PaymentFormModal({
         id: data.id,
         numeroRecu: data.numeroRecu,
         montant: data.montant,
+        devise: selectedTarif.devise,
         studentName: `${data.student.lastName} ${data.student.middleName} ${data.student.firstName}`,
       })
       setSuccess(true)
@@ -1365,7 +1463,7 @@ function PaymentFormModal({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${textSecondary}`}>Montant</span>
-                    <span className="text-lg font-bold text-green-500">{createdPayment.montant} $</span>
+                    <span className="text-lg font-bold text-green-500">{formatMontant(createdPayment.montant, createdPayment.devise)}</span>
                   </div>
                 </div>
 
@@ -1390,7 +1488,7 @@ function PaymentFormModal({
                         if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
                         const { data } = await res.json()
 
-                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} $</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Imprimé le ${new Date().toLocaleString()}</div></body></html>`
+                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} ${data.devise === "CDF" ? "FC" : "$"}</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Imprimé le ${new Date().toLocaleString()}</div></body></html>`
 
                         w.document.write(html)
                         w.document.close()
@@ -1415,7 +1513,7 @@ function PaymentFormModal({
                         if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
                         const { data } = await res.json()
 
-                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} $</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Téléchargé le ${new Date().toLocaleString()}</div></body></html>`
+                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} ${data.devise === "CDF" ? "FC" : "$"}</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Téléchargé le ${new Date().toLocaleString()}</div></body></html>`
 
                         const blob = new Blob([html], { type: "text/html;charset=utf-8" })
                         const url = URL.createObjectURL(blob)
@@ -1564,7 +1662,7 @@ function PaymentFormModal({
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className={`text-lg font-bold ${textColor}`}>{t.montant} $</p>
+                              <p className={`text-lg font-bold ${textColor}`}>{formatMontant(t.montant, t.devise)}</p>
                               {selectedTarif?.id === t.id && (
                                 <Check className="w-4 h-4 text-green-500 ml-auto" />
                               )}
@@ -1592,16 +1690,16 @@ function PaymentFormModal({
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-sm">
                           <span className={textSecondary}>Montant total</span>
-                          <span className={`font-medium ${textColor}`}>{balanceInfo.montantTotal} $</span>
+                          <span className={`font-medium ${textColor}`}>{formatMontant(balanceInfo.montantTotal, balanceInfo.devise)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className={textSecondary}>Déjà payé ({balanceInfo.nombrePaiements} paiement{balanceInfo.nombrePaiements > 1 ? "s" : ""})</span>
-                          <span className="font-medium text-green-500">{balanceInfo.totalPaye} $</span>
+                          <span className="font-medium text-green-500">{formatMontant(balanceInfo.totalPaye, balanceInfo.devise)}</span>
                         </div>
                         <div className={`flex justify-between text-sm pt-1.5 border-t ${borderColor}`}>
                           <span className={`font-semibold ${textColor}`}>Reste à payer</span>
                           <span className={`font-bold ${balanceInfo.solde > 0 ? "text-orange-500" : "text-green-500"}`}>
-                            {balanceInfo.solde} $
+                            {formatMontant(balanceInfo.solde, balanceInfo.devise)}
                           </span>
                         </div>
                         {balanceInfo.solde <= 0 && (
@@ -1627,7 +1725,7 @@ function PaymentFormModal({
                   </div>
                   <div className="min-w-0">
                     <p className={`text-sm font-medium ${textColor} truncate`}>{selectedEnrollment.studentName}</p>
-                    <p className={`text-xs ${textSecondary}`}>{selectedTarif.typeFrais.nom} — Reste: {balanceInfo?.solde ?? "?"} $</p>
+                    <p className={`text-xs ${textSecondary}`}>{selectedTarif.typeFrais.nom} — Reste: {formatMontant(balanceInfo?.solde ?? 0, selectedTarif.devise)}</p>
                   </div>
                 </div>
 
@@ -1635,7 +1733,7 @@ function PaymentFormModal({
                 <div>
                   <label className={`block text-sm font-semibold ${textColor} mb-2`}>
                     <DollarSign className="w-4 h-4 inline mr-1" />
-                    Montant reçu
+                    Montant reçu ({selectedTarif.devise === "CDF" ? "FC" : "$"})
                   </label>
                   <div className="relative">
                     <input
@@ -1648,12 +1746,12 @@ function PaymentFormModal({
                       className={`${inputClasses} text-xl font-bold pr-10`}
                       autoFocus
                     />
-                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 font-bold ${textSecondary}`}>$</span>
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 font-bold ${textSecondary}`}>{selectedTarif.devise === "CDF" ? "FC" : "$"}</span>
                   </div>
                   {balanceInfo && parseFloat(montant) > balanceInfo.solde && (
                     <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      Ce montant dépasse le reste à payer ({balanceInfo.solde} $)
+                      Ce montant dépasse le reste à payer ({formatMontant(balanceInfo.solde, balanceInfo.devise)})
                     </p>
                   )}
 
@@ -1674,7 +1772,7 @@ function PaymentFormModal({
                               : `${borderColor} ${textSecondary} hover:border-green-500`
                           }`}
                         >
-                          {amount === balanceInfo.solde ? "Tout payer" : `${amount} $`}
+                          {amount === balanceInfo.solde ? "Tout payer" : formatMontant(amount, selectedTarif.devise)}
                         </button>
                       ))}
                     </div>
@@ -1685,11 +1783,11 @@ function PaymentFormModal({
                     <div className={`mt-3 p-3 rounded-xl ${theme === "dark" ? "bg-gray-700/50" : "bg-green-50"} space-y-1.5`}>
                       <div className="flex justify-between text-sm">
                         <span className={textSecondary}>Reste à payer actuel</span>
-                        <span className={`font-medium ${textColor}`}>{balanceInfo.solde} $</span>
+                        <span className={`font-medium ${textColor}`}>{formatMontant(balanceInfo.solde, selectedTarif.devise)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className={textSecondary}>Ce paiement</span>
-                        <span className="font-medium text-green-500">- {parseFloat(montant)} $</span>
+                        <span className="font-medium text-green-500">- {formatMontant(parseFloat(montant), selectedTarif.devise)}</span>
                       </div>
                       <div className={`flex justify-between text-sm pt-1.5 border-t ${borderColor}`}>
                         <span className={`font-semibold ${textColor}`}>Nouveau solde</span>
@@ -1697,7 +1795,7 @@ function PaymentFormModal({
                           const newBalance = balanceInfo.solde - parseFloat(montant)
                           return (
                             <span className={`font-bold ${newBalance <= 0 ? "text-green-500" : "text-orange-500"}`}>
-                              {newBalance <= 0 ? "0" : newBalance} $
+                              {newBalance <= 0 ? formatMontant(0, selectedTarif.devise) : formatMontant(newBalance, selectedTarif.devise)}
                               {newBalance <= 0 && " ✓ Soldé"}
                             </span>
                           )
@@ -1980,7 +2078,6 @@ function TarificationsTab({
   borderColor,
   headerBg,
   hoverRow,
-  formatCurrency,
   onCreateTarif,
   onRefresh,
 }: {
@@ -1994,7 +2091,6 @@ function TarificationsTab({
   borderColor: string
   headerBg: string
   hoverRow: string
-  formatCurrency: (amount: number) => string
   onCreateTarif: () => void
   onRefresh: () => void
 }) {
@@ -2196,7 +2292,7 @@ function TarificationsTab({
                               </div>
                             ) : (
                               <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                {formatCurrency(tarif.montant)}
+                                {formatMontant(tarif.montant, tarif.devise)}
                               </span>
                             )}
                           </td>
@@ -2283,6 +2379,7 @@ function CreateTarificationModal({
   // Classes disponibles (pas encore assignées)
   const availableClasses = classes.filter((c) => !alreadyAssignedClassIds.includes(c.id))
   const [montant, setMontant] = useState("")
+  const [devise, setDevise] = useState<"USD" | "CDF">("USD")
   const [description, setDescription] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -2341,6 +2438,7 @@ function CreateTarificationModal({
             yearId: Number(yearId),
             classId,
             montant: parseFloat(montant),
+            devise,
             description: description || undefined,
           }),
         })
@@ -2440,7 +2538,7 @@ function CreateTarificationModal({
 
             {/* Montant */}
             <div>
-              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Montant ($)</label>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Montant</label>
               <input
                 type="number"
                 value={montant}
@@ -2450,6 +2548,27 @@ function CreateTarificationModal({
                 step="100"
                 className={inputClasses}
               />
+            </div>
+
+            {/* Devise */}
+            <div>
+              <label className={`block text-sm font-semibold ${textColor} mb-2`}>Devise</label>
+              <div className="flex gap-2">
+                {(["USD", "CDF"] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDevise(d)}
+                    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                      devise === d
+                        ? "border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                        : `${borderColor} ${textSecondary} hover:border-gray-400`
+                    }`}
+                  >
+                    {d === "USD" ? "$ USD" : "FC CDF"}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Description */}

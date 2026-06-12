@@ -20,11 +20,13 @@ export const createTarificationSchema = z.object({
   yearId: z.number().int().positive("yearId invalide"),
   classId: z.number().int().positive("classId invalide"),
   montant: z.number().positive("Le montant doit être positif"),
+  devise: z.enum(["USD", "CDF"]).default("USD"),
   description: z.string().optional(),
 })
 
 export const updateTarificationSchema = z.object({
   montant: z.number().positive("Le montant doit être positif").optional(),
+  devise: z.enum(["USD", "CDF"]).optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
 })

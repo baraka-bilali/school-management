@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         yearId: data.yearId,
         classId: data.classId,
         montant: data.montant,
+        devise: data.devise as "USD" | "CDF",
         description: data.description || null,
         schoolId: user.schoolId,
       },

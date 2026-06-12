@@ -126,6 +126,7 @@ export async function getReceiptData(paiementId: number) {
     numeroRecu: paiement.numeroRecu,
     datePaiement: paiement.datePaiement,
     montant: paiement.montant,
+    devise: paiement.tarification.devise,
     modePaiement: paiement.modePaiement,
     reference: paiement.reference,
     eleve: {
