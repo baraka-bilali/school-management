@@ -42,6 +42,7 @@ interface ExpenseRow {
   categorie: string
   motif: string
   montant: number
+  devise: "USD" | "CDF"
   beneficiaire: string | null
   modePaiement: string
   reference: string | null
@@ -58,8 +59,10 @@ interface TreasuryData {
   totalIncomeUsd: number
   totalIncomeCdf: number
   totalTeacherPayments: number
-  totalExpenses: number
-  balance: number
+  totalExpensesUsd: number
+  totalExpensesCdf: number
+  balanceUsd: number
+  balanceCdf: number
   teacherPayments: TeacherPaymentRow[]
   expenses: ExpenseRow[]
   teachers: TeacherOption[]
@@ -135,6 +138,7 @@ export default function AdminTreasuryPage() {
   const [expCategorie, setExpCategorie] = useState("AUTRE")
   const [expMotif, setExpMotif] = useState("")
   const [expMontant, setExpMontant] = useState("")
+  const [expDevise, setExpDevise] = useState<"USD" | "CDF">("USD")
   const [expBeneficiaire, setExpBeneficiaire] = useState("")
   const [expModePaiement, setExpModePaiement] = useState("CASH")
   const [expReference, setExpReference] = useState("")
@@ -248,11 +252,12 @@ export default function AdminTreasuryPage() {
           beneficiaire: expBeneficiaire || null,
           modePaiement: expModePaiement,
           reference: expReference || null,
+          devise: expDevise,
         }),
       })
       if (res.ok) {
         setShowExpenseForm(false)
-        setExpMotif(""); setExpMontant(""); setExpCategorie("AUTRE"); setExpBeneficiaire(""); setExpReference("")
+        setExpMotif(""); setExpMontant(""); setExpCategorie("AUTRE"); setExpBeneficiaire(""); setExpReference(""); setExpDevise("USD")
         setTreasury(null)
         fetchTreasury()
       } else {
@@ -323,7 +328,8 @@ export default function AdminTreasuryPage() {
   }) ?? []
 
   const filteredTotalPayments = filteredTeacherPayments.reduce((s, tp) => s + tp.montant, 0)
-  const filteredTotalExpenses = filteredExpenses.reduce((s, e) => s + e.montant, 0)
+  const filteredTotalExpensesUsd = filteredExpenses.filter(e => e.devise !== "CDF").reduce((s, e) => s + e.montant, 0)
+  const filteredTotalExpensesCdf = filteredExpenses.filter(e => e.devise === "CDF").reduce((s, e) => s + e.montant, 0)
 
   const availableMois = treasury ? Array.from(
     new Set([
@@ -410,7 +416,7 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Salaires versés</p>
-                      <p className={`text-xl font-bold text-blue-600`}>{formatCurrency(treasury.totalTeacherPayments)}</p>
+                      <p className={`text-xl font-bold text-blue-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalTeacherPayments)} $</p>
                     </div>
                   </div>
                 </CardContent>
@@ -423,7 +429,15 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Dépenses</p>
-                      <p className={`text-xl font-bold text-orange-600`}>{formatCurrency(treasury.totalExpenses)}</p>
+                      {treasury.totalExpensesUsd > 0 && (
+                        <p className={`text-xl font-bold text-orange-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalExpensesUsd)} $</p>
+                      )}
+                      {treasury.totalExpensesCdf > 0 && (
+                        <p className={`text-base font-semibold text-orange-500`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalExpensesCdf)} FC</p>
+                      )}
+                      {treasury.totalExpensesUsd === 0 && treasury.totalExpensesCdf === 0 && (
+                        <p className={`text-xl font-bold text-orange-600`}>0 $</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -431,12 +445,15 @@ export default function AdminTreasuryPage() {
               <Card theme={theme}>
                 <CardContent className="pt-5">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${treasury.balance >= 0 ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
-                      <Landmark className={`w-5 h-5 ${treasury.balance >= 0 ? "text-emerald-500" : "text-red-500"}`} />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${treasury.balanceUsd >= 0 ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
+                      <Landmark className={`w-5 h-5 ${treasury.balanceUsd >= 0 ? "text-emerald-500" : "text-red-500"}`} />
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Solde budget</p>
-                      <p className={`text-xl font-bold ${treasury.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balance)} $</p>
+                      <p className={`text-xl font-bold ${treasury.balanceUsd >= 0 ? "text-emerald-600" : "text-red-600"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balanceUsd)} $</p>
+                      {treasury.balanceCdf !== 0 && (
+                        <p className={`text-base font-semibold ${treasury.balanceCdf >= 0 ? "text-emerald-500" : "text-red-500"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balanceCdf)} FC</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -516,12 +533,15 @@ export default function AdminTreasuryPage() {
 
               {/* Totaux filtrés */}
               {trFilterMois && (
-                <div className="flex gap-3 ml-auto text-sm">
+                <div className="flex gap-3 ml-auto text-sm flex-wrap">
                   {(treasurySubTab !== "depenses") && (
-                    <span className="text-blue-600 font-medium">Salaires : {formatCurrency(filteredTotalPayments)}</span>
+                    <span className="text-blue-600 font-medium">Salaires : {new Intl.NumberFormat("fr-FR").format(filteredTotalPayments)} $</span>
                   )}
-                  {(treasurySubTab !== "salaires") && (
-                    <span className="text-orange-600 font-medium">Dépenses : {formatCurrency(filteredTotalExpenses)}</span>
+                  {(treasurySubTab !== "salaires") && filteredTotalExpensesUsd > 0 && (
+                    <span className="text-orange-600 font-medium">Dépenses : {new Intl.NumberFormat("fr-FR").format(filteredTotalExpensesUsd)} $</span>
+                  )}
+                  {(treasurySubTab !== "salaires") && filteredTotalExpensesCdf > 0 && (
+                    <span className="text-orange-500 font-medium">Dépenses : {new Intl.NumberFormat("fr-FR").format(filteredTotalExpensesCdf)} FC</span>
                   )}
                 </div>
               )}
@@ -628,8 +648,14 @@ export default function AdminTreasuryPage() {
                       </select>
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Montant ($) *</label>
-                      <input type="number" value={expMontant} onChange={(e) => setExpMontant(e.target.value)} placeholder="0" className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`} />
+                      <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Montant *</label>
+                      <div className="flex gap-2">
+                        <input type="number" value={expMontant} onChange={(e) => setExpMontant(e.target.value)} placeholder="0" className={`flex-1 px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`} />
+                        <div className="flex rounded-xl border overflow-hidden">
+                          <button type="button" onClick={() => setExpDevise("USD")} className={`px-3 py-2 text-sm font-semibold transition-colors ${expDevise === "USD" ? "bg-green-600 text-white" : `${inputBg} ${textSecondary}`}`}>$</button>
+                          <button type="button" onClick={() => setExpDevise("CDF")} className={`px-3 py-2 text-sm font-semibold transition-colors ${expDevise === "CDF" ? "bg-blue-600 text-white" : `${inputBg} ${textSecondary}`}`}>FC</button>
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Bénéficiaire</label>
@@ -752,7 +778,7 @@ export default function AdminTreasuryPage() {
                                 </span>
                               </td>
                               <td className={`px-4 py-3 ${textColor} max-w-[250px]`}>{e.motif}</td>
-                              <td className={`px-4 py-3 font-medium text-red-500`}>{formatCurrency(e.montant)}</td>
+                              <td className={`px-4 py-3 font-medium text-red-500`}>{new Intl.NumberFormat("fr-FR").format(e.montant)} {e.devise === "CDF" ? "FC" : "$"}</td>
                               <td className={`px-4 py-3 ${textSecondary}`}>{e.beneficiaire || "—"}</td>
                               <td className={`px-4 py-3 ${textSecondary}`}>{getModePaiementLabel(e.modePaiement)}</td>
                               <td className={`px-4 py-3 ${textSecondary}`}>{formatDate(e.dateDepense)}</td>

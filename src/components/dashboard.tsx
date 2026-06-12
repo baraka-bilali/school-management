@@ -276,8 +276,8 @@ export default function Dashboard() {
   , [monthlySeries])
 
   const cardPaymentsData = useMemo(() =>
-    monthlySeries.map((r) => ({ name: r.month, value: r.paymentsUsd }))
-  , [monthlySeries])
+    monthlySeries.map((r) => ({ name: r.month, value: r.paymentsUsd + r.paymentsCdf / usdToCdfRate }))
+  , [monthlySeries, usdToCdfRate])
 
   const currentMonthUsd = useMemo(() =>
     monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsUsd : 0
@@ -286,6 +286,21 @@ export default function Dashboard() {
   const currentMonthCdf = useMemo(() =>
     monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsCdf : 0
   , [monthlySeries])
+
+  // Y-axis ticks for the payments chart (steps of 5000 USD / equivalent CDF)
+  const chartYAxis = useMemo(() => {
+    const maxUsd = Math.max(...monthlySeries.map(d => d.paymentsUsd), 0)
+    const usdStep = 5000
+    const yMaxUsd = Math.max(usdStep, Math.ceil(Math.max(maxUsd, 1) / usdStep) * usdStep)
+    const usdTicks = Array.from({ length: Math.floor(yMaxUsd / usdStep) + 1 }, (_, i) => i * usdStep)
+
+    const maxCdf = Math.max(...monthlySeries.map(d => d.paymentsCdf), 0)
+    const cdfStep = usdStep * usdToCdfRate
+    const yMaxCdf = Math.max(cdfStep, Math.ceil(Math.max(maxCdf, 1) / cdfStep) * cdfStep)
+    const cdfTicks = Array.from({ length: Math.floor(yMaxCdf / cdfStep) + 1 }, (_, i) => i * cdfStep)
+
+    return { usdTicks, yMaxUsd, cdfTicks, yMaxCdf }
+  }, [monthlySeries, usdToCdfRate])
 
   return (
     <div className={`min-h-screen ${bgPage}`}>
@@ -302,7 +317,16 @@ export default function Dashboard() {
           <TrendCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
           <TrendCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
           <TrendCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
-          <TrendCard title="Paiements (mois)" value={formatUsd(currentMonthUsd)} subValue={currentMonthCdf > 0 ? `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC` : undefined} icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
+          <TrendCard title="Paiements (mois)"
+            value={currentMonthUsd > 0 || currentMonthCdf === 0 ? formatUsd(currentMonthUsd) : `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`}
+            subValue={
+              currentMonthUsd > 0 && currentMonthCdf > 0
+                ? `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`
+                : currentMonthUsd === 0 && currentMonthCdf > 0
+                  ? "0 $"
+                  : undefined
+            }
+            icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
@@ -339,24 +363,49 @@ export default function Dashboard() {
               </div>
               <BarChart3 className={`w-4 h-4 ${textSecondary}`} />
             </div>
-            <div className="h-64">
+            <p className={`text-xs font-semibold ${textSecondary} mb-1`}>USD ($)</p>
+            <div className="h-[108px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlySeries}>
+                <BarChart data={monthlySeries} margin={{ top: 2, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis yAxisId="usd" orientation="left" stroke={palette.payment} tickFormatter={(v) => `$${Math.round(v)}`} />
-                  <YAxis yAxisId="cdf" orientation="right" stroke="#06b6d4" tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}K FC` : `${v} FC`} />
+                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tick={{ fontSize: 10 }} />
+                  <YAxis
+                    stroke={palette.payment}
+                    ticks={chartYAxis.usdTicks}
+                    domain={[0, chartYAxis.yMaxUsd]}
+                    tickFormatter={(v) => v >= 1000 ? `$${v / 1000}k` : `$${v}`}
+                    tick={{ fontSize: 10 }}
+                    width={44}
+                  />
                   <Tooltip
-                    formatter={(value: number, name: string) =>
-                      name === "paymentsUsd"
-                        ? [`${formatUsd(value)}`, "USD"]
-                        : [`${new Intl.NumberFormat("fr-FR").format(value)} FC`, "CDF"]
-                    }
+                    formatter={(value: number) => [formatUsd(value), "USD"]}
                     labelFormatter={(label: string) => `Mois: ${label}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Bar yAxisId="usd" dataKey="paymentsUsd" radius={[6, 6, 0, 0]} fill={palette.payment} name="paymentsUsd" />
-                  <Bar yAxisId="cdf" dataKey="paymentsCdf" radius={[6, 6, 0, 0]} fill="#06b6d4" name="paymentsCdf" />
+                  <Bar dataKey="paymentsUsd" radius={[4, 4, 0, 0]} fill={palette.payment} name="USD" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className={`text-xs font-semibold ${textSecondary} mt-3 mb-1`}>Francs congolais (FC)</p>
+            <div className="h-[108px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlySeries} margin={{ top: 2, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tick={{ fontSize: 10 }} />
+                  <YAxis
+                    stroke="#06b6d4"
+                    ticks={chartYAxis.cdfTicks}
+                    domain={[0, chartYAxis.yMaxCdf]}
+                    tickFormatter={(v) => v >= 1000000 ? `${Math.round(v / 1000000)}M` : v >= 1000 ? `${Math.round(v / 1000)}K` : `${v}`}
+                    tick={{ fontSize: 10 }}
+                    width={44}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${new Intl.NumberFormat("fr-FR").format(value)} FC`, "CDF"]}
+                    labelFormatter={(label: string) => `Mois: ${label}`}
+                    contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
+                  />
+                  <Bar dataKey="paymentsCdf" radius={[4, 4, 0, 0]} fill="#06b6d4" name="CDF" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

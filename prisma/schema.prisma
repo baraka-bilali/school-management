@@ -391,6 +391,7 @@ model SchoolExpense {
   categorie     ExpenseCategory @default(AUTRE)
   motif         String          @db.Text
   montant       Float
+  devise        Devise          @default(USD)
   beneficiaire  String?
   modePaiement  ModePaiement    @default(CASH)
   reference     String?
@@ -402,6 +403,7 @@ model SchoolExpense {
   @@index([schoolId])
   @@index([dateDepense])
   @@index([schoolId, categorie])
+  @@index([schoolId, devise])
 }
 
 enum PaymentType {

@@ -25,8 +25,10 @@ export async function GET(req: NextRequest) {
           totalIncomeUsd: 0,
           totalIncomeCdf: 0,
           totalTeacherPayments: 0,
-          totalExpenses: 0,
-          balance: 0,
+          totalExpensesUsd: 0,
+          totalExpensesCdf: 0,
+          balanceUsd: 0,
+          balanceCdf: 0,
           teacherPayments: [],
           expenses: [],
           teachers: [],
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Revenus : total des paiements élèves — séparé par devise
-    const [incomeAggUsd, incomeAggCdf] = await Promise.all([
+    const [incomeAggUsd, incomeAggCdf, teacherPaymentsAgg, expensesAggUsd, expensesAggCdf] = await Promise.all([
       prisma.paiement.aggregate({
         where: {
           schoolId: user.schoolId,
@@ -52,59 +54,65 @@ export async function GET(req: NextRequest) {
         },
         _sum: { montant: true },
       }),
+      // Salaires professeurs (en USD)
+      prisma.teacherPayment.aggregate({
+        where: { schoolId: user.schoolId },
+        _sum: { montant: true },
+      }),
+      // Dépenses USD
+      prisma.schoolExpense.aggregate({
+        where: { schoolId: user.schoolId, devise: "USD" },
+        _sum: { montant: true },
+      }),
+      // Dépenses CDF
+      prisma.schoolExpense.aggregate({
+        where: { schoolId: user.schoolId, devise: "CDF" },
+        _sum: { montant: true },
+      }),
     ])
+
     const totalIncomeUsd = incomeAggUsd._sum.montant ?? 0
     const totalIncomeCdf = incomeAggCdf._sum.montant ?? 0
-
-    // Salaires professeurs
-    const teacherPaymentsAgg = await prisma.teacherPayment.aggregate({
-      where: { schoolId: user.schoolId },
-      _sum: { montant: true },
-    })
     const totalTeacherPayments = teacherPaymentsAgg._sum.montant ?? 0
+    const totalExpensesUsd = expensesAggUsd._sum.montant ?? 0
+    const totalExpensesCdf = expensesAggCdf._sum.montant ?? 0
 
-    // Dépenses
-    const expensesAgg = await prisma.schoolExpense.aggregate({
-      where: { schoolId: user.schoolId },
-      _sum: { montant: true },
-    })
-    const totalExpenses = expensesAgg._sum.montant ?? 0
+    const balanceUsd = totalIncomeUsd - totalTeacherPayments - totalExpensesUsd
+    const balanceCdf = totalIncomeCdf - totalExpensesCdf
 
-    const balance = totalIncomeUsd - totalTeacherPayments - totalExpenses
-
-    // Derniers paiements profs
-    const teacherPayments = await prisma.teacherPayment.findMany({
-      where: { schoolId: user.schoolId },
-      include: {
-        teacher: {
-          select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
+    // Derniers paiements profs + dépenses + liste profs en parallèle
+    const [teacherPayments, expenses, teachers] = await Promise.all([
+      prisma.teacherPayment.findMany({
+        where: { schoolId: user.schoolId },
+        include: {
+          teacher: {
+            select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
+          },
         },
-      },
-      orderBy: { datePaiement: "desc" },
-      take: 50,
-    })
-
-    // Dernières dépenses
-    const expenses = await prisma.schoolExpense.findMany({
-      where: { schoolId: user.schoolId },
-      orderBy: { dateDepense: "desc" },
-      take: 50,
-    })
-
-    // Liste des profs
-    const teachers = await prisma.teacher.findMany({
-      where: { user: { schoolId: user.schoolId } },
-      select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
-      orderBy: { lastName: "asc" },
-    })
+        orderBy: { datePaiement: "desc" },
+        take: 50,
+      }),
+      prisma.schoolExpense.findMany({
+        where: { schoolId: user.schoolId },
+        orderBy: { dateDepense: "desc" },
+        take: 50,
+      }),
+      prisma.teacher.findMany({
+        where: { user: { schoolId: user.schoolId } },
+        select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
+        orderBy: { lastName: "asc" },
+      }),
+    ])
 
     return NextResponse.json({
       data: {
         totalIncomeUsd,
         totalIncomeCdf,
         totalTeacherPayments,
-        totalExpenses,
-        balance,
+        totalExpensesUsd,
+        totalExpensesCdf,
+        balanceUsd,
+        balanceCdf,
         teacherPayments: teacherPayments.map((tp) => ({
           id: tp.id,
           teacherId: tp.teacherId,
@@ -123,6 +131,7 @@ export async function GET(req: NextRequest) {
           categorie: e.categorie,
           motif: e.motif,
           montant: e.montant,
+          devise: e.devise,
           beneficiaire: e.beneficiaire,
           modePaiement: e.modePaiement,
           reference: e.reference,

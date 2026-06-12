@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       categorie: e.categorie,
       motif: e.motif,
       montant: e.montant,
+      devise: e.devise,
       beneficiaire: e.beneficiaire,
       modePaiement: e.modePaiement,
       reference: e.reference,
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
 
     const body = await req.json()
-    const { categorie, motif, montant, beneficiaire, modePaiement, reference } = body
+    const { categorie, motif, montant, beneficiaire, modePaiement, reference, devise } = body
 
     if (!motif || !montant) {
       return NextResponse.json(
@@ -66,12 +67,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const validDevises = ["USD", "CDF"]
+    const selectedDevise = validDevises.includes(devise) ? devise : "USD"
+
     const expense = await prisma.schoolExpense.create({
       data: {
         schoolId: user.schoolId,
         categorie: categorie || "AUTRE",
         motif,
         montant: parseFloat(montant),
+        devise: selectedDevise,
         beneficiaire: beneficiaire || null,
         modePaiement: modePaiement || "CASH",
         reference: reference || null,
