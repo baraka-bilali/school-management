@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
+import dynamic from "next/dynamic"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import {
@@ -35,8 +36,15 @@ import {
   Filter,
   ArrowUpDown,
   SlidersHorizontal,
+  Printer,
 } from "lucide-react"
 import Portal from "@/components/portal"
+import type { ReceiptData } from "@/components/receipt-pdf"
+
+const ReceiptDownloadButton = dynamic(
+  () => import("@/components/receipt-download-button"),
+  { ssr: false }
+)
 
 // ============================================================
 // TYPES
@@ -1284,8 +1292,20 @@ function PaymentFormModal({
     studentName: string
     id: number
   } | null>(null)
+  const [receiptPdfData, setReceiptPdfData] = useState<ReceiptData | null>(null)
 
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  // Fetch receipt data for PDF when payment succeeds
+  useEffect(() => {
+    if (success && createdPayment) {
+      setReceiptPdfData(null)
+      fetch(`/api/admin/fees/paiements/${createdPayment.id}/receipt`)
+        .then(r => r.json())
+        .then(({ data }) => setReceiptPdfData(data as ReceiptData))
+        .catch(console.error)
+    }
+  }, [success, createdPayment])
 
   // Couleurs
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
@@ -1447,97 +1467,86 @@ function PaymentFormModal({
 
             {/* === SUCCÈS === */}
             {success && createdPayment && (
-              <div className="text-center py-4 space-y-4">
-                <div className="w-20 h-20 bg-green-500/15 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-10 h-10 text-green-500" />
-                </div>
-                <div>
+              <div className="py-4">
+                {/* Icône succès */}
+                <div className="flex flex-col items-center mb-5">
+                  <div className="w-20 h-20 bg-green-500/15 rounded-full flex items-center justify-center mb-3">
+                    <CheckCircle className="w-10 h-10 text-green-500" />
+                  </div>
                   <h4 className={`text-xl font-bold ${textColor}`}>Paiement enregistré !</h4>
-                  <p className={`${textSecondary} mt-1`}>{createdPayment.studentName}</p>
+                  <p className={`${textSecondary} mt-1 text-sm`}>{createdPayment.studentName}</p>
                 </div>
 
-                <div className={`p-4 rounded-xl ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"} space-y-2`}>
+                {/* Récapitulatif */}
+                <div className={`rounded-2xl ${theme === "dark" ? "bg-gray-700/50 border border-gray-600" : "bg-gray-50 border border-gray-200"} p-4 mb-5 space-y-2.5`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${textSecondary}`}>N° Reçu</span>
-                    <span className={`font-mono font-bold ${textColor}`}>{createdPayment.numeroRecu}</span>
+                    <span className={`font-mono font-bold text-sm ${textColor}`}>{createdPayment.numeroRecu}</span>
                   </div>
+                  <div className={`border-t ${theme === "dark" ? "border-gray-600" : "border-gray-200"}`} />
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${textSecondary}`}>Montant</span>
-                    <span className="text-lg font-bold text-green-500">{formatMontant(createdPayment.montant, createdPayment.devise)}</span>
+                    <span className="text-xl font-bold text-green-500">{formatMontant(createdPayment.montant, createdPayment.devise)}</span>
                   </div>
                 </div>
 
-                <div className="flex gap-3 mt-4">
+                {/* Boutons principaux */}
+                <div className="grid grid-cols-3 gap-2.5 mb-3">
                   <button
                     onClick={onClose}
-                    className={`flex-1 px-4 py-2.5 rounded-xl border ${borderColor} ${textColor} font-medium text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
+                    className={`col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 ${theme === "dark" ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-600 hover:bg-gray-100"} font-medium text-sm transition-colors`}
                   >
+                    <X className="w-4 h-4" />
                     Fermer
                   </button>
-                  <button
-                    onClick={async () => {
-                      if (!createdPayment) return
-                      // Ouvrir la fenêtre AVANT le fetch pour éviter le popup blocker
-                      const w = window.open("", "_blank", "width=700,height=900")
-                      if (!w) {
-                        alert("Veuillez autoriser les popups pour imprimer le reçu")
-                        return
-                      }
-                      try {
-                        const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}?receipt=1`)
-                        if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
-                        const { data } = await res.json()
 
-                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} ${data.devise === "CDF" ? "FC" : "$"}</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Imprimé le ${new Date().toLocaleString()}</div></body></html>`
+                  {receiptPdfData ? (
+                    <ReceiptDownloadButton
+                      data={receiptPdfData}
+                      className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium text-sm transition-colors w-full"
+                    />
+                  ) : (
+                    <button disabled className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-400 text-white font-medium text-sm cursor-wait">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>PDF…</span>
+                    </button>
+                  )}
 
-                        w.document.write(html)
-                        w.document.close()
-                        w.focus()
-                        setTimeout(() => { w.print() }, 300)
-                      } catch (err) {
-                        console.error(err)
-                        w.close()
-                        alert(err instanceof Error ? err.message : "Erreur lors de la génération du reçu")
-                      }
-                    }}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors"
-                  >
-                    Imprimer le reçu
-                  </button>
-                  <button
-                    title="Télécharger le reçu"
-                    onClick={async () => {
-                      if (!createdPayment) return
-                      try {
-                        const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}?receipt=1`)
-                        if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
-                        const { data } = await res.json()
-
-                        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>body{font-family:Inter,Arial,Helvetica,sans-serif;padding:24px;color:#111} .header{display:flex;justify-content:space-between;align-items:center} .brand{font-weight:700} .box{border:1px solid #e5e7eb;padding:16px;border-radius:8px;margin-top:12px} .row{display:flex;justify-content:space-between;margin-bottom:8px} .muted{color:#6b7280;font-size:0.9rem}</style></head><body><div class="header"><div><div class="brand">Reçu de paiement</div><div class="muted">${data.anneeScolaire}</div></div><div><strong>${data.numeroRecu}</strong></div></div><div class="box"><div class="row"><div class="muted">Élève</div><div>${data.eleve.nom} (${data.eleve.code})</div></div><div class="row"><div class="muted">Classe</div><div>${data.classe}</div></div><div class="row"><div class="muted">Type</div><div>${data.typeFrais}</div></div><div class="row"><div class="muted">Date</div><div>${new Date(data.datePaiement).toLocaleString()}</div></div><div class="row"><div class="muted">Mode</div><div>${data.modePaiement}</div></div><div class="row"><div class="muted">Référence</div><div>${data.reference || '—'}</div></div><div class="row" style="margin-top:12px;font-size:1.1rem;font-weight:700"><div>Total</div><div>${data.montant} ${data.devise === "CDF" ? "FC" : "$"}</div></div></div><div style="margin-top:18px;font-size:0.9rem;color:#6b7280">Téléchargé le ${new Date().toLocaleString()}</div></body></html>`
-
-                        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement("a")
-                        a.href = url
-                        a.download = `recu-${data.numeroRecu}.html`
-                        a.click()
-                        URL.revokeObjectURL(url)
-                      } catch (err) {
-                        console.error(err)
-                        alert(err instanceof Error ? err.message : "Erreur lors du téléchargement du reçu")
-                      }
-                    }}
-                    className="px-3 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
                   <button
                     onClick={onSuccess}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition-colors"
+                    className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition-colors"
                   >
-                    Nouveau paiement
+                    <Plus className="w-4 h-4" />
+                    Nouveau
                   </button>
                 </div>
+
+                {/* Imprimer (secondaire) */}
+                <button
+                  onClick={async () => {
+                    if (!createdPayment) return
+                    const w = window.open("", "_blank", "width=700,height=900")
+                    if (!w) { alert("Veuillez autoriser les popups pour imprimer le reçu"); return }
+                    try {
+                      const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}/receipt`)
+                      if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
+                      const { data } = await res.json()
+                      const devise = data.devise === "CDF" ? "FC" : "$"
+                      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:600px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #16a34a;padding-bottom:16px;margin-bottom:20px}.title{font-size:22px;font-weight:800;letter-spacing:2px}.recu-num{color:#16a34a;font-weight:700;margin-top:4px}.badge{background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;margin-top:6px;display:inline-block}.meta{text-align:right;font-size:13px}.label{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}.parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.party-box{background:#f9fafb;border-radius:8px;padding:12px}.table{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px}.thead{display:flex;justify-content:space-between;background:#f3f4f6;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280}.trow{display:flex;justify-content:space-between;padding:12px;border-bottom:1px solid #f3f4f6}.tfooter{display:flex;justify-content:space-between;padding:10px 12px;background:#f0fdf4;font-weight:700;font-size:15px;color:#16a34a}.amount{font-weight:700;font-size:14px}.footer{margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px;text-align:center;font-size:11px;color:#9ca3af}@media print{body{padding:16px}}</style></head><body><div class="header"><div><div class="title">REÇU DE PAIEMENT</div><div class="recu-num">${data.numeroRecu}</div><div class="badge">PAYÉ</div></div><div class="meta"><div class="label">Date d'émission</div><div style="font-weight:700">${new Date(data.datePaiement).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}</div><div class="label" style="margin-top:10px">Année scolaire</div><div style="font-weight:700">${data.anneeScolaire}</div></div></div><div class="parties"><div class="party-box"><div class="label">Établissement</div><div style="font-weight:700;font-size:14px">${data.schoolName || "École"}</div></div><div class="party-box"><div class="label">Élève</div><div style="font-weight:700;font-size:14px">${data.eleve.nom}</div><div style="color:#4b5563;margin-top:2px">Code : ${data.eleve.code}</div><div style="color:#4b5563">Classe : ${data.classe}</div></div></div><div class="table"><div class="thead"><span>Description</span><span>Montant</span></div><div class="trow"><div><div style="font-weight:700">${data.typeFrais}</div><div style="color:#6b7280;font-size:12px;margin-top:3px">${data.classe} — ${data.anneeScolaire}</div></div><div class="amount">${new Intl.NumberFormat("fr-FR").format(data.montant)} ${devise}</div></div><div class="tfooter"><span>TOTAL</span><span>${new Intl.NumberFormat("fr-FR").format(data.montant)} ${devise}</span></div></div><div style="display:flex;gap:24px;margin-bottom:16px"><div><div class="label">Mode de paiement</div><div style="font-weight:700">${data.modePaiement}</div></div><div><div class="label">Référence</div><div style="font-weight:700">${data.reference || "—"}</div></div></div>${data.notes ? `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:10px;margin-bottom:12px"><div class="label" style="color:#92400e">Notes</div><div style="color:#78350f;font-size:12px">${data.notes}</div></div>` : ""}<div class="footer"><div>${data.schoolName || "École"} — Ce document tient lieu de reçu officiel de paiement</div><div style="margin-top:4px">Imprimé le ${new Date().toLocaleDateString("fr-FR")} — Système DigiSchool</div></div></body></html>`
+                      w.document.write(html)
+                      w.document.close()
+                      w.focus()
+                      setTimeout(() => { w.print() }, 300)
+                    } catch (err) {
+                      w.close()
+                      alert(err instanceof Error ? err.message : "Erreur lors de l'impression")
+                    }
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200 hover:border-gray-500" : "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400"} text-sm transition-colors`}
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimer le reçu
+                </button>
               </div>
             )}
 

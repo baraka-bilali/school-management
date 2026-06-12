@@ -122,6 +122,11 @@ export async function getReceiptData(paiementId: number) {
     throw new Error(`Paiement #${paiementId} introuvable`)
   }
 
+  const school = await prisma.school.findUnique({
+    where: { id: paiement.schoolId },
+    select: { nomEtablissement: true },
+  })
+
   return {
     numeroRecu: paiement.numeroRecu,
     datePaiement: paiement.datePaiement,
@@ -138,5 +143,6 @@ export async function getReceiptData(paiementId: number) {
     anneeScolaire: paiement.tarification.year.name,
     notes: paiement.notes,
     isAnnule: paiement.isAnnule,
+    schoolName: school?.nomEtablissement ?? "",
   }
 }
