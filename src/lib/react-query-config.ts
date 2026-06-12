@@ -52,12 +52,12 @@ export const queryClient = new QueryClient({
 // Utilisez ces configs pour des besoins spécifiques
 
 export const QUERY_CONFIGS = {
-  // Dashboard - Données rarement modifiées, long cache
+  // Dashboard - Paiements en temps quasi-réel, cache court
   dashboard: {
-    staleTime: 5 * 60 * 1000, // 5 min
-    gcTime: 15 * 60 * 1000, // 15 min - garde plus longtemps
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000, // 1 min
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   },
   
   // Fees - Changements fréquents, cache court
