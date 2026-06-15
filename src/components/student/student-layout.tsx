@@ -8,6 +8,8 @@ import { supabaseBrowser } from "@/lib/supabase-client"
 import { playBing } from "@/lib/play-bing"
 import { cn } from "@/lib/utils"
 import StudentHeader from "./student-header"
+import StudentDesktopHeader from "./student-desktop-header"
+import StudentSidebar from "./student-sidebar"
 import StudentBottomNav from "./student-bottom-nav"
 import { useStudentTheme } from "./use-student-theme"
 
@@ -17,6 +19,10 @@ interface StudentLayoutProps {
 
 interface StudentContext {
   firstName: string
+  lastName: string
+  middleName: string
+  fullName: string
+  className?: string
   school: string
   photoUrl: string | null
   isPremium: boolean
@@ -31,7 +37,7 @@ const menuLinks = [
 
 export default function StudentLayout({ children }: StudentLayoutProps) {
   const pathname = usePathname()
-  const { isDark, bg } = useStudentTheme()
+  const { isDark, bg, desktopBg } = useStudentTheme()
   const [menuOpen, setMenuOpen] = useState(false)
   const [student, setStudent] = useState<StudentContext | null>(null)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
@@ -39,6 +45,20 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const [schoolId, setSchoolId] = useState<number | null>(null)
   const [feePulse, setFeePulse] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    const saved = localStorage.getItem("student-sidebar-open")
+    if (saved !== null) setSidebarOpen(saved === "true")
+  }, [])
+
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => {
+      const next = !prev
+      localStorage.setItem("student-sidebar-open", String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,8 +71,13 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
         if (res.ok) {
           const data = await res.json()
           const s = data.student
+          const fullName = `${s.lastName} ${s.middleName || ""} ${s.firstName}`.replace(/\s+/g, " ").trim()
           setStudent({
             firstName: s.firstName,
+            lastName: s.lastName,
+            middleName: s.middleName || "",
+            fullName,
+            className: s.class,
             school: s.school || "Mon école",
             photoUrl: s.photoUrl || null,
             isPremium: s.isPremium === true,
@@ -162,26 +187,57 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const showMenuButton = pathname === "/student"
   const totalUnread = unreadCommuniques + unreadNotifications
 
+  const sidebarProfile = student
+    ? {
+        school: student.school,
+        fullName: student.fullName,
+        firstName: student.firstName,
+        className: student.className,
+        photoUrl: student.photoUrl,
+      }
+    : null
+
   return (
-    <div className={cn("min-h-screen transition-colors", bg)}>
-      <StudentHeader
-        schoolName={student?.school}
-        photoUrl={student?.photoUrl}
-        firstName={student?.firstName}
-        showMenu={showMenuButton}
-        onMenuClick={() => setMenuOpen(true)}
-        unreadCount={totalUnread}
+    <div className={cn("min-h-screen transition-colors lg:flex", bg, desktopBg)}>
+      <StudentSidebar
+        profile={sidebarProfile}
+        open={sidebarOpen}
+        unreadMessages={totalUnread}
+        feePulse={feePulse}
+        onLogout={handleLogout}
+        loggingOut={loggingOut}
         isDark={isDark}
       />
 
-      <main className="mx-auto max-w-lg px-4 pb-28 pt-2">
-        <RouteTransition>{children}</RouteTransition>
-      </main>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <StudentHeader
+          schoolName={student?.school}
+          photoUrl={student?.photoUrl}
+          firstName={student?.firstName}
+          showMenu={showMenuButton}
+          onMenuClick={() => setMenuOpen(true)}
+          unreadCount={totalUnread}
+          isDark={isDark}
+        />
 
-      <StudentBottomNav feePulse={feePulse} />
+        <StudentDesktopHeader
+          photoUrl={student?.photoUrl}
+          firstName={student?.firstName}
+          unreadCount={totalUnread}
+          isDark={isDark}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={toggleSidebar}
+        />
+
+        <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-2 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6 xl:max-w-6xl xl:px-8">
+          <RouteTransition>{children}</RouteTransition>
+        </main>
+
+        <StudentBottomNav feePulse={feePulse} />
+      </div>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
           <aside className={cn("absolute left-0 top-0 flex h-full w-72 flex-col shadow-2xl", isDark ? "bg-gray-900" : "bg-white")}>
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">

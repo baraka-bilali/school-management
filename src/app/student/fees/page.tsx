@@ -85,7 +85,7 @@ export default function StudentFeesPage() {
   const cdfSummary = balance?.cdf
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 lg:space-y-8">
       {paymentToast && (
         <div className="rounded-2xl bg-green-500 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg">
           {paymentToast}
@@ -94,13 +94,16 @@ export default function StudentFeesPage() {
 
       <div className="flex items-start justify-between">
         <div>
-          <h1 className={cn("text-2xl font-bold tracking-tight", text)}>Frais scolaires</h1>
-          <p className={cn("mt-1 text-sm", textMuted)}>Gérez vos paiements et consultez votre solde</p>
+          <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Frais scolaires</h1>
+          <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>
+            Gérez vos paiements et consultez votre solde en temps réel.
+          </p>
         </div>
         {refreshing && <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />}
       </div>
 
-      <div className={cn("relative overflow-hidden rounded-2xl border p-5", card, border, shadow)}>
+      <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+      <div className={cn("relative overflow-hidden rounded-2xl border p-5 lg:col-span-2 lg:p-6", card, border, shadow)}>
         <div className="mb-4 flex items-start justify-between">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
             <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -118,21 +121,22 @@ export default function StudentFeesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
+      <div className="grid grid-cols-2 gap-3 lg:contents">
+        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
           <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-green-50 dark:bg-green-500/10">
             <CheckCircle className="h-4 w-4 text-green-600" />
           </div>
           <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Payé</p>
-          <p className="mt-1 text-xl font-bold text-green-600">{formatMoney(summary.totalPaye, summary.devise)}</p>
+          <p className="mt-1 text-xl font-bold text-green-600 lg:text-2xl">{formatMoney(summary.totalPaye, summary.devise)}</p>
         </div>
-        <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
+        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
           <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
             <AlertCircle className="h-4 w-4 text-red-500" />
           </div>
           <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Solde</p>
-          <p className="mt-1 text-xl font-bold text-red-500">{formatMoney(summary.solde, summary.devise)}</p>
+          <p className="mt-1 text-xl font-bold text-red-500 lg:text-2xl">{formatMoney(summary.solde, summary.devise)}</p>
         </div>
+      </div>
       </div>
 
       <section>
@@ -156,26 +160,31 @@ export default function StudentFeesPage() {
             </p>
           </div>
         ) : (
-          <div className={cn("space-y-2 overflow-hidden rounded-2xl border", card, border, shadow)}>
+          <div className={cn("space-y-2 overflow-hidden rounded-2xl border lg:space-y-0", card, border, shadow)}>
             {paiements.map((p) => (
-              <div key={p.id} className={cn("border-b p-4 last:border-0", border)}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className={cn("text-sm font-semibold", text)}>{p.typeFrais}</p>
-                    <p className={cn("text-xs", textMuted)}>Reçu n° {p.numeroRecu}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <p className="text-sm font-bold text-green-600">{formatMoney(p.montant, p.devise)}</p>
-                    <StudentReceiptDownload paiementId={p.id} />
-                  </div>
+              <div key={p.id} className={cn("border-b p-4 last:border-0 lg:flex lg:items-center lg:gap-4 lg:p-5", border)}>
+                <div className="mb-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 lg:mb-0">
+                  <Receipt className="h-5 w-5 text-indigo-500" />
                 </div>
-                <p className={cn("mt-1 text-xs", textMuted)}>
-                  {new Date(p.datePaiement).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2 lg:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-sm font-semibold", text)}>{p.typeFrais}</p>
+                      <p className={cn("text-xs", textMuted)}>Reçu n° {p.numeroRecu}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 lg:gap-4">
+                      <p className="text-sm font-bold text-green-600 lg:text-base">{formatMoney(p.montant, p.devise)}</p>
+                      <StudentReceiptDownload paiementId={p.id} />
+                    </div>
+                  </div>
+                  <p className={cn("mt-1 text-xs", textMuted)}>
+                    {new Date(p.datePaiement).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

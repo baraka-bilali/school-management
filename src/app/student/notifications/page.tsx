@@ -134,14 +134,14 @@ function NotificationsHubContent() {
   const unreadComm = communiques.filter((c) => !c.isRead).length
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:space-y-6">
       <div>
-        <h1 className={cn("text-2xl font-bold tracking-tight", text)}>Messages</h1>
-        <p className={cn("mt-1 text-sm", textMuted)}>Notifications et communiqués de votre école</p>
+        <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Messages</h1>
+        <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>Notifications et communiqués de votre école</p>
       </div>
 
       {/* Onglets */}
-      <div className={cn("flex gap-1 rounded-2xl border p-1", card, border)}>
+      <div className={cn("flex gap-1 rounded-2xl border p-1 lg:max-w-md", card, border)}>
         <button
           type="button"
           onClick={() => setTab("notifications")}
@@ -266,6 +266,19 @@ function NotificationsHubContent() {
               </Link>
             ))
           )}
+        </div>
+      )}
+
+      {/* Footer info — desktop */}
+      {tab === "communiques" && !loadingComm && communiques.length > 0 && (
+        <div className="hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-600/10 to-violet-600/10 p-6 lg:flex lg:items-center lg:justify-between">
+          <div className="max-w-lg">
+            <h3 className={cn("text-lg font-bold", text)}>Restez informé</h3>
+            <p className={cn("mt-2 text-sm leading-relaxed", textMuted)}>
+              Toutes les informations importantes pour vous sont centralisées ici. Consultez régulièrement vos communiqués.
+            </p>
+          </div>
+          <Megaphone className="h-16 w-16 text-indigo-500/30" />
         </div>
       )}
     </div>

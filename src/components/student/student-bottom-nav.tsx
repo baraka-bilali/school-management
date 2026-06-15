@@ -2,15 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutGrid, Wallet, ClipboardList, User } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const navItems = [
-  { href: "/student", label: "Accueil", icon: LayoutGrid, match: (p: string) => p === "/student" },
-  { href: "/student/fees", label: "Frais", icon: Wallet, match: (p: string) => p.startsWith("/student/fees") },
-  { href: "/student/tasks", label: "Tâches", icon: ClipboardList, match: (p: string) => p.startsWith("/student/tasks") },
-  { href: "/student/settings", label: "Profil", icon: User, match: (p: string) => p.startsWith("/student/settings") },
-]
+import { studentMobileNavItems } from "./student-nav"
 
 interface StudentBottomNavProps {
   feePulse?: boolean
@@ -20,11 +13,12 @@ export default function StudentBottomNav({ feePulse = false }: StudentBottomNavP
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md dark:border-gray-800 dark:bg-gray-950/95">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md dark:border-gray-800 dark:bg-gray-950/95 lg:hidden">
       <div className="mx-auto flex max-w-lg items-center justify-around py-2">
-        {navItems.map(({ href, label, icon: Icon, match }) => {
+        {studentMobileNavItems.map(({ href, label, icon: Icon, match, badgeKey }) => {
           const active = match(pathname)
-          const showFeePulse = feePulse && href === "/student/fees" && !active
+          const showFeePulse = feePulse && badgeKey === "fees" && !active
+
           return (
             <Link
               key={href}

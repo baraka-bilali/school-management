@@ -36,10 +36,11 @@ export function useStudentTheme() {
     isDark,
     toggleTheme,
     bg: isDark ? "bg-gray-950" : "bg-[#eef2f9]",
-    card: isDark ? "bg-gray-900" : "bg-white",
+    desktopBg: isDark ? "lg:bg-[#0a0a12]" : "lg:bg-[#eef2f9]",
+    card: isDark ? "bg-gray-900 lg:bg-[#1c1c24]" : "bg-white",
     text: isDark ? "text-gray-100" : "text-gray-900",
     textMuted: isDark ? "text-gray-400" : "text-gray-500",
-    border: isDark ? "border-gray-800" : "border-gray-100",
+    border: isDark ? "border-gray-800 lg:border-white/5" : "border-gray-100",
     shadow: isDark ? "shadow-none" : "shadow-sm shadow-gray-200/60",
   }
 }

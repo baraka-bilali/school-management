@@ -125,48 +125,66 @@ export default function StudentDashboard() {
   if (loading) return <StudentLoading />
 
   return (
-    <div className="space-y-5">
-      {/* Salutation — sous la barre de navigation */}
+    <div className="space-y-5 lg:space-y-8">
+      {/* Salutation */}
       {studentInfo && (
-        <p className={cn("text-xl font-bold tracking-tight", text)}>
-          {getGreeting()}, {studentInfo.firstName}
-        </p>
+        <div>
+          <p className={cn("text-xl font-bold tracking-tight lg:text-3xl", text)}>
+            {getGreeting()}, {studentInfo.firstName}
+          </p>
+          <p className={cn("mt-1 hidden text-sm lg:block", textMuted)}>
+            Prêt pour vos cours de demain ?
+          </p>
+        </div>
       )}
 
       {/* Cartes rapides : QR + Frais */}
-      <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
         <div
           className={cn(
-            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-3",
+            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-3 lg:min-w-0 lg:p-6",
             card,
             border,
             shadow
           )}
         >
           {qrValue && (
-            <div className="mb-2 rounded-xl bg-white p-1.5 shadow-sm">
-              <QRCodeSVG value={qrValue} size={56} level="M" />
-            </div>
+            <>
+              <div className="mb-2 rounded-xl bg-white p-1.5 shadow-sm lg:hidden">
+                <QRCodeSVG value={qrValue} size={56} level="M" />
+              </div>
+              <div className="mb-4 hidden rounded-xl bg-white p-3 shadow-sm lg:block">
+                <QRCodeSVG value={qrValue} size={120} level="M" />
+              </div>
+            </>
           )}
-          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400">MON QR</p>
-          <p className={cn("mt-0.5 text-center text-[10px]", textMuted)}>Code {studentInfo?.code}</p>
+          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400 lg:text-xs">MON QR CODE</p>
+          <p className={cn("mt-0.5 text-center text-[10px] lg:text-sm", textMuted)}>Identifiant numérique · Code {studentInfo?.code}</p>
         </div>
 
         <button
           type="button"
           onClick={() => router.push("/student/fees")}
           className={cn(
-            "min-w-[9.5rem] shrink-0 rounded-2xl border p-4 text-left transition-transform active:scale-[0.98]",
+            "min-w-[9.5rem] shrink-0 rounded-2xl border p-4 text-left transition-transform active:scale-[0.98] lg:min-w-0 lg:p-6",
             card,
             border,
             shadow
           )}
         >
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-            <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <div className="mb-3 flex items-start justify-between">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 lg:h-12 lg:w-12">
+              <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400 lg:h-6 lg:w-6" />
+            </div>
+            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-500/10 dark:text-green-400">
+              PAYÉ
+            </span>
           </div>
-          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400">FRAIS SCOLAIRES</p>
-          <p className={cn("mt-0.5 text-xs", textMuted)}>Paiements à jour</p>
+          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400 lg:text-xs">FRAIS SCOLAIRES</p>
+          <p className={cn("mt-0.5 text-xs lg:text-base lg:font-medium", text)}>Paiements à jour</p>
+          <div className="mt-4 hidden h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 lg:block">
+            <div className="h-full w-4/5 rounded-full bg-indigo-600" />
+          </div>
         </button>
       </div>
 
@@ -215,6 +233,8 @@ export default function StudentDashboard() {
         </div>
       </section>
 
+      {/* Tâches + Communiqués — 2 colonnes sur desktop */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
       {/* Mes tâches */}
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -267,6 +287,7 @@ export default function StudentDashboard() {
           </div>
         )}
       </section>
+      </div>
     </div>
   )
 }

@@ -175,38 +175,50 @@ export default function StudentSettingsPage() {
   if (loadingProfile) return <StudentLoading />
 
   return (
-    <div className="space-y-5">
-      <div className="text-center pt-2">
-        <h1 className={cn("text-xl font-bold", text)}>{fullName || "Mon profil"}</h1>
-        {student?.class && <p className={cn("mt-1 text-sm", textMuted)}>{student.class}</p>}
+    <div className="space-y-5 lg:space-y-8">
+      {/* En-tête profil — centré sur desktop */}
+      <div className="text-center pt-2 lg:pt-4">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600 text-2xl font-bold text-white lg:h-24 lg:w-24 lg:text-3xl">
+          {student?.firstName?.charAt(0)?.toUpperCase() || "É"}
+        </div>
+        <h1 className={cn("text-xl font-bold lg:text-2xl", text)}>{fullName || "Mon profil"}</h1>
+        {student?.class && <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>{student.class}</p>}
+        {student && (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider", isDark ? "bg-white/10 text-gray-300" : "bg-gray-100 text-gray-600")}>
+              Actif
+            </span>
+            {student.year && (
+              <span className="rounded-full bg-indigo-600/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                Session {student.year}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {student ? (
         <>
           <SectionCard icon={User} iconBg="bg-blue-50 dark:bg-blue-500/10" iconColor="text-blue-600" title="Informations officielles">
-            <div className="space-y-4">
-              <InfoField label="Nom complet" value={fullName} />
-              <div className="grid grid-cols-2 gap-4">
-                <InfoField label="Code élève" value={student.code} />
-                <InfoField label="Classe" value={student.class || "—"} />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoField label="Nom complet" value={fullName} className="sm:col-span-2 lg:col-span-3" />
+              <InfoField label="Code élève" value={student.code} />
+              <InfoField label="Classe" value={student.class || "—"} />
               <InfoField label="Email" value={student.email} />
-              <div className="grid grid-cols-2 gap-4">
-                <InfoField label="Genre" value={genderLabel} />
-                <InfoField
-                  label="Date de naissance"
-                  value={student.birthDate ? new Date(student.birthDate).toLocaleDateString("fr-FR") : "—"}
-                />
-              </div>
+              <InfoField label="Genre" value={genderLabel} />
+              <InfoField
+                label="Date de naissance"
+                value={student.birthDate ? new Date(student.birthDate).toLocaleDateString("fr-FR") : "—"}
+              />
               {student.year && <InfoField label="Année scolaire" value={student.year} />}
             </div>
           </SectionCard>
 
           <SectionCard icon={User} iconBg="bg-slate-50 dark:bg-slate-500/10" iconColor="text-slate-600" title="Informations personnelles">
-            <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <InfoField label="Lieu de naissance" value={student.birthPlace || "—"} />
               <InfoField label="Nationalité" value={student.nationality || "—"} />
-              <InfoField label="Adresse" value={student.address || "—"} />
+              <InfoField label="Adresse" value={student.address || "—"} className="sm:col-span-2" />
             </div>
           </SectionCard>
 
@@ -244,7 +256,7 @@ export default function StudentSettingsPage() {
             </div>
           </SectionCard>
 
-          <p className={cn("text-center text-xs", textMuted)}>
+          <p className={cn("text-center text-xs lg:text-sm", textMuted)}>
             Pour modifier les informations officielles, contactez votre administration.
           </p>
         </>
@@ -256,7 +268,7 @@ export default function StudentSettingsPage() {
 
       <SectionCard icon={Lock} iconBg="bg-orange-50 dark:bg-orange-500/10" iconColor="text-orange-500" title="Sécurité">
         <p className={cn("mb-4 text-sm", textMuted)}>Changer mon mot de passe</p>
-        <form onSubmit={handleChangePassword} className="space-y-4">
+        <form onSubmit={handleChangePassword} className="space-y-4 lg:max-w-lg">
           <div>
             <label className={cn("mb-1.5 block text-sm font-medium", textMuted)}>
               Nouveau mot de passe <span className="text-red-500">*</span>
@@ -347,7 +359,7 @@ export default function StudentSettingsPage() {
         type="button"
         onClick={handleLogout}
         disabled={loggingOut}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 py-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-500/20 dark:bg-red-500/10"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 py-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60 dark:border-red-500/20 dark:bg-red-500/10 lg:hidden"
       >
         <LogOut className="h-5 w-5" />
         {loggingOut ? "Déconnexion..." : "Déconnexion"}

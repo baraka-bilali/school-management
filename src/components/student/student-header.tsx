@@ -34,7 +34,7 @@ export default function StudentHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-b backdrop-blur-md",
+        "sticky top-0 z-40 border-b backdrop-blur-md lg:hidden",
         isDark ? "border-gray-800 bg-gray-950/90" : "border-gray-100 bg-[#eef2f9]/90"
       )}
     >
