@@ -243,6 +243,7 @@ export default function AdminFeesPage() {
   const [paiementsPagination, setPaiementsPagination] = useState({ total: 0, page: 1, totalPages: 1 })
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [years, setYears] = useState<AcademicYearOption[]>([])
+  const [currentYearId, setCurrentYearId] = useState<number | null>(null)
 
   // Par élève
   const [studentFees, setStudentFees] = useState<StudentFeeRow[]>([])
@@ -308,12 +309,26 @@ export default function AdminFeesPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [statsRes, typesRes, tarifsRes, paiementsRes, metaRes] = await Promise.all([
-        fetch("/api/admin/fees/stats"),
+      const metaRes = await fetch("/api/admin/meta")
+      let resolvedYearId: number | null = null
+
+      if (metaRes.ok) {
+        const meta = await metaRes.json()
+        resolvedYearId = meta.currentYearId ?? null
+        setClasses(meta.classes || [])
+        setCurrentYearId(resolvedYearId)
+        setYears((meta.years || []).map((y: { id: number; name: string; current: boolean }) => ({
+          ...y,
+          current: y.id === meta.currentYearId,
+        })))
+      }
+
+      const yearQs = resolvedYearId ? `?yearId=${resolvedYearId}` : ""
+      const [statsRes, typesRes, tarifsRes, paiementsRes] = await Promise.all([
+        fetch(`/api/admin/fees/stats${yearQs}`),
         fetch("/api/admin/fees/types"),
         fetch("/api/admin/fees/tarifications"),
         fetch("/api/admin/fees/paiements?pageSize=15"),
-        fetch("/api/admin/meta"),
       ])
 
       if (statsRes.ok) {
@@ -333,14 +348,6 @@ export default function AdminFeesPage() {
         setPaiements(result.data)
         setPaiementsPagination(result.pagination)
       }
-      if (metaRes.ok) {
-        const meta = await metaRes.json()
-        setClasses(meta.classes || [])
-        setYears((meta.years || []).map((y: { id: number; name: string; current: boolean }) => ({
-          ...y,
-          current: y.id === meta.currentYearId,
-        })))
-      }
     } catch (error) {
       console.error("Erreur lors du chargement:", error)
     } finally {
@@ -357,7 +364,8 @@ export default function AdminFeesPage() {
   const fetchStudentFees = useCallback(async () => {
     setStudentFeesLoading(true)
     try {
-      const res = await fetch("/api/admin/fees/students")
+      const qs = currentYearId ? `?yearId=${currentYearId}` : ""
+      const res = await fetch(`/api/admin/fees/students${qs}`)
       if (res.ok) {
         const { data } = await res.json()
         setStudentFees(data)
@@ -368,13 +376,13 @@ export default function AdminFeesPage() {
       setStudentFeesLoading(false)
       setStudentFeesFetched(true)
     }
-  }, [])
+  }, [currentYearId])
 
   useEffect(() => {
-    if (activeTab === "students" && !studentFeesFetched && !studentFeesLoading) {
+    if (activeTab === "students") {
       fetchStudentFees()
     }
-  }, [activeTab, studentFeesFetched, studentFeesLoading, fetchStudentFees])
+  }, [activeTab, currentYearId, fetchStudentFees])
 
   // Filtrer et trier les élèves
   const filteredStudentFees = (() => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { ensureSchoolSettingsTable } from "@/lib/fees/school-year"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -22,20 +23,12 @@ function requireAdmin(req: NextRequest): JwtPayload | null {
   }
 }
 
-async function ensureSchoolSettingsTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS school_settings (
-      school_id INTEGER PRIMARY KEY,
-      currency_code TEXT NOT NULL DEFAULT 'USD',
-      usd_to_cdf_rate DOUBLE PRECISION NOT NULL DEFAULT 2800,
-      current_year_id INTEGER,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `)
+async function ensureSchoolSettingsTableLocal() {
+  await ensureSchoolSettingsTable()
 }
 
 async function getSchoolSettings(schoolId: number) {
-  await ensureSchoolSettingsTable()
+  await ensureSchoolSettingsTableLocal()
 
   const rows = await prisma.$queryRawUnsafe<
     Array<{
@@ -92,7 +85,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Taux de change invalide" }, { status: 400 })
     }
 
-    await ensureSchoolSettingsTable()
+    await ensureSchoolSettingsTableLocal()
     await prisma.$executeRawUnsafe(
       `INSERT INTO school_settings (school_id, currency_code, usd_to_cdf_rate, current_year_id, updated_at)
        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
