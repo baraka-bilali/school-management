@@ -1,204 +1,272 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import dynamic from "next/dynamic"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import Layout from "@/components/layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
-import { Calendar, FileText, Wallet, BookOpen, Clock, TrendingUp } from "lucide-react"
+import {
+  Wallet,
+  ClipboardList,
+  Megaphone,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useStudentTheme } from "@/components/student/use-student-theme"
+import StudentLoading from "@/components/student/student-loading"
+import TaskCard from "@/components/student/task-card"
+
+const QRCodeSVG = dynamic(
+  () => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })),
+  { ssr: false, loading: () => <div className="h-14 w-14 animate-pulse rounded-lg bg-gray-100" /> }
+)
 
 interface StudentInfo {
   id: number
-  lastName: string
-  middleName: string
   firstName: string
   code: string
   class?: string
-  year?: string
+}
+
+interface Communique {
+  id: number
+  title: string
+  createdAt: string
+  isRead: boolean
+}
+
+interface Task {
+  id: number
+  title: string
+  question: string | null
+  description: string | null
+  dueAt: string
+  createdAt: string
+  subject: { name: string; color: string | null } | null
+}
+
+const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
+
+function getGreeting(): "Bonjour" | "Bonsoir" {
+  const hour = new Date().getHours()
+  return hour >= 18 || hour < 5 ? "Bonsoir" : "Bonjour"
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const hours = Math.floor(diff / 3_600_000)
+  if (hours < 1) return "Publié à l'instant"
+  if (hours < 24) return `Publié il y a ${hours} heure${hours > 1 ? "s" : ""}`
+  const days = Math.floor(hours / 24)
+  return `Publié il y a ${days} jour${days > 1 ? "s" : ""}`
 }
 
 export default function StudentDashboard() {
   const router = useRouter()
+  const { card, text, textMuted, shadow, border, isDark } = useStudentTheme()
   const [loading, setLoading] = useState(true)
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [latestCommunique, setLatestCommunique] = useState<Communique | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [selectedDate, setSelectedDate] = useState(new Date())
 
-  useEffect(() => {
-    // Charger le thème
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-    }
-
-    const handleThemeChange = () => {
-      const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
-      if (newTheme) setTheme(newTheme)
-    }
-
-    window.addEventListener("themeChange", handleThemeChange)
-    window.addEventListener("storage", handleThemeChange)
-
-    return () => {
-      window.removeEventListener("themeChange", handleThemeChange)
-      window.removeEventListener("storage", handleThemeChange)
-    }
+  const weekDays = useMemo(() => {
+    const today = new Date()
+    const start = new Date(today)
+    start.setDate(today.getDate() - today.getDay() + 1)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      return d
+    })
   }, [])
 
+  const monthLabel = selectedDate.toLocaleDateString("fr-FR", { month: "long" })
+  const qrValue = studentInfo ? `STUDENT:${studentInfo.code}:${studentInfo.id}` : ""
+
+  const fetchTasks = async () => {
+    try {
+      const res = await fetch("/api/student/tasks?limit=1", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data.tasks || [])
+      }
+    } catch {}
+  }
+
   useEffect(() => {
-    // Récupérer les infos de l'élève
-    const fetchStudentInfo = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch("/api/student/me", { credentials: "include" })
-        if (res.ok) {
-          const data = await res.json()
+        const [meRes, commRes] = await Promise.all([
+          fetch("/api/student/me", { credentials: "include" }),
+          fetch("/api/student/communiques?page=1&limit=1", { credentials: "include" }),
+        ])
+        if (meRes.ok) {
+          const data = await meRes.json()
           setStudentInfo(data.student)
         }
+        if (commRes.ok) {
+          const data = await commRes.json()
+          if (data.communiques?.length > 0) setLatestCommunique(data.communiques[0])
+        }
+        await fetchTasks()
       } catch (error) {
-        console.error("Erreur lors du chargement des infos élève:", error)
+        console.error("Erreur chargement:", error)
       } finally {
         setLoading(false)
       }
     }
-
-    fetchStudentInfo()
+    fetchData()
+    const onNewTask = () => fetchTasks()
+    window.addEventListener("newTaskReceived", onNewTask)
+    return () => window.removeEventListener("newTaskReceived", onNewTask)
   }, [])
 
-  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
-  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
-  const cardBg = theme === "dark" ? "bg-gray-800" : "bg-white"
-  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
-
-  const quickActions = [
-    {
-      title: "Horaire des cours",
-      description: "Consulter votre emploi du temps",
-      icon: Calendar,
-      href: "/student/schedule",
-      color: "bg-blue-500",
-    },
-    {
-      title: "Notes & Bulletins",
-      description: "Voir vos résultats scolaires",
-      icon: FileText,
-      href: "/student/grades",
-      color: "bg-green-500",
-    },
-    {
-      title: "Frais scolaires",
-      description: "Gérer vos paiements",
-      icon: Wallet,
-      href: "/student/fees",
-      color: "bg-orange-500",
-    },
-  ]
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[calc(100vh-120px)]">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            </div>
-            <p className={`text-lg ${textSecondary}`}>Chargement...</p>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
+  if (loading) return <StudentLoading />
 
   return (
-    <Layout>
-      <div className="p-6 space-y-6">
-        {/* En-tête de bienvenue */}
-        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h1 className={`text-2xl font-bold ${textColor} mb-2`}>
-            Bienvenue, {studentInfo?.firstName} ! 👋
-          </h1>
-          <p className={textSecondary}>
-            {studentInfo?.class && studentInfo?.year 
-              ? `${studentInfo.class} - Année scolaire ${studentInfo.year}`
-              : "Votre espace élève"
-            }
-          </p>
+    <div className="space-y-5">
+      {/* Salutation — sous la barre de navigation */}
+      {studentInfo && (
+        <p className={cn("text-xl font-bold tracking-tight", text)}>
+          {getGreeting()}, {studentInfo.firstName}
+        </p>
+      )}
+
+      {/* Cartes rapides : QR + Frais */}
+      <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className={cn(
+            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-3",
+            card,
+            border,
+            shadow
+          )}
+        >
+          {qrValue && (
+            <div className="mb-2 rounded-xl bg-white p-1.5 shadow-sm">
+              <QRCodeSVG value={qrValue} size={56} level="M" />
+            </div>
+          )}
+          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400">MON QR</p>
+          <p className={cn("mt-0.5 text-center text-[10px]", textMuted)}>Code {studentInfo?.code}</p>
         </div>
 
-        {/* Carte d'information élève */}
-        <Card theme={theme}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-indigo-500" />
-              Mes informations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                <p className={`text-sm ${textSecondary} mb-1`}>Nom complet</p>
-                <p className={`font-semibold ${textColor}`}>
-                  {studentInfo?.lastName} {studentInfo?.middleName} {studentInfo?.firstName}
-                </p>
-              </div>
-              <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                <p className={`text-sm ${textSecondary} mb-1`}>Code élève</p>
-                <p className={`font-semibold ${textColor}`}>{studentInfo?.code || "-"}</p>
-              </div>
-              <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                <p className={`text-sm ${textSecondary} mb-1`}>Classe</p>
-                <p className={`font-semibold ${textColor}`}>{studentInfo?.class || "-"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <button
+          type="button"
+          onClick={() => router.push("/student/fees")}
+          className={cn(
+            "min-w-[9.5rem] shrink-0 rounded-2xl border p-4 text-left transition-transform active:scale-[0.98]",
+            card,
+            border,
+            shadow
+          )}
+        >
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
+            <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400">FRAIS SCOLAIRES</p>
+          <p className={cn("mt-0.5 text-xs", textMuted)}>Paiements à jour</p>
+        </button>
+      </div>
 
-        {/* Actions rapides */}
-        <div>
-          <h2 className={`text-lg font-semibold ${textColor} mb-4`}>Accès rapide</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                onClick={() => router.push(action.href)}
-                className={`${cardBg} border ${borderColor} rounded-xl p-6 text-left hover:shadow-lg transition-all duration-200 hover:scale-[1.02] group`}
-              >
-                <div className={`w-12 h-12 ${action.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <action.icon className="w-6 h-6 text-white" />
-                </div>
-                <h3 className={`font-semibold ${textColor} mb-1`}>{action.title}</h3>
-                <p className={`text-sm ${textSecondary}`}>{action.description}</p>
-              </button>
-            ))}
+      {/* Calendrier hebdomadaire */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className={cn("text-base font-bold", text)}>Calendrier hebdomadaire</h2>
+          <button
+            type="button"
+            className={cn(
+              "flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium capitalize",
+              isDark ? "bg-gray-800 text-gray-300" : "bg-white text-gray-700 shadow-sm"
+            )}
+          >
+            {monthLabel}
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <div className={cn("rounded-2xl border p-3", card, border, shadow)}>
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((day) => {
+              const isToday = day.toDateString() === new Date().toDateString()
+              const isSelected = day.toDateString() === selectedDate.toDateString()
+              return (
+                <button
+                  key={day.toISOString()}
+                  type="button"
+                  onClick={() => setSelectedDate(day)}
+                  className="flex flex-col items-center gap-1 py-1"
+                >
+                  <span className={cn("text-[10px] font-medium", textMuted)}>{DAY_LABELS[day.getDay()]}</span>
+                  <span
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors",
+                      isToday || isSelected
+                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                        : cn(text, "hover:bg-gray-100 dark:hover:bg-gray-800")
+                    )}
+                  >
+                    {day.getDate()}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
+      </section>
 
-        {/* Statistiques rapides */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card theme={theme}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="w-5 h-5 text-blue-500" />
-                Prochain cours
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={textSecondary}>Fonctionnalité à venir...</p>
-            </CardContent>
-          </Card>
-          
-          <Card theme={theme}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="w-5 h-5 text-green-500" />
-                Dernière moyenne
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={textSecondary}>Fonctionnalité à venir...</p>
-            </CardContent>
-          </Card>
+      {/* Mes tâches */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className={cn("text-base font-bold", text)}>Mes tâches</h2>
+          <Link href="/student/tasks" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+            Voir tout
+          </Link>
         </div>
-      </div>
-    </Layout>
+        {tasks.length === 0 ? (
+          <div className={cn("rounded-2xl border p-6 text-center", card, border, shadow)}>
+            <ClipboardList className={cn("mx-auto mb-2 h-8 w-8", textMuted)} />
+            <p className={cn("text-sm", textMuted)}>Aucune tâche pour le moment</p>
+          </div>
+        ) : (
+          <TaskCard task={tasks[0]} compact />
+        )}
+      </section>
+
+      {/* Communiqués récents */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className={cn("text-base font-bold", text)}>Communiqués récents</h2>
+          <Link href="/student/notifications?tab=communiques" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+            Voir tout
+          </Link>
+        </div>
+        {latestCommunique ? (
+          <Link
+            href={`/student/communiques/${latestCommunique.id}`}
+            className={cn(
+              "flex items-center gap-3 rounded-2xl border p-4 transition-colors active:bg-gray-50 dark:active:bg-gray-800/50",
+              card,
+              border,
+              shadow
+            )}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
+              <Megaphone className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={cn("truncate text-sm font-semibold", text)}>{latestCommunique.title}</p>
+              <p className={cn("text-xs", textMuted)}>{timeAgo(latestCommunique.createdAt)}</p>
+            </div>
+            <ChevronRight className={cn("h-5 w-5 shrink-0", textMuted)} />
+          </Link>
+        ) : (
+          <div className={cn("rounded-2xl border p-6 text-center", card, border, shadow)}>
+            <Megaphone className={cn("mx-auto mb-2 h-8 w-8", textMuted)} />
+            <p className={cn("text-sm", textMuted)}>Aucun communiqué pour le moment</p>
+          </div>
+        )}
+      </section>
+    </div>
   )
 }

@@ -61,8 +61,9 @@ model Class {
   school        School             @relation(fields: [schoolId], references: [id])
   enrollments   Enrollment[]
   tarifications Tarification[]
-  assignments   CourseAssignment[]
+  assignments    CourseAssignment[]
   slots         ScheduleSlot[]
+  tasks         StudentTask[]
 
   @@unique([name, schoolId])
   @@index([section])
@@ -127,6 +128,7 @@ model Teacher {
   user        User               @relation(fields: [userId], references: [id])
   payments    TeacherPayment[]
   assignments CourseAssignment[]
+  tasks         StudentTask[]
 
   @@index([lastName])
   @@index([specialty])
@@ -537,9 +539,32 @@ model Subject {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   assignments    CourseAssignment[]
+  tasks          StudentTask[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
+}
+
+model StudentTask {
+  id          Int      @id @default(autoincrement())
+  title       String
+  question    String?  @db.Text
+  description String?  @db.Text
+  dueAt       DateTime
+  classId     Int
+  subjectId   Int?
+  teacherId   Int
+  schoolId    Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  class   Class    @relation(fields: [classId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  teacher Teacher  @relation(fields: [teacherId], references: [id])
+
+  @@index([classId, dueAt])
+  @@index([schoolId, isActive])
 }
 
 model CourseAssignment {

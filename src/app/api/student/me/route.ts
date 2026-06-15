@@ -52,11 +52,13 @@ export async function GET(request: NextRequest) {
           include: {
             class: {
               select: {
+                id: true,
                 name: true
               }
             },
             year: {
               select: {
+                id: true,
                 name: true,
                 current: true
               }
@@ -91,6 +93,8 @@ export async function GET(request: NextRequest) {
       student: {
         id: student.id,
         schoolId: decoded.schoolId,
+        classId: currentEnrollment?.classId ?? null,
+        yearId: currentEnrollment?.yearId ?? null,
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
@@ -102,9 +106,11 @@ export async function GET(request: NextRequest) {
         address: student.address,
         parentName1: student.parentName1,
         parentPhone1: student.parentPhone1,
+        parentJob1: student.parentJob1,
         parentEmail1: student.parentEmail1,
         parentName2: student.parentName2,
         parentPhone2: student.parentPhone2,
+        parentJob2: student.parentJob2,
         parentEmail2: student.parentEmail2,
         bloodGroup: student.bloodGroup,
         allergies: student.allergies,
@@ -112,6 +118,7 @@ export async function GET(request: NextRequest) {
         emergencyContact: student.emergencyContact,
         emergencyPhone: student.emergencyPhone,
         profileCompleted: student.profileCompleted,
+        photoUrl: student.photoUrl,
         email: student.user.email,
         temporaryPassword: student.user.temporaryPassword,
         school: school?.nomEtablissement,
@@ -123,6 +130,9 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error("Erreur lors de la récupération des infos élève:", error)
+    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
+      return NextResponse.json({ error: "Session expirée, veuillez vous reconnecter" }, { status: 401 })
+    }
     return NextResponse.json(
       { error: "Erreur serveur" },
       { status: 500 }

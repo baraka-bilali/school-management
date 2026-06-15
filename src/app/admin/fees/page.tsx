@@ -1491,62 +1491,49 @@ function PaymentFormModal({
                 </div>
 
                 {/* Boutons principaux */}
-                <div className="grid grid-cols-3 gap-2.5 mb-3">
-                  <button
-                    onClick={onClose}
-                    className={`col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 ${theme === "dark" ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-600 hover:bg-gray-100"} font-medium text-sm transition-colors`}
-                  >
-                    <X className="w-4 h-4" />
-                    Fermer
-                  </button>
-
+                <div className="grid grid-cols-2 gap-3">
                   {receiptPdfData ? (
                     <ReceiptDownloadButton
                       data={receiptPdfData}
-                      className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium text-sm transition-colors w-full"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium text-sm transition-colors w-full"
                     />
                   ) : (
-                    <button disabled className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-indigo-400 text-white font-medium text-sm cursor-wait">
+                    <button disabled className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-400 text-white font-medium text-sm cursor-wait">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>PDF…</span>
+                      <span>Préparation…</span>
                     </button>
                   )}
 
                   <button
                     onClick={onSuccess}
-                    className="col-span-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition-colors"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-sm transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    Nouveau
+                    Nouveau paiement
                   </button>
                 </div>
 
-                {/* Imprimer (secondaire) */}
-                <button
-                  onClick={async () => {
-                    if (!createdPayment) return
-                    const w = window.open("", "_blank", "width=700,height=900")
-                    if (!w) { alert("Veuillez autoriser les popups pour imprimer le reçu"); return }
-                    try {
-                      const res = await fetch(`/api/admin/fees/paiements/${createdPayment.id}/receipt`)
-                      if (!res.ok) throw new Error("Impossible de récupérer les données du reçu")
-                      const { data } = await res.json()
-                      const devise = data.devise === "CDF" ? "FC" : "$"
-                      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${data.numeroRecu}</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:32px;color:#111;max-width:600px;margin:0 auto}.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #16a34a;padding-bottom:16px;margin-bottom:20px}.title{font-size:22px;font-weight:800;letter-spacing:2px}.recu-num{color:#16a34a;font-weight:700;margin-top:4px}.badge{background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:4px;margin-top:6px;display:inline-block}.meta{text-align:right;font-size:13px}.label{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}.parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.party-box{background:#f9fafb;border-radius:8px;padding:12px}.table{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:16px}.thead{display:flex;justify-content:space-between;background:#f3f4f6;padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280}.trow{display:flex;justify-content:space-between;padding:12px;border-bottom:1px solid #f3f4f6}.tfooter{display:flex;justify-content:space-between;padding:10px 12px;background:#f0fdf4;font-weight:700;font-size:15px;color:#16a34a}.amount{font-weight:700;font-size:14px}.footer{margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px;text-align:center;font-size:11px;color:#9ca3af}@media print{body{padding:16px}}</style></head><body><div class="header"><div><div class="title">REÇU DE PAIEMENT</div><div class="recu-num">${data.numeroRecu}</div><div class="badge">PAYÉ</div></div><div class="meta"><div class="label">Date d'émission</div><div style="font-weight:700">${new Date(data.datePaiement).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}</div><div class="label" style="margin-top:10px">Année scolaire</div><div style="font-weight:700">${data.anneeScolaire}</div></div></div><div class="parties"><div class="party-box"><div class="label">Établissement</div><div style="font-weight:700;font-size:14px">${data.schoolName || "École"}</div></div><div class="party-box"><div class="label">Élève</div><div style="font-weight:700;font-size:14px">${data.eleve.nom}</div><div style="color:#4b5563;margin-top:2px">Code : ${data.eleve.code}</div><div style="color:#4b5563">Classe : ${data.classe}</div></div></div><div class="table"><div class="thead"><span>Description</span><span>Montant</span></div><div class="trow"><div><div style="font-weight:700">${data.typeFrais}</div><div style="color:#6b7280;font-size:12px;margin-top:3px">${data.classe} — ${data.anneeScolaire}</div></div><div class="amount">${new Intl.NumberFormat("fr-FR").format(data.montant)} ${devise}</div></div><div class="tfooter"><span>TOTAL</span><span>${new Intl.NumberFormat("fr-FR").format(data.montant)} ${devise}</span></div></div><div style="display:flex;gap:24px;margin-bottom:16px"><div><div class="label">Mode de paiement</div><div style="font-weight:700">${data.modePaiement}</div></div><div><div class="label">Référence</div><div style="font-weight:700">${data.reference || "—"}</div></div></div>${data.notes ? `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:10px;margin-bottom:12px"><div class="label" style="color:#92400e">Notes</div><div style="color:#78350f;font-size:12px">${data.notes}</div></div>` : ""}<div class="footer"><div>${data.schoolName || "École"} — Ce document tient lieu de reçu officiel de paiement</div><div style="margin-top:4px">Imprimé le ${new Date().toLocaleDateString("fr-FR")} — Système DigiSchool</div></div></body></html>`
-                      w.document.write(html)
-                      w.document.close()
-                      w.focus()
-                      setTimeout(() => { w.print() }, 300)
-                    } catch (err) {
-                      w.close()
-                      alert(err instanceof Error ? err.message : "Erreur lors de l'impression")
-                    }
-                  }}
-                  className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200 hover:border-gray-500" : "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400"} text-sm transition-colors`}
-                >
-                  <Printer className="w-4 h-4" />
-                  Imprimer le reçu
-                </button>
+                {/* Ouvrir PDF pour impression propre */}
+                {receiptPdfData && (
+                  <button
+                    onClick={async () => {
+                      if (!receiptPdfData) return
+                      try {
+                        const { pdf } = await import("@react-pdf/renderer")
+                        const { default: ReceiptPDF } = await import("@/components/receipt-pdf")
+                        const blob = await pdf(<ReceiptPDF data={receiptPdfData} />).toBlob()
+                        const url = URL.createObjectURL(blob)
+                        window.open(url, "_blank")
+                      } catch {
+                        alert("Impossible de générer le PDF pour impression")
+                      }
+                    }}
+                    className={`mt-2.5 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border ${theme === "dark" ? "border-gray-600 text-gray-400 hover:text-gray-200 hover:border-gray-500" : "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400"} text-sm transition-colors`}
+                  >
+                    <Printer className="w-4 h-4" />
+                    Ouvrir pour imprimer
+                  </button>
+                )}
               </div>
             )}
 

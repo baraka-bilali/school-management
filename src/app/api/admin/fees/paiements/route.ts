@@ -5,6 +5,8 @@ import {
   createPaiementSchema,
 } from "@/lib/fees"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { prisma } from "@/lib/prisma"
+import { supabaseAdmin } from "@/lib/supabase-server"
 
 // GET /api/admin/fees/paiements
 export async function GET(req: NextRequest) {
@@ -57,6 +59,39 @@ export async function POST(req: NextRequest) {
       schoolId: user.schoolId,
       createdBy: user.id,
     })
+
+    const student = await prisma.student.findUnique({
+      where: { id: paiement.studentId },
+      select: { userId: true },
+    })
+
+    const typeFrais = paiement.tarification?.typeFrais?.nom || "frais scolaires"
+    const devise = paiement.tarification?.devise || "USD"
+
+    if (student?.userId) {
+      await prisma.notification.create({
+        data: {
+          type: "SYSTEM_MESSAGE",
+          message: `Paiement enregistré : ${paiement.montant} ${devise} pour ${typeFrais}. Reçu n° ${paiement.numeroRecu}.`,
+          userId: student.userId,
+          schoolId: user.schoolId,
+          targetRole: "ALL",
+        },
+      })
+    }
+
+    await supabaseAdmin
+      .channel(`fees:student:${paiement.studentId}`)
+      .send({
+        type: "broadcast",
+        event: "payment_received",
+        payload: {
+          paiementId: paiement.id,
+          montant: paiement.montant,
+          devise,
+          typeFrais,
+        },
+      })
 
     return NextResponse.json({ data: paiement }, { status: 201 })
   } catch (error) {
