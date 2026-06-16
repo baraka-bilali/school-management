@@ -40,7 +40,7 @@ import {
   SlidersHorizontal,
   Printer,
 } from "lucide-react"
-import Portal from "@/components/portal"
+import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 import type { ReceiptData } from "@/components/receipt-pdf"
 
 const ReceiptDownloadButton = dynamic(
@@ -113,6 +113,7 @@ interface ClassOption {
   name: string
   level: string
   section: string
+  letter: string
 }
 
 interface AcademicYearOption {
@@ -220,6 +221,19 @@ function getStudentPrimaryRemaining(row: StudentFeeRow): number {
   return 0
 }
 
+function getStudentPaidInCurrency(row: StudentFeeRow, currency: "USD" | "CDF"): number {
+  return currency === "USD" ? row.usd.paid : row.cdf.paid
+}
+
+function getStudentRemainingInCurrency(row: StudentFeeRow, currency: "USD" | "CDF"): number {
+  return currency === "USD" ? row.usd.remaining : row.cdf.remaining
+}
+
+function getStudentAmountCurrency(row: StudentFeeRow, filter: "" | "USD" | "CDF"): "USD" | "CDF" | null {
+  if (filter) return filter
+  return getStudentPrimaryCurrency(row)
+}
+
 const MODES_PAIEMENT = [
   { value: "CASH", label: "Espèces", icon: Banknote, color: "text-green-500" },
   { value: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone, color: "text-blue-500" },
@@ -281,9 +295,11 @@ export default function AdminFeesPage() {
   const [sfStatusFilter, setSfStatusFilter] = useState<"" | "solde" | "partiel" | "impaye">("")
   const [sfAmountThreshold, setSfAmountThreshold] = useState("")
   const [sfAmountMode, setSfAmountMode] = useState<"gte" | "lt">("gte")
+  const [sfCurrencyFilter, setSfCurrencyFilter] = useState<"" | "USD" | "CDF">("")
   const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
   const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
   const [sfPage, setSfPage] = useState(1)
+  const [exportingPaiements, setExportingPaiements] = useState(false)
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -416,7 +432,9 @@ export default function AdminFeesPage() {
 
   useEffect(() => {
     setSfPage(1)
-  }, [sfSearch, sfClassFilter, sfStatusFilter, sfAmountThreshold, sfAmountMode, sfSortKey, sfSortDir])
+  }, [sfSearch, sfClassFilter, sfStatusFilter, sfAmountThreshold, sfAmountMode, sfCurrencyFilter, sfSortKey, sfSortDir])
+
+  const sortedClasses = sortClasses(classes)
 
   const studentRowToEnrollment = (row: StudentFeeRow): EnrollmentOption => ({
     enrollmentId: row.enrollmentId,
@@ -460,12 +478,19 @@ export default function AdminFeesPage() {
       list = list.filter((s) => s.status === sfStatusFilter)
     }
 
-    // Filtre par montant seuil (devise de la classe de l'élève : USD ou CDF)
+    // Filtre par devise (USD / CDF selon la classe)
+    if (sfCurrencyFilter) {
+      list = list.filter((s) => getStudentPrimaryCurrency(s) === sfCurrencyFilter)
+    }
+
+    // Filtre par montant seuil (dans la devise sélectionnée ou celle de la classe)
     if (sfAmountThreshold) {
       const threshold = parseFloat(sfAmountThreshold)
       if (!isNaN(threshold)) {
         list = list.filter((s) => {
-          const paid = getStudentPrimaryPaid(s)
+          const currency = getStudentAmountCurrency(s, sfCurrencyFilter)
+          if (!currency) return false
+          const paid = getStudentPaidInCurrency(s, currency)
           return sfAmountMode === "gte" ? paid >= threshold : paid < threshold
         })
       }
@@ -478,18 +503,32 @@ export default function AdminFeesPage() {
         case "name":
           cmp = a.lastName.localeCompare(b.lastName)
           break
-        case "paid":
-          cmp = getStudentPrimaryPaid(a) - getStudentPrimaryPaid(b)
+        case "paid": {
+          const curA = getStudentAmountCurrency(a, sfCurrencyFilter)
+          const curB = getStudentAmountCurrency(b, sfCurrencyFilter)
+          const paidA = curA ? getStudentPaidInCurrency(a, curA) : getStudentPrimaryPaid(a)
+          const paidB = curB ? getStudentPaidInCurrency(b, curB) : getStudentPrimaryPaid(b)
+          cmp = paidA - paidB
           break
-        case "remaining":
-          cmp = getStudentPrimaryRemaining(a) - getStudentPrimaryRemaining(b)
+        }
+        case "remaining": {
+          const curA = getStudentAmountCurrency(a, sfCurrencyFilter)
+          const curB = getStudentAmountCurrency(b, sfCurrencyFilter)
+          const remA = curA ? getStudentRemainingInCurrency(a, curA) : getStudentPrimaryRemaining(a)
+          const remB = curB ? getStudentRemainingInCurrency(b, curB) : getStudentPrimaryRemaining(b)
+          cmp = remA - remB
           break
+        }
         case "percent":
           cmp = getStudentPercent(a) - getStudentPercent(b)
           break
-        case "class":
-          cmp = a.className.localeCompare(b.className)
+        case "class": {
+          const classA = classes.find((c) => c.id === a.classId)
+          const classB = classes.find((c) => c.id === b.classId)
+          if (classA && classB) cmp = compareClasses(classA, classB)
+          else cmp = a.className.localeCompare(b.className)
           break
+        }
       }
       return sfSortDir === "asc" ? cmp : -cmp
     })
@@ -539,6 +578,51 @@ export default function AdminFeesPage() {
     a.download = `frais-par-eleve-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const exportPaiementsExcel = async () => {
+    setExportingPaiements(true)
+    try {
+      const params = new URLSearchParams({ page: "1", pageSize: "10000" })
+      if (currentYearId) params.set("yearId", String(currentYearId))
+      const res = await fetch(`/api/admin/fees/paiements?${params}`)
+      if (!res.ok) return
+      const { data } = await res.json() as { data: PaiementRecord[] }
+      if (!data?.length) return
+
+      const headers = ["N° Reçu", "Nom", "Prénom", "Code", "Classe", "Type de frais", "Montant", "Devise", "Date", "Mode", "Référence", "Statut"]
+      const csvRows = [headers.join(";")]
+
+      for (const p of data) {
+        csvRows.push([
+          p.numeroRecu,
+          p.student.lastName,
+          p.student.firstName,
+          p.student.code,
+          p.enrollment.class.name,
+          p.tarification.typeFrais.nom,
+          p.montant,
+          p.tarification.devise,
+          new Date(p.datePaiement).toLocaleDateString("fr-FR"),
+          getModePaiementLabel(p.modePaiement),
+          p.reference || "",
+          p.isAnnule ? "Annulé" : "Valide",
+        ].join(";"))
+      }
+
+      const BOM = "\uFEFF"
+      const blob = new Blob([BOM + csvRows.join("\n")], { type: "text/csv;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `historique-paiements-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Erreur export paiements:", error)
+    } finally {
+      setExportingPaiements(false)
+    }
   }
 
   // Couleurs thème
@@ -1004,6 +1088,23 @@ export default function AdminFeesPage() {
                       <p className={`text-sm ${textSecondary} mt-1`}>Les paiements enregistrés apparaîtront ici</p>
                     </div>
                   ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={exportPaiementsExcel}
+                          disabled={exportingPaiements}
+                          title="Télécharger l'historique en Excel"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                        >
+                          {exportingPaiements ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                          Excel
+                        </button>
+                      </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className={headerBg}>
@@ -1063,6 +1164,7 @@ export default function AdminFeesPage() {
                         </div>
                       )}
                     </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -1102,12 +1204,20 @@ export default function AdminFeesPage() {
                         <select
                           value={sfClassFilter}
                           onChange={(e) => setSfClassFilter(e.target.value)}
-                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[140px]`}
+                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[180px] max-w-[280px]`}
                         >
                           <option value="">Toutes les classes</option>
-                          {classes.map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
+                          {SECTION_ORDER.map((section) => {
+                            const sectionClasses = sortedClasses.filter((c) => c.section === section)
+                            if (sectionClasses.length === 0) return null
+                            return (
+                              <optgroup key={section} label={SECTION_LABELS[section] ?? section}>
+                                {sectionClasses.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </optgroup>
+                            )
+                          })}
                         </select>
 
                         {/* Filtre statut */}
@@ -1122,8 +1232,29 @@ export default function AdminFeesPage() {
                           <option value="impaye">Impayé</option>
                         </select>
 
-                        {/* Filtre montant */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Filtre montant + devise */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className={`inline-flex rounded-xl border ${borderColor} overflow-hidden shrink-0`}>
+                            {([
+                              { value: "" as const, label: "Tous" },
+                              { value: "USD" as const, label: "$" },
+                              { value: "CDF" as const, label: "FC" },
+                            ]).map((opt) => (
+                              <button
+                                key={opt.value || "all"}
+                                type="button"
+                                onClick={() => setSfCurrencyFilter(opt.value)}
+                                className={`px-3 py-2 text-xs font-medium transition-colors ${
+                                  sfCurrencyFilter === opt.value
+                                    ? "bg-indigo-600 text-white"
+                                    : `${textSecondary} ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`
+                                }`}
+                                title={opt.value === "" ? "Toutes les devises" : opt.value === "USD" ? "Élèves en dollars" : "Élèves en francs congolais"}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
                           <select
                             value={sfAmountMode}
                             onChange={(e) => setSfAmountMode(e.target.value as "gte" | "lt")}
@@ -1134,11 +1265,11 @@ export default function AdminFeesPage() {
                           </select>
                           <input
                             type="number"
-                            placeholder="Montant"
+                            placeholder={sfCurrencyFilter === "USD" ? "Montant $" : sfCurrencyFilter === "CDF" ? "Montant FC" : "Montant"}
                             value={sfAmountThreshold}
                             onChange={(e) => setSfAmountThreshold(e.target.value)}
                             className={`w-[110px] px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}
-                            title="Filtre selon le montant payé dans la devise de la classe (USD ou CDF)"
+                            title="Filtre selon le montant payé dans la devise sélectionnée"
                           />
                         </div>
 

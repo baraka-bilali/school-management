@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import { sortClasses } from "@/lib/class-sort"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -31,12 +32,11 @@ export async function GET(request: NextRequest) {
     }
 
     // ✅ Récupérer uniquement les classes de cette école
-    const classes = await prisma.class.findMany({
-      where: {
-        schoolId: schoolId
-      },
-      orderBy: { name: 'asc' }
-    })
+    const classes = sortClasses(
+      await prisma.class.findMany({
+        where: { schoolId },
+      })
+    )
 
     // Récupérer toutes les années académiques
     const years = await prisma.academicYear.findMany({
