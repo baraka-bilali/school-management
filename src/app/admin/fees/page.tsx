@@ -40,6 +40,7 @@ import {
   SlidersHorizontal,
   Printer,
 } from "lucide-react"
+import Portal from "@/components/portal"
 import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 import type { ReceiptData } from "@/components/receipt-pdf"
 
@@ -1908,9 +1909,9 @@ function PaymentFormModal({
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className={`font-medium ${textColor}`}>{t.typeFrais.nom}</p>
+                              <p className={`font-medium ${textColor}`}>{t.typeFrais?.nom ?? "Frais scolaire"}</p>
                               <p className={`text-xs ${textSecondary} mt-0.5`}>
-                                {t.class?.name || "Toutes les classes"} · {t.year.name}
+                                {t.class?.name || "Toutes les classes"} · {t.year?.name ?? "—"}
                               </p>
                             </div>
                             <div className="text-right">
@@ -1977,7 +1978,7 @@ function PaymentFormModal({
                   </div>
                   <div className="min-w-0">
                     <p className={`text-sm font-medium ${textColor} truncate`}>{selectedEnrollment.studentName}</p>
-                    <p className={`text-xs ${textSecondary}`}>{selectedTarif.typeFrais.nom} — Reste: {formatMontant(balanceInfo?.solde ?? 0, selectedTarif.devise)}</p>
+                    <p className={`text-xs ${textSecondary}`}>{selectedTarif.typeFrais?.nom ?? "Frais"} — Reste: {formatMontant(balanceInfo?.solde ?? 0, selectedTarif.devise)}</p>
                   </div>
                 </div>
 
