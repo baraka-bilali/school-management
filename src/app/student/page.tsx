@@ -184,7 +184,7 @@ export default function StudentDashboard() {
     }
   }, [])
 
-  if (loading) return <StudentLoading variant="cards" />
+  if (loading) return <StudentLoading variant="dashboard" />
 
   const feeProgress = computeFeeProgress(feeBalance)
 

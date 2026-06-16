@@ -213,7 +213,7 @@ function NotificationsHubContent() {
             </button>
           )}
           {loadingNotif ? (
-            <StudentLoading variant="list" label="Chargement..." />
+            <StudentLoading variant="notifications" />
           ) : notifications.length === 0 ? (
             <div className={cn("rounded-2xl border p-10 text-center", card, border, shadow)}>
               <Bell className={cn("mx-auto mb-3 h-10 w-10", textMuted)} />
@@ -262,7 +262,7 @@ function NotificationsHubContent() {
       {tab === "communiques" && (
         <div className="space-y-2">
           {loadingComm ? (
-            <StudentLoading variant="list" label="Chargement..." />
+            <StudentLoading variant="communiques" />
           ) : communiques.length === 0 ? (
             <div className={cn("rounded-2xl border p-10 text-center", card, border, shadow)}>
               <Megaphone className={cn("mx-auto mb-3 h-10 w-10", textMuted)} />
@@ -316,7 +316,7 @@ function NotificationsHubContent() {
 
 export default function StudentNotificationsPage() {
   return (
-    <Suspense fallback={<StudentLoading variant="list" />}>
+    <Suspense fallback={<StudentLoading variant="notifications" />}>
       <NotificationsHubContent />
     </Suspense>
   )
