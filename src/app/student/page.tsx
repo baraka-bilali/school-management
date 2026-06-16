@@ -26,6 +26,7 @@ interface StudentInfo {
   firstName: string
   code: string
   class?: string
+  year?: string
 }
 
 interface Communique {
@@ -43,6 +44,51 @@ interface Task {
   dueAt: string
   createdAt: string
   subject: { name: string; color: string | null } | null
+}
+
+interface FeeBalance {
+  usd: { totalDu: number; totalPaye: number; solde: number }
+  cdf: { totalDu: number; totalPaye: number; solde: number }
+}
+
+function computeFeeProgress(balance: FeeBalance | null) {
+  if (!balance) {
+    return { percent: 0, status: "unknown" as const, subtitle: "Chargement…" }
+  }
+
+  const { usd, cdf } = balance
+  const hasUsd = usd.totalDu > 0 || usd.totalPaye > 0
+  const hasCdf = cdf.totalDu > 0 || cdf.totalPaye > 0
+
+  const usdPercent = usd.totalDu > 0 ? Math.min(100, Math.round((usd.totalPaye / usd.totalDu) * 100)) : 100
+  const cdfPercent = cdf.totalDu > 0 ? Math.min(100, Math.round((cdf.totalPaye / cdf.totalDu) * 100)) : 100
+
+  let percent = 0
+  if (hasCdf && hasUsd) {
+    const active = [usd.totalDu > 0 ? usdPercent : null, cdf.totalDu > 0 ? cdfPercent : null].filter(
+      (v): v is number => v !== null
+    )
+    percent = active.length > 0 ? Math.round(active.reduce((a, b) => a + b, 0) / active.length) : 100
+  } else if (hasCdf) {
+    percent = cdfPercent
+  } else if (hasUsd) {
+    percent = usdPercent
+  } else {
+    percent = 100
+  }
+
+  const usdOk = usd.totalDu === 0 || usd.solde <= 0
+  const cdfOk = cdf.totalDu === 0 || cdf.solde <= 0
+  const hasFees = usd.totalDu > 0 || cdf.totalDu > 0
+  const fullyPaid = hasFees && usdOk && cdfOk
+
+  if (fullyPaid || percent >= 100) {
+    return { percent: 100, status: "paid" as const, subtitle: "Paiements à jour" }
+  }
+  if (percent > 0) {
+    return { percent, status: "partial" as const, subtitle: `${percent}% payé` }
+  }
+  return { percent: 0, status: "unpaid" as const, subtitle: "Aucun paiement enregistré" }
 }
 
 const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
@@ -68,6 +114,7 @@ export default function StudentDashboard() {
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [latestCommunique, setLatestCommunique] = useState<Communique | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
+  const [feeBalance, setFeeBalance] = useState<FeeBalance | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
 
   const weekDays = useMemo(() => {
@@ -94,6 +141,16 @@ export default function StudentDashboard() {
     } catch {}
   }
 
+  const fetchFees = async () => {
+    try {
+      const res = await fetch("/api/student/fees", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.balance) setFeeBalance(data.balance)
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -109,7 +166,7 @@ export default function StudentDashboard() {
           const data = await commRes.json()
           if (data.communiques?.length > 0) setLatestCommunique(data.communiques[0])
         }
-        await fetchTasks()
+        await Promise.all([fetchTasks(), fetchFees()])
       } catch (error) {
         console.error("Erreur chargement:", error)
       } finally {
@@ -118,23 +175,49 @@ export default function StudentDashboard() {
     }
     fetchData()
     const onNewTask = () => fetchTasks()
+    const onPayment = () => fetchFees()
     window.addEventListener("newTaskReceived", onNewTask)
-    return () => window.removeEventListener("newTaskReceived", onNewTask)
+    window.addEventListener("feePaymentReceived", onPayment)
+    return () => {
+      window.removeEventListener("newTaskReceived", onNewTask)
+      window.removeEventListener("feePaymentReceived", onPayment)
+    }
   }, [])
 
   if (loading) return <StudentLoading />
+
+  const feeProgress = computeFeeProgress(feeBalance)
 
   return (
     <div className="space-y-5 lg:space-y-8">
       {/* Salutation */}
       {studentInfo && (
-        <div>
-          <p className={cn("text-xl font-bold tracking-tight lg:text-3xl", text)}>
-            {getGreeting()}, {studentInfo.firstName}
-          </p>
-          <p className={cn("mt-1 hidden text-sm lg:block", textMuted)}>
-            Prêt pour vos cours de demain ?
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className={cn("text-xl font-bold tracking-tight lg:text-3xl", text)}>
+              {getGreeting()}, {studentInfo.firstName}
+            </p>
+            <p className={cn("mt-1 hidden text-sm lg:block", textMuted)}>
+              Prêt pour vos cours de demain ?
+            </p>
+          </div>
+          {studentInfo.year && (
+            <div
+              className={cn(
+                "shrink-0 rounded-2xl border px-4 py-2.5 lg:px-5 lg:py-3 lg:text-right",
+                card,
+                border,
+                shadow
+              )}
+            >
+              <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>
+                Année scolaire
+              </p>
+              <p className={cn("mt-0.5 text-sm font-bold lg:text-lg", text)}>
+                Session {studentInfo.year}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -176,14 +259,38 @@ export default function StudentDashboard() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 lg:h-12 lg:w-12">
               <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400 lg:h-6 lg:w-6" />
             </div>
-            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-500/10 dark:text-green-400">
-              PAYÉ
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-[10px] font-bold",
+                feeProgress.status === "paid"
+                  ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400"
+                  : feeProgress.status === "partial"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+              )}
+            >
+              {feeProgress.status === "paid" ? "PAYÉ" : feeProgress.status === "partial" ? "PARTIEL" : "IMPAYÉ"}
             </span>
           </div>
           <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400 lg:text-xs">FRAIS SCOLAIRES</p>
-          <p className={cn("mt-0.5 text-xs lg:text-base lg:font-medium", text)}>Paiements à jour</p>
-          <div className="mt-4 hidden h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 lg:block">
-            <div className="h-full w-4/5 rounded-full bg-indigo-600" />
+          <p className={cn("mt-0.5 text-xs lg:text-base lg:font-medium", text)}>{feeProgress.subtitle}</p>
+          <div className="mt-3 flex items-center gap-2 lg:mt-4">
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  feeProgress.status === "paid"
+                    ? "bg-green-500"
+                    : feeProgress.status === "partial"
+                      ? "bg-amber-500"
+                      : "bg-indigo-600"
+                )}
+                style={{ width: `${feeProgress.percent}%` }}
+              />
+            </div>
+            <span className={cn("shrink-0 text-xs font-bold tabular-nums lg:text-sm", text)}>
+              {feeProgress.percent}%
+            </span>
           </div>
         </button>
       </div>
@@ -206,22 +313,35 @@ export default function StudentDashboard() {
         <div className={cn("rounded-2xl border p-3", card, border, shadow)}>
           <div className="grid grid-cols-7 gap-1">
             {weekDays.map((day) => {
+              const isSunday = day.getDay() === 0
               const isToday = day.toDateString() === new Date().toDateString()
               const isSelected = day.toDateString() === selectedDate.toDateString()
+              const isHighlighted = !isSunday && (isToday || isSelected)
+
               return (
                 <button
                   key={day.toISOString()}
                   type="button"
                   onClick={() => setSelectedDate(day)}
                   className="flex flex-col items-center gap-1 py-1"
+                  title={isSunday ? "Dimanche — école fermée" : undefined}
                 >
-                  <span className={cn("text-[10px] font-medium", textMuted)}>{DAY_LABELS[day.getDay()]}</span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium",
+                      isSunday ? "text-red-500" : textMuted
+                    )}
+                  >
+                    {DAY_LABELS[day.getDay()]}
+                  </span>
                   <span
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors",
-                      isToday || isSelected
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                        : cn(text, "hover:bg-gray-100 dark:hover:bg-gray-800")
+                      isSunday
+                        ? "bg-red-500 text-white shadow-md shadow-red-500/30"
+                        : isHighlighted
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                          : cn(text, "hover:bg-gray-100 dark:hover:bg-gray-800")
                     )}
                   >
                     {day.getDate()}

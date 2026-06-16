@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LogOut } from "lucide-react"
+import { LogOut, PanelLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { studentNavItems } from "./student-nav"
 
@@ -16,7 +16,8 @@ export interface StudentSidebarProfile {
 
 interface StudentSidebarProps {
   profile: StudentSidebarProfile | null
-  open?: boolean
+  expanded?: boolean
+  onToggle?: () => void
   unreadMessages?: number
   feePulse?: boolean
   onLogout?: () => void
@@ -26,7 +27,8 @@ interface StudentSidebarProps {
 
 export default function StudentSidebar({
   profile,
-  open = true,
+  expanded = true,
+  onToggle,
   unreadMessages = 0,
   feePulse = false,
   onLogout,
@@ -39,39 +41,70 @@ export default function StudentSidebar({
   return (
     <aside
       className={cn(
-        "hidden h-screen shrink-0 flex-col overflow-hidden border-r transition-[width] duration-300 ease-in-out lg:flex",
-        open ? "w-64 xl:w-72" : "w-0 border-r-0",
-        isDark
-          ? "border-white/5 bg-[#12121a]"
-          : "border-gray-200 bg-white"
+        "fixed inset-y-0 left-0 z-40 hidden flex-col border-r transition-[width] duration-300 ease-in-out lg:flex",
+        expanded ? "w-64 xl:w-72" : "w-[4.25rem]",
+        isDark ? "border-white/5 bg-[#12121a]" : "border-gray-200 bg-white"
       )}
     >
-      <div className={cn("flex h-full w-64 shrink-0 flex-col xl:w-72", !open && "invisible")}>
-      <div className={cn("border-b px-5 py-5", isDark ? "border-white/5" : "border-gray-100")}>
-        <p className={cn("text-sm font-bold tracking-tight", isDark ? "text-white" : "text-gray-900")}>
-          {profile?.school || "Mon école"}
-        </p>
+      {/* En-tête + toggle (style Claude) */}
+      <div
+        className={cn(
+          "flex shrink-0 items-center border-b",
+          expanded ? "justify-between px-4 py-4" : "justify-center px-2 py-4",
+          isDark ? "border-white/5" : "border-gray-100"
+        )}
+      >
+        {expanded && (
+          <p className={cn("min-w-0 truncate pr-2 text-sm font-bold tracking-tight", isDark ? "text-white" : "text-gray-900")}>
+            {profile?.school || "Mon école"}
+          </p>
+        )}
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+              isDark ? "text-gray-400 hover:bg-white/10 hover:text-gray-200" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            )}
+            aria-label={expanded ? "Réduire le menu" : "Étendre le menu"}
+            title={expanded ? "Réduire le menu" : "Étendre le menu"}
+          >
+            <PanelLeft className={cn("h-5 w-5 transition-transform", !expanded && "scale-x-[-1]")} />
+          </button>
+        )}
       </div>
 
       {profile && (
-        <div className={cn("flex items-center gap-3 border-b px-5 py-4", isDark ? "border-white/5" : "border-gray-100")}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+        <div
+          className={cn(
+            "shrink-0 border-b",
+            expanded ? "flex items-center gap-3 px-4 py-4" : "flex justify-center py-3",
+            isDark ? "border-white/5" : "border-gray-100"
+          )}
+        >
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white"
+            title={!expanded ? profile.fullName : undefined}
+          >
             {initials}
           </div>
-          <div className="min-w-0">
-            <p className={cn("truncate text-sm font-semibold", isDark ? "text-white" : "text-gray-900")}>
-              {profile.fullName}
-            </p>
-            {profile.className && (
-              <p className={cn("truncate text-xs", isDark ? "text-gray-400" : "text-gray-500")}>
-                {profile.className}
+          {expanded && (
+            <div className="min-w-0">
+              <p className={cn("truncate text-sm font-semibold", isDark ? "text-white" : "text-gray-900")}>
+                {profile.fullName}
               </p>
-            )}
-          </div>
+              {profile.className && (
+                <p className={cn("truncate text-xs", isDark ? "text-gray-400" : "text-gray-500")}>
+                  {profile.className}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className={cn("flex-1 space-y-1 overflow-y-auto py-3", expanded ? "px-3" : "px-2")}>
         {studentNavItems.map(({ href, label, icon: Icon, match, badgeKey }) => {
           const active = match(pathname)
           const showMsgBadge = badgeKey === "messages" && unreadMessages > 0 && !active
@@ -81,8 +114,10 @@ export default function StudentSidebar({
             <Link
               key={href}
               href={href}
+              title={!expanded ? label : undefined}
               className={cn(
-                "relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                "relative flex items-center rounded-xl text-sm font-medium transition-colors",
+                expanded ? "gap-3 px-3 py-3" : "justify-center px-0 py-3",
                 active
                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
                   : isDark
@@ -90,15 +125,37 @@ export default function StudentSidebar({
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.25 : 2} />
-              <span>{label}</span>
-              {showMsgBadge && (
-                <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                  {unreadMessages > 9 ? "9+" : unreadMessages}
-                </span>
-              )}
-              {showFeePulse && (
-                <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              <span className="relative shrink-0">
+                <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 2} />
+                {!expanded && showMsgBadge && (
+                  <span
+                    className={cn(
+                      "absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500 ring-2",
+                      isDark ? "ring-[#12121a]" : "ring-white"
+                    )}
+                  />
+                )}
+                {!expanded && showFeePulse && (
+                  <span
+                    className={cn(
+                      "absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-green-500 ring-2",
+                      isDark ? "ring-[#12121a]" : "ring-white"
+                    )}
+                  />
+                )}
+              </span>
+              {expanded && (
+                <>
+                  <span className="truncate">{label}</span>
+                  {showMsgBadge && (
+                    <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                  {showFeePulse && (
+                    <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                  )}
+                </>
               )}
             </Link>
           )
@@ -106,24 +163,23 @@ export default function StudentSidebar({
       </nav>
 
       {onLogout && (
-        <div className={cn("border-t p-3", isDark ? "border-white/5" : "border-gray-100")}>
+        <div className={cn("shrink-0 border-t p-2", isDark ? "border-white/5" : "border-gray-100")}>
           <button
             type="button"
             onClick={onLogout}
             disabled={loggingOut}
+            title={!expanded ? "Déconnexion" : undefined}
             className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-              isDark
-                ? "text-red-400 hover:bg-red-500/10"
-                : "text-red-600 hover:bg-red-50"
+              "flex w-full items-center rounded-xl text-sm font-medium transition-colors",
+              expanded ? "gap-3 px-3 py-3" : "justify-center py-3",
+              isDark ? "text-red-400 hover:bg-red-500/10" : "text-red-600 hover:bg-red-50"
             )}
           >
-            <LogOut className="h-5 w-5" />
-            {loggingOut ? "Déconnexion..." : "Déconnexion"}
+            <LogOut className="h-5 w-5 shrink-0" />
+            {expanded && (loggingOut ? "Déconnexion..." : "Déconnexion")}
           </button>
         </div>
       )}
-      </div>
     </aside>
   )
 }

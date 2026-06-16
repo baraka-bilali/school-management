@@ -45,15 +45,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   const [schoolId, setSchoolId] = useState<number | null>(null)
   const [feePulse, setFeePulse] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
 
   useEffect(() => {
     const saved = localStorage.getItem("student-sidebar-open")
-    if (saved !== null) setSidebarOpen(saved === "true")
+    if (saved !== null) setSidebarExpanded(saved === "true")
   }, [])
 
   const toggleSidebar = () => {
-    setSidebarOpen((prev) => {
+    setSidebarExpanded((prev) => {
       const next = !prev
       localStorage.setItem("student-sidebar-open", String(next))
       return next
@@ -198,10 +198,11 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     : null
 
   return (
-    <div className={cn("min-h-screen transition-colors lg:flex", bg, desktopBg)}>
+    <div className={cn("min-h-screen transition-colors", bg, desktopBg)}>
       <StudentSidebar
         profile={sidebarProfile}
-        open={sidebarOpen}
+        expanded={sidebarExpanded}
+        onToggle={toggleSidebar}
         unreadMessages={totalUnread}
         feePulse={feePulse}
         onLogout={handleLogout}
@@ -209,7 +210,12 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
         isDark={isDark}
       />
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div
+        className={cn(
+          "flex min-h-screen min-w-0 flex-col transition-[padding] duration-300 ease-in-out",
+          sidebarExpanded ? "lg:pl-64 xl:pl-72" : "lg:pl-[4.25rem]"
+        )}
+      >
         <StudentHeader
           schoolName={student?.school}
           photoUrl={student?.photoUrl}
@@ -225,8 +231,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           firstName={student?.firstName}
           unreadCount={totalUnread}
           isDark={isDark}
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={toggleSidebar}
         />
 
         <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-2 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6 xl:max-w-6xl xl:px-8">
