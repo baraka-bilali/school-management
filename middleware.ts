@@ -29,6 +29,7 @@ export async function middleware(req: NextRequest) {
   const adminAllowed = new Set([
     "ADMIN",
     "COMPTABLE",
+    "CAISSIER",
     "DIRECTEUR_DISCIPLINE",
     "DIRECTEUR_ETUDES",
   ])

@@ -12,7 +12,9 @@ import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
 
-type TabKey = "students" | "teachers"
+import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
+
+type TabKey = "students" | "teachers" | "staff"
 
 interface PaginationState {
   page: number
@@ -71,7 +73,7 @@ export default function UsersPage() {
       <div className="p-6 space-y-4">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Utilisateurs</h1>
-          <p className={textSecondary}>Gestion des administrateurs, enseignants et élèves.</p>
+          <p className={textSecondary}>Gestion des élèves, enseignants et personnel administratif.</p>
         </div>
 
         {/* Tabs */}
@@ -98,10 +100,23 @@ export default function UsersPage() {
           >
             Enseignants
           </button>
+          <button
+            className={cn(
+              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              tab === "staff"
+                ? "border-indigo-600 text-indigo-700"
+                : `border-transparent ${textSecondary} hover:${textColor}`
+            )}
+            onClick={() => setTab("staff")}
+          >
+            Personnel
+          </button>
         </div>
 
         <div className={`transition-all duration-250 ease-out transform ${tabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
-          {tab === "students" ? <StudentsSection theme={theme} /> : <TeachersSection theme={theme} />}
+          {tab === "students" && <StudentsSection theme={theme} />}
+          {tab === "teachers" && <TeachersSection theme={theme} />}
+          {tab === "staff" && <StaffSection theme={theme} />}
         </div>
       </div>
     </Layout>
@@ -2111,3 +2126,384 @@ function CreateTeacherModal({
   )
 }
 
+function StaffSection({ theme }: { theme: "light" | "dark" }) {
+  const [items, setItems] = useState<any[]>([])
+  const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
+  const [q, setQ] = useState("")
+  const [banner, setBanner] = useState<{
+    message?: string
+    email?: string
+    password?: string
+    type?: "success" | "error"
+    notificationType?: "create" | "update"
+  } | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [selectedStaff, setSelectedStaff] = useState<any>(null)
+  const [newPassword, setNewPassword] = useState("")
+  const [resetting, setResetting] = useState(false)
+  const [passwordCopied, setPasswordCopied] = useState(false)
+  const [emailCopied, setEmailCopied] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (q) params.set("q", q)
+    params.set("page", String(pagination.page))
+    params.set("pageSize", String(pagination.pageSize))
+    ;(async () => {
+      setLoading(true)
+      try {
+        const r = await authFetch(`/api/admin/staff?${params.toString()}`)
+        const res = await r.json()
+        if (!r.ok) throw new Error(res.error || "Erreur")
+        setItems(res.items || [])
+        setTotal(res.total || 0)
+      } catch (e) {
+        console.error(e)
+        setItems([])
+        setTotal(0)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [pagination, q])
+
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
+  const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
+  const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+
+  const handleResetPassword = (staff: any) => {
+    setSelectedStaff(staff)
+    setShowResetModal(true)
+    setNewPassword("")
+    setPasswordCopied(false)
+    setEmailCopied(false)
+  }
+
+  const handleConfirmReset = async () => {
+    if (!selectedStaff) return
+    try {
+      setResetting(true)
+      const res = await authFetch(`/api/admin/staff/${selectedStaff.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur")
+      setNewPassword(data.newPassword)
+    } catch (e) {
+      alert((e as Error).message)
+      setShowResetModal(false)
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const closeResetModal = () => {
+    setShowResetModal(false)
+    setSelectedStaff(null)
+    setNewPassword("")
+  }
+
+  return (
+    <Card theme={theme}>
+      <CardContent className="pt-5">
+        {banner && (
+          <Banner
+            type={banner.type || "success"}
+            message={banner.message}
+            email={banner.email}
+            password={banner.password}
+            onClose={() => setBanner(null)}
+          />
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Rechercher par nom, email ou fonction..."
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPagination((p) => ({ ...p, page: 1 })) }}
+            className={`flex-1 rounded-xl border ${borderColor} ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-white text-gray-900"} px-4 py-2 text-sm`}
+          />
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Créer
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className={theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-600"}>
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Nom</th>
+                <th className="px-3 py-2 text-left font-medium">Prénom</th>
+                <th className="px-3 py-2 text-left font-medium">Rôle</th>
+                <th className="px-3 py-2 text-left font-medium">Email</th>
+                <th className="px-3 py-2 text-left font-medium">Téléphone</th>
+                <th className="px-3 py-2 text-left font-medium">Fonction</th>
+                <th className="px-3 py-2 text-left font-medium">Statut</th>
+                <th className="px-3 py-2 text-left font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className={`px-3 py-8 text-center ${textSecondary}`}>Chargement...</td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun membre du personnel trouvé.</td>
+                </tr>
+              ) : (
+                items.map((s) => (
+                  <tr key={s.id} className={hoverBg}>
+                    <td className={`px-3 py-2 ${textColor}`}>{s.nom || "—"}</td>
+                    <td className={`px-3 py-2 ${textColor}`}>{s.prenom || "—"}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                        {STAFF_ROLE_LABELS[s.role as StaffRole] || s.role}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-2 ${textSecondary} font-mono text-xs`}>{s.email}</td>
+                    <td className={`px-3 py-2 ${textSecondary}`}>{s.telephone || "—"}</td>
+                    <td className={`px-3 py-2 ${textSecondary}`}>{s.fonction || "—"}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${s.isActive ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400" : "bg-gray-100 text-gray-500"}`}>
+                        {s.isActive ? "Actif" : "Inactif"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        className={`${textSecondary} hover:text-orange-500 transition-colors`}
+                        onClick={() => handleResetPassword(s)}
+                        title="Réinitialiser le mot de passe"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <Pagination state={pagination} setState={setPagination} total={total} />
+
+        <CreateStaffModal
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          theme={theme}
+          onCreated={(payload) => {
+            setShowCreate(false)
+            setBanner({
+              email: payload.email,
+              password: payload.plaintextPassword,
+              type: "success",
+              notificationType: "create",
+            })
+            setPagination((p) => ({ ...p }))
+          }}
+        />
+
+        {showResetModal && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeResetModal} />
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-md`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                    <KeyRound className="w-5 h-5 text-orange-500" />
+                    {newPassword ? "Nouveaux identifiants" : "Réinitialiser le mot de passe"}
+                  </h3>
+                </div>
+                <div className="p-6">
+                  {!newPassword ? (
+                    <>
+                      <p className={`${textSecondary} mb-2`}>
+                        Réinitialiser le mot de passe de <strong>{selectedStaff?.nom} {selectedStaff?.prenom}</strong> ?
+                      </p>
+                      <p className={`text-sm ${textSecondary}`}>Un nouveau mot de passe temporaire sera généré.</p>
+                    </>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className={`block text-xs font-semibold ${textSecondary} mb-1`}>Email</label>
+                        <div className={`flex items-center justify-between rounded-lg border ${borderColor} p-3`}>
+                          <span className="font-mono text-sm">{selectedStaff?.email}</span>
+                          <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedStaff?.email || ""); setEmailCopied(true) }} className="text-indigo-500">
+                            {emailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={`block text-xs font-semibold ${textSecondary} mb-1`}>Nouveau mot de passe</label>
+                        <div className={`flex items-center justify-between rounded-lg border ${borderColor} p-3`}>
+                          <span className="font-mono text-lg font-bold">{newPassword}</span>
+                          <button type="button" onClick={() => { navigator.clipboard?.writeText(newPassword); setPasswordCopied(true) }} className="text-orange-500">
+                            {passwordCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className={`p-6 flex gap-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button type="button" onClick={closeResetModal} className={`flex-1 px-4 py-2 rounded-lg border ${borderColor} ${textColor}`}>
+                    {newPassword ? "Fermer" : "Annuler"}
+                  </button>
+                  {!newPassword && (
+                    <button
+                      type="button"
+                      onClick={handleConfirmReset}
+                      disabled={resetting}
+                      className="flex-1 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
+                    >
+                      {resetting ? "..." : "Réinitialiser"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function CreateStaffModal({
+  open,
+  onClose,
+  onCreated,
+  theme = "light",
+}: {
+  open: boolean
+  onClose: () => void
+  onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  theme?: "light" | "dark"
+}) {
+  const [form, setForm] = useState({
+    lastName: "",
+    middleName: "",
+    firstName: "",
+    role: "CAISSIER" as StaffRole,
+    phone: "",
+    fonction: "",
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const id = setTimeout(() => setVisible(true), 10)
+      return () => clearTimeout(id)
+    }
+    setVisible(false)
+    const t = setTimeout(() => setMounted(false), 220)
+    return () => clearTimeout(t)
+  }, [open])
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        lastName: "",
+        middleName: "",
+        firstName: "",
+        role: "CAISSIER",
+        phone: "",
+        fonction: "",
+      })
+      setSubmitting(false)
+    }
+  }, [open])
+
+  if (!mounted) return null
+
+  const inputCls = `w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`
+  const labelCls = `block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`
+
+  const submit = async () => {
+    if (!form.lastName.trim() || !form.firstName.trim()) {
+      alert("Nom et prénom sont obligatoires")
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await authFetch("/api/admin/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur")
+      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword })
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Portal>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+            <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un membre du personnel</div>
+            <button type="button" className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose}>×</button>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+              <label className={labelCls}>Nom *</label>
+              <input className={inputCls} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Post-nom</label>
+              <input className={inputCls} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Prénom *</label>
+              <input className={inputCls} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Rôle *</label>
+              <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as StaffRole })}>
+                {STAFF_ROLES.map((role) => (
+                  <option key={role} value={role}>{STAFF_ROLE_LABELS[role]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Téléphone</label>
+              <input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className={labelCls}>Fonction / description</label>
+              <input className={inputCls} placeholder="Ex: Caissière principale" value={form.fonction} onChange={(e) => setForm({ ...form, fonction: e.target.value })} />
+            </div>
+          </div>
+          <p className={`px-4 pb-2 text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+            L&apos;email et le mot de passe seront générés automatiquement après la création.
+          </p>
+          <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+            <button type="button" className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200" : "border-gray-300 text-gray-700"} px-4 py-2`} onClick={onClose}>Annuler</button>
+            <button type="button" disabled={submitting} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
+              {submitting ? "Création..." : "Créer"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+}

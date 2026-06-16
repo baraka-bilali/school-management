@@ -71,6 +71,7 @@ export default function LoginPage() {
 		switch (role) {
 			case "ADMIN":
 			case "COMPTABLE":
+			case "CAISSIER":
 			case "DIRECTEUR_DISCIPLINE":
 			case "DIRECTEUR_ETUDES":
 				router.push("/admin")

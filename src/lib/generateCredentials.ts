@@ -86,6 +86,28 @@ export function buildTeacherEmail({ lastName, middleName, suffix }: { lastName: 
   return `${left}@${DEFAULT_DOMAIN}`
 }
 
+export function buildStaffEmail({
+  lastName,
+  firstName,
+  role,
+  suffix,
+}: {
+  lastName: string
+  firstName: string
+  role: string
+  suffix?: number
+}): string {
+  const rolePrefix =
+    role === "CAISSIER" ? "cai" :
+    role === "COMPTABLE" ? "cpt" :
+    role === "DIRECTEUR_DISCIPLINE" ? "dis" :
+    role === "DIRECTEUR_ETUDES" ? "etu" :
+    "stf"
+  const sfx = suffix && suffix >= 2 ? String(suffix) : ""
+  const left = `${rolePrefix}.${initial(lastName)}${initial(firstName)}${sfx}`
+  return `${left}@${DEFAULT_DOMAIN}`
+}
+
 export function generatePassword(): string {
   const length = 14
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
