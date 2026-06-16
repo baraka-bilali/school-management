@@ -28,6 +28,8 @@ import {
   ArrowRight,
   Loader2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Hash,
   Calendar,
   Building,
@@ -192,6 +194,32 @@ interface StudentFeeRow {
 // MODE DE PAIEMENT OPTIONS
 // ============================================================
 
+const SF_PAGE_SIZE = 10
+const OVERVIEW_RECENT_PAYMENTS_LIMIT = 6
+
+function getStudentPrimaryCurrency(row: StudentFeeRow): "USD" | "CDF" | null {
+  const hasUsd = row.usd.expected > 0
+  const hasCdf = row.cdf.expected > 0
+  if (hasUsd && !hasCdf) return "USD"
+  if (hasCdf && !hasUsd) return "CDF"
+  if (hasUsd && hasCdf) return row.cdf.expected >= row.usd.expected ? "CDF" : "USD"
+  return null
+}
+
+function getStudentPrimaryPaid(row: StudentFeeRow): number {
+  const currency = getStudentPrimaryCurrency(row)
+  if (currency === "USD") return row.usd.paid
+  if (currency === "CDF") return row.cdf.paid
+  return 0
+}
+
+function getStudentPrimaryRemaining(row: StudentFeeRow): number {
+  const currency = getStudentPrimaryCurrency(row)
+  if (currency === "USD") return row.usd.remaining
+  if (currency === "CDF") return row.cdf.remaining
+  return 0
+}
+
 const MODES_PAIEMENT = [
   { value: "CASH", label: "Espèces", icon: Banknote, color: "text-green-500" },
   { value: "MOBILE_MONEY", label: "Mobile Money", icon: Smartphone, color: "text-blue-500" },
@@ -255,9 +283,11 @@ export default function AdminFeesPage() {
   const [sfAmountMode, setSfAmountMode] = useState<"gte" | "lt">("gte")
   const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
   const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
+  const [sfPage, setSfPage] = useState(1)
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentInitialEnrollment, setPaymentInitialEnrollment] = useState<EnrollmentOption | null>(null)
   const [showCreateTypeModal, setShowCreateTypeModal] = useState(false)
   const [showCreateTarifModal, setShowCreateTarifModal] = useState(false)
 
@@ -384,6 +414,26 @@ export default function AdminFeesPage() {
     }
   }, [activeTab, currentYearId, fetchStudentFees])
 
+  useEffect(() => {
+    setSfPage(1)
+  }, [sfSearch, sfClassFilter, sfStatusFilter, sfAmountThreshold, sfAmountMode, sfSortKey, sfSortDir])
+
+  const studentRowToEnrollment = (row: StudentFeeRow): EnrollmentOption => ({
+    enrollmentId: row.enrollmentId,
+    studentId: row.studentId,
+    studentName: `${row.lastName} ${row.middleName} ${row.firstName}`.trim(),
+    studentCode: row.code,
+    classId: row.classId,
+    className: row.className,
+    yearId: currentYearId ?? 0,
+    yearName: years.find((y) => y.id === currentYearId)?.name ?? "",
+  })
+
+  const openPaymentModal = (enrollment?: EnrollmentOption | null) => {
+    setPaymentInitialEnrollment(enrollment ?? null)
+    setShowPaymentModal(true)
+  }
+
   // Filtrer et trier les élèves
   const filteredStudentFees = (() => {
     let list = [...studentFees]
@@ -410,15 +460,14 @@ export default function AdminFeesPage() {
       list = list.filter((s) => s.status === sfStatusFilter)
     }
 
-    // Filtre par montant seuil
+    // Filtre par montant seuil (devise de la classe de l'élève : USD ou CDF)
     if (sfAmountThreshold) {
       const threshold = parseFloat(sfAmountThreshold)
       if (!isNaN(threshold)) {
-        if (sfAmountMode === "gte") {
-          list = list.filter((s) => (s.usd.paid + s.cdf.paid) >= threshold)
-        } else {
-          list = list.filter((s) => (s.usd.paid + s.cdf.paid) < threshold)
-        }
+        list = list.filter((s) => {
+          const paid = getStudentPrimaryPaid(s)
+          return sfAmountMode === "gte" ? paid >= threshold : paid < threshold
+        })
       }
     }
 
@@ -430,10 +479,10 @@ export default function AdminFeesPage() {
           cmp = a.lastName.localeCompare(b.lastName)
           break
         case "paid":
-          cmp = (a.usd.paid + a.cdf.paid) - (b.usd.paid + b.cdf.paid)
+          cmp = getStudentPrimaryPaid(a) - getStudentPrimaryPaid(b)
           break
         case "remaining":
-          cmp = (a.usd.remaining + a.cdf.remaining) - (b.usd.remaining + b.cdf.remaining)
+          cmp = getStudentPrimaryRemaining(a) - getStudentPrimaryRemaining(b)
           break
         case "percent":
           cmp = getStudentPercent(a) - getStudentPercent(b)
@@ -447,6 +496,12 @@ export default function AdminFeesPage() {
 
     return list
   })()
+
+  const sfTotalPages = Math.max(1, Math.ceil(filteredStudentFees.length / SF_PAGE_SIZE))
+  const paginatedStudentFees = filteredStudentFees.slice(
+    (sfPage - 1) * SF_PAGE_SIZE,
+    sfPage * SF_PAGE_SIZE
+  )
 
   // Export Excel (CSV UTF-8 avec BOM pour Excel)
   const exportStudentsExcel = () => {
@@ -551,7 +606,7 @@ export default function AdminFeesPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setShowPaymentModal(true)}
+              onClick={() => openPaymentModal()}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-green-500/25 font-medium"
             >
               <DollarSign className="w-4 h-4" />
@@ -688,7 +743,7 @@ export default function AdminFeesPage() {
         )}
 
         {/* Onglets */}
-        <div className={`flex items-center gap-1 border-b ${borderColor} overflow-x-auto`}>
+        <div className={`flex items-center gap-1 border-b ${borderColor} flex-wrap`}>
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
@@ -814,7 +869,7 @@ export default function AdminFeesPage() {
                         <Receipt className={`w-12 h-12 mx-auto mb-3 ${textSecondary} opacity-30`} />
                         <p className={textSecondary}>Aucun paiement enregistré</p>
                         <button
-                          onClick={() => setShowPaymentModal(true)}
+                          onClick={() => openPaymentModal()}
                           className="mt-3 text-sm text-indigo-500 hover:text-indigo-400 font-medium inline-flex items-center gap-1"
                         >
                           Enregistrer le premier paiement <ArrowRight className="w-3.5 h-3.5" />
@@ -822,7 +877,7 @@ export default function AdminFeesPage() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {stats.recentPayments.map((payment) => (
+                        {stats.recentPayments.slice(0, OVERVIEW_RECENT_PAYMENTS_LIMIT).map((payment) => (
                           <div key={payment.id} className={`flex items-center justify-between p-3 rounded-xl transition-colors ${theme === "dark" ? "bg-gray-700/40 hover:bg-gray-700/70" : "bg-gray-50 hover:bg-gray-100"}`}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-9 h-9 bg-green-500/15 rounded-full flex items-center justify-center shrink-0">
@@ -839,6 +894,15 @@ export default function AdminFeesPage() {
                             </div>
                           </div>
                         ))}
+                        {stats.recentPayments.length > OVERVIEW_RECENT_PAYMENTS_LIMIT && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("payments")}
+                            className="w-full mt-2 py-2 text-sm font-medium text-indigo-500 hover:text-indigo-400 transition-colors"
+                          >
+                            Voir tous les paiements ({stats.recentPayments.length})
+                          </button>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -1070,10 +1134,11 @@ export default function AdminFeesPage() {
                           </select>
                           <input
                             type="number"
-                            placeholder="Montant $"
+                            placeholder="Montant"
                             value={sfAmountThreshold}
                             onChange={(e) => setSfAmountThreshold(e.target.value)}
                             className={`w-[110px] px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}
+                            title="Filtre selon le montant payé dans la devise de la classe (USD ou CDF)"
                           />
                         </div>
 
@@ -1113,7 +1178,7 @@ export default function AdminFeesPage() {
                           <p className={`text-sm ${textSecondary} mt-1`}>Modifiez les filtres pour afficher des résultats</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto rounded-xl border ${borderColor}">
+                        <div className={`overflow-x-auto rounded-xl border ${borderColor}`}>
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={headerBg}>
@@ -1144,10 +1209,11 @@ export default function AdminFeesPage() {
                                 ))}
                                 <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
                                 <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Nb Paie.</th>
+                                <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Action</th>
                               </tr>
                             </thead>
                             <tbody className={`divide-y ${borderColor}`}>
-                              {filteredStudentFees.map((s) => (
+                              {paginatedStudentFees.map((s) => (
                                 <tr key={s.studentId} className={`${hoverRow} transition-colors`}>
                                   <td className={`px-4 py-3 ${textColor}`}>
                                     <div className="font-medium">{s.lastName} {s.middleName} {s.firstName}</div>
@@ -1155,7 +1221,7 @@ export default function AdminFeesPage() {
                                   </td>
                                   <td className={`px-4 py-3 ${textSecondary}`}>{s.className}</td>
                                   <td className={`px-4 py-3 font-medium ${textColor}`}>{formatStudentAmounts(s, "paid")}</td>
-                                  <td className={`px-4 py-3 font-medium ${(s.usd.remaining + s.cdf.remaining) > 0 ? "text-red-500" : "text-green-500"}`}>
+                                  <td className={`px-4 py-3 font-medium ${getStudentPrimaryRemaining(s) > 0 ? "text-red-500" : "text-green-500"}`}>
                                     {formatStudentAmounts(s, "remaining")}
                                   </td>
                                   <td className="px-4 py-3">
@@ -1191,10 +1257,52 @@ export default function AdminFeesPage() {
                                     </span>
                                   </td>
                                   <td className={`px-4 py-3 text-center ${textSecondary}`}>{s.paymentCount}</td>
+                                  <td className="px-4 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => openPaymentModal(studentRowToEnrollment(s))}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                                      title="Enregistrer un paiement pour cet élève"
+                                    >
+                                      <DollarSign className="w-3.5 h-3.5" />
+                                      Payer
+                                    </button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                      )}
+
+                      {filteredStudentFees.length > 0 && sfTotalPages > 1 && (
+                        <div className={`flex items-center justify-between pt-4 border-t ${borderColor}`}>
+                          <p className={`text-sm ${textSecondary}`}>
+                            {(sfPage - 1) * SF_PAGE_SIZE + 1}–{Math.min(sfPage * SF_PAGE_SIZE, filteredStudentFees.length)} sur {filteredStudentFees.length} élève{filteredStudentFees.length > 1 ? "s" : ""}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSfPage((p) => Math.max(1, p - 1))}
+                              disabled={sfPage <= 1}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                              Préc.
+                            </button>
+                            <span className={`text-sm ${textSecondary} px-2`}>
+                              {sfPage} / {sfTotalPages}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSfPage((p) => Math.min(sfTotalPages, p + 1))}
+                              disabled={sfPage >= sfTotalPages}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              Suiv.
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1211,12 +1319,19 @@ export default function AdminFeesPage() {
       {/* ============================================================ */}
       {showPaymentModal && (
         <PaymentFormModal
+          key={paymentInitialEnrollment?.enrollmentId ?? "new"}
           theme={theme}
           tarifications={tarifications}
-          onClose={() => setShowPaymentModal(false)}
+          initialEnrollment={paymentInitialEnrollment}
+          onClose={() => {
+            setShowPaymentModal(false)
+            setPaymentInitialEnrollment(null)
+          }}
           onSuccess={() => {
             setShowPaymentModal(false)
+            setPaymentInitialEnrollment(null)
             fetchAll()
+            if (activeTab === "students") fetchStudentFees()
           }}
         />
       )}
@@ -1261,15 +1376,17 @@ export default function AdminFeesPage() {
 function PaymentFormModal({
   theme,
   tarifications,
+  initialEnrollment,
   onClose,
   onSuccess,
 }: {
   theme: "light" | "dark"
   tarifications: Tarification[]
+  initialEnrollment?: EnrollmentOption | null
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(initialEnrollment ? 2 : 1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
@@ -1278,7 +1395,7 @@ function PaymentFormModal({
   const [studentSearch, setStudentSearch] = useState("")
   const [searchResults, setSearchResults] = useState<EnrollmentOption[]>([])
   const [searching, setSearching] = useState(false)
-  const [selectedEnrollment, setSelectedEnrollment] = useState<EnrollmentOption | null>(null)
+  const [selectedEnrollment, setSelectedEnrollment] = useState<EnrollmentOption | null>(initialEnrollment ?? null)
 
   // Step 2: Sélection tarification + montant
   const [selectedTarif, setSelectedTarif] = useState<Tarification | null>(null)
