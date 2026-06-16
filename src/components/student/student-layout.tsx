@@ -112,6 +112,21 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     setMenuOpen(false)
   }, [pathname])
 
+  // Sync badge notifications (lu/non lu) après lecture dans /student/notifications
+  useEffect(() => {
+    const handle = (evt: Event) => {
+      const custom = evt as CustomEvent<{ unread?: number }>
+      const unread = custom.detail?.unread
+      if (typeof unread === "number") {
+        setUnreadNotifications(unread)
+        return
+      }
+    }
+
+    window.addEventListener("studentNotificationsUpdated", handle as EventListener)
+    return () => window.removeEventListener("studentNotificationsUpdated", handle as EventListener)
+  }, [])
+
   useEffect(() => {
     const handleRead = async () => {
       try {

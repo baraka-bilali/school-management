@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
   Bell,
@@ -93,6 +93,8 @@ function NotificationsHubContent() {
     if (searchParams.get("tab") === "communiques") setTab("communiques")
   }, [searchParams])
 
+  const router = useRouter()
+
   const markAsRead = async (id: number) => {
     try {
       const res = await fetch(`/api/student/notifications/${id}/read`, {
@@ -100,9 +102,17 @@ function NotificationsHubContent() {
         credentials: "include",
       })
       if (res.ok) {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+        setNotifications((prev) => {
+          const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+          const unread = next.filter((n) => !n.isRead).length
+          window.dispatchEvent(new CustomEvent("studentNotificationsUpdated", { detail: { unread } }))
+          return next
+        })
+        return true
       }
     } catch {}
+
+    return false
   }
 
   const markAllAsRead = async () => {
@@ -111,8 +121,17 @@ function NotificationsHubContent() {
         method: "POST",
         credentials: "include",
       })
-      if (res.ok) setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+      if (res.ok) {
+        setNotifications((prev) => {
+          const next = prev.map((n) => ({ ...n, isRead: true }))
+          window.dispatchEvent(new CustomEvent("studentNotificationsUpdated", { detail: { unread: 0 } }))
+          return next
+        })
+        return true
+      }
     } catch {}
+
+    return false
   }
 
   const getNotificationIcon = (type: string) => {
@@ -194,7 +213,7 @@ function NotificationsHubContent() {
             </button>
           )}
           {loadingNotif ? (
-            <StudentLoading label="Chargement..." />
+            <StudentLoading variant="list" label="Chargement..." />
           ) : notifications.length === 0 ? (
             <div className={cn("rounded-2xl border p-10 text-center", card, border, shadow)}>
               <Bell className={cn("mx-auto mb-3 h-10 w-10", textMuted)} />
@@ -205,7 +224,11 @@ function NotificationsHubContent() {
               <button
                 key={notification.id}
                 type="button"
-                onClick={() => !notification.isRead && markAsRead(notification.id)}
+                onClick={async () => {
+                  if (notification.isRead) return
+                  const ok = await markAsRead(notification.id)
+                  if (ok && notification.type === "FEE") router.push("/student/fees")
+                }}
                 className={cn(
                   "w-full rounded-2xl border p-4 text-left",
                   notification.isRead
@@ -221,7 +244,13 @@ function NotificationsHubContent() {
                     <p className={cn("text-sm", notification.isRead ? textMuted : cn(text, "font-medium"))}>{notification.message}</p>
                     <p className={cn("mt-1 text-xs", textMuted)}>{formatDate(notification.createdAt)}</p>
                   </div>
-                  {!notification.isRead && <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />}
+                  <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
+                    {notification.isRead ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                    )}
+                  </div>
                 </div>
               </button>
             ))
@@ -233,7 +262,7 @@ function NotificationsHubContent() {
       {tab === "communiques" && (
         <div className="space-y-2">
           {loadingComm ? (
-            <StudentLoading label="Chargement..." />
+            <StudentLoading variant="list" label="Chargement..." />
           ) : communiques.length === 0 ? (
             <div className={cn("rounded-2xl border p-10 text-center", card, border, shadow)}>
               <Megaphone className={cn("mx-auto mb-3 h-10 w-10", textMuted)} />
@@ -287,7 +316,7 @@ function NotificationsHubContent() {
 
 export default function StudentNotificationsPage() {
   return (
-    <Suspense fallback={<StudentLoading />}>
+    <Suspense fallback={<StudentLoading variant="list" />}>
       <NotificationsHubContent />
     </Suspense>
   )

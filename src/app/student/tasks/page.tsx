@@ -42,7 +42,7 @@ export default function StudentTasksPage() {
     return () => window.removeEventListener("newTaskReceived", onNewTask)
   }, [])
 
-  if (loading) return <StudentLoading />
+  if (loading) return <StudentLoading variant="cards" />
 
   const activeTasks = tasks.filter((t) => new Date(t.dueAt) >= new Date())
   const pastTasks = tasks.filter((t) => new Date(t.dueAt) < new Date())

@@ -48,7 +48,7 @@ export default function StudentCommuniqueViewPage() {
     if (params.id) fetchCommunique()
   }, [params.id])
 
-  if (loading) return <StudentLoading />
+  if (loading) return <StudentLoading variant="cards" />
 
   if (notFound || !communique) {
     return (

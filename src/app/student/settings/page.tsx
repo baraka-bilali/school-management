@@ -172,7 +172,7 @@ export default function StudentSettingsPage() {
         ? "Féminin"
         : student?.gender || "—"
 
-  if (loadingProfile) return <StudentLoading />
+  if (loadingProfile) return <StudentLoading variant="profile" />
 
   return (
     <div className="space-y-5 lg:space-y-8">

@@ -72,7 +72,7 @@ export default function StudentCommuniquesPage() {
     return acc
   }, {} as Record<string, Communique[]>)
 
-  if (loading) return <StudentLoading />
+  if (loading) return <StudentLoading variant="list" />
 
   return (
     <div className="space-y-5">

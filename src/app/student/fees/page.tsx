@@ -79,7 +79,7 @@ export default function StudentFeesPage() {
     return () => window.removeEventListener("feePaymentReceived", onPayment)
   }, [fetchFees])
 
-  if (loading) return <StudentLoading />
+  if (loading) return <StudentLoading variant="cards" />
 
   const summary = mergeBalance(balance)
   const cdfSummary = balance?.cdf
