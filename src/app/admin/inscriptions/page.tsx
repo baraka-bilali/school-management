@@ -14,6 +14,14 @@ export default function InscriptionsPage() {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) setTheme(savedTheme)
 
+    const handleThemeChange = () => {
+      const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
+      if (newTheme) setTheme(newTheme)
+    }
+
+    window.addEventListener("themeChange", handleThemeChange)
+    window.addEventListener("storage", handleThemeChange)
+
     fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -35,6 +43,11 @@ export default function InscriptionsPage() {
         setAllowed(false)
         router.replace("/admin/fees")
       })
+
+    return () => {
+      window.removeEventListener("themeChange", handleThemeChange)
+      window.removeEventListener("storage", handleThemeChange)
+    }
   }, [router])
 
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"

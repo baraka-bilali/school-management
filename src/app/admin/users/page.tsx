@@ -11,6 +11,7 @@ import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download } fro
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
+import { toDisplayCode } from "@/lib/student-fields"
 
 import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
 
@@ -137,7 +138,14 @@ function CreateStudentModal({
   classes: Array<{ id: number; name: string }>
   years: Array<{ id: number; name: string }>
   defaultYearId?: number
-  onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  onCreated: (payload: { 
+    email: string
+    plaintextPassword: string
+    lastName?: string
+    firstName?: string
+    code?: string
+    classId?: number
+  }) => void
   theme?: "light" | "dark"
 }) {
   const [form, setForm] = useState({
@@ -228,7 +236,14 @@ function CreateStudentModal({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
-      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword })
+      onCreated({ 
+        email: data.user.email, 
+        plaintextPassword: data.plaintextPassword,
+        lastName: data.student?.lastName ?? form.lastName,
+        firstName: data.student?.firstName ?? form.firstName,
+        code: data.student?.code ?? form.code,
+        classId: Number(form.classId),
+      })
     } catch (e) {
       alert((e as Error).message)
     } finally {
@@ -482,6 +497,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
 
   // États pour la réinitialisation de mot de passe
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [isCreateCredentials, setIsCreateCredentials] = useState(false)
   const [selectedStudentForReset, setSelectedStudentForReset] = useState<any>(null)
   const [resettingPassword, setResettingPassword] = useState(false)
   const [newPasswordGenerated, setNewPasswordGenerated] = useState("")
@@ -498,6 +514,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
 
   // Gestionnaire pour réinitialiser le mot de passe
   const handleResetPassword = (student: any) => {
+    setIsCreateCredentials(false)
     setSelectedStudentForReset(student)
     setShowResetPasswordModal(true)
     setNewPasswordGenerated("")
@@ -541,6 +558,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   // Fermer le modal de réinitialisation
   const closeResetPasswordModal = () => {
     setShowResetPasswordModal(false)
+    setIsCreateCredentials(false)
     setSelectedStudentForReset(null)
     setNewPasswordGenerated("")
     setPasswordCopied(false)
@@ -550,7 +568,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   const handleEdit = (student: any) => {
     setEditingId(student.id)
     setEditForm({
-      code: student.code,
+      code: studentDisplayCode(student),
       lastName: student.lastName,
       middleName: student.middleName,
       firstName: student.firstName,
@@ -713,6 +731,9 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+  const cellHover = theme === "dark" ? "group-hover:bg-gray-700" : "group-hover:bg-gray-50"
+  const studentDisplayCode = (student: { code?: string; enrollments?: Array<{ classId?: number }> }) =>
+    toDisplayCode(student.code, student.enrollments?.[0]?.classId)
 
   const exportStudents = () => {
     if (!items.length) return
@@ -724,7 +745,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
     const rows = items.map((s) => {
       const enr = s.enrollments?.[0]
       return [
-        s.code ?? "",
+        s.code ? studentDisplayCode(s) : "",
         s.lastName ?? "",
         s.middleName ?? "",
         s.firstName ?? "",
@@ -889,7 +910,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                 <div key={`mobile-${s.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
                   {/* En-tête avec code et actions */}
                   <div className="flex items-center justify-between">
-                    <div className={`font-medium ${textColor}`}>Code: {s.code}</div>
+                    <div className={`font-medium ${textColor}`}>Code: {studentDisplayCode(s)}</div>
                     {!enrollmentOnly && (
                     <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}>
                       <Eye className="h-4 w-4" />
@@ -961,20 +982,20 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                 return (
                   <React.Fragment key={s.id}>
                     <tr className={cn(
-                      hoverBg,
-                      "cursor-pointer",
+                      "group",
+                      !enrollmentOnly && "cursor-pointer",
                       editingId === s.id ? (theme === "dark" ? "bg-blue-900/30" : "bg-blue-50") : ""
                     )} onClick={() => !enrollmentOnly && !editingId && setExpandedId(isOpen ? null : s.id)}>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <input
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
                             value={editForm.code}
                             onChange={(e) => setEditForm(prev => ({ ...prev, code: e.target.value }))}
                           />
-                        ) : s.code}
+                        ) : studentDisplayCode(s)}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <input
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
@@ -983,7 +1004,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           />
                         ) : s.lastName}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <input
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
@@ -992,7 +1013,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           />
                         ) : s.middleName}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <input
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
@@ -1001,7 +1022,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           />
                         ) : s.firstName}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <select
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
@@ -1013,7 +1034,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           </select>
                         ) : s.gender}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className={cn("px-3 py-2", cellHover)}>
                         {editingId === s.id ? (
                           <input
                             type="date"
@@ -1023,7 +1044,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           />
                         ) : new Date(s.birthDate).toLocaleDateString()}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
                           <select
                             className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-2 py-1`}
@@ -1036,7 +1057,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                           </select>
                         ) : enr?.class?.name || "-"}
                       </td>
-                      <td className={`px-3 py-2 ${textColor}`}>{enr?.year?.name || "-"}</td>
+                      <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>{enr?.year?.name || "-"}</td>
                       {!enrollmentOnly && (
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
@@ -1044,7 +1065,8 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                             <>
                               <button 
                                 disabled={submitting}
-                                className={`transition-colors cursor-pointer relative group ${
+                                title={submitting ? "Enregistrement..." : "Valider"}
+                                className={`transition-colors cursor-pointer ${
                                   submitting 
                                     ? 'text-gray-400 cursor-not-allowed' 
                                     : 'text-green-600 hover:text-green-700'
@@ -1059,13 +1081,11 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                                 ) : (
                                   <Check className="h-4 w-4" />
                                 )}
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  {submitting ? 'Enregistrement...' : 'Valider'}
-                                </span>
                               </button>
                               <button 
                                 disabled={submitting}
-                                className={`transition-colors cursor-pointer relative group ${
+                                title="Annuler"
+                                className={`transition-colors cursor-pointer ${
                                   submitting
                                     ? 'text-gray-400 cursor-not-allowed'
                                     : 'text-red-600 hover:text-red-700'
@@ -1079,45 +1099,36 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                                 }}
                               >
                                 <X className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Annuler
-                                </span>
                               </button>
                             </>
                           ) : (
                             <>
                               <button 
-                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
+                                title="Modifier"
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
                                   handleEdit(s);
                                 }}
                               >
                                 <Pencil className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Modifier
-                                </span>
                               </button>
                               <button 
-                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer relative group`}
+                                title="Réinitialiser mot de passe"
+                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer`}
                                 onClick={(e) => { 
                                   e.stopPropagation();
                                   handleResetPassword(s);
                                 }}
                               >
                                 <KeyRound className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Réinitialiser mot de passe
-                                </span>
                               </button>
                               <button 
-                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`}
+                                title="Détails"
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer`}
                                 onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}
                               >
                                 <Eye className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Détails
-                                </span>
                               </button>
                             </>
                           )}
@@ -1125,14 +1136,10 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                       </td>
                       )}
                     </tr>
-                    {!enrollmentOnly && (
+                    {!enrollmentOnly && isOpen && (
                     <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
-                      <td colSpan={9} className="px-3 py-0">
-                        <div className={cn(
-                          "overflow-hidden transition-all duration-300",
-                          isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-                        )}>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
+                      <td colSpan={9} className="px-3 py-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{s.lastName}</div></div>
                             <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{s.middleName}</div></div>
                             <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{s.firstName}</div></div>
@@ -1141,7 +1148,6 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                             <div><span className={textSecondary}>Classe</span><div className={`font-medium ${textColor}`}>{enr?.class?.name || "-"}</div></div>
                             <div><span className={textSecondary}>Année</span><div className={`font-medium ${textColor}`}>{enr?.year?.name || "-"}</div></div>
                           </div>
-                        </div>
                       </td>
                     </tr>
                     )}
@@ -1168,14 +1174,16 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
-            // show credentials banner (no extra message)
-            setBanner({
+            setIsCreateCredentials(true)
+            setSelectedStudentForReset({
               email: payload.email,
-              password: payload.plaintextPassword,
-              type: "success",
-              notificationType: "create"
+              lastName: payload.lastName,
+              firstName: payload.firstName,
+              code: toDisplayCode(payload.code, payload.classId),
             })
-            // show loading while refreshing
+            setNewPasswordGenerated(payload.plaintextPassword)
+            setPasswordCopied(false)
+            setEmailCopied(false)
             setLoading(true)
             setPagination((p) => ({ ...p }))
           }}
@@ -1205,7 +1213,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                         {selectedStudentForReset?.lastName} {selectedStudentForReset?.middleName} {selectedStudentForReset?.firstName}
                       </p>
                       <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        Code: {selectedStudentForReset?.code}
+                        Code: {toDisplayCode(selectedStudentForReset?.code, selectedStudentForReset?.enrollments?.[0]?.classId)}
                       </p>
                     </div>
                   </div>
@@ -1259,7 +1267,9 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                     </div>
                     <div>
                       <h2 className={`text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Identifiants de Connexion</h2>
-                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Mot de passe réinitialisé avec succès</p>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        {isCreateCredentials ? "Compte créé avec succès" : "Mot de passe réinitialisé avec succès"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1287,7 +1297,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                         {selectedStudentForReset?.lastName} {selectedStudentForReset?.firstName}
                       </p>
                       <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        Code: {selectedStudentForReset?.code}
+                        Code: {toDisplayCode(selectedStudentForReset?.code, selectedStudentForReset?.enrollments?.[0]?.classId)}
                       </p>
                     </div>
                   </div>
@@ -1335,7 +1345,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                   <div>
                     <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}>
                       <KeyRound className="w-3.5 h-3.5" />
-                      Nouveau mot de passe
+                      {isCreateCredentials ? "Mot de passe temporaire" : "Nouveau mot de passe"}
                     </label>
                     <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${passwordCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
                       <span className={`font-mono text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>
