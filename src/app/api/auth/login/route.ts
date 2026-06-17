@@ -41,7 +41,8 @@ export async function POST(req: Request) {
         email: user.email, 
         role: user.role,
         schoolId: user.schoolId,
-        name: user.name
+        name: user.name,
+        canEnrollStudents: user.canEnrollStudents ?? false,
       },
       JWT_SECRET,
       { expiresIn: "1h" }

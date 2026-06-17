@@ -18,7 +18,8 @@ import {
   Wallet,
   Landmark,
   Lock,
-  Megaphone
+  Megaphone,
+  UserPlus,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -40,6 +41,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   const [loggingOut, setLoggingOut] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [userRole, setUserRole] = useState<string>("ADMIN")
+  const [canEnrollStudents, setCanEnrollStudents] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -56,10 +58,21 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
       try {
         const payload = JSON.parse(atob(token.split(".")[1]))
         setUserRole(payload.role || "ADMIN")
+        setCanEnrollStudents(!!payload.canEnrollStudents)
       } catch (error) {
         console.error("Erreur lors du décodage du token:", error)
       }
     }
+
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.user?.role) setUserRole(data.user.role)
+        if (typeof data?.user?.canEnrollStudents === "boolean") {
+          setCanEnrollStudents(data.user.canEnrollStudents)
+        }
+      })
+      .catch(() => {})
 
     // Écouter les changements de thème
     const handleStorageChange = () => {
@@ -107,6 +120,9 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   // Menu caissier (POS — encaissement uniquement)
   const cashierNavItems: NavItem[] = [
     { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
+    ...(canEnrollStudents
+      ? [{ icon: UserPlus, label: "Inscription", href: "/admin/inscriptions" }]
+      : []),
   ]
 
   // Menu pour les élèves

@@ -73,6 +73,12 @@ interface FeeStats {
   totalStudents: number
   recentPayments: RecentPayment[]
   tarificationsSummary: TarificationSummary[]
+  dailyCollected?: {
+    usd: number
+    cdf: number
+    count: number
+    date: string
+  }
 }
 
 interface RecentPayment {
@@ -736,7 +742,35 @@ export default function AdminFeesPage() {
 
         {/* Statistiques */}
         {stats && (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCashier ? "lg:grid-cols-2" : "lg:grid-cols-4"} gap-4`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCashier ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-4`}>
+            {isCashier && stats.dailyCollected && (
+            <Card theme={theme} className="relative overflow-hidden border-green-500/30">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-2xl flex items-center justify-center">
+                    <Banknote className="w-6 h-6 text-green-500" />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total du jour</p>
+                    {stats.dailyCollected.usd > 0 && (
+                      <p className="text-lg font-bold text-green-500 mt-0.5">{formatMontant(stats.dailyCollected.usd, "USD")}</p>
+                    )}
+                    {stats.dailyCollected.cdf > 0 && (
+                      <p className={`text-lg font-bold text-green-500 ${stats.dailyCollected.usd > 0 ? "" : "mt-0.5"}`}>
+                        {formatMontant(stats.dailyCollected.cdf, "CDF")}
+                      </p>
+                    )}
+                    {stats.dailyCollected.usd === 0 && stats.dailyCollected.cdf === 0 && (
+                      <p className={`text-lg font-bold ${textColor} mt-0.5`}>0</p>
+                    )}
+                    <p className={`text-[10px] ${textSecondary} mt-1`}>
+                      {stats.dailyCollected.count} paiement{stats.dailyCollected.count !== 1 ? "s" : ""} aujourd&apos;hui
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            )}
             {!isCashier && (
             <Card theme={theme} className="relative overflow-hidden">
               <CardContent className="pt-5 pb-4">

@@ -3,6 +3,43 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
+function getDayBounds() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const end = new Date(start)
+  end.setDate(end.getDate() + 1)
+  return { start, end }
+}
+
+async function getDailyCollected(schoolId: number) {
+  const { start, end } = getDayBounds()
+  const payments = await prisma.paiement.findMany({
+    where: {
+      schoolId,
+      isAnnule: false,
+      datePaiement: { gte: start, lt: end },
+    },
+    select: {
+      montant: true,
+      tarification: { select: { devise: true } },
+    },
+  })
+
+  let usd = 0
+  let cdf = 0
+  for (const p of payments) {
+    if (p.tarification.devise === "USD") usd += p.montant
+    else cdf += p.montant
+  }
+
+  return {
+    usd,
+    cdf,
+    count: payments.length,
+    date: start.toISOString().slice(0, 10),
+  }
+}
+
 // GET /api/admin/fees/stats - Statistiques globales des frais
 export async function GET(req: NextRequest) {
   try {
@@ -214,6 +251,7 @@ export async function GET(req: NextRequest) {
           studentsUnpaid: cdfUnpaid,
         },
         totalStudents: enrollments.length,
+        dailyCollected: await getDailyCollected(user.schoolId),
         recentPayments: recentPayments.map((p) => ({
           id: p.id,
           numeroRecu: p.numeroRecu,

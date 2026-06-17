@@ -20,6 +20,7 @@ export async function GET(req: Request) {
         email: true,
         role: true,
         schoolId: true,
+        canEnrollStudents: true,
         school: {
           select: {
             id: true,
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
+        canEnrollStudents: user.canEnrollStudents,
       },
       subscription: {
         expired: subscriptionExpired,

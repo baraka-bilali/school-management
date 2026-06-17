@@ -44,9 +44,10 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { isActive } = body
-    if (typeof isActive !== "boolean") {
-      return NextResponse.json({ error: "isActive requis (boolean)" }, { status: 400 })
+    const { isActive, canEnrollStudents } = body
+
+    if (typeof isActive !== "boolean" && typeof canEnrollStudents !== "boolean") {
+      return NextResponse.json({ error: "isActive ou canEnrollStudents requis" }, { status: 400 })
     }
 
     const user = await prisma.user.findUnique({
@@ -64,9 +65,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
     }
 
+    if (typeof canEnrollStudents === "boolean" && user.role !== "CAISSIER") {
+      return NextResponse.json({ error: "La permission inscription ne s'applique qu'aux caissiers" }, { status: 400 })
+    }
+
+    const data: { isActive?: boolean; canEnrollStudents?: boolean } = {}
+    if (typeof isActive === "boolean") data.isActive = isActive
+    if (typeof canEnrollStudents === "boolean") data.canEnrollStudents = canEnrollStudents
+
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: { isActive },
+      data,
       select: {
         id: true,
         email: true,
@@ -74,6 +83,7 @@ export async function PATCH(
         prenom: true,
         role: true,
         isActive: true,
+        canEnrollStudents: true,
       },
     })
 

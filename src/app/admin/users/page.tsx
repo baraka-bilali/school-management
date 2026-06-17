@@ -445,7 +445,7 @@ function Pagination({ state, setState, total }: { state: PaginationState; setSta
   )
 }
 
-function StudentsSection({ theme }: { theme: "light" | "dark" }) {
+function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "dark"; enrollmentOnly?: boolean }) {
   const router = useRouter()
   const [items, setItems] = useState<any[]>([])
   const [total, setTotal] = useState(0)
@@ -774,6 +774,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
               </div>
             )}
           </div>
+          {!enrollmentOnly && (
           <button
             onClick={exportStudents}
             aria-label="Télécharger CSV"
@@ -782,6 +783,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
           >
             <Download className="h-4 w-4" />
           </button>
+          )}
           <button
             onClick={() => setShowCreate(true)}
             aria-label="Ajouter"
@@ -885,9 +887,11 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                   {/* En-tête avec code et actions */}
                   <div className="flex items-center justify-between">
                     <div className={`font-medium ${textColor}`}>Code: {s.code}</div>
+                    {!enrollmentOnly && (
                     <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}>
                       <Eye className="h-4 w-4" />
                     </button>
+                    )}
                   </div>
 
                   {/* Informations personnelles */}
@@ -930,13 +934,13 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                 <th className="px-3 py-2 text-left font-medium">Naissance</th>
                 <th className="px-3 py-2 text-left font-medium">Classe</th>
                 <th className="px-3 py-2 text-left font-medium">Année</th>
-                <th className="px-3 py-2 text-left font-medium">Actions</th>
+                {!enrollmentOnly && <th className="px-3 py-2 text-left font-medium">Actions</th>}
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
               {loading && (
                 <tr>
-                  <td colSpan={9} className={`px-3 py-12 ${textSecondary}`}>
+                  <td colSpan={enrollmentOnly ? 8 : 9} className={`px-3 py-12 ${textSecondary}`}>
                     <div className="flex flex-col items-center gap-3">
                       <div className="flex items-center justify-center gap-1.5">
                         <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -957,7 +961,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                       hoverBg,
                       "cursor-pointer",
                       editingId === s.id ? (theme === "dark" ? "bg-blue-900/30" : "bg-blue-50") : ""
-                    )} onClick={() => !editingId && setExpandedId(isOpen ? null : s.id)}>
+                    )} onClick={() => !enrollmentOnly && !editingId && setExpandedId(isOpen ? null : s.id)}>
                       <td className={`px-3 py-2 ${textColor}`}>
                         {editingId === s.id ? (
                           <input
@@ -1030,6 +1034,7 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                         ) : enr?.class?.name || "-"}
                       </td>
                       <td className={`px-3 py-2 ${textColor}`}>{enr?.year?.name || "-"}</td>
+                      {!enrollmentOnly && (
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           {editingId === s.id ? (
@@ -1115,7 +1120,9 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                           )}
                         </div>
                       </td>
+                      )}
                     </tr>
+                    {!enrollmentOnly && (
                     <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
                       <td colSpan={9} className="px-3 py-0">
                         <div className={cn(
@@ -1134,12 +1141,13 @@ function StudentsSection({ theme }: { theme: "light" | "dark" }) {
                         </div>
                       </td>
                     </tr>
+                    )}
                   </React.Fragment>
                 )
               })}
               {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun élève trouvé.</td>
+                  <td colSpan={enrollmentOnly ? 8 : 9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun élève trouvé.</td>
                 </tr>
               )}
             </tbody>
@@ -2139,6 +2147,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
   const [credentialsMode, setCredentialsMode] = useState<"create" | "reset">("reset")
   const [resetting, setResetting] = useState(false)
   const [togglingId, setTogglingId] = useState<number | null>(null)
+  const [togglingEnrollId, setTogglingEnrollId] = useState<number | null>(null)
   const [passwordCopied, setPasswordCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
 
@@ -2177,6 +2186,24 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
     setNewPassword("")
     setPasswordCopied(false)
     setEmailCopied(false)
+  }
+
+  const handleToggleEnrollPermission = async (staff: any) => {
+    setTogglingEnrollId(staff.id)
+    try {
+      const res = await authFetch(`/api/admin/staff/${staff.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canEnrollStudents: !staff.canEnrollStudents }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur")
+      setItems((prev) => prev.map((s) => (s.id === staff.id ? { ...s, canEnrollStudents: data.user.canEnrollStudents } : s)))
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setTogglingEnrollId(null)
+    }
   }
 
   const handleToggleActive = async (staff: any) => {
@@ -2266,17 +2293,18 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                 <th className="px-3 py-2 text-left font-medium">Téléphone</th>
                 <th className="px-3 py-2 text-left font-medium">Fonction</th>
                 <th className="px-3 py-2 text-left font-medium">Actif</th>
+                <th className="px-3 py-2 text-left font-medium">Inscription</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className={`px-3 py-8 text-center ${textSecondary}`}>Chargement...</td>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Chargement...</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun membre du personnel trouvé.</td>
+                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun membre du personnel trouvé.</td>
                 </tr>
               ) : (
                 items.map((s) => (
@@ -2311,6 +2339,31 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                           )}
                         />
                       </button>
+                    </td>
+                    <td className="px-3 py-2">
+                      {s.role === "CAISSIER" ? (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={s.canEnrollStudents}
+                          disabled={togglingEnrollId === s.id}
+                          onClick={() => handleToggleEnrollPermission(s)}
+                          title={s.canEnrollStudents ? "Retirer la permission inscription" : "Autoriser les inscriptions"}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                            s.canEnrollStudents ? "bg-indigo-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-300"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5",
+                              s.canEnrollStudents ? "translate-x-5" : "translate-x-0.5"
+                            )}
+                          />
+                        </button>
+                      ) : (
+                        <span className={`text-xs ${textSecondary}`}>—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -2563,3 +2616,5 @@ function CreateStaffModal({
     </Portal>
   )
 }
+
+export { StudentsSection }

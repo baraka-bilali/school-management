@@ -79,11 +79,16 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/login"
       return NextResponse.redirect(url)
     }
-    // Caissier : accès limité à la caisse (frais scolaires)
-    if (role === "CAISSIER" && !pathname.startsWith("/admin/fees")) {
-      const url = req.nextUrl.clone()
-      url.pathname = "/admin/fees"
-      return NextResponse.redirect(url)
+    // Caissier : accès limité à la caisse et aux inscriptions (permission vérifiée côté page/API)
+    if (role === "CAISSIER") {
+      const allowed =
+        pathname.startsWith("/admin/fees") ||
+        pathname.startsWith("/admin/inscriptions")
+      if (!allowed) {
+        const url = req.nextUrl.clone()
+        url.pathname = "/admin/fees"
+        return NextResponse.redirect(url)
+      }
     }
   }
 

@@ -10,13 +10,20 @@ interface JwtPayload {
   schoolId?: number
 }
 
+import { assertStudentEnrollmentAccess, EnrollmentAccessError } from "@/lib/student-enrollment-access"
+
 // GET /api/admin/students/next-code?classId=X&yearId=Y
 export async function GET(req: NextRequest) {
   try {
-    const token = req.cookies.get("token")?.value
-    if (!token) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    try {
+      await assertStudentEnrollmentAccess(req)
+    } catch (e) {
+      if (e instanceof EnrollmentAccessError) {
+        return NextResponse.json({ error: e.message }, { status: e.status })
+      }
+      throw e
+    }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     const { searchParams } = new URL(req.url)
     const classId = parseInt(searchParams.get("classId") || "")
     const yearId = searchParams.get("yearId") ? parseInt(searchParams.get("yearId")!) : undefined

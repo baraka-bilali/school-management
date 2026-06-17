@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
           telephone: true,
           fonction: true,
           isActive: true,
+          canEnrollStudents: true,
           createdAt: true,
         },
       }),

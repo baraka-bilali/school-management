@@ -24,6 +24,7 @@ model User {
   dateCreation      DateTime? @default(now())
   temporaryPassword Boolean   @default(false)
   isActive          Boolean   @default(true)
+  canEnrollStudents Boolean   @default(false)
   createdSchools    School[]  @relation("SchoolsCreated")
   student           Student?
   teacher           Teacher?

@@ -7,6 +7,7 @@ import { getCached, invalidateCachePattern } from "@/lib/cache"
 import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import { assertStudentEnrollmentAccess, EnrollmentAccessError } from "@/lib/student-enrollment-access"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -18,15 +19,22 @@ interface JwtPayload {
 
 export async function GET(req: NextRequest) {
   try {
-    // Vérifier l'authentification et récupérer le schoolId de l'admin
     const token = req.cookies.get("token")?.value
     let adminSchoolId: number | undefined
 
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-        adminSchoolId = decoded.schoolId
-      } catch (error) {
+        if (decoded.role === "CAISSIER") {
+          const auth = await assertStudentEnrollmentAccess(req)
+          adminSchoolId = auth.schoolId
+        } else {
+          adminSchoolId = decoded.schoolId
+        }
+      } catch (e) {
+        if (e instanceof EnrollmentAccessError) {
+          return NextResponse.json({ error: e.message }, { status: e.status })
+        }
         console.log('Token invalide, continuer sans filtre schoolId')
       }
     }
@@ -229,17 +237,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Vérifier l'authentification
-    const token = req.cookies.get("token")?.value
-    if (!token) {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const adminSchoolId = decoded.schoolId
-
-    if (!adminSchoolId) {
-      return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
+    let adminSchoolId: number
+    try {
+      const auth = await assertStudentEnrollmentAccess(req)
+      adminSchoolId = auth.schoolId
+    } catch (e) {
+      if (e instanceof EnrollmentAccessError) {
+        return NextResponse.json({ error: e.message }, { status: e.status })
+      }
+      throw e
     }
 
     // Récupérer le code et le nom de l'école pour générer l'email
