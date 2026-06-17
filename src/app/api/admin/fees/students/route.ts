@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
 // GET /api/admin/fees/students - Liste des élèves avec résumé paiements
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
-    requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
+    requireRole(user, [...FEE_VIEW_ROLES])
 
     const { searchParams } = new URL(req.url)
     const yearId = searchParams.get("yearId")

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { calculateBalance, calculateStudentYearBalance } from "@/lib/fees"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
 // GET /api/admin/fees/balance?studentId=X&tarificationId=Y
 // GET /api/admin/fees/balance?studentId=X&yearId=Y  (solde global année)
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
-    requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
+    requireRole(user, [...FEE_VIEW_ROLES])
 
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get("studentId")

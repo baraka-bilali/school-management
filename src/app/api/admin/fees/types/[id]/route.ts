@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { updateTypeFraisSchema } from "@/lib/fees/validation"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -11,7 +12,7 @@ interface RouteParams {
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
     const user = getAuthUser(req)
-    requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
+    requireRole(user, [...FEE_VIEW_ROLES])
     const { id } = await params
 
     const typeFrais = await prisma.typeFrais.findUnique({

@@ -260,6 +260,7 @@ function formatMontant(amount: number, devise: "USD" | "CDF"): string {
 
 export default function AdminFeesPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [isCashier, setIsCashier] = useState(false)
   const [activeTab, setActiveTab] = useState<"overview" | "types" | "tarifications" | "students" | "payments">("overview")
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -307,11 +308,20 @@ export default function AdminFeesPage() {
   const [paymentInitialEnrollment, setPaymentInitialEnrollment] = useState<EnrollmentOption | null>(null)
   const [showCreateTypeModal, setShowCreateTypeModal] = useState(false)
   const [showCreateTarifModal, setShowCreateTarifModal] = useState(false)
+  const [cashierTabInitialized, setCashierTabInitialized] = useState(false)
 
   // Theme listener
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) setTheme(savedTheme)
+
+    const token = localStorage.getItem("token")
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]))
+        setIsCashier(payload.role === "CAISSIER")
+      } catch { /* ignore */ }
+    }
 
     const handleThemeChange = () => {
       const newTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -670,7 +680,20 @@ export default function AdminFeesPage() {
     { key: "tarifications", label: "Tarifications", icon: Wallet },
     { key: "students", label: "Par élève", icon: Users },
     { key: "payments", label: "Paiements", icon: Receipt },
-  ]
+  ].filter((tab) => !(isCashier && tab.key === "tarifications"))
+
+  useEffect(() => {
+    if (isCashier && activeTab === "tarifications") {
+      setActiveTab("overview")
+    }
+  }, [isCashier, activeTab])
+
+  useEffect(() => {
+    if (isCashier && !cashierTabInitialized) {
+      setActiveTab("students")
+      setCashierTabInitialized(true)
+    }
+  }, [isCashier, cashierTabInitialized])
 
   const percentPaidUsd = stats ? Math.round((stats.usd.totalCollected / Math.max(stats.usd.totalExpected, 1)) * 100) : 0
   const percentPaidCdf = stats ? Math.round((stats.cdf.totalCollected / Math.max(stats.cdf.totalExpected, 1)) * 100) : 0
@@ -687,7 +710,9 @@ export default function AdminFeesPage() {
               <BadgeDollarSign className="w-7 h-7 text-green-500" />
               Frais scolaires
             </h1>
-            <p className={`${textSecondary} mt-1`}>Gestion des frais et paiements des élèves</p>
+            <p className={`${textSecondary} mt-1`}>
+              {isCashier ? "Encaissement et suivi des paiements" : "Gestion des frais et paiements des élèves"}
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
@@ -697,6 +722,7 @@ export default function AdminFeesPage() {
               <DollarSign className="w-4 h-4" />
               Enregistrer un paiement
             </button>
+            {!isCashier && (
             <button
               onClick={() => setShowCreateTypeModal(true)}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/25 font-medium"
@@ -704,12 +730,14 @@ export default function AdminFeesPage() {
               <Plus className="w-4 h-4" />
               Nouveau type de frais
             </button>
+            )}
           </div>
         </div>
 
         {/* Statistiques */}
         {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCashier ? "lg:grid-cols-2" : "lg:grid-cols-4"} gap-4`}>
+            {!isCashier && (
             <Card theme={theme} className="relative overflow-hidden">
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-center gap-4">
@@ -726,7 +754,9 @@ export default function AdminFeesPage() {
                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               </CardContent>
             </Card>
+            )}
 
+            {!isCashier && (
             <Card theme={theme} className="relative overflow-hidden">
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-center gap-4">
@@ -763,6 +793,7 @@ export default function AdminFeesPage() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             <Card theme={theme} className="relative overflow-hidden">
               <CardContent className="pt-5 pb-4">
@@ -1004,6 +1035,7 @@ export default function AdminFeesPage() {
                       <FileText className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
                       <p className={`text-lg font-medium ${textColor}`}>Aucun type de frais</p>
                       <p className={`text-sm ${textSecondary} mt-1`}>Commencez par créer un type de frais pour pouvoir configurer les tarifications</p>
+                      {!isCashier && (
                       <button
                         onClick={() => setShowCreateTypeModal(true)}
                         className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1011,6 +1043,7 @@ export default function AdminFeesPage() {
                         <Plus className="w-4 h-4" />
                         Créer un type de frais
                       </button>
+                      )}
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1021,7 +1054,9 @@ export default function AdminFeesPage() {
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Tarifications</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
+                            {!isCashier && (
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
@@ -1040,6 +1075,7 @@ export default function AdminFeesPage() {
                                   {t.isActive ? "Actif" : "Inactif"}
                                 </span>
                               </td>
+                              {!isCashier && (
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-1">
                                   <button className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}>
@@ -1050,6 +1086,7 @@ export default function AdminFeesPage() {
                                   </button>
                                 </div>
                               </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -1061,7 +1098,7 @@ export default function AdminFeesPage() {
             )}
 
             {/* === TARIFICATIONS (Grille tarifaire par classe) === */}
-            {activeTab === "tarifications" && (
+            {activeTab === "tarifications" && !isCashier && (
               <TarificationsTab
                 theme={theme}
                 tarifications={tarifications}
@@ -1471,7 +1508,7 @@ export default function AdminFeesPage() {
       {/* ============================================================ */}
       {/* MODAL : CRÉER UN TYPE DE FRAIS */}
       {/* ============================================================ */}
-      {showCreateTypeModal && (
+      {showCreateTypeModal && !isCashier && (
         <CreateFeeTypeModal
           theme={theme}
           onClose={() => setShowCreateTypeModal(false)}
@@ -1482,7 +1519,7 @@ export default function AdminFeesPage() {
         />
       )}
 
-      {showCreateTarifModal && (
+      {showCreateTarifModal && !isCashier && (
         <CreateTarificationModal
           theme={theme}
           typesFrais={typesFrais}

@@ -79,6 +79,12 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/login"
       return NextResponse.redirect(url)
     }
+    // Caissier : accès limité à la caisse (frais scolaires)
+    if (role === "CAISSIER" && !pathname.startsWith("/admin/fees")) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/admin/fees"
+      return NextResponse.redirect(url)
+    }
   }
 
   // Student space protection
@@ -109,6 +115,8 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/super-admin"
     } else if (role === "ELEVE") {
       url.pathname = "/student"
+    } else if (role === "CAISSIER") {
+      url.pathname = "/admin/fees"
     } else {
       url.pathname = "/admin"
     }

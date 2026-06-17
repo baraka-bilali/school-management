@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createTypeFraisSchema, updateTypeFraisSchema } from "@/lib/fees/validation"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { FEE_CONFIG_ROLES, FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
 // GET /api/admin/fees/types - Lister les types de frais
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
-    requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
+    requireRole(user, [...FEE_VIEW_ROLES])
 
     const { searchParams } = new URL(req.url)
     const includeInactive = searchParams.get("includeInactive") === "true"
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = getAuthUser(req)
-    requireRole(user, ["ADMIN", "SUPER_ADMIN"])
+    requireRole(user, [...FEE_CONFIG_ROLES])
 
     const body = await req.json()
     const data = createTypeFraisSchema.parse(body)

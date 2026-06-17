@@ -104,6 +104,11 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: Bell, label: "Notifications", href: "/admin/notifications" },
   ]
 
+  // Menu caissier (POS — encaissement uniquement)
+  const cashierNavItems: NavItem[] = [
+    { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
+  ]
+
   // Menu pour les élèves
   const studentNavItems: NavItem[] = [
     { icon: BarChart3, label: "Tableau de bord", href: "/student" },
@@ -115,7 +120,12 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   ]
 
   // Sélectionner le menu selon le rôle
-  const navItems = userRole === "ELEVE" ? studentNavItems : adminNavItems
+  const navItems =
+    userRole === "ELEVE"
+      ? studentNavItems
+      : userRole === "CAISSIER"
+        ? cashierNavItems
+        : adminNavItems
   const basePath = userRole === "ELEVE" ? "/student" : "/admin"
 
   // For non-premium students, completely hide premium-only items
@@ -152,10 +162,13 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     | { icon: LucideIcon; label: string; key: "logout" }
   
   // Items de pied de page (Paramètres + Déconnexion) selon le rôle
-  const adminItems: AdminItem[] = [
-    { icon: Settings, label: "Paramètres", href: userRole === "ELEVE" ? "/student/settings" : "/admin/settings" },
-    { icon: LogOut, label: "Déconnexion", key: "logout" },
-  ]
+  const adminItems: AdminItem[] =
+    userRole === "CAISSIER"
+      ? [{ icon: LogOut, label: "Déconnexion", key: "logout" }]
+      : [
+          { icon: Settings, label: "Paramètres", href: userRole === "ELEVE" ? "/student/settings" : "/admin/settings" },
+          { icon: LogOut, label: "Déconnexion", key: "logout" },
+        ]
 
   const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
