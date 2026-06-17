@@ -52,7 +52,7 @@ function formatDate(dateStr: string) {
 function NotificationsHubContent() {
   const searchParams = useSearchParams()
   const initialTab = searchParams.get("tab") === "communiques" ? "communiques" : "notifications"
-  const { card, text, textMuted, shadow, border } = useStudentTheme()
+  const { card, text, textMuted, shadow, border, actionBtn, tabHover, unreadHighlight, unreadHighlightSoft, unreadIconBg, iconMutedBg, linkAccent } = useStudentTheme()
 
   const [tab, setTab] = useState<Tab>(initialTab)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -201,7 +201,7 @@ function NotificationsHubContent() {
             type="button"
             onClick={markAllMessagesAsRead}
             disabled={markingAll}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+            className={cn("inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50", actionBtn)}
           >
             {markingAll ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -222,7 +222,7 @@ function NotificationsHubContent() {
             "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors",
             tab === "notifications"
               ? "bg-indigo-600 text-white shadow-sm"
-              : cn(textMuted, "hover:bg-gray-50 dark:hover:bg-gray-800")
+              : cn(textMuted, tabHover)
           )}
         >
           <Bell className="h-4 w-4" />
@@ -240,7 +240,7 @@ function NotificationsHubContent() {
             "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors",
             tab === "communiques"
               ? "bg-indigo-600 text-white shadow-sm"
-              : cn(textMuted, "hover:bg-gray-50 dark:hover:bg-gray-800")
+              : cn(textMuted, tabHover)
           )}
         >
           <Megaphone className="h-4 w-4" />
@@ -261,7 +261,7 @@ function NotificationsHubContent() {
               type="button"
               onClick={markCurrentTabAsRead}
               disabled={markingAll}
-              className="flex items-center gap-2 text-sm font-semibold text-indigo-600 disabled:opacity-50 dark:text-indigo-400"
+              className={cn("flex items-center gap-2 text-sm font-semibold disabled:opacity-50", linkAccent)}
             >
               {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
               Marquer les notifications comme lues ({unreadNotif})
@@ -288,11 +288,11 @@ function NotificationsHubContent() {
                   "w-full rounded-2xl border p-4 text-left",
                   notification.isRead
                     ? cn(card, border)
-                    : "border-indigo-200 bg-indigo-50 dark:border-indigo-500/30 dark:bg-indigo-500/10"
+                    : unreadHighlight
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", notification.isRead ? "bg-gray-100 dark:bg-gray-800" : "bg-indigo-100 dark:bg-indigo-500/20")}>
+                  <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", notification.isRead ? iconMutedBg : unreadIconBg)}>
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -321,7 +321,7 @@ function NotificationsHubContent() {
               type="button"
               onClick={markCurrentTabAsRead}
               disabled={markingAll}
-              className="mb-1 flex items-center gap-2 text-sm font-semibold text-indigo-600 disabled:opacity-50 dark:text-indigo-400"
+              className={cn("mb-1 flex items-center gap-2 text-sm font-semibold disabled:opacity-50", linkAccent)}
             >
               {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
               Marquer les communiqués comme lus ({unreadComm})
@@ -341,10 +341,10 @@ function NotificationsHubContent() {
                 href={`/student/communiques/${c.id}`}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl border p-4 transition-colors",
-                  !c.isRead ? "border-indigo-200 bg-indigo-50/50 dark:border-indigo-500/20 dark:bg-indigo-500/5" : cn(card, border, shadow)
+                  !c.isRead ? unreadHighlightSoft : cn(card, border, shadow)
                 )}
               >
-                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", !c.isRead ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20" : "bg-gray-100 text-gray-500 dark:bg-gray-800")}>
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", !c.isRead ? cn(unreadIconBg, linkAccent) : cn(iconMutedBg, textMuted))}>
                   <Megaphone className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">

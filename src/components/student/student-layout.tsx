@@ -1,9 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { X, ClipboardList, Settings, LogOut } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 import { cn } from "@/lib/utils"
@@ -30,15 +28,9 @@ interface StudentContext {
   classId: number | null
 }
 
-const menuLinks = [
-  { href: "/student/tasks", label: "Mes tâches", icon: ClipboardList },
-  { href: "/student/settings", label: "Paramètres", icon: Settings },
-]
-
 export default function StudentLayout({ children }: StudentLayoutProps) {
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useStudentTheme()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [student, setStudent] = useState<StudentContext | null>(null)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
@@ -107,10 +99,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     }
     fetchData()
   }, [])
-
-  useEffect(() => {
-    setMenuOpen(false)
-  }, [pathname])
 
   // Sync badge notifications (lu/non lu) après lecture dans /student/notifications
   useEffect(() => {
@@ -199,7 +187,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     }
   }
 
-  const showMenuButton = pathname === "/student"
   const totalUnread = unreadCommuniques + unreadNotifications
 
   const sidebarProfile = student
@@ -235,8 +222,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           schoolName={student?.school}
           photoUrl={student?.photoUrl}
           firstName={student?.firstName}
-          showMenu={showMenuButton}
-          onMenuClick={() => setMenuOpen(true)}
           unreadCount={totalUnread}
           isDark={isDark}
         />
@@ -252,53 +237,8 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
           <RouteTransition>{children}</RouteTransition>
         </main>
 
-        <StudentBottomNav feePulse={feePulse} />
+        <StudentBottomNav feePulse={feePulse} isDark={isDark} />
       </div>
-
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <aside className={cn("absolute left-0 top-0 flex h-full w-72 flex-col shadow-2xl", isDark ? "bg-gray-900" : "bg-white")}>
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-              <p className="font-bold text-gray-900 dark:text-gray-100">Menu</p>
-              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <nav className="flex-1 space-y-1 p-3">
-              {menuLinks.map(({ href, label, icon: Icon }) => {
-                const active = pathname.startsWith(href)
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {label}
-                  </Link>
-                )
-              })}
-            </nav>
-            <div className="border-t border-gray-100 p-3 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={loggingOut}
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-              >
-                <LogOut className="h-5 w-5" />
-                {loggingOut ? "Déconnexion..." : "Déconnexion"}
-              </button>
-            </div>
-          </aside>
-        </div>
-      )}
     </div>
   )
 }

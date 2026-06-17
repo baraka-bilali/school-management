@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Bell, Menu } from "lucide-react"
+import { Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface StudentHeaderProps {
   schoolName?: string
   photoUrl?: string | null
   firstName?: string
-  showMenu?: boolean
-  onMenuClick?: () => void
   unreadCount?: number
   isDark?: boolean
 }
@@ -19,8 +17,6 @@ export default function StudentHeader({
   schoolName = "Mon école",
   photoUrl,
   firstName,
-  showMenu = false,
-  onMenuClick,
   unreadCount = 0,
   isDark = false,
 }: StudentHeaderProps) {
@@ -39,36 +35,32 @@ export default function StudentHeader({
       )}
     >
       <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
-        {showMenu ? (
-          <button
-            type="button"
-            onClick={onMenuClick}
+        <Link href="/student/settings" className="shrink-0">
+          <div
             className={cn(
-              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-              isDark ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-white"
+              "h-9 w-9 overflow-hidden rounded-full ring-2 shadow-sm",
+              isDark ? "ring-gray-800" : "ring-white"
             )}
-            aria-label="Menu"
           >
-            <Menu className="h-5 w-5" />
-          </button>
-        ) : (
-          <Link href="/student/settings" className="shrink-0">
-            <div className="h-9 w-9 overflow-hidden rounded-full ring-2 ring-white shadow-sm dark:ring-gray-800">
-              {photoUrl && !avatarError ? (
-                <img
-                  src={photoUrl}
-                  alt={firstName || "Profil"}
-                  className="h-full w-full object-cover"
-                  onError={() => setAvatarError(true)}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-indigo-100 text-sm font-bold text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300">
-                  {initials}
-                </div>
-              )}
-            </div>
-          </Link>
-        )}
+            {photoUrl && !avatarError ? (
+              <img
+                src={photoUrl}
+                alt={firstName || "Profil"}
+                className="h-full w-full object-cover"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              <div
+                className={cn(
+                  "flex h-full w-full items-center justify-center text-sm font-bold",
+                  isDark ? "bg-indigo-900/50 text-indigo-300" : "bg-indigo-100 text-indigo-600"
+                )}
+              >
+                {initials}
+              </div>
+            )}
+          </div>
+        </Link>
 
         <h1
           className={cn(
@@ -94,25 +86,6 @@ export default function StudentHeader({
             </span>
           )}
         </Link>
-
-        {showMenu && (
-          <Link href="/student/settings" className="shrink-0">
-            <div className="h-9 w-9 overflow-hidden rounded-full ring-2 ring-white shadow-sm dark:ring-gray-800">
-              {photoUrl && !avatarError ? (
-                <img
-                  src={photoUrl}
-                  alt={firstName || "Profil"}
-                  className="h-full w-full object-cover"
-                  onError={() => setAvatarError(true)}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-indigo-100 text-sm font-bold text-indigo-600">
-                  {initials}
-                </div>
-              )}
-            </div>
-          </Link>
-        )}
       </div>
     </header>
   )
