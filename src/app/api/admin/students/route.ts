@@ -8,6 +8,11 @@ import { withRetry } from "@/lib/db-retry"
 import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { assertStudentEnrollmentAccess, EnrollmentAccessError } from "@/lib/student-enrollment-access"
+import {
+  getNextClassCode,
+  isCodeUsedInClass,
+  normalizeStudentIdentity,
+} from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -260,16 +265,25 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
+    const identity = normalizeStudentIdentity({
+      lastName: body.lastName,
+      middleName: body.middleName,
+      firstName: body.firstName,
+    })
+
     const {
-      lastName,
-      middleName,
-      firstName,
       gender,
       birthDate,
-      code,
+      code: rawCode,
       classId,
       academicYearId,
     } = body
+
+    const { lastName, middleName, firstName } = identity
+
+    if (!lastName || !firstName) {
+      return NextResponse.json({ error: "Nom et prénom obligatoires" }, { status: 400 })
+    }
 
     // Vérifier que l'année académique existe
     let yearId = academicYearId
@@ -284,6 +298,21 @@ export async function POST(req: NextRequest) {
         )
       }
       yearId = currentYear.id
+    }
+
+    const parsedClassId = parseInt(classId)
+    const parsedYearId = parseInt(yearId)
+
+    let code = rawCode?.trim() ? String(rawCode).trim() : ""
+    if (!code) {
+      code = String(await getNextClassCode(parsedClassId, parsedYearId))
+    }
+
+    if (await isCodeUsedInClass(parsedClassId, parsedYearId, code)) {
+      return NextResponse.json(
+        { error: `Le code « ${code} » est déjà utilisé dans cette classe pour l'année sélectionnée` },
+        { status: 400 }
+      )
     }
 
     // Générer email avec le code de l'école et gestion des doublons
@@ -331,8 +360,8 @@ export async function POST(req: NextRequest) {
       await tx.enrollment.create({
         data: {
           studentId: student.id,
-          classId: parseInt(classId),
-          yearId: parseInt(yearId),
+          classId: parsedClassId,
+          yearId: parsedYearId,
           status: "ACTIVE",
         },
       })
@@ -351,8 +380,13 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error(e)
     if (e.code === 'P2002') {
+      const target = e.meta?.target
+      const field = Array.isArray(target) ? target.join(", ") : String(target || "")
+      if (field.includes("email")) {
+        return NextResponse.json({ error: "Cet email est déjà utilisé" }, { status: 400 })
+      }
       return NextResponse.json(
-        { error: 'Email ou code déjà utilisé' },
+        { error: "Conflit de données — vérifiez le code dans cette classe ou l'email" },
         { status: 400 }
       )
     }

@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import jwt from "jsonwebtoken"
-
-const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
-
-interface JwtPayload {
-  id: number
-  role: string
-  schoolId?: number
-}
-
 import { assertStudentEnrollmentAccess, EnrollmentAccessError } from "@/lib/student-enrollment-access"
+import { getNextClassCode } from "@/lib/student-fields"
 
 // GET /api/admin/students/next-code?classId=X&yearId=Y
 export async function GET(req: NextRequest) {
@@ -26,34 +16,26 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const classId = parseInt(searchParams.get("classId") || "")
-    const yearId = searchParams.get("yearId") ? parseInt(searchParams.get("yearId")!) : undefined
+    const yearIdParam = searchParams.get("yearId")
 
     if (isNaN(classId)) {
       return NextResponse.json({ error: "classId requis" }, { status: 400 })
     }
 
-    // Find all students enrolled in this class (optionally filtered by year)
-    const enrollments = await prisma.enrollment.findMany({
-      where: {
-        classId,
-        ...(yearId ? { yearId } : {}),
-      },
-      include: {
-        student: { select: { code: true } },
-      },
-    })
-
-    // Extract numeric codes and find max
-    let maxCode = 0
-    for (const enrollment of enrollments) {
-      const code = enrollment.student?.code
-      if (code) {
-        const num = parseInt(code.replace(/\D/g, ""))
-        if (!isNaN(num) && num > maxCode) maxCode = num
+    let yearId: number
+    if (yearIdParam) {
+      yearId = parseInt(yearIdParam)
+    } else {
+      const { prisma } = await import("@/lib/prisma")
+      const currentYear = await prisma.academicYear.findFirst({ where: { current: true } })
+      if (!currentYear) {
+        return NextResponse.json({ error: "Aucune année académique courante" }, { status: 400 })
       }
+      yearId = currentYear.id
     }
 
-    return NextResponse.json({ nextCode: maxCode + 1 })
+    const nextCode = await getNextClassCode(classId, yearId)
+    return NextResponse.json({ nextCode })
   } catch (error) {
     console.error("Erreur next-code:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })

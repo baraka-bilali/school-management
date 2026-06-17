@@ -76,7 +76,7 @@ model Class {
 model Student {
   id          Int          @id @default(autoincrement())
   userId      Int          @unique
-  code        String       @unique
+  code        String
   lastName    String
   middleName  String
   firstName   String

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import {
+  isCodeUsedInClass,
+  normalizeStudentIdentity,
+  normalizeStudentProfile,
+} from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -86,12 +91,23 @@ export async function PUT(
 
     const data = await req.json()
 
-    const requiredFields = ["lastName", "middleName", "firstName", "gender", "birthDate", "code"]
+    const identity = normalizeStudentIdentity({
+      lastName: data.lastName,
+      middleName: data.middleName,
+      firstName: data.firstName,
+    })
+
+    const requiredFields = ["lastName", "middleName", "firstName", "gender", "birthDate", "code"] as const
     for (const field of requiredFields) {
-      if (!data[field]) {
+      const value = field === "lastName" || field === "middleName" || field === "firstName"
+        ? identity[field]
+        : data[field]
+      if (!value) {
         return NextResponse.json({ error: `Le champ ${field} est requis` }, { status: 400 })
       }
     }
+
+    const code = String(data.code).trim()
 
     // Vérifier appartenance école
     const existing = await prisma.student.findUnique({
@@ -103,14 +119,37 @@ export async function PUT(
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
     }
 
+    const currentEnrollment = await prisma.enrollment.findFirst({
+      where: { studentId },
+      orderBy: { year: { startDate: "desc" } },
+      select: { classId: true, yearId: true },
+    })
+
+    if (currentEnrollment && code) {
+      const taken = await isCodeUsedInClass(
+        currentEnrollment.classId,
+        currentEnrollment.yearId,
+        code,
+        studentId
+      )
+      if (taken) {
+        return NextResponse.json(
+          { error: `Le code « ${code} » est déjà utilisé dans cette classe` },
+          { status: 400 }
+        )
+      }
+    }
+
+    const profileFields = normalizeStudentProfile(data)
+
     // 1. Save core fields (always exist in DB)
     await prisma.student.update({
       where: { id: studentId },
       data: {
-        code: data.code,
-        lastName: data.lastName,
-        middleName: data.middleName,
-        firstName: data.firstName,
+        code,
+        lastName: identity.lastName,
+        middleName: identity.middleName,
+        firstName: identity.firstName,
         gender: data.gender,
         birthDate: new Date(data.birthDate),
       },
@@ -140,23 +179,23 @@ export async function PUT(
           "emergencyPhone"   = $17
         WHERE id = $18
       `,
-        data.birthPlace       || null,
-        data.nationality      || null,
-        data.address          || null,
-        data.photoUrl         || null,
-        data.parentName1      || null,
-        data.parentPhone1     || null,
-        data.parentJob1       || null,
-        data.parentEmail1     || null,
-        data.parentName2      || null,
-        data.parentPhone2     || null,
-        data.parentJob2       || null,
-        data.parentEmail2     || null,
-        data.bloodGroup       || null,
-        data.allergies        || null,
-        data.medicalNotes     || null,
-        data.emergencyContact || null,
-        data.emergencyPhone   || null,
+        data.birthPlace       !== undefined ? (profileFields.birthPlace ?? null) : null,
+        data.nationality      !== undefined ? (profileFields.nationality ?? null) : null,
+        data.address          !== undefined ? (profileFields.address ?? null) : null,
+        data.photoUrl         ?? null,
+        data.parentName1      !== undefined ? (profileFields.parentName1 ?? null) : null,
+        data.parentPhone1     ?? null,
+        data.parentJob1       !== undefined ? (profileFields.parentJob1 ?? null) : null,
+        data.parentEmail1     ?? null,
+        data.parentName2      !== undefined ? (profileFields.parentName2 ?? null) : null,
+        data.parentPhone2     ?? null,
+        data.parentJob2       !== undefined ? (profileFields.parentJob2 ?? null) : null,
+        data.parentEmail2     ?? null,
+        data.bloodGroup       ?? null,
+        data.allergies        !== undefined ? (profileFields.allergies ?? null) : null,
+        data.medicalNotes     !== undefined ? (profileFields.medicalNotes ?? null) : null,
+        data.emergencyContact !== undefined ? (profileFields.emergencyContact ?? null) : null,
+        data.emergencyPhone   ?? null,
         studentId,
       )
     } catch {

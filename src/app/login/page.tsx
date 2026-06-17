@@ -64,6 +64,8 @@ export default function LoginPage() {
 
 	const router = useRouter()
 
+	const profileUpper = (value: string) => value.toUpperCase()
+
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setForm({ ...form, [e.target.name]: e.target.value })
 	}
@@ -518,16 +520,18 @@ export default function LoginPage() {
 										</label>
 										<Input
 											value={profileForm.birthPlace}
-											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: profileUpper(e.target.value) })}
 											placeholder="Ex : Kinshasa"
+											className="uppercase"
 										/>
 									</div>
 									<div>
 										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nationalité</label>
 										<Input
 											value={profileForm.nationality}
-											onChange={(e) => setProfileForm({ ...profileForm, nationality: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, nationality: profileUpper(e.target.value) })}
 											placeholder="Ex : Congolaise"
+											className="uppercase"
 										/>
 									</div>
 								</div>
@@ -538,8 +542,9 @@ export default function LoginPage() {
 									</label>
 									<Input
 										value={profileForm.address}
-										onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+										onChange={(e) => setProfileForm({ ...profileForm, address: profileUpper(e.target.value) })}
 										placeholder="Ex : Av. de l'Université, Commune de Lingwala"
+										className="uppercase"
 									/>
 								</div>
 
@@ -551,9 +556,9 @@ export default function LoginPage() {
 									<div className="space-y-3">
 										<Input
 											value={profileForm.parentName1}
-											onChange={(e) => setProfileForm({ ...profileForm, parentName1: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, parentName1: profileUpper(e.target.value) })}
 											placeholder="Nom complet du parent/tuteur"
-											className="rounded-xl"
+											className="rounded-xl uppercase"
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
@@ -583,9 +588,9 @@ export default function LoginPage() {
 									<div className="space-y-3">
 										<Input
 											value={profileForm.parentName2}
-											onChange={(e) => setProfileForm({ ...profileForm, parentName2: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, parentName2: profileUpper(e.target.value) })}
 											placeholder="Nom complet"
-											className="rounded-xl"
+											className="rounded-xl uppercase"
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
@@ -615,8 +620,9 @@ export default function LoginPage() {
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 										<Input
 											value={profileForm.emergencyContact}
-											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: profileUpper(e.target.value) })}
 											placeholder="Nom du contact"
+											className="uppercase"
 										/>
 										<div className="relative">
 											<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -652,18 +658,18 @@ export default function LoginPage() {
 										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Allergies connues</label>
 										<Input
 											value={profileForm.allergies}
-											onChange={(e) => setProfileForm({ ...profileForm, allergies: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, allergies: profileUpper(e.target.value) })}
 											placeholder="Ex : pénicilline, arachides..."
-											className="rounded-xl"
+											className="rounded-xl uppercase"
 										/>
 									</div>
 									<div>
 										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Notes médicales</label>
 										<Input
 											value={profileForm.medicalNotes}
-											onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: e.target.value })}
+											onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: profileUpper(e.target.value) })}
 											placeholder="Informations importantes pour l'école"
-											className="rounded-xl"
+											className="rounded-xl uppercase"
 										/>
 									</div>
 								</div>
