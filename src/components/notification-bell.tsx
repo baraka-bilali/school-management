@@ -5,7 +5,7 @@ import { Bell, X, Check, AlertCircle, Clock, BellOff, Megaphone } from "lucide-r
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
 import { supabaseBrowser } from "@/lib/supabase-client"
-import { playBing } from "@/lib/play-bing"
+import { showSystemNotification } from "@/lib/system-notifications"
 
 interface Notification {
   id: number
@@ -34,6 +34,7 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const isOpenRef = useRef(isOpen)
   const prevUnreadRef = useRef(0)
+  const countInitializedRef = useRef(false)
 
   useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
 
@@ -52,16 +53,30 @@ export default function NotificationBell({ onNotificationClick }: NotificationBe
     }
   }, [])
 
+  const notifyNewAlerts = async (newCount: number) => {
+    if (newCount <= prevUnreadRef.current || prevUnreadRef.current < 0) return
+    let message = "Vous avez de nouvelles notifications"
+    try {
+      const res = await authFetch("/api/notifications?page=1&limit=1", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        const latest = data.notifications?.[0]
+        if (latest?.message) message = latest.message
+      }
+    } catch {}
+    await showSystemNotification("digiSchool", message, { url: "/admin/notifications" })
+  }
+
   const fetchUnreadCount = async () => {
     try {
       const res = await authFetch("/api/notifications/count", { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
         const newCount: number = data.count
-        // Jouer le son si nouvelles notifications arrivées
-        if (newCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-          playBing()
+        if (countInitializedRef.current && newCount > prevUnreadRef.current) {
+          await notifyNewAlerts(newCount)
         }
+        countInitializedRef.current = true
         prevUnreadRef.current = newCount
         setUnreadCount(newCount)
       }

@@ -1,12 +1,27 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./no-translate.css";
 import ClientOnly from "@/components/client-only";
+import PwaShell from "@/components/pwa-shell";
 import { ReactQueryProvider } from "@/lib/react-query";
 
 export const metadata: Metadata = {
   title: "digiSchool",
   description: "Plateforme de gestion scolaire digitale",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "digiSchool",
+  },
+  icons: {
+    icon: "/icons/icon.svg",
+    apple: "/icons/icon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({
@@ -24,6 +39,7 @@ export default function RootLayout({
         <ReactQueryProvider>
           <ClientOnly>
             {children}
+            <PwaShell />
           </ClientOnly>
         </ReactQueryProvider>
       </body>

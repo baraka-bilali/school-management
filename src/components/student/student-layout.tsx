@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { X, ClipboardList, Settings, LogOut } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase-client"
-import { playBing } from "@/lib/play-bing"
+import { showSystemNotification } from "@/lib/system-notifications"
 import { cn } from "@/lib/utils"
 import StudentHeader from "./student-header"
 import StudentDesktopHeader from "./student-desktop-header"
@@ -147,7 +147,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       .channel(`communiques:school:${schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((prev) => prev + 1)
-        playBing()
+        void showSystemNotification("digiSchool", "Nouveau communiqué", { url: "/student/communiques" })
       })
       .subscribe()
     return () => {
@@ -161,7 +161,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       .channel(`fees:student:${student.studentId}`)
       .on("broadcast", { event: "payment_received" }, () => {
         setFeePulse(true)
-        playBing()
+        void showSystemNotification("digiSchool", "Paiement enregistré", { url: "/student/fees" })
         window.dispatchEvent(new Event("feePaymentReceived"))
       })
       .subscribe()
@@ -175,7 +175,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     const channel = supabaseBrowser
       .channel(`tasks:class:${student.classId}`)
       .on("broadcast", { event: "new_task" }, () => {
-        playBing()
+        void showSystemNotification("digiSchool", "Nouvelle tâche assignée", { url: "/student/tasks" })
         window.dispatchEvent(new Event("newTaskReceived"))
       })
       .subscribe()

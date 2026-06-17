@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
 import { supabaseBrowser } from "@/lib/supabase-client"
-import { playBing } from "@/lib/play-bing"
+import { showSystemNotification } from "@/lib/system-notifications"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -126,7 +126,7 @@ export default function Layout({ children }: LayoutProps) {
       .channel(`communiques:school:${studentSchoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques(prev => prev + 1)
-        playBing()
+        void showSystemNotification("digiSchool", "Nouveau communiqué publié", { url: "/student/communiques" })
       })
       .subscribe()
 

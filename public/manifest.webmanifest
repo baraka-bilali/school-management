@@ -1,0 +1,19 @@
+{
+  "name": "digiSchool",
+  "short_name": "digiSchool",
+  "description": "Plateforme de gestion scolaire digitale",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

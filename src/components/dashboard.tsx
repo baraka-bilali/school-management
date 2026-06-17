@@ -11,7 +11,6 @@ import {
   GraduationCap,
   PieChart as PieIcon,
   School,
-  TrendingUp,
   Users,
 } from "lucide-react"
 import {
@@ -28,6 +27,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import DashboardSkeleton from "@/components/dashboard-skeleton"
+import { SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 
 // ============================================================
 // OPTIMIZATION #4: Lazy Load Charts (40% bundle reduction)
@@ -53,10 +54,7 @@ interface DashboardStatsResponse {
     male: number
     female: number
   }
-  sectionStats?: {
-    Primaire: number
-    Secondaire: number
-  }
+  sectionStats?: Record<string, number>
 }
 
 function formatUsd(value: number): string {
@@ -73,13 +71,12 @@ function formatCdf(value: number): string {
   }).format(value)} CDF`
 }
 
-function TrendCard({
+function StatCard({
   title,
   value,
   subValue,
   icon,
   color,
-  data,
   theme,
 }: {
   title: string
@@ -87,7 +84,6 @@ function TrendCard({
   subValue?: string
   icon: ComponentType<{ className?: string }>
   color: string
-  data: Array<{ name: string; value: number }>
   theme: Theme
 }) {
   const Icon = icon
@@ -98,7 +94,7 @@ function TrendCard({
 
   return (
     <div className={`${bgCard} border ${borderColor} rounded-2xl p-5 shadow-sm`}>
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between">
         <div>
           <p className={`text-xs uppercase tracking-wider font-semibold ${textSecondary}`}>{title}</p>
           <p className={`text-3xl font-bold mt-1 ${textColor}`}>{value}</p>
@@ -107,24 +103,6 @@ function TrendCard({
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}20` }}>
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
-      </div>
-
-      <div className="h-16 -mx-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
-            <Tooltip
-              formatter={(v: number) => [v, title]}
-              labelFormatter={(label: string) => `Mois: ${label}`}
-              contentStyle={{ borderRadius: 12, border: `1px solid ${theme === "dark" ? "#374151" : "#e5e7eb"}` }}
-            />
-            <Area type="monotone" dataKey="value" stroke={color} fill={color} fillOpacity={0.18} strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className={`text-xs ${textSecondary} flex items-center gap-1 mt-1`}>
-        <TrendingUp className="w-3 h-3 text-green-500" />
-        Donnees reelles basees sur la BDD
       </div>
     </div>
   )
@@ -135,7 +113,7 @@ export default function Dashboard() {
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
 
   // ✅ OPTIMISÉ - React Query avec config centralisée
-  const { data: stats, isLoading: loading, error } = useQuery({
+  const { data: stats, isLoading: loading, isFetching, error } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
       const res = await fetch("/api/admin/dashboard-stats-simple", { 
@@ -153,21 +131,10 @@ export default function Dashboard() {
       
       return res.json() as Promise<DashboardStatsResponse>
     },
-    ...QUERY_CONFIGS.dashboard, // ✅ Config optimisée centralisée
-    placeholderData: {
-      students: 0,
-      teachers: 0,
-      classes: 0,
-      attendance: "--",
-      monthLabels: [],
-      monthlyStudents: [],
-      monthlyTeachers: [],
-      monthlyPaymentsUsd: [],
-      monthlyPaymentsCdf: [],
-      genderStats: { male: 0, female: 0 },
-      sectionStats: { Primaire: 0, Secondaire: 0 },
-    },
+    ...QUERY_CONFIGS.dashboard,
   })
+
+  const isInitialLoading = loading && !stats
 
   // ✅ OPTIMISÉ - Callbacks memoïzés pour éviter re-créations
   const handleThemeChange = useCallback(() => {
@@ -213,7 +180,7 @@ export default function Dashboard() {
     monthlyTeachers: [],
     monthlyPayments: [],
     genderStats: { male: 0, female: 0 },
-    sectionStats: { Primaire: 0, Secondaire: 0 },
+    sectionStats: Object.fromEntries(SECTION_ORDER.map((s) => [s, 0])),
   }
 
   const palette = {
@@ -226,6 +193,8 @@ export default function Dashboard() {
     female: "#ec4899",
     primaire: "#f59e0b",
     secondaire: "#3b82f6",
+    maternelle: "#ec4899",
+    educationBase: "#10b981",
   }
 
   const bgPage = theme === "dark" ? "bg-gray-900" : "bg-gray-50"
@@ -258,26 +227,25 @@ export default function Dashboard() {
     { name: "Filles", value: safeStats.genderStats?.female ?? 0, color: palette.female },
   ], [safeStats.genderStats, palette.male, palette.female])
 
-  const sectionData = useMemo(() => [
-    { name: "Primaire", value: safeStats.sectionStats?.Primaire ?? 0, color: palette.primaire },
-    { name: "Secondaire", value: safeStats.sectionStats?.Secondaire ?? 0, color: palette.secondaire },
-  ], [safeStats.sectionStats, palette.primaire, palette.secondaire])
+  const sectionData = useMemo(() => {
+    const colors: Record<string, string> = {
+      Maternelle: palette.maternelle,
+      Primaire: palette.primaire,
+      "Education de Base": palette.educationBase,
+      Humanités: palette.secondaire,
+    }
+    return SECTION_ORDER.map((key) => ({
+      key,
+      name: SECTION_LABELS[key] || key,
+      value: safeStats.sectionStats?.[key] ?? 0,
+      color: colors[key] ?? "#6b7280",
+    }))
+  }, [safeStats.sectionStats, palette.maternelle, palette.primaire, palette.educationBase, palette.secondaire])
 
-  const cardStudentsData = useMemo(() => 
-    monthlySeries.map((r) => ({ name: r.month, value: r.students }))
-  , [monthlySeries])
-
-  const cardTeachersData = useMemo(() => 
-    monthlySeries.map((r) => ({ name: r.month, value: r.teachers }))
-  , [monthlySeries])
-
-  const cardClassesData = useMemo(() => 
-    monthlySeries.map((r) => ({ name: r.month, value: r.students + r.teachers }))
-  , [monthlySeries])
-
-  const cardPaymentsData = useMemo(() =>
-    monthlySeries.map((r) => ({ name: r.month, value: r.paymentsUsd + r.paymentsCdf / usdToCdfRate }))
-  , [monthlySeries, usdToCdfRate])
+  const sectionTotal = useMemo(
+    () => sectionData.reduce((sum, item) => sum + item.value, 0),
+    [sectionData]
+  )
 
   const currentMonthUsd = useMemo(() =>
     monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsUsd : 0
@@ -309,15 +277,19 @@ export default function Dashboard() {
           <h2 className={`text-2xl font-bold ${textColor}`}>Tableau de bord</h2>
           <span className={`text-xs ${textSecondary} flex items-center gap-1`}>
             <Activity className="w-3 h-3" />
-            {loading ? "Chargement..." : "Graphiques interactifs (survol actif)"}
+            {isInitialLoading ? "Chargement..." : isFetching ? "Mise à jour..." : "Graphiques interactifs (survol actif)"}
           </span>
         </div>
 
+        {isInitialLoading ? (
+          <DashboardSkeleton theme={theme} />
+        ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-          <TrendCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} data={cardStudentsData} theme={theme} />
-          <TrendCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} data={cardTeachersData} theme={theme} />
-          <TrendCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} data={cardClassesData} theme={theme} />
-          <TrendCard title="Paiements (mois)"
+          <StatCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} theme={theme} />
+          <StatCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} theme={theme} />
+          <StatCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} theme={theme} />
+          <StatCard title="Paiements (mois)"
             value={currentMonthUsd > 0 || currentMonthCdf === 0 ? formatUsd(currentMonthUsd) : `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`}
             subValue={
               currentMonthUsd > 0 && currentMonthCdf > 0
@@ -326,7 +298,7 @@ export default function Dashboard() {
                   ? "0 $"
                   : undefined
             }
-            icon={BarChart3} color={palette.payment} data={cardPaymentsData} theme={theme} />
+            icon={BarChart3} color={palette.payment} theme={theme} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
@@ -427,7 +399,12 @@ export default function Dashboard() {
                 <AreaChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
+                  <YAxis
+                    stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                    allowDecimals={false}
+                    domain={[0, 30]}
+                    ticks={[0, 5, 10, 15, 20, 25, 30]}
+                  />
                   <Tooltip
                     formatter={(value: number) => [value, "Enseignants cumules"]}
                     labelFormatter={(label: string) => `Mois: ${label}`}
@@ -475,30 +452,61 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Niveau scolaire</p>
-                <p className={`text-xs ${textSecondary}`}>Primaire vs Secondaire (inscriptions actives)</p>
+                <p className={`text-xs ${textSecondary}`}>
+                  Répartition par section — {sectionTotal} inscription{sectionTotal > 1 ? "s" : ""} active{sectionTotal > 1 ? "s" : ""}
+                </p>
               </div>
               <BookOpen className={`w-4 h-4 ${textSecondary}`} />
             </div>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Tooltip formatter={(value: number) => [value, "Eleves"]} contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }} />
-                  <Pie data={sectionData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
-                    {sectionData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center justify-center gap-4 mt-1">
-              {sectionData.map((entry) => (
-                <div key={entry.name} className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: entry.color }} />
-                  <span className={`text-xs ${textSecondary}`}>{entry.name}: {entry.value}</span>
+            {sectionTotal === 0 ? (
+              <div className={`h-56 flex items-center justify-center rounded-xl border border-dashed ${borderColor}`}>
+                <p className={`text-sm ${textSecondary}`}>Aucune inscription active cette année</p>
+              </div>
+            ) : (
+              <>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sectionData} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
+                      <XAxis type="number" allowDecimals={false} stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={108}
+                        tick={{ fontSize: 11 }}
+                        stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                      />
+                      <Tooltip
+                        formatter={(value: number, _name: string, props: { payload?: { name: string } }) => {
+                          const pct = sectionTotal > 0 ? Math.round((value / sectionTotal) * 100) : 0
+                          return [`${value} élève${value > 1 ? "s" : ""} (${pct}%)`, props.payload?.name ?? "Section"]
+                        }}
+                        contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
+                      />
+                      <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={22}>
+                        {sectionData.map((entry) => (
+                          <Cell key={entry.key} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {sectionData.map((entry) => {
+                    const pct = sectionTotal > 0 ? Math.round((entry.value / sectionTotal) * 100) : 0
+                    return (
+                      <div key={entry.key} className={`flex items-center justify-between gap-2 text-xs ${textSecondary}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                          <span className="truncate">{entry.name}</span>
+                        </div>
+                        <span className={`font-medium ${textColor} shrink-0`}>{entry.value} ({pct}%)</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <div className={`lg:col-span-2 ${bgCard} rounded-2xl shadow-sm border ${borderColor} overflow-hidden`}>
@@ -516,6 +524,8 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { SECTION_ORDER } from "@/lib/class-sort"
+
+function emptySectionStats(): Record<string, number> {
+  return Object.fromEntries(SECTION_ORDER.map((s) => [s, 0]))
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,23 +24,24 @@ export async function GET(request: NextRequest) {
         prisma.academicYear.findFirst({ where: { current: true } }),
       ])
 
-    let primaireCount = 0
-    let secondaireCount = 0
+    let sectionStats = emptySectionStats()
     if (currentYear) {
-      const [prim, total] = await Promise.all([
-        prisma.enrollment.count({
-          where: {
-            yearId: currentYear.id,
-            student: { user: { schoolId, isActive: true } },
-            class: { level: { in: ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"] } },
-          },
-        }),
-        prisma.enrollment.count({
-          where: { yearId: currentYear.id, student: { user: { schoolId, isActive: true } } },
-        }),
-      ])
-      primaireCount = prim
-      secondaireCount = total - prim
+      const enrollments = await prisma.enrollment.findMany({
+        where: {
+          yearId: currentYear.id,
+          status: "ACTIVE",
+          student: { user: { schoolId, isActive: true } },
+        },
+        select: { class: { select: { section: true } } },
+      })
+      for (const enrollment of enrollments) {
+        const section = enrollment.class.section
+        if (section in sectionStats) {
+          sectionStats[section]++
+        } else {
+          sectionStats[section] = (sectionStats[section] ?? 0) + 1
+        }
+      }
     }
 
     // Données mensuelles (12 derniers mois)
@@ -109,7 +115,7 @@ export async function GET(request: NextRequest) {
       monthlyPaymentsUsd,
       monthlyPaymentsCdf,
       genderStats: { male: maleCount, female: femaleCount },
-      sectionStats: { Primaire: primaireCount, Secondaire: secondaireCount },
+      sectionStats,
     })
   } catch (error) {
     console.error('[ERROR] Dashboard stats:', error)
