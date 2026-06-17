@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { buildTeacherEmail, generatePassword } from "@/lib/generateCredentials"
+import { buildPersonnelEmailByCode, generatePassword } from "@/lib/generateCredentials"
 import { getCached, invalidateCachePattern } from "@/lib/cache"
 import jwt from "jsonwebtoken"
 
@@ -150,20 +150,18 @@ export async function POST(req: NextRequest) {
 
     const { lastName, middleName, firstName, gender, birthDate, specialty, phone } = body
 
-    // Générer email unique avec suffixe si nécessaire
-    let email = buildTeacherEmail({ lastName, middleName })
-    let suffix = 1
-    
-    while (true) {
-      try {
-        await prisma.user.findUnique({ where: { email } })
-        break // Email unique trouvé
-      } catch {
-        // Email existe déjà, essayer avec un suffixe
-        email = buildTeacherEmail({ lastName, middleName, suffix: suffix.toString() })
-        suffix++
-        if (suffix > 100) break // Éviter la boucle infinie
-      }
+    const school = await prisma.school.findUnique({
+      where: { id: adminSchoolId },
+      select: { codeEtablissement: true, nomEtablissement: true },
+    })
+    const schoolCode = school?.codeEtablissement || school?.nomEtablissement || "school"
+
+    let email = buildPersonnelEmailByCode({ firstName, lastName, schoolCode })
+    let suffix = 2
+    while (await prisma.user.findUnique({ where: { email } })) {
+      email = buildPersonnelEmailByCode({ firstName, lastName, schoolCode, suffix })
+      suffix++
+      if (suffix > 100) break
     }
 
     const plaintextPassword = generatePassword()

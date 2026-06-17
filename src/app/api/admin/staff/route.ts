@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import { buildStaffEmail, generatePassword } from "@/lib/generateCredentials"
+import { buildPersonnelEmailByCode, generatePassword } from "@/lib/generateCredentials"
 import { isStaffRole, STAFF_ROLES } from "@/lib/staff-roles"
 import { User_role } from "@prisma/client"
 
@@ -26,18 +26,19 @@ function getAuth(req: NextRequest): JwtPayload | null {
   }
 }
 
-async function uniqueStaffEmail(lastName: string, firstName: string, role: string): Promise<string> {
-  for (let suffix = 0; suffix < 100; suffix++) {
-    const email = buildStaffEmail({
-      lastName,
-      firstName,
-      role,
-      suffix: suffix || undefined,
-    })
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (!existing) return email
+async function uniquePersonnelEmail(
+  firstName: string,
+  lastName: string,
+  schoolCode: string
+): Promise<string> {
+  let email = buildPersonnelEmailByCode({ firstName, lastName, schoolCode })
+  let suffix = 2
+  while (await prisma.user.findUnique({ where: { email } })) {
+    email = buildPersonnelEmailByCode({ firstName, lastName, schoolCode, suffix })
+    suffix++
+    if (suffix > 100) throw new Error("Impossible de générer un email unique")
   }
-  throw new Error("Impossible de générer un email unique")
+  return email
 }
 
 // GET /api/admin/staff
@@ -122,7 +123,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })
     }
 
-    const email = await uniqueStaffEmail(lastName.trim(), firstName.trim(), role)
+    const email = await (async () => {
+      const school = await prisma.school.findUnique({
+        where: { id: auth.schoolId },
+        select: { codeEtablissement: true, nomEtablissement: true },
+      })
+      const schoolCode = school?.codeEtablissement || school?.nomEtablissement || "school"
+      return uniquePersonnelEmail(firstName.trim(), lastName.trim(), schoolCode)
+    })()
     const plaintextPassword = generatePassword()
     const hashedPassword = await bcrypt.hash(plaintextPassword, 10)
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
 import Portal from "@/components/portal"
+import { BLOOD_GROUPS } from "@/lib/blood-groups"
 
 type ModalStep =
   | "none"
@@ -467,26 +468,27 @@ export default function LoginPage() {
 			{/* ── Modal : Complétion du profil (ELEVE) ── */}
 			{step === "profile_completion" && (
 				<Portal>
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-						<div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl my-4">
-							<div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100">
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+						<div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+						<div className="relative bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full shadow-2xl border border-gray-200 dark:border-gray-700 max-h-[92vh] flex flex-col overflow-hidden">
+							<div className="p-5 sm:p-6 bg-gradient-to-br from-indigo-600 via-indigo-600 to-purple-600 text-white shrink-0">
 								<div className="flex items-center gap-3">
-									<div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center">
-										<User className="w-6 h-6 text-blue-600" />
+									<div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+										<User className="w-6 h-6" />
 									</div>
 									<div>
-										<h2 className="text-xl font-bold text-gray-900">Complétez votre profil</h2>
-										<p className="text-sm text-gray-500">Quelques informations importantes pour votre dossier</p>
+										<h2 className="text-lg sm:text-xl font-bold">Complétez votre profil</h2>
+										<p className="text-sm text-indigo-100">Quelques infos pour votre dossier scolaire</p>
 									</div>
 								</div>
 							</div>
-							<div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+							<div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
 
 								{/* Read-only: admin-set fields */}
 								{studentReadOnly && (
-									<div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-										<p className="text-xs font-semibold text-gray-500 uppercase mb-3">Informations enregistrées par l&apos;école</p>
-										<div className="grid grid-cols-2 gap-2">
+									<div className="rounded-xl border border-indigo-100 dark:border-indigo-500/20 bg-gradient-to-br from-indigo-50/80 to-purple-50/50 dark:from-indigo-500/10 dark:to-purple-500/5 p-4">
+										<p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase mb-3 tracking-wide">Informations enregistrées par l&apos;école</p>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
 											{[
 												{ label: "Code élève", value: studentReadOnly.code },
 												{ label: "Nom", value: studentReadOnly.lastName },
@@ -496,9 +498,9 @@ export default function LoginPage() {
 												{ label: "Naissance", value: studentReadOnly.birthDate ? new Date(studentReadOnly.birthDate).toLocaleDateString("fr-FR") : "—" },
 												{ label: "Classe", value: studentReadOnly.className || "—" },
 											].map(({ label, value }) => (
-												<div key={label} className="bg-white rounded-lg p-2.5 border border-gray-100">
-													<p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
-													<p className="text-sm font-medium text-gray-700">{value || "—"}</p>
+												<div key={label} className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-2.5 border border-white dark:border-gray-700/50">
+													<p className="text-[10px] text-gray-400 dark:text-gray-500 mb-0.5">{label}</p>
+													<p className="text-sm font-medium text-gray-800 dark:text-gray-100">{value || "—"}</p>
 												</div>
 											))}
 										</div>
@@ -506,9 +508,9 @@ export default function LoginPage() {
 								)}
 
 								{/* Fillable fields */}
-								<div className="grid grid-cols-2 gap-4">
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1.5">
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
 											<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
 											Lieu de naissance
 										</label>
@@ -519,7 +521,7 @@ export default function LoginPage() {
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-medium text-gray-700 mb-1.5">Nationalité</label>
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nationalité</label>
 										<Input
 											value={profileForm.nationality}
 											onChange={(e) => setProfileForm({ ...profileForm, nationality: e.target.value })}
@@ -528,7 +530,7 @@ export default function LoginPage() {
 									</div>
 								</div>
 								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-1.5">
+									<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
 										<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
 										Adresse résidentielle
 									</label>
@@ -539,8 +541,8 @@ export default function LoginPage() {
 									/>
 								</div>
 
-								<div className="pt-2 border-t border-gray-100">
-									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+								<div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
+									<p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-1.5">
 										<User className="w-4 h-4 text-blue-500" />
 										Parent / Tuteur principal
 									</p>
@@ -549,8 +551,9 @@ export default function LoginPage() {
 											value={profileForm.parentName1}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName1: e.target.value })}
 											placeholder="Nom complet du parent/tuteur"
+											className="rounded-xl"
 										/>
-										<div className="grid grid-cols-2 gap-3">
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
 												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
 												<Input
@@ -570,8 +573,8 @@ export default function LoginPage() {
 									</div>
 								</div>
 
-								<div className="pt-2 border-t border-gray-100">
-									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+								<div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
+									<p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-1.5">
 										<User className="w-4 h-4 text-indigo-500" />
 										Parent / Tuteur secondaire <span className="text-xs font-normal text-gray-400">(optionnel)</span>
 									</p>
@@ -580,8 +583,9 @@ export default function LoginPage() {
 											value={profileForm.parentName2}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName2: e.target.value })}
 											placeholder="Nom complet"
+											className="rounded-xl"
 										/>
-										<div className="grid grid-cols-2 gap-3">
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
 												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
 												<Input
@@ -601,12 +605,12 @@ export default function LoginPage() {
 									</div>
 								</div>
 
-								<div className="pt-2 border-t border-gray-100">
-									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
+								<div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
+									<p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-1.5">
 										<Phone className="w-4 h-4 text-red-500" />
 										Contact d&apos;urgence
 									</p>
-									<div className="grid grid-cols-2 gap-3">
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 										<Input
 											value={profileForm.emergencyContact}
 											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: e.target.value })}
@@ -624,50 +628,55 @@ export default function LoginPage() {
 									</div>
 								</div>
 
-								<div className="pt-2 border-t border-gray-100">
-									<p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-										<Heart className="w-4 h-4 text-rose-500" />
-										Informations médicales <span className="text-xs font-normal text-gray-400">(optionnel)</span>
+								<div className="rounded-xl border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 p-4 space-y-3">
+									<p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+										<Heart className="w-3.5 h-3.5" />
+										Informations médicales <span className="font-normal normal-case text-gray-500">(optionnel)</span>
 									</p>
-									<div className="space-y-3">
-										<div>
-											<label className="block text-xs text-gray-500 mb-1">Groupe sanguin</label>
-											<Input
-												value={profileForm.bloodGroup}
-												onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
-												placeholder="Ex : A+, O−"
-											/>
-										</div>
-										<div>
-											<label className="block text-xs text-gray-500 mb-1">Allergies connues</label>
-											<Input
-												value={profileForm.allergies}
-												onChange={(e) => setProfileForm({ ...profileForm, allergies: e.target.value })}
-												placeholder="Ex : pénicilline, arachides..."
-											/>
-										</div>
-										<div>
-											<label className="block text-xs text-gray-500 mb-1">Notes médicales</label>
-											<Input
-												value={profileForm.medicalNotes}
-												onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: e.target.value })}
-												placeholder="Informations importantes pour l'école"
-											/>
-										</div>
+									<div>
+										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Groupe sanguin</label>
+										<select
+											value={profileForm.bloodGroup}
+											onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
+											className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+										>
+											<option value="">Je ne sais pas / Non renseigné</option>
+											{BLOOD_GROUPS.map((g) => (
+												<option key={g} value={g}>{g}</option>
+											))}
+										</select>
+									</div>
+									<div>
+										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Allergies connues</label>
+										<Input
+											value={profileForm.allergies}
+											onChange={(e) => setProfileForm({ ...profileForm, allergies: e.target.value })}
+											placeholder="Ex : pénicilline, arachides..."
+											className="rounded-xl"
+										/>
+									</div>
+									<div>
+										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Notes médicales</label>
+										<Input
+											value={profileForm.medicalNotes}
+											onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: e.target.value })}
+											placeholder="Informations importantes pour l'école"
+											className="rounded-xl"
+										/>
 									</div>
 								</div>
 							</div>
-							<div className="p-6 border-t border-gray-100 flex gap-3">
+							<div className="p-4 sm:p-6 border-t border-gray-100 dark:border-gray-700 flex flex-col-reverse sm:flex-row gap-3 shrink-0 bg-white dark:bg-gray-900">
 								<button
 									onClick={handleSkipProfile}
-									className="flex-none px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+									className="flex-none px-4 py-2.5 text-sm font-medium rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
 								>
 									Plus tard
 								</button>
 								<button
 									onClick={handleSaveProfile}
 									disabled={savingProfile}
-									className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+									className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/25"
 								>
 									{savingProfile ? (
 										<span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

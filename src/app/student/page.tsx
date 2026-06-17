@@ -10,11 +10,14 @@ import {
   Megaphone,
   ChevronRight,
   ChevronDown,
+  QrCode,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
 import StudentLoading from "@/components/student/student-loading"
 import TaskCard from "@/components/student/task-card"
+import Portal from "@/components/portal"
 
 const QRCodeSVG = dynamic(
   () => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })),
@@ -116,6 +119,7 @@ export default function StudentDashboard() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [feeBalance, setFeeBalance] = useState<FeeBalance | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [showQrModal, setShowQrModal] = useState(false)
 
   const weekDays = useMemo(() => {
     const today = new Date()
@@ -223,27 +227,22 @@ export default function StudentDashboard() {
 
       {/* Cartes rapides : QR + Frais */}
       <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
-        <div
+        <button
+          type="button"
+          onClick={() => qrValue && setShowQrModal(true)}
           className={cn(
-            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-3 lg:min-w-0 lg:p-6",
+            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-3 transition-transform active:scale-[0.98] lg:min-w-0 lg:p-6",
             card,
             border,
             shadow
           )}
         >
-          {qrValue && (
-            <>
-              <div className="mb-2 rounded-xl bg-white p-1.5 shadow-sm lg:hidden">
-                <QRCodeSVG value={qrValue} size={56} level="M" />
-              </div>
-              <div className="mb-4 hidden rounded-xl bg-white p-3 shadow-sm lg:block">
-                <QRCodeSVG value={qrValue} size={120} level="M" />
-              </div>
-            </>
-          )}
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 lg:mb-4 lg:h-16 lg:w-16">
+            <QrCode className="h-6 w-6 text-indigo-600 dark:text-indigo-400 lg:h-8 lg:w-8" />
+          </div>
           <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400 lg:text-xs">MON QR CODE</p>
-          <p className={cn("mt-0.5 text-center text-[10px] lg:text-sm", textMuted)}>Identifiant numérique · Code {studentInfo?.code}</p>
-        </div>
+          <p className={cn("mt-0.5 text-center text-[10px] lg:text-sm", textMuted)}>Appuyer pour afficher · Code {studentInfo?.code}</p>
+        </button>
 
         <button
           type="button"
@@ -408,6 +407,38 @@ export default function StudentDashboard() {
         )}
       </section>
       </div>
+
+      {showQrModal && qrValue && (
+        <Portal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowQrModal(false)} />
+            <div className={cn("relative rounded-2xl border shadow-2xl w-full max-w-sm p-6", card, border)}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={cn("text-lg font-bold", text)}>Mon code QR</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(false)}
+                  className={cn("p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800", textMuted)}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex flex-col items-center gap-4">
+                <div className="rounded-2xl bg-white p-4 shadow-inner">
+                  <QRCodeSVG value={qrValue} size={200} level="M" />
+                </div>
+                <div className="text-center">
+                  <p className={cn("text-sm font-semibold", text)}>{studentInfo?.firstName}</p>
+                  <p className={cn("text-xs", textMuted)}>Code élève : {studentInfo?.code}</p>
+                  {studentInfo?.class && (
+                    <p className={cn("text-xs mt-1", textMuted)}>{studentInfo.class}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   )
 }

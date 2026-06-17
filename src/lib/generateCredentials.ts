@@ -81,30 +81,27 @@ export function buildStudentEmailByCode({
   return `${fn}${ln}${sfx}${year}@${sc}.com`
 }
 
-export function buildTeacherEmail({ lastName, middleName, suffix }: { lastName: string; middleName: string; suffix?: string }): string {
-  const left = `${initial(lastName)}${initial(middleName)}${suffix ? normalize(suffix) : ""}`
-  return `${left}@${DEFAULT_DOMAIN}`
-}
-
-export function buildStaffEmail({
-  lastName,
+/** Email personnel / enseignant : prenomnom@codeecole.com (sans année) */
+export function buildPersonnelEmailByCode({
   firstName,
-  role,
+  lastName,
+  schoolCode,
   suffix,
 }: {
-  lastName: string
   firstName: string
-  role: string
+  lastName: string
+  schoolCode: string
   suffix?: number
 }): string {
-  const rolePrefix =
-    role === "CAISSIER" ? "cai" :
-    role === "COMPTABLE" ? "cpt" :
-    role === "DIRECTEUR_DISCIPLINE" ? "dis" :
-    role === "DIRECTEUR_ETUDES" ? "etu" :
-    "stf"
+  const fn = normalize(firstName)
+  const ln = normalize(lastName)
+  const sc = normalize(schoolCode)
   const sfx = suffix && suffix >= 2 ? String(suffix) : ""
-  const left = `${rolePrefix}.${initial(lastName)}${initial(firstName)}${sfx}`
+  return `${fn}${ln}${sfx}@${sc}.com`
+}
+
+export function buildTeacherEmail({ lastName, middleName, suffix }: { lastName: string; middleName: string; suffix?: string }): string {
+  const left = `${initial(lastName)}${initial(middleName)}${suffix ? normalize(suffix) : ""}`
   return `${left}@${DEFAULT_DOMAIN}`
 }
 

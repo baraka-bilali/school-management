@@ -2131,19 +2131,14 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
   const [q, setQ] = useState("")
-  const [banner, setBanner] = useState<{
-    message?: string
-    email?: string
-    password?: string
-    type?: "success" | "error"
-    notificationType?: "create" | "update"
-  } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showResetModal, setShowResetModal] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<any>(null)
   const [newPassword, setNewPassword] = useState("")
+  const [credentialsMode, setCredentialsMode] = useState<"create" | "reset">("reset")
   const [resetting, setResetting] = useState(false)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
   const [passwordCopied, setPasswordCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
 
@@ -2177,10 +2172,40 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
 
   const handleResetPassword = (staff: any) => {
     setSelectedStaff(staff)
+    setCredentialsMode("reset")
     setShowResetModal(true)
     setNewPassword("")
     setPasswordCopied(false)
     setEmailCopied(false)
+  }
+
+  const handleToggleActive = async (staff: any) => {
+    setTogglingId(staff.id)
+    try {
+      const res = await authFetch(`/api/admin/staff/${staff.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !staff.isActive }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur")
+      setItems((prev) => prev.map((s) => (s.id === staff.id ? { ...s, isActive: data.user.isActive } : s)))
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const copyText = (text: string, type: "email" | "password") => {
+    navigator.clipboard?.writeText(text)
+    if (type === "email") {
+      setEmailCopied(true)
+      setTimeout(() => setEmailCopied(false), 2000)
+    } else {
+      setPasswordCopied(true)
+      setTimeout(() => setPasswordCopied(false), 2000)
+    }
   }
 
   const handleConfirmReset = async () => {
@@ -2194,6 +2219,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
       setNewPassword(data.newPassword)
+      setCredentialsMode("reset")
     } catch (e) {
       alert((e as Error).message)
       setShowResetModal(false)
@@ -2206,21 +2232,12 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
     setShowResetModal(false)
     setSelectedStaff(null)
     setNewPassword("")
+    setCredentialsMode("reset")
   }
 
   return (
     <Card theme={theme}>
       <CardContent className="pt-5">
-        {banner && (
-          <Banner
-            type={banner.type || "success"}
-            message={banner.message}
-            email={banner.email}
-            password={banner.password}
-            onClose={() => setBanner(null)}
-          />
-        )}
-
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="text"
@@ -2248,7 +2265,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                 <th className="px-3 py-2 text-left font-medium">Email</th>
                 <th className="px-3 py-2 text-left font-medium">Téléphone</th>
                 <th className="px-3 py-2 text-left font-medium">Fonction</th>
-                <th className="px-3 py-2 text-left font-medium">Statut</th>
+                <th className="px-3 py-2 text-left font-medium">Actif</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
@@ -2275,9 +2292,25 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                     <td className={`px-3 py-2 ${textSecondary}`}>{s.telephone || "—"}</td>
                     <td className={`px-3 py-2 ${textSecondary}`}>{s.fonction || "—"}</td>
                     <td className="px-3 py-2">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${s.isActive ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400" : "bg-gray-100 text-gray-500"}`}>
-                        {s.isActive ? "Actif" : "Inactif"}
-                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={s.isActive}
+                        disabled={togglingId === s.id}
+                        onClick={() => handleToggleActive(s)}
+                        title={s.isActive ? "Désactiver l'accès" : "Réactiver l'accès"}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                          s.isActive ? "bg-green-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-300"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5",
+                            s.isActive ? "translate-x-5" : "translate-x-0.5"
+                          )}
+                        />
+                      </button>
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -2303,12 +2336,12 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
           theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
-            setBanner({
-              email: payload.email,
-              password: payload.plaintextPassword,
-              type: "success",
-              notificationType: "create",
-            })
+            setSelectedStaff(payload.user)
+            setNewPassword(payload.plaintextPassword)
+            setCredentialsMode("create")
+            setPasswordCopied(false)
+            setEmailCopied(false)
+            setShowResetModal(true)
             setPagination((p) => ({ ...p }))
           }}
         />
@@ -2317,12 +2350,21 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
           <Portal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeResetModal} />
-              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-md`}>
-                <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                  <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
-                    <KeyRound className="w-5 h-5 text-orange-500" />
-                    {newPassword ? "Nouveaux identifiants" : "Réinitialiser le mot de passe"}
-                  </h3>
+              <div className={`relative ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-2xl border shadow-2xl w-full max-w-lg`}>
+                <div className={`p-6 border-b ${theme === "dark" ? "border-green-500/20 bg-green-500/5" : "border-green-200 bg-green-50"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                      <KeyRound className="w-7 h-7 text-green-500" />
+                    </div>
+                    <div>
+                      <h2 className={`text-lg font-bold ${textColor}`}>
+                        {newPassword ? "Identifiants de connexion" : "Réinitialiser le mot de passe"}
+                      </h2>
+                      <p className={`text-xs ${textSecondary}`}>
+                        {credentialsMode === "create" ? "Compte créé avec succès" : "Mot de passe réinitialisé"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-6">
                   {!newPassword ? (
@@ -2334,20 +2376,34 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                     </>
                   ) : (
                     <div className="space-y-4">
+                      <div className={`${theme === "dark" ? "bg-yellow-500/10 border-yellow-500/30" : "bg-yellow-50 border-yellow-200"} border rounded-lg p-3`}>
+                        <p className={`text-sm ${theme === "dark" ? "text-yellow-400" : "text-yellow-700"}`}>
+                          <strong>Important :</strong> Copiez ces identifiants maintenant. Ils ne seront plus affichés après fermeture.
+                        </p>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === "dark" ? "bg-indigo-500/20 text-indigo-400" : "bg-indigo-100 text-indigo-600"}`}>
+                          <User className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className={`font-semibold ${textColor}`}>{selectedStaff?.nom} {selectedStaff?.prenom}</p>
+                          <p className={`text-xs ${textSecondary}`}>{STAFF_ROLE_LABELS[selectedStaff?.role as StaffRole] || selectedStaff?.role}</p>
+                        </div>
+                      </div>
                       <div>
-                        <label className={`block text-xs font-semibold ${textSecondary} mb-1`}>Email</label>
-                        <div className={`flex items-center justify-between rounded-lg border ${borderColor} p-3`}>
-                          <span className="font-mono text-sm">{selectedStaff?.email}</span>
-                          <button type="button" onClick={() => { navigator.clipboard?.writeText(selectedStaff?.email || ""); setEmailCopied(true) }} className="text-indigo-500">
+                        <label className={`block text-xs font-semibold ${textSecondary} mb-2 flex items-center gap-1.5`}><Mail className="w-3.5 h-3.5" />Email</label>
+                        <div className={`flex items-center justify-between rounded-lg border-2 p-3 ${emailCopied ? "border-green-500" : borderColor}`}>
+                          <span className="font-mono text-sm select-all">{selectedStaff?.email}</span>
+                          <button type="button" onClick={() => copyText(selectedStaff?.email || "", "email")} className="text-indigo-500 p-1.5">
                             {emailCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
                       <div>
-                        <label className={`block text-xs font-semibold ${textSecondary} mb-1`}>Nouveau mot de passe</label>
-                        <div className={`flex items-center justify-between rounded-lg border ${borderColor} p-3`}>
-                          <span className="font-mono text-lg font-bold">{newPassword}</span>
-                          <button type="button" onClick={() => { navigator.clipboard?.writeText(newPassword); setPasswordCopied(true) }} className="text-orange-500">
+                        <label className={`block text-xs font-semibold ${textSecondary} mb-2 flex items-center gap-1.5`}><KeyRound className="w-3.5 h-3.5" />Mot de passe</label>
+                        <div className={`flex items-center justify-between rounded-lg border-2 p-3 ${passwordCopied ? "border-green-500" : borderColor}`}>
+                          <span className="font-mono text-lg font-bold select-all">{newPassword}</span>
+                          <button type="button" onClick={() => copyText(newPassword, "password")} className="text-orange-500 p-1.5">
                             {passwordCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                           </button>
                         </div>
@@ -2356,15 +2412,15 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
                   )}
                 </div>
                 <div className={`p-6 flex gap-3 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                  <button type="button" onClick={closeResetModal} className={`flex-1 px-4 py-2 rounded-lg border ${borderColor} ${textColor}`}>
-                    {newPassword ? "Fermer" : "Annuler"}
+                  <button type="button" onClick={closeResetModal} className={`flex-1 px-4 py-2.5 rounded-lg border ${borderColor} ${textColor} text-sm font-medium`}>
+                    {newPassword ? (passwordCopied && emailCopied ? "✓ Identifiants copiés" : "Fermer") : "Annuler"}
                   </button>
                   {!newPassword && (
                     <button
                       type="button"
                       onClick={handleConfirmReset}
                       disabled={resetting}
-                      className="flex-1 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium disabled:opacity-50"
                     >
                       {resetting ? "..." : "Réinitialiser"}
                     </button>
@@ -2387,7 +2443,7 @@ function CreateStaffModal({
 }: {
   open: boolean
   onClose: () => void
-  onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  onCreated: (payload: { email: string; plaintextPassword: string; user: Record<string, unknown> }) => void
   theme?: "light" | "dark"
 }) {
   const [form, setForm] = useState({
@@ -2446,7 +2502,7 @@ function CreateStaffModal({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
-      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword })
+      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword, user: data.user })
     } catch (e) {
       alert((e as Error).message)
     } finally {

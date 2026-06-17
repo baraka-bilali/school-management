@@ -27,6 +27,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Mot de passe incorrect." }, { status: 401 });
     }
 
+    if (!user.isActive) {
+      return NextResponse.json(
+        { error: "Votre compte a été désactivé. Contactez l'administration de l'école." },
+        { status: 403 }
+      );
+    }
+
     // Générer un token JWT avec schoolId
     const token = jwt.sign(
       { 
