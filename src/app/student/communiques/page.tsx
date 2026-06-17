@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Megaphone, Clock, ChevronRight, Loader2, Check } from "lucide-react"
+import { Megaphone, Clock, ChevronRight, Loader2, Check, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
@@ -41,6 +41,7 @@ export default function StudentCommuniquesPage() {
   const [hasMore, setHasMore] = useState(false)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
 
   const fetchCommuniques = useCallback(async (pageNum: number, append: boolean) => {
     if (pageNum === 1) setLoading(true)
@@ -62,6 +63,22 @@ export default function StudentCommuniquesPage() {
 
   useEffect(() => { fetchCommuniques(1, false) }, [fetchCommuniques])
 
+  const markAllAsRead = async () => {
+    setMarkingAll(true)
+    try {
+      const res = await fetch("/api/student/communiques/read-all", {
+        method: "POST",
+        credentials: "include",
+      })
+      if (res.ok) {
+        setCommuniques((prev) => prev.map((c) => ({ ...c, isRead: true })))
+        window.dispatchEvent(new Event("communiqueRead"))
+      }
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   const unreadCount = communiques.filter((c) => !c.isRead).length
   const latest = communiques[0]
 
@@ -76,15 +93,28 @@ export default function StudentCommuniquesPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className={cn("text-2xl font-bold tracking-tight", text)}>Communiqués</h1>
-        <p className={cn("mt-1 text-sm", textMuted)}>
-          {unreadCount > 0 ? (
-            <span className="font-semibold text-red-500">{unreadCount} non lu{unreadCount !== 1 ? "s" : ""}</span>
-          ) : (
-            "Tous les messages de votre école"
-          )}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className={cn("text-2xl font-bold tracking-tight", text)}>Communiqués</h1>
+          <p className={cn("mt-1 text-sm", textMuted)}>
+            {unreadCount > 0 ? (
+              <span className="font-semibold text-red-500">{unreadCount} non lu{unreadCount !== 1 ? "s" : ""}</span>
+            ) : (
+              "Tous les messages de votre école"
+            )}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={markAllAsRead}
+            disabled={markingAll}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+          >
+            {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+            Tout marquer comme lu
+          </button>
+        )}
       </div>
 
       {communiques.length === 0 ? (

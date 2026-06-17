@@ -59,6 +59,7 @@ function NotificationsHubContent() {
   const [communiques, setCommuniques] = useState<Communique[]>([])
   const [loadingNotif, setLoadingNotif] = useState(true)
   const [loadingComm, setLoadingComm] = useState(true)
+  const [markingAll, setMarkingAll] = useState(false)
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -134,6 +135,41 @@ function NotificationsHubContent() {
     return false
   }
 
+  const markAllCommuniquesAsRead = async () => {
+    try {
+      const res = await fetch("/api/student/communiques/read-all", {
+        method: "POST",
+        credentials: "include",
+      })
+      if (res.ok) {
+        setCommuniques((prev) => prev.map((c) => ({ ...c, isRead: true })))
+        window.dispatchEvent(new Event("communiqueRead"))
+        return true
+      }
+    } catch {}
+
+    return false
+  }
+
+  const markAllMessagesAsRead = async () => {
+    setMarkingAll(true)
+    try {
+      await Promise.all([markAllAsRead(), markAllCommuniquesAsRead()])
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
+  const markCurrentTabAsRead = async () => {
+    setMarkingAll(true)
+    try {
+      if (tab === "notifications") await markAllAsRead()
+      else await markAllCommuniquesAsRead()
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "GRADE":
@@ -151,12 +187,30 @@ function NotificationsHubContent() {
 
   const unreadNotif = notifications.filter((n) => !n.isRead).length
   const unreadComm = communiques.filter((c) => !c.isRead).length
+  const unreadTotal = unreadNotif + unreadComm
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <div>
-        <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Messages</h1>
-        <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>Notifications et communiqués de votre école</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Messages</h1>
+          <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>Notifications et communiqués de votre école</p>
+        </div>
+        {unreadTotal > 0 && (
+          <button
+            type="button"
+            onClick={markAllMessagesAsRead}
+            disabled={markingAll}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-50 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+          >
+            {markingAll ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            Tout marquer comme lu ({unreadTotal})
+          </button>
+        )}
       </div>
 
       {/* Onglets */}
@@ -205,11 +259,12 @@ function NotificationsHubContent() {
           {unreadNotif > 0 && (
             <button
               type="button"
-              onClick={markAllAsRead}
-              className="flex items-center gap-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400"
+              onClick={markCurrentTabAsRead}
+              disabled={markingAll}
+              className="flex items-center gap-2 text-sm font-semibold text-indigo-600 disabled:opacity-50 dark:text-indigo-400"
             >
-              <CheckCircle className="h-4 w-4" />
-              Tout marquer comme lu
+              {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+              Marquer les notifications comme lues ({unreadNotif})
             </button>
           )}
           {loadingNotif ? (
@@ -261,6 +316,17 @@ function NotificationsHubContent() {
       {/* Communiqués */}
       {tab === "communiques" && (
         <div className="space-y-2">
+          {unreadComm > 0 && (
+            <button
+              type="button"
+              onClick={markCurrentTabAsRead}
+              disabled={markingAll}
+              className="mb-1 flex items-center gap-2 text-sm font-semibold text-indigo-600 disabled:opacity-50 dark:text-indigo-400"
+            >
+              {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+              Marquer les communiqués comme lus ({unreadComm})
+            </button>
+          )}
           {loadingComm ? (
             <StudentLoading variant="communiques" />
           ) : communiques.length === 0 ? (
