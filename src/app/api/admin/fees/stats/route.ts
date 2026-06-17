@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
+import { toDisplayCode } from "@/lib/student-fields"
 
 function getDayBounds() {
   const now = new Date()
@@ -194,7 +195,7 @@ export async function GET(req: NextRequest) {
         tarification: {
           include: { typeFrais: { select: { nom: true } } },
         },
-        enrollment: { include: { class: { select: { name: true } } } },
+        enrollment: { include: { class: { select: { id: true, name: true } } } },
       },
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -256,7 +257,7 @@ export async function GET(req: NextRequest) {
           id: p.id,
           numeroRecu: p.numeroRecu,
           studentName: `${p.student.lastName} ${p.student.middleName} ${p.student.firstName}`,
-          studentCode: p.student.code,
+          studentCode: toDisplayCode(p.student.code, p.enrollment.class.id),
           className: p.enrollment.class.name,
           typeFrais: p.tarification.typeFrais.nom,
           montant: p.montant,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
+import { toDisplayCode } from "@/lib/student-fields"
 
 // GET /api/admin/fees/enrollments?yearId=X&q=search
 // Recherche d'élèves inscrits pour le formulaire de paiement
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
       enrollmentId: e.id,
       studentId: e.student.id,
       studentName: `${e.student.lastName} ${e.student.middleName} ${e.student.firstName}`,
-      studentCode: e.student.code,
+      studentCode: toDisplayCode(e.student.code, e.class.id),
       classId: e.class.id,
       className: e.class.name,
       yearId: e.year.id,

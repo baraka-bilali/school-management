@@ -12,6 +12,8 @@ import {
   getNextClassCode,
   isCodeUsedInClass,
   normalizeStudentIdentity,
+  studentWithDisplayCode,
+  toStoredCode,
 } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -211,7 +213,11 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      return { items: students, total, page, pageSize }
+      const items = students.map((s: (typeof students)[number]) =>
+        studentWithDisplayCode(s, classId ? parseInt(classId) : s.enrollments?.[0]?.classId)
+      )
+
+      return { items, total, page, pageSize }
     }, 300000) // Cache de 5 minutes
 
     console.timeEnd(perfLabel)
@@ -303,17 +309,19 @@ export async function POST(req: NextRequest) {
     const parsedClassId = parseInt(classId)
     const parsedYearId = parseInt(yearId)
 
-    let code = rawCode?.trim() ? String(rawCode).trim() : ""
-    if (!code) {
-      code = String(await getNextClassCode(parsedClassId, parsedYearId))
+    let displayCode = rawCode?.trim() ? String(rawCode).trim() : ""
+    if (!displayCode) {
+      displayCode = String(await getNextClassCode(parsedClassId, parsedYearId))
     }
 
-    if (await isCodeUsedInClass(parsedClassId, parsedYearId, code)) {
+    if (await isCodeUsedInClass(parsedClassId, parsedYearId, displayCode)) {
       return NextResponse.json(
-        { error: `Le code « ${code} » est déjà utilisé dans cette classe pour l'année sélectionnée` },
+        { error: `Le code « ${displayCode} » est déjà utilisé dans cette classe pour l'année sélectionnée` },
         { status: 400 }
       )
     }
+
+    const storedCode = toStoredCode(parsedClassId, displayCode)
 
     // Générer email avec le code de l'école et gestion des doublons
     const calendarYear = new Date().getFullYear()
@@ -351,7 +359,7 @@ export async function POST(req: NextRequest) {
           firstName,
           gender,
           birthDate: new Date(birthDate),
-          code,
+          code: storedCode,
           userId: user.id,
         },
       })
@@ -373,9 +381,10 @@ export async function POST(req: NextRequest) {
     invalidateCachePattern('students-*')
     console.log('[CACHE] Invalidated students cache after creation')
 
-    return NextResponse.json({ 
-      ...result, 
-      plaintextPassword 
+    return NextResponse.json({
+      ...result,
+      student: studentWithDisplayCode(result.student, parsedClassId),
+      plaintextPassword,
     })
   } catch (e: any) {
     console.error(e)

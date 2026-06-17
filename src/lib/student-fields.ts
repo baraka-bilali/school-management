@@ -46,6 +46,43 @@ export function normalizeStudentProfile(input: {
   return out
 }
 
+const CLASS_CODE_SEP = ":"
+
+/** Numéro affiché (1, 2, 3…) depuis le code stocké (ex. « 42:1 » → « 1 »). */
+export function toDisplayCode(stored: string | null | undefined, classId?: number): string {
+  if (!stored) return ""
+  const str = String(stored)
+  const sep = str.lastIndexOf(CLASS_CODE_SEP)
+  if (sep >= 0) {
+    if (classId !== undefined && str.slice(0, sep) !== String(classId)) {
+      return str.slice(sep + 1)
+    }
+    return str.slice(sep + 1)
+  }
+  return str
+}
+
+/** Préfixe par classe pour l'unicité globale en BDD tout en affichant 1, 2, 3… par classe. */
+export function toStoredCode(classId: number, displayCode: string): string {
+  const display = displayCode.trim()
+  if (!display) return display
+  const sep = display.lastIndexOf(CLASS_CODE_SEP)
+  if (sep >= 0 && display.slice(0, sep) === String(classId)) {
+    return display
+  }
+  return `${classId}${CLASS_CODE_SEP}${display}`
+}
+
+export function studentWithDisplayCode<
+  T extends { code: string | null; enrollments?: Array<{ classId?: number }> },
+>(student: T, classId?: number): T {
+  const resolvedClassId = classId ?? student.enrollments?.[0]?.classId
+  return {
+    ...student,
+    code: toDisplayCode(student.code, resolvedClassId),
+  }
+}
+
 /** Prochain numéro de code pour une classe / année (1, 2, 3… par classe). */
 export async function getNextClassCode(classId: number, yearId: number): Promise<number> {
   const enrollments = await prisma.enrollment.findMany({
@@ -57,7 +94,8 @@ export async function getNextClassCode(classId: number, yearId: number): Promise
   for (const enrollment of enrollments) {
     const code = enrollment.student?.code
     if (!code) continue
-    const num = parseInt(String(code).replace(/\D/g, ""), 10)
+    const display = toDisplayCode(code, classId)
+    const num = parseInt(display.replace(/\D/g, ""), 10)
     if (!isNaN(num) && num > maxCode) maxCode = num
   }
 
@@ -68,23 +106,24 @@ export async function getNextClassCode(classId: number, yearId: number): Promise
 export async function isCodeUsedInClass(
   classId: number,
   yearId: number,
-  code: string,
+  displayCode: string,
   excludeStudentId?: number
 ): Promise<boolean> {
-  const trimmed = code.trim()
+  const trimmed = displayCode.trim()
   if (!trimmed) return false
 
-  const existing = await prisma.enrollment.findFirst({
+  const stored = toStoredCode(classId, trimmed)
+  const enrollments = await prisma.enrollment.findMany({
     where: {
       classId,
       yearId,
-      student: {
-        code: trimmed,
-        ...(excludeStudentId ? { id: { not: excludeStudentId } } : {}),
-      },
+      ...(excludeStudentId ? { studentId: { not: excludeStudentId } } : {}),
     },
-    select: { id: true },
+    include: { student: { select: { code: true } } },
   })
 
-  return !!existing
+  return enrollments.some((e) => {
+    const sc = e.student?.code ?? ""
+    return sc === stored || sc === trimmed || toDisplayCode(sc, classId) === trimmed
+  })
 }

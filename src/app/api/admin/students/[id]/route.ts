@@ -6,6 +6,8 @@ import {
   isCodeUsedInClass,
   normalizeStudentIdentity,
   normalizeStudentProfile,
+  studentWithDisplayCode,
+  toStoredCode,
 } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -63,7 +65,10 @@ export async function GET(
       return NextResponse.json({ error: "Accès refusé à cet élève" }, { status: 403 })
     }
 
-    return NextResponse.json({ student })
+    const enrollment = student.enrollments[0]
+    return NextResponse.json({
+      student: studentWithDisplayCode(student, enrollment?.classId),
+    })
   } catch (error) {
     console.error("Erreur récupération élève:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
@@ -107,7 +112,7 @@ export async function PUT(
       }
     }
 
-    const code = String(data.code).trim()
+    const displayCode = String(data.code).trim()
 
     // Vérifier appartenance école
     const existing = await prisma.student.findUnique({
@@ -125,20 +130,24 @@ export async function PUT(
       select: { classId: true, yearId: true },
     })
 
-    if (currentEnrollment && code) {
+    if (currentEnrollment && displayCode) {
       const taken = await isCodeUsedInClass(
         currentEnrollment.classId,
         currentEnrollment.yearId,
-        code,
+        displayCode,
         studentId
       )
       if (taken) {
         return NextResponse.json(
-          { error: `Le code « ${code} » est déjà utilisé dans cette classe` },
+          { error: `Le code « ${displayCode} » est déjà utilisé dans cette classe` },
           { status: 400 }
         )
       }
     }
+
+    const storedCode = currentEnrollment
+      ? toStoredCode(currentEnrollment.classId, displayCode)
+      : displayCode
 
     const profileFields = normalizeStudentProfile(data)
 
@@ -146,7 +155,7 @@ export async function PUT(
     await prisma.student.update({
       where: { id: studentId },
       data: {
-        code,
+        code: storedCode,
         lastName: identity.lastName,
         middleName: identity.middleName,
         firstName: identity.firstName,
@@ -259,7 +268,12 @@ export async function PUT(
       },
     })
 
-    return NextResponse.json({ student: responseStudent })
+    const enrollment = responseStudent?.enrollments[0]
+    return NextResponse.json({
+      student: responseStudent
+        ? studentWithDisplayCode(responseStudent, enrollment?.classId)
+        : null,
+    })
   } catch (error) {
     console.error("Erreur mise à jour élève:", error)
     return NextResponse.json({ error: "Erreur lors de la modification" }, { status: 500 })

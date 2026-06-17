@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
+import { toDisplayCode } from "@/lib/student-fields"
 
 // GET /api/admin/fees/students - Liste des élèves avec résumé paiements
 export async function GET(req: NextRequest) {
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
         lastName: e.student.lastName,
         middleName: e.student.middleName,
         firstName: e.student.firstName,
-        code: e.student.code,
+        code: toDisplayCode(e.student.code, e.class.id),
         gender: e.student.gender,
         classId: e.class.id,
         className: e.class.name,

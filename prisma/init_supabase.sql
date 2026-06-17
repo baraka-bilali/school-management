@@ -418,9 +418,7 @@ CREATE UNIQUE INDEX "Class_name_schoolId_key" ON "Class"("name", "schoolId");
 CREATE UNIQUE INDEX "Student_userId_key" ON "Student"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Student_code_key" ON "Student"("code");
-
--- CreateIndex
+-- Code élève : unicité par classe via préfixe « classId:code » (pas d'index unique global)
 CREATE INDEX "Student_lastName_idx" ON "Student"("lastName");
 
 -- CreateIndex

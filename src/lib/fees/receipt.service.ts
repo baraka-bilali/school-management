@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { toDisplayCode } from "@/lib/student-fields"
 
 /**
  * Génère un numéro de reçu séquentiel au format REC-ANNEE-0001
@@ -112,7 +113,7 @@ export async function getReceiptData(paiementId: number) {
       },
       enrollment: {
         include: {
-          class: { select: { name: true } },
+          class: { select: { id: true, name: true } },
         },
       },
     },
@@ -135,7 +136,7 @@ export async function getReceiptData(paiementId: number) {
     modePaiement: paiement.modePaiement,
     reference: paiement.reference,
     eleve: {
-      code: paiement.student.code,
+      code: toDisplayCode(paiement.student.code, paiement.enrollment.class.id),
       nom: `${paiement.student.lastName} ${paiement.student.middleName} ${paiement.student.firstName}`,
     },
     classe: paiement.enrollment.class.name,

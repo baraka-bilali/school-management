@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { toDisplayCode } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
-        code: student.code,
+        code: toDisplayCode(student.code, currentEnrollment?.classId),
         gender: student.gender,
         birthDate: student.birthDate,
         birthPlace: student.birthPlace,
