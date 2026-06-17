@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import { SECTION_ORDER } from "@/lib/class-sort"
 
 function emptySectionStats(): Record<string, number> {
@@ -14,32 +15,42 @@ export async function GET(request: NextRequest) {
 
     const schoolId = user.schoolId
 
-    const [studentsCount, teachersCount, classesCount, maleCount, femaleCount, currentYear] =
+    const [studentsCount, teachersCount, classesCount, maleCount, femaleCount, currentYearId] =
       await Promise.all([
         prisma.student.count({ where: { user: { schoolId, isActive: true } } }),
         prisma.teacher.count({ where: { user: { schoolId, isActive: true } } }),
         prisma.class.count({ where: { schoolId } }),
         prisma.student.count({ where: { user: { schoolId, isActive: true }, gender: "M" } }),
         prisma.student.count({ where: { user: { schoolId, isActive: true }, gender: "F" } }),
-        prisma.academicYear.findFirst({ where: { current: true } }),
+        getSchoolCurrentYearId(schoolId),
       ])
 
+    let currentYearName: string | null = null
     let sectionStats = emptySectionStats()
-    if (currentYear) {
-      const enrollments = await prisma.enrollment.findMany({
-        where: {
-          yearId: currentYear.id,
-          status: "ACTIVE",
-          student: { user: { schoolId, isActive: true } },
-        },
-        select: { class: { select: { section: true } } },
+
+    if (currentYearId) {
+      const year = await prisma.academicYear.findUnique({
+        where: { id: currentYearId },
+        select: { id: true, name: true },
       })
-      for (const enrollment of enrollments) {
-        const section = enrollment.class.section
-        if (section in sectionStats) {
-          sectionStats[section]++
-        } else {
-          sectionStats[section] = (sectionStats[section] ?? 0) + 1
+      currentYearName = year?.name ?? null
+
+      if (year) {
+        const enrollments = await prisma.enrollment.findMany({
+          where: {
+            yearId: year.id,
+            status: "ACTIVE",
+            student: { user: { schoolId } },
+          },
+          select: { class: { select: { section: true } } },
+        })
+        for (const enrollment of enrollments) {
+          const section = enrollment.class.section
+          if (section in sectionStats) {
+            sectionStats[section]++
+          } else {
+            sectionStats[section] = (sectionStats[section] ?? 0) + 1
+          }
         }
       }
     }
@@ -116,6 +127,8 @@ export async function GET(request: NextRequest) {
       monthlyPaymentsCdf,
       genderStats: { male: maleCount, female: femaleCount },
       sectionStats,
+      currentYearId,
+      currentYearName,
     })
   } catch (error) {
     console.error('[ERROR] Dashboard stats:', error)

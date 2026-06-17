@@ -55,6 +55,8 @@ interface DashboardStatsResponse {
     female: number
   }
   sectionStats?: Record<string, number>
+  currentYearId?: number | null
+  currentYearName?: string | null
 }
 
 function formatUsd(value: number): string {
@@ -273,8 +275,15 @@ export default function Dashboard() {
   return (
     <div className={`min-h-screen ${bgPage}`}>
       <div id="dashboard" className="p-1">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className={`text-2xl font-bold ${textColor}`}>Tableau de bord</h2>
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className={`text-2xl font-bold ${textColor}`}>Tableau de bord</h2>
+            {safeStats.currentYearName && (
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
+                Année {safeStats.currentYearName}
+              </span>
+            )}
+          </div>
           <span className={`text-xs ${textSecondary} flex items-center gap-1`}>
             <Activity className="w-3 h-3" />
             {isInitialLoading ? "Chargement..." : isFetching ? "Mise à jour..." : "Graphiques interactifs (survol actif)"}
@@ -454,13 +463,17 @@ export default function Dashboard() {
                 <p className={`text-sm font-semibold ${textColor}`}>Niveau scolaire</p>
                 <p className={`text-xs ${textSecondary}`}>
                   Répartition par section — {sectionTotal} inscription{sectionTotal > 1 ? "s" : ""} active{sectionTotal > 1 ? "s" : ""}
+                  {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
                 </p>
               </div>
               <BookOpen className={`w-4 h-4 ${textSecondary}`} />
             </div>
             {sectionTotal === 0 ? (
               <div className={`h-56 flex items-center justify-center rounded-xl border border-dashed ${borderColor}`}>
-                <p className={`text-sm ${textSecondary}`}>Aucune inscription active cette année</p>
+                <p className={`text-sm ${textSecondary} text-center px-4`}>
+                  Aucune inscription active
+                  {safeStats.currentYearName ? ` pour ${safeStats.currentYearName}` : " cette année"}
+                </p>
               </div>
             ) : (
               <>
