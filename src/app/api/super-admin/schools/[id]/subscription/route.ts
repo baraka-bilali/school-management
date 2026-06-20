@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { extendSubscriptionEnd, newSubscriptionPeriod } from "@/lib/subscription-period"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -42,35 +43,56 @@ async function generateInvoiceNumber(): Promise<string> {
   return `FAC-${year}-${String(counter).padStart(4, "0")}`
 }
 
-// Calcule les dates de début et de fin selon l'état actuel de l'abonnement
-// - Si actif avec dateFinAbonnement dans le futur : prolonge à partir de la fin actuelle
-// - Sinon : commence aujourd'hui
+const SUBSCRIPTION_DURATION_DAYS = 30
+
+// Calcule les dates selon l'état actuel :
+// - Prolongation : conserve dateDebutAbonnement, ajoute 30 j à dateFinAbonnement
+// - Nouvelle activation : démarre aujourd'hui
 function calculateSubscriptionDates(school: {
   etatCompte: string
+  dateDebutAbonnement: Date | null
   dateFinAbonnement: Date | null
-}): { startDate: Date; endDate: Date } {
+}): {
+  schoolStart: Date
+  schoolEnd: Date
+  paymentStart: Date
+  paymentEnd: Date
+  isExtension: boolean
+} {
   const now = new Date()
   const isActive =
     school.etatCompte === "ACTIF" &&
     school.dateFinAbonnement !== null &&
     new Date(school.dateFinAbonnement) > now
 
-  let startDate: Date
-  if (isActive) {
-    // Prolongation : nouveau mois commence à la fin de l'abonnement en cours
-    startDate = new Date(school.dateFinAbonnement!)
-    startDate.setHours(0, 0, 0, 0)
-  } else {
-    // Nouvelle activation : commence aujourd'hui
-    startDate = new Date()
-    startDate.setHours(0, 0, 0, 0)
+  if (isActive && school.dateFinAbonnement) {
+    const currentEnd = new Date(school.dateFinAbonnement)
+    const schoolStart = school.dateDebutAbonnement
+      ? new Date(school.dateDebutAbonnement)
+      : new Date(now)
+    schoolStart.setHours(0, 0, 0, 0)
+
+    const paymentStart = new Date(currentEnd)
+    paymentStart.setHours(0, 0, 0, 0)
+    const schoolEnd = extendSubscriptionEnd(currentEnd, SUBSCRIPTION_DURATION_DAYS)
+
+    return {
+      schoolStart,
+      schoolEnd,
+      paymentStart,
+      paymentEnd: schoolEnd,
+      isExtension: true,
+    }
   }
 
-  const endDate = new Date(startDate)
-  endDate.setDate(endDate.getDate() + 30)
-  endDate.setHours(23, 59, 59, 999)
-
-  return { startDate, endDate }
+  const { startDate, endDate } = newSubscriptionPeriod(now, SUBSCRIPTION_DURATION_DAYS)
+  return {
+    schoolStart: startDate,
+    schoolEnd: endDate,
+    paymentStart: startDate,
+    paymentEnd: endDate,
+    isExtension: false,
+  }
 }
 
 // PUT: Activer / prolonger l'abonnement d'une école (toujours 30 jours)
@@ -93,7 +115,8 @@ export async function PUT(
     const { planAbonnement, typePaiement, montantPaye, notes, reference } = body
 
     // Dates auto-calculées — toujours 30 jours, prolongement si déjà actif
-    const { startDate, endDate } = calculateSubscriptionDates(existingSchool)
+    const { schoolStart, schoolEnd, paymentStart, paymentEnd, isExtension } =
+      calculateSubscriptionDates(existingSchool)
 
     const plan = planAbonnement || "STARTER"
     const montant = montantPaye != null ? parseFloat(String(montantPaye)) : 70
@@ -105,8 +128,8 @@ export async function PUT(
       prisma.school.update({
         where: { id: schoolId },
         data: {
-          dateDebutAbonnement: startDate,
-          dateFinAbonnement: endDate,
+          dateDebutAbonnement: schoolStart,
+          dateFinAbonnement: schoolEnd,
           periodeAbonnement: "MENSUEL",
           planAbonnement: plan,
           typePaiement: typePaiement || "MOBILE_MONEY",
@@ -133,8 +156,8 @@ export async function PUT(
           devise,
           typePaiement: typePaiement || "MOBILE_MONEY",
           reference: reference || null,
-          dateDebut: startDate,
-          dateFin: endDate,
+          dateDebut: paymentStart,
+          dateFin: paymentEnd,
           periode: "MENSUEL",
           plan,
           numeroFacture,
@@ -145,12 +168,8 @@ export async function PUT(
       }),
     ])
 
-    const isExtension = existingSchool.etatCompte === "ACTIF" &&
-      existingSchool.dateFinAbonnement !== null &&
-      new Date(existingSchool.dateFinAbonnement) > new Date()
-
     const actionLabel = isExtension ? "prolongé" : "activé"
-    const schoolAdminMessage = `✅ Votre abonnement a été ${actionLabel}. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${endDate.toLocaleDateString("fr-FR")}.`
+    const schoolAdminMessage = `✅ Votre abonnement a été ${actionLabel}. Facture n° ${numeroFacture} — ${montant} ${devise}. Valable jusqu'au ${schoolEnd.toLocaleDateString("fr-FR")}.`
 
     await prisma.notification.create({
       data: {
@@ -202,10 +221,10 @@ export async function PUT(
       school: updatedSchool,
       payment,
       numeroFacture,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      startDate: schoolStart.toISOString(),
+      endDate: schoolEnd.toISOString(),
       isExtension,
-      message: `Abonnement ${actionLabel} jusqu'au ${endDate.toLocaleDateString("fr-FR")} — Facture ${numeroFacture}`,
+      message: `Abonnement ${actionLabel} jusqu'au ${schoolEnd.toLocaleDateString("fr-FR")} — Facture ${numeroFacture}`,
     })
   } catch (e: any) {
     console.error("Erreur abonnement:", e)

@@ -118,27 +118,33 @@ export default function SubscriptionManagement() {
     }
   }
 
-  // Calcul des dates prévisionnelles (identique à l'API)
+  // Calcul des dates prévisionnelles (aligné sur l'API)
   const getPreviewDates = () => {
+    if (!school) return null
     const now = new Date()
     const isActive =
-      school?.etatCompte === "ACTIF" &&
+      school.etatCompte === "ACTIF" &&
       school.dateFinAbonnement !== null &&
       new Date(school.dateFinAbonnement!) > now
 
-    let startDate: Date
-    if (isActive) {
-      startDate = new Date(school!.dateFinAbonnement!)
-    } else {
-      startDate = new Date()
+    if (isActive && school.dateFinAbonnement) {
+      const schoolStart = school.dateDebutAbonnement
+        ? new Date(school.dateDebutAbonnement)
+        : new Date(now)
+      schoolStart.setHours(0, 0, 0, 0)
+      const currentEnd = new Date(school.dateFinAbonnement)
+      const endDate = new Date(currentEnd)
+      endDate.setDate(endDate.getDate() + 30)
+      endDate.setHours(23, 59, 59, 999)
+      return { startDate: schoolStart, endDate, isExtension: true }
     }
-    startDate.setHours(0, 0, 0, 0)
 
+    const startDate = new Date()
+    startDate.setHours(0, 0, 0, 0)
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + 30)
     endDate.setHours(23, 59, 59, 999)
-
-    return { startDate, endDate, isExtension: isActive }
+    return { startDate, endDate, isExtension: false }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -7,10 +7,25 @@ import { authFetch } from "@/lib/auth-fetch"
 import {
   CreditCard, Calendar, AlertCircle, CheckCircle, Clock,
   Mail, Phone, Receipt, FileText, ChevronLeft,
-  ChevronRight, Download, MessageCircle, X, Building2, User
+  ChevronRight, Download, MessageCircle, X, Building2, User, Timer, Layers
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
 import Portal from "@/components/portal"
+import {
+  getSubscriptionPeriodMetrics,
+  parseSubscriptionDate,
+  type SubscriptionPeriodMetrics,
+  type SubscriptionSegment,
+} from "@/lib/subscription-period"
+
+interface SubscriptionSummary {
+  cumulativeStart: string | null
+  cumulativeEnd: string | null
+  totalDays: number
+  subscriptionCount: number
+  segments: SubscriptionSegment[]
+  metrics: SubscriptionPeriodMetrics
+}
 
 interface School {
   id: number
@@ -39,20 +54,33 @@ interface SubscriptionPayment {
 }
 
 const CircularProgress = ({
-  percentage, daysRemaining, status, theme
+  remainingPercent,
+  daysRemaining,
+  daysElapsed,
+  totalDays,
+  daysUntilStart,
+  phase,
+  theme,
 }: {
-  percentage: number
+  remainingPercent: number
   daysRemaining: number | null
-  status: string
+  daysElapsed: number
+  totalDays: number
+  daysUntilStart: number
+  phase: string
   theme: "light" | "dark"
 }) => {
   const radius = 80
   const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (percentage / 100) * circumference
+  const clamped = Math.min(100, Math.max(0, remainingPercent))
+  const strokeDashoffset = circumference - (clamped / 100) * circumference
 
   const getGradientColors = () => {
-    if (status === "EXPIRÉ" || (daysRemaining !== null && daysRemaining <= 0)) {
+    if (phase === "expired" || phase === "suspended" || (daysRemaining !== null && daysRemaining <= 0)) {
       return { from: "#ef4444", to: "#dc2626" }
+    }
+    if (daysRemaining !== null && daysRemaining <= 7) {
+      return { from: "#ef4444", to: "#f97316" }
     }
     if (daysRemaining !== null && daysRemaining <= 15) {
       return { from: "#f97316", to: "#ea580c" }
@@ -61,46 +89,77 @@ const CircularProgress = ({
   }
 
   const colors = getGradientColors()
+  const gradientId = `subscriptionRemaining-${theme}`
 
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width="200" height="200" className="transform -rotate-90">
-        <defs>
-          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style={{ stopColor: colors.from, stopOpacity: 1 }} />
-            <stop offset="100%" style={{ stopColor: colors.to, stopOpacity: 1 }} />
-          </linearGradient>
-        </defs>
-        <circle cx="100" cy="100" r={radius} stroke={theme === "dark" ? "#374151" : "#e5e7eb"} strokeWidth="12" fill="none" />
-        <circle
-          cx="100" cy="100" r={radius}
-          stroke="url(#progressGradient)" strokeWidth="12" fill="none"
-          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round" className="transition-all duration-1000 ease-out"
-          style={{ filter: "drop-shadow(0 0 8px rgba(20, 184, 166, 0.4))" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-center">
-          {daysRemaining !== null && daysRemaining > 0 ? (
-            <>
-              <div className={`text-5xl font-bold ${daysRemaining <= 15 ? "text-orange-500" : "text-teal-500"}`}>
-                {daysRemaining}
-              </div>
-              <div className={`text-sm font-medium mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                jours restants
-              </div>
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
-              <div className="text-sm font-medium text-red-500">
-                {status === "SUSPENDU" ? "Résilié" : "Expiré"}
-              </div>
-            </>
-          )}
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative inline-flex items-center justify-center">
+        <div
+          className={`absolute -top-1 -right-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-md ${
+            theme === "dark" ? "border-gray-700 bg-gray-800" : "border-white bg-white"
+          } ${
+            daysRemaining !== null && daysRemaining <= 7
+              ? "text-red-500 animate-pulse"
+              : daysRemaining !== null && daysRemaining <= 15
+                ? "text-orange-500"
+                : "text-teal-500"
+          }`}
+        >
+          <Timer className="h-4 w-4" />
+        </div>
+        <svg width="200" height="200" className="transform -rotate-90" aria-hidden>
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style={{ stopColor: colors.from, stopOpacity: 1 }} />
+              <stop offset="100%" style={{ stopColor: colors.to, stopOpacity: 1 }} />
+            </linearGradient>
+          </defs>
+          <circle cx="100" cy="100" r={radius} stroke={theme === "dark" ? "#374151" : "#e5e7eb"} strokeWidth="12" fill="none" />
+          <circle
+            cx="100" cy="100" r={radius}
+            stroke={`url(#${gradientId})`} strokeWidth="12" fill="none"
+            strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round" className="transition-all duration-1000 ease-out"
+            style={{ filter: "drop-shadow(0 0 8px rgba(20, 184, 166, 0.35))" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+          <div className="text-center">
+            {phase === "upcoming" && daysUntilStart > 0 ? (
+              <>
+                <div className="text-4xl font-bold text-teal-500">{totalDays}</div>
+                <div className={`text-sm font-medium mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  jours au total
+                </div>
+                <div className={`text-xs mt-2 ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+                  début dans {daysUntilStart} j.
+                </div>
+              </>
+            ) : daysRemaining !== null && daysRemaining > 0 ? (
+              <>
+                <div className={`text-5xl font-bold tabular-nums ${daysRemaining <= 7 ? "text-red-500" : daysRemaining <= 15 ? "text-orange-500" : "text-teal-500"}`}>
+                  {daysRemaining}
+                </div>
+                <div className={`text-sm font-medium mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+                  jours restants
+                </div>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+                <div className="text-sm font-medium text-red-500">
+                  {phase === "suspended" ? "Résilié" : "Expiré"}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+      {phase === "active" && totalDays > 0 && (
+        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
+          {daysElapsed} consommé{daysElapsed > 1 ? "s" : ""} · {daysRemaining ?? 0} restant{(daysRemaining ?? 0) > 1 ? "s" : ""} · {totalDays} j. total
+        </p>
+      )}
     </div>
   )
 }
@@ -284,6 +343,7 @@ function InvoicePrintModal({
 
 export default function SubscriptionPage() {
   const [school, setSchool] = useState<School | null>(null)
+  const [subscriptionSummary, setSubscriptionSummary] = useState<SubscriptionSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [activeTab, setActiveTab] = useState<"overview" | "history">("overview")
@@ -295,6 +355,12 @@ export default function SubscriptionPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalPayments, setTotalPayments] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState<SubscriptionPayment | null>(null)
+  const [todayTick, setTodayTick] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = setInterval(() => setTodayTick(Date.now()), 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -314,15 +380,29 @@ export default function SubscriptionPage() {
   useEffect(() => { fetchSchoolData() }, [])
 
   useEffect(() => {
+    const onFocus = () => { void fetchSchoolData() }
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [])
+
+  useEffect(() => {
     if (activeTab === "history") fetchPayments(page)
   }, [activeTab, page])
 
   const fetchSchoolData = async () => {
     try {
       setLoading(true)
-      const response = await authFetch("/api/admin/school")
-      const data = await response.json()
-      setSchool(data.school)
+      const [schoolRes, summaryRes] = await Promise.all([
+        authFetch("/api/admin/school"),
+        authFetch("/api/admin/subscription/summary"),
+      ])
+      const schoolData = await schoolRes.json()
+      setSchool(schoolData.school)
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json()
+        setSubscriptionSummary(summaryData)
+        setTotalPayments(summaryData.subscriptionCount ?? 0)
+      }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error)
     } finally {
@@ -345,19 +425,11 @@ export default function SubscriptionPage() {
     }
   }
 
-  const calculateDaysRemaining = () => {
-    if (!school?.dateFinAbonnement) return null
-    if (school.etatCompte === "SUSPENDU") return 0
-    const today = new Date()
-    const endDate = new Date(school.dateFinAbonnement)
-    const diffTime = endDate.getTime() - today.getTime()
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Non défini"
-    return new Date(dateString).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    const d = parseSubscriptionDate(dateString)
+    if (!d) return "Non défini"
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
   }
 
   const formatMontant = (montant: number | null) => {
@@ -365,10 +437,14 @@ export default function SubscriptionPage() {
     return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(montant)
   }
 
-  const getStatusInfo = () => {
+  const getStatusInfo = (metrics: SubscriptionPeriodMetrics) => {
     if (!school) return { label: "Inconnu", color: "gray", icon: AlertCircle, status: "INCONNU" }
-    const daysRemaining = calculateDaysRemaining()
+    const daysRemaining = metrics.daysRemaining
+
     if (school.etatCompte === "ACTIF") {
+      if (metrics.phase === "upcoming") {
+        return { label: "À venir", color: "teal", icon: Clock, status: "A_VENIR" }
+      }
       if (daysRemaining === null) return { label: "Actif", color: "teal", icon: CheckCircle, status: "ACTIF" }
       if (daysRemaining <= 0) return { label: "Expiré", color: "red", icon: AlertCircle, status: "EXPIRÉ" }
       if (daysRemaining <= 15) return { label: "Expire bientôt", color: "orange", icon: Clock, status: "EXPIRE_BIENTOT" }
@@ -377,15 +453,6 @@ export default function SubscriptionPage() {
     if (school.etatCompte === "SUSPENDU") return { label: "Suspendu", color: "red", icon: AlertCircle, status: "SUSPENDU" }
     if (school.etatCompte === "INACTIF") return { label: "Inactif", color: "gray", icon: AlertCircle, status: "INACTIF" }
     return { label: school.etatCompte, color: "gray", icon: AlertCircle, status: school.etatCompte }
-  }
-
-  const calculateProgress = () => {
-    if (school?.etatCompte === "SUSPENDU") return 100
-    if (!school?.dateDebutAbonnement || !school?.dateFinAbonnement) return 0
-    const now = new Date().getTime()
-    const start = new Date(school.dateDebutAbonnement).getTime()
-    const end = new Date(school.dateFinAbonnement).getTime()
-    return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100))
   }
 
   const periodeLabel: Record<string, string> = {
@@ -426,10 +493,32 @@ export default function SubscriptionPage() {
     )
   }
 
-  const statusInfo = getStatusInfo()
+  const fallbackMetrics = getSubscriptionPeriodMetrics(
+    school.dateDebutAbonnement,
+    school.dateFinAbonnement,
+    school.etatCompte,
+    new Date(todayTick)
+  )
+  const periodMetrics = subscriptionSummary
+    ? getSubscriptionPeriodMetrics(
+        subscriptionSummary.cumulativeStart,
+        subscriptionSummary.cumulativeEnd,
+        school.etatCompte,
+        new Date(todayTick),
+        subscriptionSummary.totalDays
+      )
+    : fallbackMetrics
+  const cumulativeStart = subscriptionSummary?.cumulativeStart ?? school.dateDebutAbonnement
+  const cumulativeEnd = subscriptionSummary?.cumulativeEnd ?? school.dateFinAbonnement
+  const totalDaysCumulative = subscriptionSummary?.totalDays ?? periodMetrics.totalDays
+  const subscriptionCount = subscriptionSummary?.subscriptionCount ?? 1
+  const segments = subscriptionSummary?.segments ?? []
+
+  const statusInfo = getStatusInfo(periodMetrics)
   const StatusIcon = statusInfo.icon
-  const daysRemaining = calculateDaysRemaining()
-  const progress = calculateProgress()
+  const daysRemaining = periodMetrics.daysRemaining
+  const progressRemaining = periodMetrics.progressRemaining
+  const progressElapsed = periodMetrics.progressElapsed
 
   const statusColors = {
     teal: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
@@ -493,9 +582,12 @@ export default function SubscriptionPage() {
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
                   <div className="flex-shrink-0">
                     <CircularProgress
-                      percentage={progress}
+                      remainingPercent={progressRemaining}
                       daysRemaining={daysRemaining}
-                      status={statusInfo.status}
+                      daysElapsed={periodMetrics.daysElapsed}
+                      totalDays={totalDaysCumulative}
+                      daysUntilStart={periodMetrics.daysUntilStart}
+                      phase={periodMetrics.phase}
                       theme={theme}
                     />
                   </div>
@@ -504,29 +596,73 @@ export default function SubscriptionPage() {
                       <p className={`${textSecondary} text-sm font-medium mb-1`}>Établissement</p>
                       <h2 className={`${textColor} text-2xl font-bold`}>{school.nomEtablissement}</h2>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div className={`p-4 rounded-lg border ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className={`w-4 h-4 ${textSecondary}`} />
-                          <p className={`${textSecondary} text-xs font-semibold uppercase tracking-wide`}>Date de début</p>
+                    <div className="space-y-4">
+                      {/* Couverture totale cumulée */}
+                      <div className={`rounded-xl border p-4 ${theme === "dark" ? "bg-teal-900/10 border-teal-800/40" : "bg-teal-50/80 border-teal-200"}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                            <p className={`text-xs font-semibold uppercase tracking-wide ${theme === "dark" ? "text-teal-300" : "text-teal-800"}`}>
+                              Couverture totale
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center rounded-full bg-teal-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
+                            {subscriptionCount} abonnement{subscriptionCount > 1 ? "s" : ""} · {totalDaysCumulative} jours
+                          </span>
                         </div>
-                        <p className={`${textColor} text-lg font-semibold`}>{formatDate(school.dateDebutAbonnement)}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                          <div>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider ${textSecondary} mb-1`}>Début global</p>
+                            <p className={`${textColor} text-base font-semibold`}>{formatDate(cumulativeStart)}</p>
+                          </div>
+                          <div className={`hidden sm:flex items-center justify-center ${textSecondary}`}>
+                            <span className="text-lg">→</span>
+                          </div>
+                          <div>
+                            <p className={`text-[10px] font-bold uppercase tracking-wider ${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-500" : textSecondary} mb-1`}>
+                              Expiration globale
+                            </p>
+                            <p className={`${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-600 dark:text-orange-400" : textColor} text-base font-semibold`}>
+                              {formatDate(cumulativeEnd)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className={`p-4 rounded-lg border ${
-                        daysRemaining !== null && daysRemaining <= 15
-                          ? theme === "dark" ? "bg-orange-900/20 border-orange-700" : "bg-orange-50 border-orange-200"
-                          : theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"
-                      }`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className={`w-4 h-4 ${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-500" : textSecondary}`} />
-                          <p className={`${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-500" : textSecondary} text-xs font-semibold uppercase tracking-wide`}>
-                            Date d'expiration
+
+                      {/* Détail par abonnement */}
+                      {segments.length > 0 && (
+                        <div className={`rounded-xl border p-4 ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                          <p className={`text-xs font-semibold uppercase tracking-wide ${textSecondary} mb-3`}>
+                            Détail des périodes souscrites
                           </p>
+                          <div className="space-y-2">
+                            {segments.map((seg) => (
+                              <div
+                                key={`${seg.index}-${seg.dateDebut}`}
+                                className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${
+                                  theme === "dark" ? "bg-gray-900/60" : "bg-white"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[11px] font-bold text-white">
+                                    {seg.index}
+                                  </span>
+                                  <span className={`font-medium ${textColor}`}>
+                                    Abonnement {seg.index}
+                                    {seg.plan ? ` · ${seg.plan}` : ""}
+                                  </span>
+                                </div>
+                                <span className={`tabular-nums ${textSecondary}`}>
+                                  {formatDate(seg.dateDebut)} → {formatDate(seg.dateFin)}
+                                </span>
+                                <span className="rounded-md bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-600 dark:text-teal-400">
+                                  {seg.days} j.
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <p className={`${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-600 dark:text-orange-400" : textColor} text-lg font-semibold`}>
-                          {formatDate(school.dateFinAbonnement)}
-                        </p>
-                      </div>
+                      )}
                     </div>
                     {daysRemaining !== null && daysRemaining <= 30 && (
                       <div className={`flex items-start gap-3 p-4 rounded-lg border ${
@@ -547,18 +683,35 @@ export default function SubscriptionPage() {
                 </div>
                 <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between mb-2">
-                    <p className={`${textSecondary} text-sm font-medium`}>Progression de la période</p>
-                    <p className={`${textColor} text-sm font-semibold`}>{Math.round(progress)}%</p>
+                    <div className="flex items-center gap-2">
+                      <Clock className={`w-4 h-4 ${textSecondary}`} />
+                      <p className={`${textSecondary} text-sm font-medium`}>Progression vers l&apos;expiration</p>
+                    </div>
+                    <p className={`${textColor} text-sm font-semibold tabular-nums`}>{Math.round(progressElapsed)}%</p>
                   </div>
-                  <div className={`h-2 w-full rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                  <div className={`h-2.5 w-full rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
                     <div
                       className={`h-full rounded-full transition-all duration-1000 ${
-                        school.etatCompte === "SUSPENDU" || (daysRemaining !== null && daysRemaining <= 0)
+                        school.etatCompte === "SUSPENDU" || periodMetrics.phase === "expired" || (daysRemaining !== null && daysRemaining <= 0)
                           ? "bg-gradient-to-r from-red-500 to-red-600"
-                          : "bg-gradient-to-r from-teal-500 to-teal-600"
+                          : daysRemaining !== null && daysRemaining <= 7
+                            ? "bg-gradient-to-r from-red-500 to-orange-500"
+                            : daysRemaining !== null && daysRemaining <= 15
+                              ? "bg-gradient-to-r from-orange-500 to-orange-600"
+                              : "bg-gradient-to-r from-teal-500 to-teal-600"
                       }`}
-                      style={{ width: `${progress}%` }}
-                    ></div>
+                      style={{ width: `${progressElapsed}%` }}
+                    />
+                  </div>
+                  <div className={`flex items-center justify-between mt-2 text-xs ${textSecondary}`}>
+                    <span>
+                      {periodMetrics.phase === "upcoming"
+                        ? `Début le ${formatDate(cumulativeStart)} · ${totalDaysCumulative} jours au total`
+                        : `${periodMetrics.daysElapsed} jour${periodMetrics.daysElapsed > 1 ? "s" : ""} consommé${periodMetrics.daysElapsed > 1 ? "s" : ""}`}
+                    </span>
+                    <span className="tabular-nums">
+                      {daysRemaining ?? 0} restant{(daysRemaining ?? 0) > 1 ? "s" : ""} / {totalDaysCumulative} j.
+                    </span>
                   </div>
                 </div>
               </CardContent>
