@@ -476,6 +476,7 @@ interface ListPaiementsFilters {
   yearId?: number
   classId?: number
   tarificationId?: number
+  typeFraisId?: number
   isAnnule?: boolean
   dateFrom?: string
   dateTo?: string
@@ -490,6 +491,7 @@ export async function listPaiements(filters: ListPaiementsFilters) {
     yearId,
     classId,
     tarificationId,
+    typeFraisId,
     isAnnule,
     dateFrom,
     dateTo,
@@ -502,8 +504,11 @@ export async function listPaiements(filters: ListPaiementsFilters) {
   if (studentId) where.studentId = studentId
   if (tarificationId) where.tarificationId = tarificationId
   if (isAnnule !== undefined) where.isAnnule = isAnnule
-  if (yearId) {
-    where.tarification = { yearId }
+  if (yearId || typeFraisId) {
+    where.tarification = {
+      ...(yearId ? { yearId } : {}),
+      ...(typeFraisId ? { typeFraisId } : {}),
+    }
   }
   if (classId) {
     where.enrollment = { classId }

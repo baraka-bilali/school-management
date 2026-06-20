@@ -7,9 +7,18 @@ import { useStudentTheme } from "@/components/student/use-student-theme"
 import StudentLoading from "@/components/student/student-loading"
 import StudentReceiptDownload from "@/components/student/student-receipt-download"
 
-interface Balance {
-  usd: { totalDu: number; totalPaye: number; solde: number }
-  cdf: { totalDu: number; totalPaye: number; solde: number }
+interface CurrencyBalance {
+  totalDu: number
+  totalPaye: number
+  solde: number
+}
+
+interface OtherFeeType {
+  typeFraisId: number
+  typeFrais: string
+  isDefault: boolean
+  usd: CurrencyBalance
+  cdf: CurrencyBalance
 }
 
 interface Paiement {
@@ -27,23 +36,92 @@ function formatMoney(amount: number, devise: string) {
   return `${amount.toLocaleString("fr-FR", { minimumFractionDigits: devise === "CDF" ? 0 : 2, maximumFractionDigits: devise === "CDF" ? 0 : 2 })} ${symbol}`
 }
 
-function mergeBalance(balance: Balance | null) {
-  if (!balance) return { totalDu: 0, totalPaye: 0, solde: 0, devise: "USD" as const }
-
-  const { usd, cdf } = balance
+function pickPrimaryCurrency(usd: CurrencyBalance, cdf: CurrencyBalance) {
   const hasUsd = usd.totalDu > 0 || usd.totalPaye > 0
   const hasCdf = cdf.totalDu > 0 || cdf.totalPaye > 0
+  if (hasCdf && !hasUsd) return { ...cdf, devise: "CDF" as const, secondary: null }
+  if (hasUsd && !hasCdf) return { ...usd, devise: "USD" as const, secondary: null }
+  if (hasCdf && hasUsd) return { ...cdf, devise: "CDF" as const, secondary: usd }
+  return { ...usd, devise: "USD" as const, secondary: null }
+}
 
-  if (hasCdf && !hasUsd) return { ...cdf, devise: "CDF" as const }
-  if (hasUsd && !hasCdf) return { ...usd, devise: "USD" as const }
-  if (hasCdf && hasUsd) return { ...cdf, devise: "CDF" as const }
-  return { ...usd, devise: "USD" as const }
+function FeeTypeSummaryCard({
+  title,
+  usd,
+  cdf,
+  badge,
+  card,
+  border,
+  shadow,
+  text,
+  textMuted,
+  isDark,
+}: {
+  title: string
+  usd: CurrencyBalance
+  cdf: CurrencyBalance
+  badge?: string
+  card: string
+  border: string
+  shadow: string
+  text: string
+  textMuted: string
+  isDark: boolean
+}) {
+  const summary = pickPrimaryCurrency(usd, cdf)
+  const secondary = summary.secondary as CurrencyBalance | null
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+      <div className={cn("relative overflow-hidden rounded-2xl border p-5 lg:col-span-2 lg:p-6", card, border, shadow)}>
+        <div className="mb-4 flex items-start justify-between">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
+            <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          {badge && (
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-400">
+              {badge}
+            </span>
+          )}
+        </div>
+        <p className={cn("text-[11px] font-semibold uppercase tracking-wider", textMuted)}>{title} — Total à payer</p>
+        <p className={cn("mt-1 text-3xl font-bold tracking-tight", text)}>
+          {formatMoney(summary.totalDu, summary.devise)}
+        </p>
+        {secondary && secondary.totalDu > 0 && summary.devise === "USD" && (
+          <p className={cn("mt-1 text-sm", textMuted)}>+ {formatMoney(secondary.totalDu, "CDF")}</p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:contents">
+        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
+          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-green-50 dark:bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </div>
+          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Payé</p>
+          <p className="mt-1 text-xl font-bold text-green-600 lg:text-2xl">
+            {formatMoney(summary.totalPaye, summary.devise)}
+          </p>
+        </div>
+        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
+          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
+            <AlertCircle className="h-4 w-4 text-red-500" />
+          </div>
+          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Solde</p>
+          <p className="mt-1 text-xl font-bold text-red-500 lg:text-2xl">
+            {formatMoney(summary.solde, summary.devise)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function StudentFeesPage() {
   const { card, text, textMuted, shadow, border, isDark } = useStudentTheme()
   const [loading, setLoading] = useState(true)
-  const [balance, setBalance] = useState<Balance | null>(null)
+  const [scolaire, setScolaire] = useState<{ usd: CurrencyBalance; cdf: CurrencyBalance } | null>(null)
+  const [autres, setAutres] = useState<OtherFeeType[]>([])
   const [paiements, setPaiements] = useState<Paiement[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [paymentToast, setPaymentToast] = useState<string | null>(null)
@@ -59,7 +137,8 @@ export default function StudentFeesPage() {
       }
       if (res.ok) {
         const data = await res.json()
-        setBalance(data.balance)
+        setScolaire(data.scolaire ?? data.balance)
+        setAutres(data.autres || [])
         setPaiements(data.paiements || [])
       }
     } finally {
@@ -81,9 +160,6 @@ export default function StudentFeesPage() {
 
   if (loading) return <StudentLoading variant="fees" />
 
-  const summary = mergeBalance(balance)
-  const cdfSummary = balance?.cdf
-
   return (
     <div className="space-y-5 lg:space-y-8">
       {paymentToast && (
@@ -102,42 +178,35 @@ export default function StudentFeesPage() {
         {refreshing && <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-      <div className={cn("relative overflow-hidden rounded-2xl border p-5 lg:col-span-2 lg:p-6", card, border, shadow)}>
-        <div className="mb-4 flex items-start justify-between">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-            <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-400">
-            Annuel
-          </span>
-        </div>
-        <p className={cn("text-[11px] font-semibold uppercase tracking-wider", textMuted)}>Total à payer</p>
-        <p className={cn("mt-1 text-3xl font-bold tracking-tight", text)}>
-          {formatMoney(summary.totalDu, summary.devise)}
-        </p>
-        {cdfSummary && cdfSummary.totalDu > 0 && summary.devise === "USD" && (
-          <p className={cn("mt-1 text-sm", textMuted)}>+ {formatMoney(cdfSummary.totalDu, "CDF")}</p>
-        )}
-      </div>
+      {scolaire && (
+        <FeeTypeSummaryCard
+          title="Frais scolaire"
+          usd={scolaire.usd}
+          cdf={scolaire.cdf}
+          badge="Annuel"
+          card={card}
+          border={border}
+          shadow={shadow}
+          text={text}
+          textMuted={textMuted}
+          isDark={isDark}
+        />
+      )}
 
-      <div className="grid grid-cols-2 gap-3 lg:contents">
-        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-green-50 dark:bg-green-500/10">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </div>
-          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Payé</p>
-          <p className="mt-1 text-xl font-bold text-green-600 lg:text-2xl">{formatMoney(summary.totalPaye, summary.devise)}</p>
-        </div>
-        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </div>
-          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Solde</p>
-          <p className="mt-1 text-xl font-bold text-red-500 lg:text-2xl">{formatMoney(summary.solde, summary.devise)}</p>
-        </div>
-      </div>
-      </div>
+      {autres.map((fee) => (
+        <FeeTypeSummaryCard
+          key={fee.typeFraisId}
+          title={fee.typeFrais}
+          usd={fee.usd}
+          cdf={fee.cdf}
+          card={card}
+          border={border}
+          shadow={shadow}
+          text={text}
+          textMuted={textMuted}
+          isDark={isDark}
+        />
+      ))}
 
       <section>
         <div className="mb-3 flex items-center justify-between">

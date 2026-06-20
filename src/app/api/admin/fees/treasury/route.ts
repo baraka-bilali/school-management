@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import { ensureDefaultFeeType, getDefaultFeeTypeId, isDefaultFeeType } from "@/lib/fees/default-fee-type"
 
 // GET /api/admin/fees/treasury — Vue d'ensemble trésorerie
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
     requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
+
+    await ensureDefaultFeeType(user.schoolId)
+    const defaultFeeTypeId = await getDefaultFeeTypeId(user.schoolId)
 
     const { searchParams } = new URL(req.url)
     const yearId = searchParams.get("yearId")
@@ -64,6 +68,11 @@ export async function GET(req: NextRequest) {
         data: {
           totalIncomeUsd: 0,
           totalIncomeCdf: 0,
+          scolaireIncomeUsd: 0,
+          scolaireIncomeCdf: 0,
+          otherIncomeUsd: 0,
+          otherIncomeCdf: 0,
+          incomeByType: [],
           totalTeacherPayments,
           totalExpensesUsd,
           totalExpensesCdf,
@@ -102,23 +111,60 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Revenus : total des paiements élèves — séparé par devise
-    const [incomeAggUsd, incomeAggCdf, teacherPaymentsAgg, expensesAggUsd, expensesAggCdf] = await Promise.all([
+    // Revenus : total des paiements élèves — séparé par devise et par type (scolaire vs autres)
+    const incomeWhereBase = {
+      schoolId: user.schoolId,
+      tarification: { yearId: activeYearId },
+      isAnnule: false,
+    } as const
+
+    const [
+      incomeAggUsd,
+      incomeAggCdf,
+      scolaireUsdAgg,
+      scolaireCdfAgg,
+      incomeByTypeRows,
+      teacherPaymentsAgg,
+      expensesAggUsd,
+      expensesAggCdf,
+    ] = await Promise.all([
       prisma.paiement.aggregate({
-        where: {
-          schoolId: user.schoolId,
-          tarification: { yearId: activeYearId, devise: "USD" },
-          isAnnule: false,
-        },
+        where: { ...incomeWhereBase, tarification: { yearId: activeYearId, devise: "USD" } },
         _sum: { montant: true },
       }),
       prisma.paiement.aggregate({
-        where: {
-          schoolId: user.schoolId,
-          tarification: { yearId: activeYearId, devise: "CDF" },
-          isAnnule: false,
-        },
+        where: { ...incomeWhereBase, tarification: { yearId: activeYearId, devise: "CDF" } },
         _sum: { montant: true },
+      }),
+      defaultFeeTypeId
+        ? prisma.paiement.aggregate({
+            where: {
+              ...incomeWhereBase,
+              tarification: { yearId: activeYearId, devise: "USD", typeFraisId: defaultFeeTypeId },
+            },
+            _sum: { montant: true },
+          })
+        : Promise.resolve({ _sum: { montant: 0 } }),
+      defaultFeeTypeId
+        ? prisma.paiement.aggregate({
+            where: {
+              ...incomeWhereBase,
+              tarification: { yearId: activeYearId, devise: "CDF", typeFraisId: defaultFeeTypeId },
+            },
+            _sum: { montant: true },
+          })
+        : Promise.resolve({ _sum: { montant: 0 } }),
+      prisma.paiement.findMany({
+        where: incomeWhereBase,
+        select: {
+          montant: true,
+          tarification: {
+            select: {
+              devise: true,
+              typeFrais: { select: { id: true, nom: true, code: true } },
+            },
+          },
+        },
       }),
       // Salaires professeurs (en USD)
       prisma.teacherPayment.aggregate({
@@ -139,6 +185,32 @@ export async function GET(req: NextRequest) {
 
     const totalIncomeUsd = incomeAggUsd._sum.montant ?? 0
     const totalIncomeCdf = incomeAggCdf._sum.montant ?? 0
+    const scolaireIncomeUsd = scolaireUsdAgg._sum.montant ?? 0
+    const scolaireIncomeCdf = scolaireCdfAgg._sum.montant ?? 0
+    const otherIncomeUsd = totalIncomeUsd - scolaireIncomeUsd
+    const otherIncomeCdf = totalIncomeCdf - scolaireIncomeCdf
+
+    const incomeByTypeMap = new Map<
+      number,
+      { typeFraisId: number; typeFrais: string; isDefault: boolean; usd: number; cdf: number }
+    >()
+    for (const row of incomeByTypeRows) {
+      const tf = row.tarification.typeFrais
+      const entry = incomeByTypeMap.get(tf.id) ?? {
+        typeFraisId: tf.id,
+        typeFrais: tf.nom,
+        isDefault: isDefaultFeeType(tf),
+        usd: 0,
+        cdf: 0,
+      }
+      if (row.tarification.devise === "CDF") entry.cdf += row.montant
+      else entry.usd += row.montant
+      incomeByTypeMap.set(tf.id, entry)
+    }
+    const incomeByType = [...incomeByTypeMap.values()].sort((a, b) => {
+      if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1
+      return a.typeFrais.localeCompare(b.typeFrais, "fr")
+    })
     const totalTeacherPayments = teacherPaymentsAgg._sum.montant ?? 0
     const totalExpensesUsd = expensesAggUsd._sum.montant ?? 0
     const totalExpensesCdf = expensesAggCdf._sum.montant ?? 0
@@ -174,6 +246,11 @@ export async function GET(req: NextRequest) {
       data: {
         totalIncomeUsd,
         totalIncomeCdf,
+        scolaireIncomeUsd,
+        scolaireIncomeCdf,
+        otherIncomeUsd,
+        otherIncomeCdf,
+        incomeByType,
         totalTeacherPayments,
         totalExpensesUsd,
         totalExpensesCdf,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 import { toDisplayCode } from "@/lib/student-fields"
+import { ensureDefaultFeeType, getDefaultFeeTypeId } from "@/lib/fees/default-fee-type"
 
 // GET /api/admin/fees/students - Liste des élèves avec résumé paiements
 export async function GET(req: NextRequest) {
@@ -13,7 +14,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const yearId = searchParams.get("yearId")
     const classId = searchParams.get("classId")
+    const typeFraisIdParam = searchParams.get("typeFraisId")
     const q = searchParams.get("q")?.trim() || ""
+
+    await ensureDefaultFeeType(user.schoolId)
+    const defaultTypeId = await getDefaultFeeTypeId(user.schoolId)
+    const typeFraisIdFilter =
+      typeFraisIdParam === "all"
+        ? undefined
+        : typeFraisIdParam
+          ? parseInt(typeFraisIdParam)
+          : defaultTypeId ?? undefined
 
     let activeYearId: number | undefined
     if (yearId) {
@@ -66,17 +77,33 @@ export async function GET(req: NextRequest) {
       orderBy: { student: { lastName: "asc" } },
     })
 
-    // Tarifications actives avec devise
+    // Tarifications actives avec devise (optionnellement filtrées par type)
+    const tarifWhere: Record<string, unknown> = {
+      schoolId: user.schoolId,
+      yearId: activeYearId,
+      isActive: true,
+    }
+    if (typeFraisIdFilter) {
+      tarifWhere.typeFraisId = typeFraisIdFilter
+    }
+
     const tarifications = await prisma.tarification.findMany({
-      where: { schoolId: user.schoolId, yearId: activeYearId, isActive: true },
+      where: tarifWhere,
       select: { id: true, montant: true, classId: true, devise: true, typeFraisId: true, typeFrais: { select: { nom: true } } },
     })
 
-    // Paiements par étudiant et par devise
+    const tarifIds = tarifications.map((t) => t.id)
+
+    const paymentBaseWhere =
+      tarifIds.length > 0
+        ? { tarificationId: { in: tarifIds } }
+        : { tarificationId: { in: [] as number[] } }
+
     const studentPaymentsUsd = await prisma.paiement.groupBy({
       by: ["studentId"],
       where: {
         schoolId: user.schoolId,
+        ...paymentBaseWhere,
         tarification: { yearId: activeYearId, devise: "USD" },
         isAnnule: false,
       },
@@ -88,6 +115,7 @@ export async function GET(req: NextRequest) {
       by: ["studentId"],
       where: {
         schoolId: user.schoolId,
+        ...paymentBaseWhere,
         tarification: { yearId: activeYearId, devise: "CDF" },
         isAnnule: false,
       },
@@ -95,10 +123,11 @@ export async function GET(req: NextRequest) {
       _count: { id: true },
     })
 
-    // Dernier paiement par étudiant
+    // Dernier paiement par étudiant (dans le périmètre filtré)
     const lastPayments = await prisma.paiement.findMany({
       where: {
         schoolId: user.schoolId,
+        ...paymentBaseWhere,
         tarification: { yearId: activeYearId },
         isAnnule: false,
       },

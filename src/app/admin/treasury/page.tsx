@@ -58,6 +58,17 @@ interface TeacherOption {
 interface TreasuryData {
   totalIncomeUsd: number
   totalIncomeCdf: number
+  scolaireIncomeUsd: number
+  scolaireIncomeCdf: number
+  otherIncomeUsd: number
+  otherIncomeCdf: number
+  incomeByType: Array<{
+    typeFraisId: number
+    typeFrais: string
+    isDefault: boolean
+    usd: number
+    cdf: number
+  }>
   totalTeacherPayments: number
   totalExpensesUsd: number
   totalExpensesCdf: number
@@ -395,10 +406,27 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Recettes (frais élèves)</p>
-                      {treasury.totalIncomeUsd > 0 && (
+                      {treasury.scolaireIncomeUsd > 0 && (
+                        <p className={`text-sm font-semibold text-green-600`}>
+                          Scolaire : {new Intl.NumberFormat("fr-FR").format(treasury.scolaireIncomeUsd)} $
+                        </p>
+                      )}
+                      {treasury.scolaireIncomeCdf > 0 && (
+                        <p className={`text-sm font-medium text-green-500`}>
+                          Scolaire : {new Intl.NumberFormat("fr-FR").format(treasury.scolaireIncomeCdf)} FC
+                        </p>
+                      )}
+                      {(treasury.otherIncomeUsd > 0 || treasury.otherIncomeCdf > 0) && (
+                        <p className={`text-xs ${textSecondary} mt-1`}>
+                          Autres types :
+                          {treasury.otherIncomeUsd > 0 && ` ${new Intl.NumberFormat("fr-FR").format(treasury.otherIncomeUsd)} $`}
+                          {treasury.otherIncomeCdf > 0 && ` ${new Intl.NumberFormat("fr-FR").format(treasury.otherIncomeCdf)} FC`}
+                        </p>
+                      )}
+                      {treasury.totalIncomeUsd > 0 && treasury.scolaireIncomeUsd === 0 && treasury.otherIncomeUsd === 0 && (
                         <p className={`text-xl font-bold text-green-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeUsd)} $</p>
                       )}
-                      {treasury.totalIncomeCdf > 0 && (
+                      {treasury.totalIncomeCdf > 0 && treasury.scolaireIncomeCdf === 0 && treasury.otherIncomeCdf === 0 && (
                         <p className={`text-base font-semibold text-green-500`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeCdf)} FC</p>
                       )}
                       {treasury.totalIncomeUsd === 0 && treasury.totalIncomeCdf === 0 && (
@@ -459,6 +487,35 @@ export default function AdminTreasuryPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {treasury.incomeByType && treasury.incomeByType.length > 1 && (
+              <Card theme={theme}>
+                <CardContent className="pt-5">
+                  <p className={`text-sm font-semibold ${textColor} mb-3`}>Recettes par type de frais</p>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {treasury.incomeByType.map((row) => (
+                      <div
+                        key={row.typeFraisId}
+                        className={`rounded-xl border p-3 ${theme === "dark" ? "border-gray-700 bg-gray-800/50" : "border-gray-100 bg-gray-50"}`}
+                      >
+                        <p className={`text-sm font-medium ${textColor}`}>
+                          {row.typeFrais}
+                          {row.isDefault && (
+                            <span className="ml-1.5 text-[10px] font-semibold text-indigo-500">(défaut)</span>
+                          )}
+                        </p>
+                        <div className={`mt-1 text-sm ${textSecondary}`}>
+                          {row.usd > 0 && <span className="text-green-600 font-semibold">{new Intl.NumberFormat("fr-FR").format(row.usd)} $</span>}
+                          {row.usd > 0 && row.cdf > 0 && " · "}
+                          {row.cdf > 0 && <span className="text-green-600 font-semibold">{new Intl.NumberFormat("fr-FR").format(row.cdf)} FC</span>}
+                          {row.usd === 0 && row.cdf === 0 && "0"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Filtres */}
             <div className="flex flex-wrap gap-3 items-center">

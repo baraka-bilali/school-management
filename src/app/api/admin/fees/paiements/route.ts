@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
       tarificationId: searchParams.get("tarificationId")
         ? parseInt(searchParams.get("tarificationId")!)
         : undefined,
+      typeFraisId: searchParams.get("typeFraisId")
+        ? parseInt(searchParams.get("typeFraisId")!)
+        : undefined,
       isAnnule: searchParams.get("isAnnule") !== null
         ? searchParams.get("isAnnule") === "true"
         : undefined,

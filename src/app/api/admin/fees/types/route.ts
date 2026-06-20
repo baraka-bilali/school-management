@@ -3,12 +3,15 @@ import { prisma } from "@/lib/prisma"
 import { createTypeFraisSchema, updateTypeFraisSchema } from "@/lib/fees/validation"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { FEE_CONFIG_ROLES, FEE_VIEW_ROLES } from "@/lib/fees/roles"
+import { ensureDefaultFeeType, isDefaultFeeTypeName } from "@/lib/fees/default-fee-type"
 
 // GET /api/admin/fees/types - Lister les types de frais
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
     requireRole(user, [...FEE_VIEW_ROLES])
+
+    await ensureDefaultFeeType(user.schoolId)
 
     const { searchParams } = new URL(req.url)
     const includeInactive = searchParams.get("includeInactive") === "true"
@@ -26,7 +29,17 @@ export async function GET(req: NextRequest) {
       orderBy: { nom: "asc" },
     })
 
-    return NextResponse.json({ data: typesFrais })
+    return NextResponse.json({
+      data: typesFrais
+        .map((t) => ({
+          ...t,
+          isDefault: t.code === "FRAIS_SCOLAIRE",
+        }))
+        .sort((a, b) => {
+          if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1
+          return a.nom.localeCompare(b.nom, "fr")
+        }),
+    })
   } catch (error) {
     return handleApiError(error)
   }
@@ -40,6 +53,13 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const data = createTypeFraisSchema.parse(body)
+
+    if (isDefaultFeeTypeName(data.nom)) {
+      return NextResponse.json(
+        { error: "Le type « Frais scolaire » est créé automatiquement. Utilisez un autre nom pour un type personnalisé." },
+        { status: 400 }
+      )
+    }
 
     // Générer le code automatiquement à partir du nom
     const baseCode = data.nom

@@ -298,7 +298,7 @@ export default function Dashboard() {
           <StatCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} theme={theme} />
           <StatCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} theme={theme} />
           <StatCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} theme={theme} />
-          <StatCard title="Paiements (mois)"
+          <StatCard title="Frais scolaires (mois)"
             value={currentMonthUsd > 0 || currentMonthCdf === 0 ? formatUsd(currentMonthUsd) : `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`}
             subValue={
               currentMonthUsd > 0 && currentMonthCdf > 0
@@ -339,8 +339,8 @@ export default function Dashboard() {
           <div className={`${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className={`text-sm font-semibold ${textColor}`}>Frais collectes</p>
-                <p className={`text-xs ${textSecondary}`}>Paiements non annulés par mois</p>
+                <p className={`text-sm font-semibold ${textColor}`}>Frais scolaires collectés</p>
+                <p className={`text-xs ${textSecondary}`}>Paiements frais scolaire par mois</p>
               </div>
               <BarChart3 className={`w-4 h-4 ${textSecondary}`} />
             </div>

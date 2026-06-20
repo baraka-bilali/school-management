@@ -150,7 +150,8 @@ export default function StudentDashboard() {
       const res = await fetch("/api/student/fees", { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
-        if (data.balance) setFeeBalance(data.balance)
+        if (data.scolaire) setFeeBalance(data.scolaire)
+        else if (data.balance) setFeeBalance(data.balance)
       }
     } catch {}
   }

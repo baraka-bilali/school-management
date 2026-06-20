@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { updateTypeFraisSchema } from "@/lib/fees/validation"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
+import { isDefaultFeeType } from "@/lib/fees/default-fee-type"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -106,6 +107,13 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     if (!existing || existing.schoolId !== user.schoolId) {
       return NextResponse.json({ error: "Type de frais introuvable" }, { status: 404 })
+    }
+
+    if (isDefaultFeeType(existing)) {
+      return NextResponse.json(
+        { error: "Le type « Frais scolaire » par défaut ne peut pas être désactivé." },
+        { status: 400 }
+      )
     }
 
     // Soft delete : désactiver au lieu de supprimer

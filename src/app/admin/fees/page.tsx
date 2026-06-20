@@ -73,6 +73,8 @@ interface FeeStats {
   totalStudents: number
   recentPayments: RecentPayment[]
   tarificationsSummary: TarificationSummary[]
+  feeTypesSummary?: FeeTypeSummary[]
+  otherTypesSummary?: FeeTypeSummary[]
   dailyCollected?: {
     usd: number
     cdf: number
@@ -106,12 +108,23 @@ interface TarificationSummary {
   nombreEleves: number
 }
 
+interface FeeTypeSummary {
+  typeFraisId: number
+  typeFrais: string
+  isDefault: boolean
+  usd: { totalExpected: number; totalCollected: number; totalPending: number }
+  cdf: { totalExpected: number; totalCollected: number; totalPending: number }
+  tarificationCount: number
+  nombreEleves: number
+}
+
 interface TypeFrais {
   id: number
   code: string
   nom: string
   description: string | null
   isActive: boolean
+  isDefault?: boolean
   _count: { tarifications: number }
 }
 
@@ -304,6 +317,8 @@ export default function AdminFeesPage() {
   const [sfAmountThreshold, setSfAmountThreshold] = useState("")
   const [sfAmountMode, setSfAmountMode] = useState<"gte" | "lt">("gte")
   const [sfCurrencyFilter, setSfCurrencyFilter] = useState<"" | "USD" | "CDF">("")
+  const [sfTypeFilter, setSfTypeFilter] = useState<string>("")
+  const [paymentsTypeFilter, setPaymentsTypeFilter] = useState<string>("")
   const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
   const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
   const [sfPage, setSfPage] = useState(1)
@@ -427,7 +442,10 @@ export default function AdminFeesPage() {
   const fetchStudentFees = useCallback(async () => {
     setStudentFeesLoading(true)
     try {
-      const qs = currentYearId ? `?yearId=${currentYearId}` : ""
+      const params = new URLSearchParams()
+      if (currentYearId) params.set("yearId", String(currentYearId))
+      if (sfTypeFilter) params.set("typeFraisId", sfTypeFilter)
+      const qs = params.toString() ? `?${params}` : ""
       const res = await fetch(`/api/admin/fees/students${qs}`)
       if (res.ok) {
         const { data } = await res.json()
@@ -439,17 +457,39 @@ export default function AdminFeesPage() {
       setStudentFeesLoading(false)
       setStudentFeesFetched(true)
     }
-  }, [currentYearId])
+  }, [currentYearId, sfTypeFilter])
+
+  const fetchPaiements = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ page: "1", pageSize: "15" })
+      if (currentYearId) params.set("yearId", String(currentYearId))
+      if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
+      const res = await fetch(`/api/admin/fees/paiements?${params}`)
+      if (res.ok) {
+        const result = await res.json()
+        setPaiements(result.data)
+        setPaiementsPagination(result.pagination)
+      }
+    } catch (error) {
+      console.error("Erreur chargement paiements:", error)
+    }
+  }, [currentYearId, paymentsTypeFilter])
 
   useEffect(() => {
     if (activeTab === "students") {
       fetchStudentFees()
     }
-  }, [activeTab, currentYearId, fetchStudentFees])
+  }, [activeTab, currentYearId, sfTypeFilter, fetchStudentFees])
+
+  useEffect(() => {
+    if (activeTab === "payments") {
+      fetchPaiements()
+    }
+  }, [activeTab, currentYearId, paymentsTypeFilter, fetchPaiements])
 
   useEffect(() => {
     setSfPage(1)
-  }, [sfSearch, sfClassFilter, sfStatusFilter, sfAmountThreshold, sfAmountMode, sfCurrencyFilter, sfSortKey, sfSortDir])
+  }, [sfSearch, sfClassFilter, sfStatusFilter, sfAmountThreshold, sfAmountMode, sfCurrencyFilter, sfTypeFilter, sfSortKey, sfSortDir])
 
   const sortedClasses = sortClasses(classes)
 
@@ -602,6 +642,7 @@ export default function AdminFeesPage() {
     try {
       const params = new URLSearchParams({ page: "1", pageSize: "10000" })
       if (currentYearId) params.set("yearId", String(currentYearId))
+      if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
       const res = await fetch(`/api/admin/fees/paiements?${params}`)
       if (!res.ok) return
       const { data } = await res.json() as { data: PaiementRecord[] }
@@ -779,7 +820,7 @@ export default function AdminFeesPage() {
                     <DollarSign className="w-6 h-6 text-blue-500" />
                   </div>
                   <div>
-                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total attendu</p>
+                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total attendu (frais scolaire)</p>
                     {hasUsd && <p className={`text-lg font-bold ${textColor} mt-0.5`}>{formatMontant(stats.usd.totalExpected, "USD")}</p>}
                     {hasCdf && <p className={`text-lg font-bold ${textColor} ${hasUsd ? "mt-0" : "mt-0.5"}`}>{formatMontant(stats.cdf.totalExpected, "CDF")}</p>}
                     {!hasUsd && !hasCdf && <p className={`text-lg font-bold ${textColor} mt-0.5`}>—</p>}
@@ -798,7 +839,7 @@ export default function AdminFeesPage() {
                     <CheckCircle className="w-6 h-6 text-green-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total perçu</p>
+                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Total perçu (frais scolaire)</p>
                     {hasUsd && (
                       <div>
                         <p className="text-lg font-bold text-green-500 mt-0.5">{formatMontant(stats.usd.totalCollected, "USD")}</p>
@@ -836,7 +877,7 @@ export default function AdminFeesPage() {
                     <Clock className="w-6 h-6 text-orange-500" />
                   </div>
                   <div>
-                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>En attente</p>
+                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>En attente (frais scolaire)</p>
                     {hasUsd && <p className={`text-lg font-bold text-orange-500 mt-0.5`}>{formatMontant(stats.usd.totalPending, "USD")}</p>}
                     {hasCdf && <p className={`text-lg font-bold text-orange-500 ${hasUsd ? "" : "mt-0.5"}`}>{formatMontant(stats.cdf.totalPending, "CDF")}</p>}
                     {!hasUsd && !hasCdf && <p className={`text-lg font-bold text-orange-500 mt-0.5`}>—</p>}
@@ -852,7 +893,7 @@ export default function AdminFeesPage() {
                     <Users className="w-6 h-6 text-indigo-500" />
                   </div>
                   <div>
-                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Élèves à jour</p>
+                    <p className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Élèves à jour (frais scolaire)</p>
                     <p className={`text-xl font-bold ${textColor} mt-0.5`}>
                       {Math.max(stats.usd.studentsFullyPaid, stats.cdf.studentsFullyPaid)}
                       <span className={`text-sm font-normal ${textSecondary}`}> / {stats.totalStudents}</span>
@@ -933,6 +974,7 @@ export default function AdminFeesPage() {
                       <TrendingUp className="w-5 h-5 text-indigo-500" />
                       Répartition des paiements
                     </CardTitle>
+                    <p className={`text-xs ${textSecondary} mt-1`}>Frais scolaire uniquement</p>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-5">
@@ -976,25 +1018,38 @@ export default function AdminFeesPage() {
                       })()}
                     </div>
 
-                    {/* Résumé tarifications */}
-                    {stats.tarificationsSummary.length > 0 && (
+                    {/* Résumé par type de frais (vue compacte) */}
+                    {(stats.feeTypesSummary?.length ?? 0) > 0 && (
                       <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
-                        <h4 className={`text-sm font-semibold ${textColor} mb-3`}>Par type de frais</h4>
+                        <h4 className={`text-sm font-semibold ${textColor} mb-3`}>Synthèse par type de frais</h4>
                         <div className="space-y-2">
-                          {stats.tarificationsSummary.map((t) => {
-                            const pct = Math.round((t.totalPercu / Math.max(t.totalAttendu, 1)) * 100)
+                          {stats.feeTypesSummary!.map((t) => {
+                            const totalAttendu = t.usd.totalExpected + t.cdf.totalExpected
+                            const totalPercu = t.usd.totalCollected + t.cdf.totalCollected
+                            const pct = Math.round((totalPercu / Math.max(totalAttendu, 1)) * 100)
                             return (
-                              <div key={t.id} className={`p-3 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                              <div key={t.typeFraisId} className={`p-3 rounded-lg ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className={`text-sm font-medium ${textColor}`}>{t.typeFrais}</span>
+                                  <span className={`text-sm font-medium ${textColor}`}>
+                                    {t.typeFrais}
+                                    {t.isDefault && (
+                                      <span className="ml-2 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                        Par défaut
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className={`text-xs ${textSecondary}`}>{pct}%</span>
                                 </div>
-                                <div className="flex items-center justify-between text-xs mb-2">
-                                  <span className={textSecondary}>{t.classe} · {t.nombreEleves} élèves</span>
-                                  <span className={textSecondary}>{formatMontant(t.totalPercu, t.devise)} / {formatMontant(t.totalAttendu, t.devise)}</span>
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-2">
+                                  <span className={textSecondary}>{t.tarificationCount} tarif{t.tarificationCount > 1 ? "s" : ""}</span>
+                                  <span className={textSecondary}>
+                                    {t.usd.totalExpected > 0 && `${formatMontant(t.usd.totalCollected, "USD")} / ${formatMontant(t.usd.totalExpected, "USD")}`}
+                                    {t.usd.totalExpected > 0 && t.cdf.totalExpected > 0 && " · "}
+                                    {t.cdf.totalExpected > 0 && `${formatMontant(t.cdf.totalCollected, "CDF")} / ${formatMontant(t.cdf.totalExpected, "CDF")}`}
+                                  </span>
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
-                                  <div className="bg-indigo-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                  <div className={`${t.isDefault ? "bg-indigo-500" : "bg-violet-500"} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
                                 </div>
                               </div>
                             )
@@ -1096,7 +1151,14 @@ export default function AdminFeesPage() {
                         <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                           {typesFrais.map((t) => (
                             <tr key={t.id} className={hoverRow}>
-                              <td className={`px-4 py-3 ${textColor} font-medium`}>{t.nom}</td>
+                              <td className={`px-4 py-3 ${textColor} font-medium`}>
+                                {t.nom}
+                                {t.isDefault && (
+                                  <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                    Par défaut
+                                  </span>
+                                )}
+                              </td>
                               <td className={`px-4 py-3 ${textSecondary} text-sm`}>{t.description || "—"}</td>
                               <td className={`px-4 py-3 ${textColor}`}>{t._count.tarifications}</td>
                               <td className="px-4 py-3">
@@ -1161,6 +1223,20 @@ export default function AdminFeesPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+                        <select
+                          value={paymentsTypeFilter}
+                          onChange={(e) => setPaymentsTypeFilter(e.target.value)}
+                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[200px]`}
+                        >
+                          <option value="">Tous les types de frais</option>
+                          {typesFrais.filter((t) => t.isActive).map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.nom}{t.isDefault ? " (défaut)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <div className="flex justify-end">
                         <button
                           type="button"
@@ -1290,6 +1366,19 @@ export default function AdminFeesPage() {
                               </optgroup>
                             )
                           })}
+                        </select>
+
+                        {/* Filtre type de frais */}
+                        <select
+                          value={sfTypeFilter}
+                          onChange={(e) => setSfTypeFilter(e.target.value)}
+                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[200px]`}
+                        >
+                          <option value="">Frais scolaire (défaut)</option>
+                          <option value="all">Tous les types combinés</option>
+                          {typesFrais.filter((t) => t.isActive && !t.isDefault).map((t) => (
+                            <option key={t.id} value={t.id}>{t.nom}</option>
+                          ))}
                         </select>
 
                         {/* Filtre statut */}
@@ -2419,7 +2508,9 @@ function TarificationsTab({
   onRefresh: () => void
 }) {
   const currentYear = years.find((y) => y.current)
+  const defaultType = typesFrais.find((t) => t.isDefault) ?? typesFrais.find((t) => t.isActive)
   const [selectedYearId, setSelectedYearId] = useState<number | null>(currentYear?.id || years[0]?.id || null)
+  const [selectedTypeId, setSelectedTypeId] = useState<number | "">("")
   const [editingTarif, setEditingTarif] = useState<number | null>(null)
   const [editMontant, setEditMontant] = useState("")
   const [saving, setSaving] = useState(false)
@@ -2432,17 +2523,17 @@ function TarificationsTab({
     }
   }, [years, selectedYearId])
 
+  useEffect(() => {
+    if (!selectedTypeId && defaultType) {
+      setSelectedTypeId(defaultType.id)
+    }
+  }, [defaultType, selectedTypeId])
+
   const filteredTarifs = tarifications.filter(
-    (t) => t.yearId === selectedYearId && t.isActive
+    (t) => t.yearId === selectedYearId && t.isActive && (selectedTypeId ? t.typeFraisId === Number(selectedTypeId) : true)
   )
 
-  // Group by type de frais
-  const tarifsByType = typesFrais
-    .filter((t) => t.isActive)
-    .map((type) => ({
-      type,
-      tarifs: filteredTarifs.filter((t) => t.typeFraisId === type.id),
-    }))
+  const selectedType = typesFrais.find((t) => t.id === Number(selectedTypeId))
 
   const handleSaveMontant = async (tarifId: number) => {
     const montant = parseFloat(editMontant)
@@ -2499,7 +2590,7 @@ function TarificationsTab({
     <div className="space-y-4">
       {/* Filtre par année + bouton ajouter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Calendar className={`w-5 h-5 ${textSecondary}`} />
           <select
             value={selectedYearId || ""}
@@ -2516,6 +2607,21 @@ function TarificationsTab({
               </option>
             ))}
           </select>
+          <select
+            value={selectedTypeId}
+            onChange={(e) => setSelectedTypeId(parseInt(e.target.value))}
+            className={`px-3 py-2 rounded-xl border text-sm font-medium min-w-[200px] ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-800"
+            } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
+          >
+            {typesFrais.filter((t) => t.isActive).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nom}{t.isDefault ? " (défaut)" : ""}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
@@ -2527,27 +2633,27 @@ function TarificationsTab({
         </button>
       </div>
 
-      {/* Grille par type de frais */}
-      {tarifsByType.map(({ type, tarifs }) => (
-        <Card key={type.id} theme={theme}>
+      {/* Tarifications du type sélectionné */}
+      {selectedType && (
+        <Card theme={theme}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BadgeDollarSign className="w-5 h-5 text-indigo-500" />
-                <span>{type.nom}</span>
-                {type.description && (
-                  <span className={`text-xs font-normal ${textSecondary}`}>— {type.description}</span>
+                <span>{selectedType.nom}</span>
+                {selectedType.description && (
+                  <span className={`text-xs font-normal ${textSecondary}`}>— {selectedType.description}</span>
                 )}
               </div>
               <span className={`text-xs font-normal px-2 py-1 rounded-full ${
                 theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
               }`}>
-                {tarifs.length} classe{tarifs.length > 1 ? "s" : ""} configurée{tarifs.length > 1 ? "s" : ""}
+                {filteredTarifs.length} classe{filteredTarifs.length > 1 ? "s" : ""} configurée{filteredTarifs.length > 1 ? "s" : ""}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {tarifs.length === 0 ? (
+            {filteredTarifs.length === 0 ? (
               <div className={`text-center py-6 border-2 border-dashed ${borderColor} rounded-xl`}>
                 <p className={`text-sm ${textSecondary}`}>Aucune tarification pour cette année</p>
                 <button
@@ -2570,7 +2676,7 @@ function TarificationsTab({
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                    {tarifs
+                    {filteredTarifs
                       .sort((a, b) => (a.class?.name || "").localeCompare(b.class?.name || ""))
                       .map((tarif) => (
                         <tr key={tarif.id} className={hoverRow}>
@@ -2661,7 +2767,7 @@ function TarificationsTab({
             )}
           </CardContent>
         </Card>
-      ))}
+      )}
     </div>
   )
 }
@@ -2689,7 +2795,9 @@ function CreateTarificationModal({
   onSuccess: () => void
 }) {
   const currentYear = years.find((y) => y.current)
-  const [typeFraisId, setTypeFraisId] = useState<number | "">(typesFrais[0]?.id || "")
+  const [typeFraisId, setTypeFraisId] = useState<number | "">(
+    typesFrais.find((t) => t.isDefault)?.id ?? typesFrais[0]?.id ?? ""
+  )
   const [yearId, setYearId] = useState<number | "">(currentYear?.id || years[0]?.id || "")
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([])
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import { ensureDefaultFeeType, getDefaultFeeTypeId } from "@/lib/fees/default-fee-type"
 import { SECTION_ORDER } from "@/lib/class-sort"
 
 function emptySectionStats(): Record<string, number> {
@@ -14,6 +15,9 @@ export async function GET(request: NextRequest) {
     requireRole(user, ["ADMIN", "COMPTABLE", "SUPER_ADMIN"])
 
     const schoolId = user.schoolId
+
+    await ensureDefaultFeeType(schoolId)
+    const defaultFeeTypeId = await getDefaultFeeTypeId(schoolId)
 
     const [studentsCount, teachersCount, classesCount, maleCount, femaleCount, currentYearId] =
       await Promise.all([
@@ -69,7 +73,14 @@ export async function GET(request: NextRequest) {
         select: { user: { select: { createdAt: true } } },
       }),
       prisma.paiement.findMany({
-        where: { schoolId, datePaiement: { gte: startDate }, isAnnule: false },
+        where: {
+          schoolId,
+          datePaiement: { gte: startDate },
+          isAnnule: false,
+          ...(defaultFeeTypeId
+            ? { tarification: { typeFraisId: defaultFeeTypeId } }
+            : {}),
+        },
         select: {
           datePaiement: true,
           montant: true,

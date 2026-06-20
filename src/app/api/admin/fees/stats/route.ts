@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_VIEW_ROLES } from "@/lib/fees/roles"
 import { toDisplayCode } from "@/lib/student-fields"
+import { ensureDefaultFeeType, isDefaultFeeType } from "@/lib/fees/default-fee-type"
+import { computeCurrencyStats, computeFeeTypeGroupSummaries } from "@/lib/fees/fee-stats.service"
 
 function getDayBounds() {
   const now = new Date()
@@ -12,13 +14,16 @@ function getDayBounds() {
   return { start, end }
 }
 
-async function getDailyCollected(schoolId: number) {
+async function getDailyCollected(schoolId: number, typeFraisId?: number) {
   const { start, end } = getDayBounds()
   const payments = await prisma.paiement.findMany({
     where: {
       schoolId,
       isAnnule: false,
       datePaiement: { gte: start, lt: end },
+      ...(typeFraisId
+        ? { tarification: { typeFraisId } }
+        : {}),
     },
     select: {
       montant: true,
@@ -41,11 +46,35 @@ async function getDailyCollected(schoolId: number) {
   }
 }
 
+async function getPaidByStudent(
+  schoolId: number,
+  yearId: number,
+  devise: "USD" | "CDF",
+  typeFraisId?: number
+) {
+  const rows = await prisma.paiement.groupBy({
+    by: ["studentId"],
+    where: {
+      schoolId,
+      tarification: {
+        yearId,
+        devise,
+        ...(typeFraisId ? { typeFraisId } : {}),
+      },
+      isAnnule: false,
+    },
+    _sum: { montant: true },
+  })
+  return new Map(rows.map((p) => [p.studentId, p._sum.montant ?? 0]))
+}
+
 // GET /api/admin/fees/stats - Statistiques globales des frais
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
     requireRole(user, [...FEE_VIEW_ROLES])
+
+    await ensureDefaultFeeType(user.schoolId)
 
     const { searchParams } = new URL(req.url)
     const yearId = searchParams.get("yearId")
@@ -63,22 +92,22 @@ export async function GET(req: NextRequest) {
       totalStudents: 0,
       recentPayments: [],
       tarificationsSummary: [],
+      feeTypesSummary: [],
+      otherTypesSummary: [],
     }
 
     if (!activeYearId) {
       return NextResponse.json({ data: emptyResult })
     }
 
-    // 1. Tarifications actives avec devise
     const tarifications = await prisma.tarification.findMany({
       where: { schoolId: user.schoolId, yearId: activeYearId, isActive: true },
       include: {
-        typeFrais: { select: { nom: true, code: true } },
+        typeFrais: { select: { id: true, nom: true, code: true } },
         class: { select: { id: true, name: true } },
       },
     })
 
-    // 2. Inscriptions actives
     const enrollments = await prisma.enrollment.findMany({
       where: {
         yearId: activeYearId,
@@ -88,102 +117,72 @@ export async function GET(req: NextRequest) {
       select: { id: true, studentId: true, classId: true },
     })
 
-    // 3. Calculer les totaux attendus par devise et par élève
-    type StudentBalance = {
-      usdDue: number
-      cdfDue: number
-    }
-    const studentBalances = new Map<number, StudentBalance>()
+    const scolaireTarifs = tarifications.filter((t) => isDefaultFeeType(t.typeFrais))
+    const defaultTypeId = scolaireTarifs[0]?.typeFrais.id
 
-    let totalExpectedUsd = 0
-    let totalExpectedCdf = 0
+    const paidUsdScolaire = await getPaidByStudent(user.schoolId, activeYearId, "USD", defaultTypeId)
+    const paidCdfScolaire = await getPaidByStudent(user.schoolId, activeYearId, "CDF", defaultTypeId)
 
-    for (const enrollment of enrollments) {
-      let usdDue = 0
-      let cdfDue = 0
-      for (const tarif of tarifications) {
-        if (tarif.classId === null || tarif.classId === enrollment.classId) {
-          if (tarif.devise === "CDF") {
-            cdfDue += tarif.montant
-          } else {
-            usdDue += tarif.montant
-          }
-        }
+    const scolaireStats = computeCurrencyStats(
+      enrollments,
+      scolaireTarifs.map((t) => ({
+        id: t.id,
+        montant: t.montant,
+        classId: t.classId,
+        devise: t.devise as "USD" | "CDF",
+        typeFraisId: t.typeFrais.id,
+        typeFrais: t.typeFrais,
+      })),
+      paidUsdScolaire,
+      paidCdfScolaire
+    )
+
+    const paymentsGroupedByTarif = await prisma.paiement.groupBy({
+      by: ["tarificationId"],
+      where: {
+        tarificationId: { in: tarifications.map((t) => t.id) },
+        isAnnule: false,
+      },
+      _sum: { montant: true },
+      _count: { id: true },
+    })
+
+    const paymentsMap = new Map(
+      paymentsGroupedByTarif.map((p) => [p.tarificationId, p._sum.montant ?? 0])
+    )
+
+    const feeTypesSummary = computeFeeTypeGroupSummaries(
+      enrollments,
+      tarifications.map((t) => ({
+        id: t.id,
+        montant: t.montant,
+        classId: t.classId,
+        devise: t.devise as "USD" | "CDF",
+        typeFraisId: t.typeFrais.id,
+        typeFrais: t.typeFrais,
+      })),
+      paymentsMap
+    )
+
+    const otherTypesSummary = feeTypesSummary.filter((t) => !t.isDefault)
+
+    const tarificationsSummary = scolaireTarifs.map((t) => {
+      const applicableStudents = enrollments.filter((e) => t.classId === null || t.classId === e.classId).length
+      const totalPercu = paymentsMap.get(t.id) ?? 0
+
+      return {
+        id: t.id,
+        typeFrais: t.typeFrais.nom,
+        classe: t.class?.name || "Toutes les classes",
+        montant: t.montant,
+        devise: t.devise,
+        totalAttendu: t.montant * applicableStudents,
+        totalPercu,
+        nombrePaiements: paymentsGroupedByTarif.find((p) => p.tarificationId === t.id)?._count.id ?? 0,
+        nombreEleves: applicableStudents,
       }
-      studentBalances.set(enrollment.studentId, { usdDue, cdfDue })
-      totalExpectedUsd += usdDue
-      totalExpectedCdf += cdfDue
-    }
-
-    // 4. Paiements perçus par devise
-    const paiementsUsd = await prisma.paiement.aggregate({
-      where: {
-        schoolId: user.schoolId,
-        tarification: { yearId: activeYearId, devise: "USD" },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
     })
 
-    const paiementsCdf = await prisma.paiement.aggregate({
-      where: {
-        schoolId: user.schoolId,
-        tarification: { yearId: activeYearId, devise: "CDF" },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
-    })
-
-    const totalCollectedUsd = paiementsUsd._sum.montant ?? 0
-    const totalCollectedCdf = paiementsCdf._sum.montant ?? 0
-
-    // 5. Statut par élève — paiements groupés par devise
-    const studentPaymentsUsd = await prisma.paiement.groupBy({
-      by: ["studentId"],
-      where: {
-        schoolId: user.schoolId,
-        tarification: { yearId: activeYearId, devise: "USD" },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
-    })
-
-    const studentPaymentsCdf = await prisma.paiement.groupBy({
-      by: ["studentId"],
-      where: {
-        schoolId: user.schoolId,
-        tarification: { yearId: activeYearId, devise: "CDF" },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
-    })
-
-    const paidUsdByStudent = new Map(studentPaymentsUsd.map((p) => [p.studentId, p._sum.montant ?? 0]))
-    const paidCdfByStudent = new Map(studentPaymentsCdf.map((p) => [p.studentId, p._sum.montant ?? 0]))
-
-    let usdFullyPaid = 0
-    let usdPartiallyPaid = 0
-    let usdUnpaid = 0
-    let cdfFullyPaid = 0
-    let cdfPartiallyPaid = 0
-    let cdfUnpaid = 0
-
-    for (const [studentId, { usdDue, cdfDue }] of studentBalances) {
-      if (usdDue > 0) {
-        const paid = paidUsdByStudent.get(studentId) ?? 0
-        if (paid >= usdDue) usdFullyPaid++
-        else if (paid > 0) usdPartiallyPaid++
-        else usdUnpaid++
-      }
-      if (cdfDue > 0) {
-        const paid = paidCdfByStudent.get(studentId) ?? 0
-        if (paid >= cdfDue) cdfFullyPaid++
-        else if (paid > 0) cdfPartiallyPaid++
-        else cdfUnpaid++
-      }
-    }
-
-    // 6. Derniers paiements
     const recentPayments = await prisma.paiement.findMany({
       where: {
         schoolId: user.schoolId,
@@ -201,58 +200,12 @@ export async function GET(req: NextRequest) {
       take: 10,
     })
 
-    // 7. Résumé par tarification
-    const paymentsGroupedByTarif = await prisma.paiement.groupBy({
-      by: ["tarificationId"],
-      where: {
-        tarificationId: { in: tarifications.map((t) => t.id) },
-        isAnnule: false,
-      },
-      _sum: { montant: true },
-      _count: { id: true },
-    })
-
-    const paymentsMap = new Map(
-      paymentsGroupedByTarif.map((p) => [p.tarificationId, { total: p._sum.montant ?? 0, count: p._count.id }])
-    )
-
-    const tarificationsSummary = tarifications.map((t) => {
-      const applicableStudents = enrollments.filter((e) => t.classId === null || t.classId === e.classId).length
-      const payments = paymentsMap.get(t.id) || { total: 0, count: 0 }
-
-      return {
-        id: t.id,
-        typeFrais: t.typeFrais.nom,
-        classe: t.class?.name || "Toutes les classes",
-        montant: t.montant,
-        devise: t.devise,
-        totalAttendu: t.montant * applicableStudents,
-        totalPercu: payments.total,
-        nombrePaiements: payments.count,
-        nombreEleves: applicableStudents,
-      }
-    })
-
     return NextResponse.json({
       data: {
-        usd: {
-          totalExpected: totalExpectedUsd,
-          totalCollected: totalCollectedUsd,
-          totalPending: totalExpectedUsd - totalCollectedUsd,
-          studentsFullyPaid: usdFullyPaid,
-          studentsPartiallyPaid: usdPartiallyPaid,
-          studentsUnpaid: usdUnpaid,
-        },
-        cdf: {
-          totalExpected: totalExpectedCdf,
-          totalCollected: totalCollectedCdf,
-          totalPending: totalExpectedCdf - totalCollectedCdf,
-          studentsFullyPaid: cdfFullyPaid,
-          studentsPartiallyPaid: cdfPartiallyPaid,
-          studentsUnpaid: cdfUnpaid,
-        },
+        usd: scolaireStats.usd,
+        cdf: scolaireStats.cdf,
         totalStudents: enrollments.length,
-        dailyCollected: await getDailyCollected(user.schoolId),
+        dailyCollected: await getDailyCollected(user.schoolId, defaultTypeId),
         recentPayments: recentPayments.map((p) => ({
           id: p.id,
           numeroRecu: p.numeroRecu,
@@ -266,6 +219,8 @@ export async function GET(req: NextRequest) {
           modePaiement: p.modePaiement,
         })),
         tarificationsSummary,
+        feeTypesSummary,
+        otherTypesSummary,
       },
     })
   } catch (error) {

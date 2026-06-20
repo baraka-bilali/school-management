@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { calculateStudentYearBalance } from "@/lib/fees/balance.service"
+import { calculateStudentFeesBreakdown } from "@/lib/fees/balance.service"
 import { listPaiements } from "@/lib/fees/paiement.service"
 import { getStudentFromRequest } from "@/lib/student-auth"
 
@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const { studentId, schoolId, yearId } = ctx
   if (!schoolId || !yearId) {
     return NextResponse.json({
+      scolaire: null,
+      autres: [],
       balance: null,
       paiements: [],
       message: "Aucune inscription active pour cette année scolaire",
@@ -19,8 +21,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [balance, paiementsResult] = await Promise.all([
-      calculateStudentYearBalance(studentId, yearId, schoolId),
+    const [breakdown, paiementsResult] = await Promise.all([
+      calculateStudentFeesBreakdown(studentId, yearId, schoolId),
       listPaiements({
         schoolId,
         studentId,
@@ -42,7 +44,9 @@ export async function GET(req: NextRequest) {
     }))
 
     return NextResponse.json({
-      balance,
+      scolaire: breakdown.scolaire,
+      autres: breakdown.autres,
+      balance: breakdown.scolaire,
       paiements,
       yearId,
     })
