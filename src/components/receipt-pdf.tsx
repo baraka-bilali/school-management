@@ -34,8 +34,9 @@ const fmt = (d: string) =>
 const s = StyleSheet.create({
   page:         { padding: 44, fontFamily: "Helvetica", fontSize: 10, color: "#1f2937", backgroundColor: "#ffffff" },
   header:       { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, paddingBottom: 20, borderBottomWidth: 2, borderBottomColor: "#16a34a", borderBottomStyle: "solid" },
-  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 12, maxWidth: "55%" },
-  logo:         { width: 56, height: 56, objectFit: "contain" },
+  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 16, maxWidth: "62%" },
+  logoWrap:     { width: 96, height: 96, alignItems: "center", justifyContent: "center" },
+  logo:         { maxWidth: 96, maxHeight: 96, objectFit: "contain" },
   title:        { fontSize: 22, fontFamily: "Helvetica-Bold", color: "#111827", letterSpacing: 1.5 },
   recuNum:      { fontSize: 11, color: "#16a34a", fontFamily: "Helvetica-Bold", marginTop: 4 },
   labelSmall:   { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
@@ -60,8 +61,9 @@ const s = StyleSheet.create({
   notesBox:     { backgroundColor: "#fefce8", borderWidth: 1, borderColor: "#fde68a", borderStyle: "solid", borderRadius: 6, padding: 10, marginBottom: 16 },
   notesLabel:   { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#92400e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 },
   notesText:    { fontSize: 9, color: "#78350f" },
-  sealRow:      { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginBottom: 12, minHeight: 72 },
-  seal:         { width: 72, height: 72, objectFit: "contain" },
+  sealRow:      { flexDirection: "row", justifyContent: "flex-end", alignItems: "flex-end", marginBottom: 16, marginTop: 8, minHeight: 140 },
+  sealWrap:     { alignItems: "center" },
+  seal:         { width: 128, height: 128, objectFit: "contain" },
   sealCaption:  { fontSize: 8, color: "#6b7280", textAlign: "center", marginTop: 4 },
   footer:       { marginTop: "auto", paddingTop: 14, borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid", textAlign: "center", color: "#9ca3af", fontSize: 9 },
 })
@@ -77,7 +79,11 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
         {/* Header */}
         <View style={s.header}>
           <View style={s.headerLeft}>
-            {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : null}
+            {data.logoUrl ? (
+              <View style={s.logoWrap}>
+                <Image src={data.logoUrl} style={s.logo} />
+              </View>
+            ) : null}
             <View>
               <Text style={s.title}>REÇU DE PAIEMENT</Text>
               <Text style={s.recuNum}>{data.numeroRecu}</Text>
@@ -157,7 +163,7 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
         {/* Sceau officiel */}
         {data.sealUrl && (
           <View style={s.sealRow}>
-            <View style={{ alignItems: "center" }}>
+            <View style={s.sealWrap}>
               <Image src={data.sealUrl} style={s.seal} />
               <Text style={s.sealCaption}>Cachet de l&apos;établissement</Text>
             </View>

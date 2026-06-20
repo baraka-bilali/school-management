@@ -138,11 +138,11 @@ export default function StudentReceiptModal({ paiementId, onClose }: StudentRece
                   <div className="flex items-center justify-between gap-3">
                     {receiptData.logoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={receiptData.logoUrl} alt="Logo" className="h-12 max-w-[120px] object-contain" />
+                      <img src={receiptData.logoUrl} alt="Logo" className="h-16 max-w-[140px] object-contain" />
                     ) : <span />}
                     {receiptData.sealUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={receiptData.sealUrl} alt="Sceau" className="h-14 w-14 object-contain opacity-90" />
+                      <img src={receiptData.sealUrl} alt="Sceau" className="h-24 w-24 object-contain opacity-95" />
                     ) : null}
                   </div>
                 )}

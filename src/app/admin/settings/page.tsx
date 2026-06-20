@@ -15,7 +15,12 @@ import {
   Building2,
 } from "lucide-react"
 import BrandingUploadCard from "@/components/branding-upload-card"
-import { resizeLogoFile, resizeProfilePhotoFile, resizeSealFile } from "@/lib/image-utils"
+import {
+  processLogoCrop,
+  processProfileCrop,
+  processSealCrop,
+  type CropArea,
+} from "@/lib/image-utils"
 
 interface AcademicYear {
   id: number
@@ -171,12 +176,13 @@ export default function SettingsPage() {
   const handleBrandingUpload = async (
     field: "logoUrl" | "sealUrl" | "profilePhotoUrl",
     uploadKey: "logo" | "seal" | "profile",
-    file: File,
-    resizeFn: (f: File) => Promise<string>
+    crop: CropArea,
+    imageSrc: string,
+    processFn: (src: string, c: CropArea) => Promise<string>
   ) => {
     setUploadingField(uploadKey)
     try {
-      const dataUrl = await resizeFn(file)
+      const dataUrl = await processFn(imageSrc, crop)
       await saveBrandingField(field, dataUrl)
     } catch (e) {
       console.error(e)
@@ -436,32 +442,33 @@ export default function SettingsPage() {
                 <BrandingUploadCard
                   theme={theme}
                   title="Logo de l'école"
-                  description="Affiché en en-tête des reçus PDF."
+                  description="Affiché en en-tête des reçus PDF. Rognez librement (PNG transparent)."
                   previewUrl={branding.logoUrl}
                   uploading={uploadingField === "logo"}
-                  onUpload={(file) => handleBrandingUpload("logoUrl", "logo", file, resizeLogoFile)}
+                  onUpload={(crop, src) => handleBrandingUpload("logoUrl", "logo", crop, src, processLogoCrop)}
                   onRemove={() => handleBrandingRemove("logoUrl", "logo")}
-                  aspect="square"
+                  aspect="free"
                 />
                 <BrandingUploadCard
                   theme={theme}
                   title="Sceau / cachet"
-                  description="Tampon officiel en bas du reçu."
+                  description="Tampon officiel en bas du reçu (PNG transparent)."
                   previewUrl={branding.sealUrl}
                   uploading={uploadingField === "seal"}
-                  onUpload={(file) => handleBrandingUpload("sealUrl", "seal", file, resizeSealFile)}
+                  onUpload={(crop, src) => handleBrandingUpload("sealUrl", "seal", crop, src, processSealCrop)}
                   onRemove={() => handleBrandingRemove("sealUrl", "seal")}
                   aspect="square"
                 />
                 <BrandingUploadCard
                   theme={theme}
                   title="Photo de profil"
-                  description="Avatar de l'établissement dans l'en-tête admin."
+                  description="Avatar rond de l'établissement dans l'en-tête admin."
                   previewUrl={branding.profilePhotoUrl}
                   uploading={uploadingField === "profile"}
-                  onUpload={(file) => handleBrandingUpload("profilePhotoUrl", "profile", file, resizeProfilePhotoFile)}
+                  onUpload={(crop, src) => handleBrandingUpload("profilePhotoUrl", "profile", crop, src, processProfileCrop)}
                   onRemove={() => handleBrandingRemove("profilePhotoUrl", "profile")}
                   aspect="square"
+                  cropShape="round"
                 />
               </div>
 
@@ -474,7 +481,7 @@ export default function SettingsPage() {
 
               <div className="mt-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 p-3">
                 <p className={`text-xs ${textSecondary}`}>
-                  Formats acceptés : PNG, JPG, WebP. Les images sont redimensionnées automatiquement. Le logo et le sceau apparaîtront sur les prochains reçus générés.
+                  Formats acceptés : PNG, JPG, WebP. Vous pourrez rogner chaque image avant l&apos;enregistrement. Logo et sceau sont enregistrés en PNG pour conserver la transparence. Réimportez-les si un fond noir apparaît sur d&apos;anciennes images.
                 </p>
               </div>
             </>

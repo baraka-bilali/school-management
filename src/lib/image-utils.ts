@@ -1,48 +1,102 @@
-/** Redimensionne une image côté client et retourne un data URL JPEG. */
-export function resizeImageFile(
-  file: File,
-  maxSize = 400,
-  quality = 0.85
-): Promise<string> {
+export interface CropArea {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface CropOutputOptions {
+  maxSize: number
+  format: "png" | "jpeg"
+  quality?: number
+  circular?: boolean
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error("Image invalide"))
+    img.src = src
+  })
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error("Lecture du fichier impossible"))
     reader.onload = (e) => {
       const b64 = e.target?.result as string
-      if (!b64) {
-        reject(new Error("Fichier vide"))
-        return
-      }
-      const img = new Image()
-      img.onerror = () => reject(new Error("Image invalide"))
-      img.onload = () => {
-        const canvas = document.createElement("canvas")
-        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1)
-        canvas.width = Math.max(1, Math.round(img.width * ratio))
-        canvas.height = Math.max(1, Math.round(img.height * ratio))
-        const ctx = canvas.getContext("2d")
-        if (!ctx) {
-          reject(new Error("Canvas indisponible"))
-          return
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL("image/jpeg", quality))
-      }
-      img.src = b64
+      if (!b64) reject(new Error("Fichier vide"))
+      else resolve(b64)
     }
     reader.readAsDataURL(file)
   })
 }
 
-/** Sceau : un peu plus grand pour la lisibilité sur les reçus. */
-export function resizeSealFile(file: File): Promise<string> {
-  return resizeImageFile(file, 320, 0.9)
+/** Rogne une image et retourne un data URL (PNG = transparence conservée). */
+export async function getCroppedImageDataUrl(
+  imageSrc: string,
+  pixelCrop: CropArea,
+  options: CropOutputOptions
+): Promise<string> {
+  const image = await loadImage(imageSrc)
+  const { maxSize, format, quality = 0.92, circular = false } = options
+
+  const scale = Math.min(maxSize / pixelCrop.width, maxSize / pixelCrop.height, 1)
+  const outW = Math.max(1, Math.round(pixelCrop.width * scale))
+  const outH = Math.max(1, Math.round(pixelCrop.height * scale))
+
+  const canvas = document.createElement("canvas")
+  canvas.width = outW
+  canvas.height = outH
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Canvas indisponible")
+
+  if (circular) {
+    ctx.beginPath()
+    ctx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2)
+    ctx.closePath()
+    ctx.clip()
+  }
+
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    outW,
+    outH
+  )
+
+  if (format === "png") return canvas.toDataURL("image/png")
+  return canvas.toDataURL("image/jpeg", quality)
 }
 
-export function resizeLogoFile(file: File): Promise<string> {
-  return resizeImageFile(file, 400, 0.88)
+export async function fileToDataUrl(file: File): Promise<string> {
+  return readFileAsDataUrl(file)
 }
 
-export function resizeProfilePhotoFile(file: File): Promise<string> {
-  return resizeImageFile(file, 256, 0.88)
+/** Logo reçu : PNG pour garder la transparence. */
+export function processLogoCrop(imageSrc: string, crop: CropArea): Promise<string> {
+  return getCroppedImageDataUrl(imageSrc, crop, { maxSize: 480, format: "png" })
+}
+
+/** Sceau : PNG, taille plus grande pour le PDF. */
+export function processSealCrop(imageSrc: string, crop: CropArea): Promise<string> {
+  return getCroppedImageDataUrl(imageSrc, crop, { maxSize: 560, format: "png" })
+}
+
+/** Photo profil : carré rogné en cercle, JPEG suffit. */
+export function processProfileCrop(imageSrc: string, crop: CropArea): Promise<string> {
+  return getCroppedImageDataUrl(imageSrc, crop, {
+    maxSize: 320,
+    format: "jpeg",
+    quality: 0.9,
+    circular: true,
+  })
 }
