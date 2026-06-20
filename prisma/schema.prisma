@@ -143,6 +143,7 @@ model Enrollment {
   yearId     Int
   status     EnrollmentStatus @default(ACTIVE)
   exitReason String?
+  createdAt  DateTime         @default(now())
   class      Class            @relation(fields: [classId], references: [id])
   student    Student          @relation(fields: [studentId], references: [id])
   year       AcademicYear     @relation(fields: [yearId], references: [id])
@@ -153,6 +154,7 @@ model Enrollment {
   @@index([yearId])
   @@index([studentId, yearId, status])
   @@index([yearId, status])
+  @@index([yearId, createdAt])
 }
 
 model School {

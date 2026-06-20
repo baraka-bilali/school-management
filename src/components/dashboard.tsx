@@ -255,6 +255,23 @@ export default function Dashboard() {
     [sectionData]
   )
 
+  const enrollmentYMax = useMemo(() => {
+    const max = Math.max(...monthlySeries.map((d) => d.students), safeStats.students, 1)
+    if (max <= 10) return Math.max(max, 5)
+    if (max <= 50) return Math.ceil(max / 5) * 5
+    if (max <= 200) return Math.ceil(max / 20) * 20
+    if (max <= 1000) return Math.ceil(max / 100) * 100
+    return Math.ceil(max / 200) * 200
+  }, [monthlySeries, safeStats.students])
+
+  const sectionXMax = useMemo(() => {
+    const max = Math.max(...sectionData.map((d) => d.value), 1)
+    if (max <= 10) return Math.max(max, 5)
+    if (max <= 100) return Math.ceil(max / 10) * 10
+    if (max <= 500) return Math.ceil(max / 50) * 50
+    return Math.ceil(max / 100) * 100
+  }, [sectionData])
+
   const currentMonthUsd = useMemo(() =>
     monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsUsd : 0
   , [monthlySeries])
@@ -321,7 +338,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des inscriptions</p>
-                <p className={`text-xs ${textSecondary}`}>Basee sur la creation des comptes eleves</p>
+                <p className={`text-xs ${textSecondary}`}>
+                  Inscriptions cumulées par mois scolaire
+                  {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
+                </p>
               </div>
               <Activity className={`w-4 h-4 ${textSecondary}`} />
             </div>
@@ -330,7 +350,11 @@ export default function Dashboard() {
                 <AreaChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} allowDecimals={false} domain={[1, 100]} />
+                  <YAxis
+                    stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                    allowDecimals={false}
+                    domain={[0, enrollmentYMax]}
+                  />
                   <Tooltip
                     formatter={(value) => [Number(value ?? 0), "Eleves cumules"]}
                     labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
@@ -487,7 +511,12 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={sectionData} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
+                      <XAxis
+                        type="number"
+                        allowDecimals={false}
+                        domain={[0, sectionXMax]}
+                        stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                      />
                       <YAxis
                         type="category"
                         dataKey="name"

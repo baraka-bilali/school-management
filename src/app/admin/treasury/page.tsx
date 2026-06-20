@@ -1,8 +1,19 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/cards"
+import { SelecteurAnneeScolaire } from "@/components/treasury/school-year-select"
+import { SelecteurMois } from "@/components/treasury/school-month-select"
+import { TreasuryPeriodShortcuts } from "@/components/treasury/treasury-period-shortcuts"
+import {
+  computePeriodBounds,
+  getSchoolYearMonths,
+  mapAcademicYearsToAnnees,
+  type AnneeScolaire,
+  type PeriodShortcut,
+} from "@/lib/school-year-utils"
 import {
   Landmark,
   ArrowDownCircle,
@@ -131,6 +142,8 @@ const MODES_PAIEMENT = [
 // ============================================================
 
 export default function AdminTreasuryPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [currency, setCurrency] = useState<"USD" | "CDF">(() => {
     if (typeof window !== "undefined") {
@@ -149,7 +162,10 @@ export default function AdminTreasuryPage() {
   const [treasury, setTreasury] = useState<TreasuryData | null>(null)
   const [treasuryLoading, setTreasuryLoading] = useState(false)
   const [treasurySubTab, setTreasurySubTab] = useState<"overview" | "salaires" | "depenses">("overview")
-  const [trFilterMois, setTrFilterMois] = useState("")
+  const [academicYears, setAcademicYears] = useState<AnneeScolaire[]>([])
+  const [trFilterYearId, setTrFilterYearId] = useState<number | null>(null)
+  const [trFilterMonth, setTrFilterMonth] = useState("")
+  const [periodShortcut, setPeriodShortcut] = useState<PeriodShortcut>("this_school_year")
   const [trFilterTeacher, setTrFilterTeacher] = useState("")
   const [trFilterType, setTrFilterType] = useState("")
   const [trFilterCategorie, setTrFilterCategorie] = useState("")
@@ -236,6 +252,89 @@ export default function AdminTreasuryPage() {
   useEffect(() => {
     fetchTreasury()
   }, [fetchTreasury])
+
+  // Charger les années scolaires (meta)
+  useEffect(() => {
+    const loadYears = async () => {
+      try {
+        const res = await fetch("/api/admin/meta")
+        if (!res.ok) return
+        const meta = await res.json()
+        const mapped = mapAcademicYearsToAnnees(meta.years || [], meta.currentYearId)
+        setAcademicYears(mapped)
+
+        const urlYear = searchParams.get("yearId")
+        const urlMonth = searchParams.get("month") ?? ""
+        const urlShortcut = (searchParams.get("period") as PeriodShortcut | null) ?? "this_school_year"
+
+        const defaultYearId = urlYear
+          ? Number(urlYear)
+          : meta.currentYearId ?? mapped[0]?.id ?? null
+
+        setTrFilterYearId(defaultYearId)
+        setTrFilterMonth(urlMonth)
+        setPeriodShortcut(
+          ["this_month", "this_quarter", "this_school_year", "custom"].includes(urlShortcut)
+            ? urlShortcut
+            : "this_school_year"
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+    void loadYears()
+  }, [searchParams])
+
+  const selectedSchoolYear = useMemo(
+    () => academicYears.find((y) => y.id === trFilterYearId) ?? academicYears[0] ?? null,
+    [academicYears, trFilterYearId]
+  )
+
+  const schoolYearMonths = useMemo(
+    () => (selectedSchoolYear ? getSchoolYearMonths(selectedSchoolYear) : []),
+    [selectedSchoolYear]
+  )
+
+  const periodBounds = useMemo(() => {
+    if (!selectedSchoolYear) {
+      return { monthValues: [] as string[], dateFrom: new Date(), dateTo: new Date(), shortcut: periodShortcut }
+    }
+    if (periodShortcut === "custom") {
+      return computePeriodBounds("custom", selectedSchoolYear, trFilterMonth || undefined)
+    }
+    return computePeriodBounds(periodShortcut, selectedSchoolYear)
+  }, [selectedSchoolYear, periodShortcut, trFilterMonth])
+
+  const syncUrlParams = useCallback(
+    (yearId: number | null, month: string, shortcut: PeriodShortcut) => {
+      const params = new URLSearchParams()
+      if (yearId) params.set("yearId", String(yearId))
+      if (month) params.set("month", month)
+      if (shortcut !== "this_school_year") params.set("period", shortcut)
+      const qs = params.toString()
+      router.replace(qs ? `/admin/treasury?${qs}` : "/admin/treasury", { scroll: false })
+    },
+    [router]
+  )
+
+  const handleYearChange = (yearId: number) => {
+    setTrFilterYearId(yearId)
+    setTrFilterMonth("")
+    setPeriodShortcut("this_school_year")
+    syncUrlParams(yearId, "", "this_school_year")
+  }
+
+  const handleMonthChange = (month: string) => {
+    setTrFilterMonth(month)
+    setPeriodShortcut("custom")
+    syncUrlParams(trFilterYearId, month, "custom")
+  }
+
+  const handleShortcutChange = (shortcut: PeriodShortcut) => {
+    setPeriodShortcut(shortcut)
+    if (shortcut !== "custom") setTrFilterMonth("")
+    syncUrlParams(trFilterYearId, shortcut === "custom" ? trFilterMonth : "", shortcut)
+  }
 
   // Recharger quand l'année scolaire change dans Paramètres
   useEffect(() => {
@@ -345,21 +444,24 @@ export default function AdminTreasuryPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `tresorerie-${treasurySubTab}${trFilterMois ? "-" + trFilterMois : ""}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `tresorerie-${treasurySubTab}${trFilterMonth ? "-" + trFilterMonth : ""}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  // Filtered treasury lists
+  // Filtrer salaires / dépenses par période scolaire
   const filteredTeacherPayments = treasury?.teacherPayments.filter((tp) => {
-    if (trFilterMois && tp.mois !== trFilterMois) return false
+    if (periodBounds.monthValues.length > 0 && !periodBounds.monthValues.includes(tp.mois)) return false
     if (trFilterTeacher && tp.teacherId !== parseInt(trFilterTeacher)) return false
     if (trFilterType && tp.type !== trFilterType) return false
     return true
   }) ?? []
 
   const filteredExpenses = treasury?.expenses.filter((e) => {
-    if (trFilterMois && !e.dateDepense.startsWith(trFilterMois)) return false
+    if (periodBounds.monthValues.length > 0) {
+      const expenseMonth = e.dateDepense.slice(0, 7)
+      if (!periodBounds.monthValues.includes(expenseMonth)) return false
+    }
     if (trFilterCategorie && e.categorie !== trFilterCategorie) return false
     return true
   }) ?? []
@@ -367,13 +469,6 @@ export default function AdminTreasuryPage() {
   const filteredTotalPayments = filteredTeacherPayments.reduce((s, tp) => s + tp.montant, 0)
   const filteredTotalExpensesUsd = filteredExpenses.filter(e => e.devise !== "CDF").reduce((s, e) => s + e.montant, 0)
   const filteredTotalExpensesCdf = filteredExpenses.filter(e => e.devise === "CDF").reduce((s, e) => s + e.montant, 0)
-
-  const availableMois = treasury ? Array.from(
-    new Set([
-      ...treasury.teacherPayments.map(tp => tp.mois),
-      ...treasury.expenses.map(e => e.dateDepense.slice(0, 7)),
-    ])
-  ).sort().reverse() : []
 
   // Couleurs thème
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
@@ -573,24 +668,30 @@ export default function AdminTreasuryPage() {
               </Card>
             )}
 
-            {/* Filtres */}
-            <div className="flex flex-wrap gap-3 items-center">
-              {/* Par mois */}
-              <div className="flex items-center gap-2">
-                <Calendar className={`w-4 h-4 ${textSecondary}`} />
-                <select
-                  value={trFilterMois}
-                  onChange={(e) => setTrFilterMois(e.target.value)}
-                  className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[150px]`}
-                >
-                  <option value="">Tous les mois</option>
-                  {availableMois.map((m) => (
-                    <option key={m} value={m}>
-                      {new Date(m + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Filtres période scolaire */}
+            <div className="space-y-3">
+              <TreasuryPeriodShortcuts
+                active={periodShortcut}
+                onChange={handleShortcutChange}
+                theme={theme}
+              />
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2">
+                  <Calendar className={`w-4 h-4 ${textSecondary}`} />
+                  <SelecteurAnneeScolaire
+                    years={academicYears}
+                    value={trFilterYearId}
+                    onChange={handleYearChange}
+                    theme={theme}
+                  />
+                  <SelecteurMois
+                    months={schoolYearMonths}
+                    value={trFilterMonth}
+                    onChange={handleMonthChange}
+                    theme={theme}
+                    disabled={periodShortcut !== "custom"}
+                  />
+                </div>
 
               {/* Par prof (salaires seulement) */}
               {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
@@ -635,9 +736,14 @@ export default function AdminTreasuryPage() {
               )}
 
               {/* Réinitialiser */}
-              {(trFilterMois || trFilterTeacher || trFilterType || trFilterCategorie) && (
+              {(periodShortcut !== "this_school_year" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
                 <button
-                  onClick={() => { setTrFilterMois(""); setTrFilterTeacher(""); setTrFilterType(""); setTrFilterCategorie("") }}
+                  onClick={() => {
+                    handleShortcutChange("this_school_year")
+                    setTrFilterTeacher("")
+                    setTrFilterType("")
+                    setTrFilterCategorie("")
+                  }}
                   className={`px-3 py-2 text-xs rounded-xl border ${borderColor} ${textSecondary} hover:text-red-500 hover:border-red-400 transition-colors`}
                 >
                   Réinitialiser filtres
@@ -645,7 +751,7 @@ export default function AdminTreasuryPage() {
               )}
 
               {/* Totaux filtrés */}
-              {trFilterMois && (
+              {(periodShortcut !== "this_school_year" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
                 <div className="flex gap-3 ml-auto text-sm flex-wrap">
                   {(treasurySubTab !== "depenses") && (
                     <span className="text-blue-600 font-medium">Salaires : {new Intl.NumberFormat("fr-FR").format(filteredTotalPayments)} $</span>
@@ -658,6 +764,7 @@ export default function AdminTreasuryPage() {
                   )}
                 </div>
               )}
+              </div>
             </div>
 
             {/* Sous-onglets + boutons */}
