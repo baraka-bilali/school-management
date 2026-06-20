@@ -12,7 +12,6 @@ import {
   School,
   X,
   CreditCard,
-  Bell,
   Calendar,
   FileText,
   Wallet,
@@ -114,7 +113,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
     { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
-    { icon: Bell, label: "Notifications", href: "/admin/notifications" },
   ]
 
   // Menu caissier (POS — encaissement uniquement)
@@ -132,7 +130,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: FileText, label: "Notes & Bulletins", href: "/student/grades", premiumOnly: true },
     { icon: Wallet, label: "Frais scolaires", href: "/student/fees" },
     { icon: Megaphone, label: "Communiqués", href: "/student/communiques" },
-    { icon: Bell, label: "Notifications", href: "/student/notifications" },
   ]
 
   // Sélectionner le menu selon le rôle

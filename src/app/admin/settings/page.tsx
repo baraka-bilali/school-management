@@ -442,22 +442,24 @@ export default function SettingsPage() {
                 <BrandingUploadCard
                   theme={theme}
                   title="Logo de l'école"
-                  description="Affiché en en-tête des reçus PDF. Rognez librement (PNG transparent)."
+                  description="Affiché en en-tête des reçus PDF. PNG transparent, rognage libre."
                   previewUrl={branding.logoUrl}
                   uploading={uploadingField === "logo"}
                   onUpload={(crop, src) => handleBrandingUpload("logoUrl", "logo", crop, src, processLogoCrop)}
                   onRemove={() => handleBrandingRemove("logoUrl", "logo")}
                   aspect="free"
+                  transparentPreview
                 />
                 <BrandingUploadCard
                   theme={theme}
                   title="Sceau / cachet"
-                  description="Tampon officiel en bas du reçu (PNG transparent)."
+                  description="Tampon officiel en bas du reçu. PNG transparent."
                   previewUrl={branding.sealUrl}
                   uploading={uploadingField === "seal"}
                   onUpload={(crop, src) => handleBrandingUpload("sealUrl", "seal", crop, src, processSealCrop)}
                   onRemove={() => handleBrandingRemove("sealUrl", "seal")}
                   aspect="square"
+                  transparentPreview
                 />
                 <BrandingUploadCard
                   theme={theme}
@@ -481,7 +483,7 @@ export default function SettingsPage() {
 
               <div className="mt-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 p-3">
                 <p className={`text-xs ${textSecondary}`}>
-                  Formats acceptés : PNG, JPG, WebP. Vous pourrez rogner chaque image avant l&apos;enregistrement. Logo et sceau sont enregistrés en PNG pour conserver la transparence. Réimportez-les si un fond noir apparaît sur d&apos;anciennes images.
+                  Formats acceptés : PNG, JPG, WebP. Logo et sceau sont enregistrés en PNG (transparence). Réimportez les images si un fond noir apparaît encore.
                 </p>
               </div>
             </>

@@ -12,6 +12,13 @@ export interface CropOutputOptions {
   circular?: boolean
 }
 
+const CHECKERBOARD =
+  "repeating-conic-gradient(#e5e7eb 0% 25%, transparent 0% 50%) 50% / 16px 16px"
+
+export const transparencyPreviewStyle = {
+  backgroundImage: CHECKERBOARD,
+} as const
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -54,6 +61,8 @@ export async function getCroppedImageDataUrl(
   const ctx = canvas.getContext("2d")
   if (!ctx) throw new Error("Canvas indisponible")
 
+  ctx.clearRect(0, 0, outW, outH)
+
   if (circular) {
     ctx.beginPath()
     ctx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2)
@@ -81,7 +90,7 @@ export async function fileToDataUrl(file: File): Promise<string> {
   return readFileAsDataUrl(file)
 }
 
-/** Logo reçu : PNG pour garder la transparence. */
+/** Logo : PNG pour garder la transparence sur les reçus et l'aperçu. */
 export function processLogoCrop(imageSrc: string, crop: CropArea): Promise<string> {
   return getCroppedImageDataUrl(imageSrc, crop, { maxSize: 480, format: "png" })
 }
@@ -91,12 +100,11 @@ export function processSealCrop(imageSrc: string, crop: CropArea): Promise<strin
   return getCroppedImageDataUrl(imageSrc, crop, { maxSize: 560, format: "png" })
 }
 
-/** Photo profil : carré rogné en cercle, JPEG suffit. */
+/** Photo profil : PNG rond pour éviter le fond noir autour du cercle. */
 export function processProfileCrop(imageSrc: string, crop: CropArea): Promise<string> {
   return getCroppedImageDataUrl(imageSrc, crop, {
     maxSize: 320,
-    format: "jpeg",
-    quality: 0.9,
+    format: "png",
     circular: true,
   })
 }

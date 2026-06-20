@@ -9,7 +9,6 @@ import Portal from "./portal"
 interface HeaderProps {
   onSidebarToggle: () => void
   role?: string | null
-  onNotificationClick?: () => void
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -23,7 +22,7 @@ const ROLE_LABEL: Record<string, string> = {
   ELEVE: 'Élève'
 }
 
-export default function Header({ onSidebarToggle, role, onNotificationClick }: HeaderProps) {
+export default function Header({ onSidebarToggle, role }: HeaderProps) {
   const router = useRouter()
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
@@ -196,6 +195,9 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
 
+  const notificationsHref =
+    (role || userRole) === "SUPER_ADMIN" ? "/super-admin/notifications" : "/admin/notifications"
+
   return (
     <>
       <nav className={`fixed top-0 left-0 right-0 ${bgColor} border-b ${borderColor} z-40 transition-colors`}>
@@ -232,7 +234,7 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
               {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
 
-            <NotificationBell onNotificationClick={onNotificationClick} />
+            <NotificationBell href={notificationsHref} />
             
             {/* Profile Button */}
             <button 

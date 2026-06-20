@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react"
 import ImageCropModal from "@/components/image-crop-modal"
-import { fileToDataUrl, type CropArea } from "@/lib/image-utils"
+import { fileToDataUrl, transparencyPreviewStyle, type CropArea } from "@/lib/image-utils"
 
 interface BrandingUploadCardProps {
   title: string
@@ -14,6 +14,8 @@ interface BrandingUploadCardProps {
   onRemove: () => void | Promise<void>
   aspect?: "square" | "wide" | "free"
   cropShape?: "rect" | "round"
+  /** Affiche un damier pour visualiser la transparence (logo, sceau). */
+  transparentPreview?: boolean
   theme: "light" | "dark"
 }
 
@@ -26,6 +28,7 @@ export default function BrandingUploadCard({
   onRemove,
   aspect = "square",
   cropShape = "rect",
+  transparentPreview = false,
   theme,
 }: BrandingUploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -35,6 +38,11 @@ export default function BrandingUploadCard({
 
   const cropAspect =
     aspect === "free" ? undefined : aspect === "wide" ? 16 / 9 : 1
+
+  const previewBg =
+    transparentPreview || !previewUrl
+      ? transparencyPreviewStyle
+      : undefined
 
   const handleFile = async (file: File) => {
     try {
@@ -62,13 +70,11 @@ export default function BrandingUploadCard({
 
         <div
           className={`relative flex items-center justify-center overflow-hidden rounded-xl border-2 border-dashed ${
-            theme === "dark" ? "border-gray-600 bg-gray-900/40" : "border-gray-200 bg-gray-50"
-          } ${aspect === "wide" ? "h-28" : "h-36"}`}
-          style={{
-            backgroundImage: previewUrl
-              ? undefined
-              : "repeating-conic-gradient(#e5e7eb 0% 25%, transparent 0% 50%) 50% / 16px 16px",
-          }}
+            theme === "dark" ? "border-gray-600" : "border-gray-200"
+          } ${aspect === "wide" ? "h-28" : "h-36"} ${
+            transparentPreview ? "" : theme === "dark" ? "bg-gray-900/40" : "bg-gray-50"
+          }`}
+          style={previewBg}
         >
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
