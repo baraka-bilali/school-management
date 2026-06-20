@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createTarificationSchema } from "@/lib/fees/validation"
-import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { FEE_CONFIG_ROLES, FEE_VIEW_ROLES } from "@/lib/fees/roles"
 
 // GET /api/admin/fees/tarifications
@@ -11,16 +11,23 @@ export async function GET(req: NextRequest) {
     requireRole(user, [...FEE_VIEW_ROLES])
 
     const { searchParams } = new URL(req.url)
-    const yearId = searchParams.get("yearId")
+    const yearIdParam = searchParams.get("yearId")
     const classId = searchParams.get("classId")
     const typeFraisId = searchParams.get("typeFraisId")
+
+    let yearId: number | undefined
+    if (yearIdParam) {
+      yearId = parseInt(yearIdParam)
+    } else {
+      yearId = (await getSchoolCurrentYearId(user.schoolId)) ?? undefined
+    }
 
     const where: Record<string, unknown> = {
       schoolId: user.schoolId,
       isActive: true,
     }
 
-    if (yearId) where.yearId = parseInt(yearId)
+    if (yearId) where.yearId = yearId
     if (classId) where.classId = parseInt(classId)
     if (typeFraisId) where.typeFraisId = parseInt(typeFraisId)
 

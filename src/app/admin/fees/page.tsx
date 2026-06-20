@@ -405,7 +405,7 @@ export default function AdminFeesPage() {
       const [statsRes, typesRes, tarifsRes, paiementsRes] = await Promise.all([
         fetch(`/api/admin/fees/stats${yearQs}`),
         fetch("/api/admin/fees/types"),
-        fetch("/api/admin/fees/tarifications"),
+        fetch(`/api/admin/fees/tarifications${yearQs}`),
         fetch("/api/admin/fees/paiements?pageSize=15"),
       ])
 
@@ -437,6 +437,18 @@ export default function AdminFeesPage() {
     fetchAll()
   }, [fetchAll])
 
+  // Recharger quand l'année scolaire change dans Paramètres
+  useEffect(() => {
+    const handleYearChange = () => {
+      const stored = localStorage.getItem("schoolCurrentYearId")
+      if (stored) setCurrentYearId(Number(stored))
+      void fetchAll()
+      setStudentFeesFetched(false)
+    }
+    window.addEventListener("schoolSettingsChange", handleYearChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleYearChange)
+  }, [fetchAll])
+
   // Charger les élèves quand l'onglet "students" est actif
   const [studentFeesFetched, setStudentFeesFetched] = useState(false)
   const fetchStudentFees = useCallback(async () => {
@@ -462,7 +474,6 @@ export default function AdminFeesPage() {
   const fetchPaiements = useCallback(async () => {
     try {
       const params = new URLSearchParams({ page: "1", pageSize: "15" })
-      if (currentYearId) params.set("yearId", String(currentYearId))
       if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
       const res = await fetch(`/api/admin/fees/paiements?${params}`)
       if (res.ok) {
@@ -473,7 +484,7 @@ export default function AdminFeesPage() {
     } catch (error) {
       console.error("Erreur chargement paiements:", error)
     }
-  }, [currentYearId, paymentsTypeFilter])
+  }, [paymentsTypeFilter])
 
   useEffect(() => {
     if (activeTab === "students") {
@@ -485,7 +496,7 @@ export default function AdminFeesPage() {
     if (activeTab === "payments") {
       fetchPaiements()
     }
-  }, [activeTab, currentYearId, paymentsTypeFilter, fetchPaiements])
+  }, [activeTab, paymentsTypeFilter, fetchPaiements])
 
   useEffect(() => {
     setSfPage(1)
@@ -641,14 +652,13 @@ export default function AdminFeesPage() {
     setExportingPaiements(true)
     try {
       const params = new URLSearchParams({ page: "1", pageSize: "10000" })
-      if (currentYearId) params.set("yearId", String(currentYearId))
       if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
       const res = await fetch(`/api/admin/fees/paiements?${params}`)
       if (!res.ok) return
       const { data } = await res.json() as { data: PaiementRecord[] }
       if (!data?.length) return
 
-      const headers = ["N° Reçu", "Nom", "Prénom", "Code", "Classe", "Type de frais", "Montant", "Devise", "Date", "Mode", "Référence", "Statut"]
+      const headers = ["N° Reçu", "Nom", "Prénom", "Code", "Classe", "Année scolaire", "Type de frais", "Montant", "Devise", "Date", "Mode", "Référence", "Statut"]
       const csvRows = [headers.join(";")]
 
       for (const p of data) {
@@ -658,6 +668,7 @@ export default function AdminFeesPage() {
           p.student.firstName,
           p.student.code,
           p.enrollment.class.name,
+          p.tarification.year.name,
           p.tarification.typeFrais.nom,
           p.montant,
           p.tarification.devise,
@@ -759,6 +770,11 @@ export default function AdminFeesPage() {
             </h1>
             <p className={`${textSecondary} mt-1`}>
               {isCashier ? "Encaissement et suivi des paiements" : "Gestion des frais et paiements des élèves"}
+              {currentYearId && years.find((y) => y.id === currentYearId) && (
+                <span className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
+                  Année {years.find((y) => y.id === currentYearId)?.name}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -1201,6 +1217,7 @@ export default function AdminFeesPage() {
                 typesFrais={typesFrais}
                 classes={classes}
                 years={years}
+                activeYearId={currentYearId}
                 textColor={textColor}
                 textSecondary={textSecondary}
                 borderColor={borderColor}
@@ -1260,6 +1277,7 @@ export default function AdminFeesPage() {
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>N° Reçu</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Élève</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Classe</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Année</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Type</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Date</th>
@@ -1278,6 +1296,7 @@ export default function AdminFeesPage() {
                                 <p className={`text-xs ${textSecondary}`}>{p.student.code}</p>
                               </td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.enrollment.class.name}</td>
+                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.tarification.year.name}</td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.tarification.typeFrais.nom}</td>
                               <td className="px-4 py-3 text-sm font-bold text-green-500">{formatMontant(p.montant, p.tarification.devise)}</td>
                               <td className={`px-4 py-3 text-sm ${textSecondary}`}>{formatDate(p.datePaiement)}</td>
@@ -1648,6 +1667,7 @@ export default function AdminFeesPage() {
           typesFrais={typesFrais}
           classes={classes}
           years={years}
+          activeYearId={currentYearId}
           existingTarifications={tarifications}
           onClose={() => setShowCreateTarifModal(false)}
           onSuccess={() => {
@@ -2486,6 +2506,7 @@ function TarificationsTab({
   typesFrais,
   classes,
   years,
+  activeYearId,
   textColor,
   textSecondary,
   borderColor,
@@ -2499,6 +2520,7 @@ function TarificationsTab({
   typesFrais: TypeFrais[]
   classes: ClassOption[]
   years: AcademicYearOption[]
+  activeYearId: number | null
   textColor: string
   textSecondary: string
   borderColor: string
@@ -2507,21 +2529,13 @@ function TarificationsTab({
   onCreateTarif: () => void
   onRefresh: () => void
 }) {
-  const currentYear = years.find((y) => y.current)
   const defaultType = typesFrais.find((t) => t.isDefault) ?? typesFrais.find((t) => t.isActive)
-  const [selectedYearId, setSelectedYearId] = useState<number | null>(currentYear?.id || years[0]?.id || null)
   const [selectedTypeId, setSelectedTypeId] = useState<number | "">("")
   const [editingTarif, setEditingTarif] = useState<number | null>(null)
   const [editMontant, setEditMontant] = useState("")
   const [saving, setSaving] = useState(false)
 
-  // Use effect to set default year when data loads
-  useEffect(() => {
-    if (!selectedYearId && years.length > 0) {
-      const current = years.find((y) => y.current)
-      setSelectedYearId(current?.id || years[0]?.id)
-    }
-  }, [years, selectedYearId])
+  const activeYear = years.find((y) => y.id === activeYearId) ?? years.find((y) => y.current)
 
   useEffect(() => {
     if (!selectedTypeId && defaultType) {
@@ -2530,7 +2544,7 @@ function TarificationsTab({
   }, [defaultType, selectedTypeId])
 
   const filteredTarifs = tarifications.filter(
-    (t) => t.yearId === selectedYearId && t.isActive && (selectedTypeId ? t.typeFraisId === Number(selectedTypeId) : true)
+    (t) => t.yearId === activeYearId && t.isActive && (selectedTypeId ? t.typeFraisId === Number(selectedTypeId) : true)
   )
 
   const selectedType = typesFrais.find((t) => t.id === Number(selectedTypeId))
@@ -2592,21 +2606,17 @@ function TarificationsTab({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Calendar className={`w-5 h-5 ${textSecondary}`} />
-          <select
-            value={selectedYearId || ""}
-            onChange={(e) => setSelectedYearId(parseInt(e.target.value))}
-            className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+          {activeYear ? (
+            <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium ${
               theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-gray-100"
-                : "bg-white border-gray-300 text-gray-800"
-            } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
-          >
-            {years.map((y) => (
-              <option key={y.id} value={y.id}>
-                {y.name} {y.current ? "(en cours)" : ""}
-              </option>
-            ))}
-          </select>
+                ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                : "bg-indigo-50 border-indigo-200 text-indigo-700"
+            }`}>
+              {activeYear.name} (en cours)
+            </span>
+          ) : (
+            <span className={`text-sm ${textSecondary}`}>Aucune année active — configurez-la dans Paramètres</span>
+          )}
           <select
             value={selectedTypeId}
             onChange={(e) => setSelectedTypeId(parseInt(e.target.value))}
@@ -2782,6 +2792,7 @@ function CreateTarificationModal({
   typesFrais,
   classes,
   years,
+  activeYearId,
   existingTarifications,
   onClose,
   onSuccess,
@@ -2790,15 +2801,16 @@ function CreateTarificationModal({
   typesFrais: TypeFrais[]
   classes: ClassOption[]
   years: AcademicYearOption[]
+  activeYearId: number | null
   existingTarifications: Tarification[]
   onClose: () => void
   onSuccess: () => void
 }) {
-  const currentYear = years.find((y) => y.current)
+  const activeYear = years.find((y) => y.id === activeYearId)
   const [typeFraisId, setTypeFraisId] = useState<number | "">(
     typesFrais.find((t) => t.isDefault)?.id ?? typesFrais[0]?.id ?? ""
   )
-  const [yearId, setYearId] = useState<number | "">(currentYear?.id || years[0]?.id || "")
+  const yearId = activeYearId ?? ""
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([])
 
   // Classes déjà assignées à ce type de frais + cette année
@@ -2843,11 +2855,6 @@ function CreateTarificationModal({
   // Réinitialiser la sélection si le type ou l'année change
   const handleTypeFraisChange = (val: number | "") => {
     setTypeFraisId(val)
-    setSelectedClassIds([])
-  }
-
-  const handleYearChange = (val: number) => {
-    setYearId(val)
     setSelectedClassIds([])
   }
 
@@ -2954,18 +2961,22 @@ function CreateTarificationModal({
               </select>
             </div>
 
-            {/* Année scolaire */}
+            {/* Année scolaire (depuis Paramètres) */}
             <div>
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Année scolaire</label>
-              <select
-                value={yearId}
-                onChange={(e) => handleYearChange(parseInt(e.target.value))}
-                className={selectClasses}
-              >
-                {years.map((y) => (
-                  <option key={y.id} value={y.id}>{y.name} {y.current ? "(en cours)" : ""}</option>
-                ))}
-              </select>
+              {activeYear ? (
+                <div className={`px-3 py-2.5 rounded-xl border text-sm font-medium ${
+                  theme === "dark"
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                    : "bg-indigo-50 border-indigo-200 text-indigo-700"
+                }`}>
+                  {activeYear.name} (en cours)
+                </div>
+              ) : (
+                <p className={`text-sm ${textSecondary}`}>
+                  Aucune année active. Définissez-la dans Paramètres avant d&apos;ajouter une tarification.
+                </p>
+              )}
             </div>
 
             {/* Montant */}

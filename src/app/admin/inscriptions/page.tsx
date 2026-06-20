@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Layout from "@/components/layout"
-import { StudentsSection } from "../users/page"
+import { StudentsSection } from "../users/students-section"
 
 export default function InscriptionsPage() {
   const router = useRouter()

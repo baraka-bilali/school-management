@@ -262,7 +262,7 @@ async function main() {
       })
 
       const student = await prisma.student.upsert({
-        where: { code },
+        where: { userId: user.id },
         update: {},
         create: {
           userId: user.id,
@@ -307,7 +307,7 @@ async function main() {
       })
 
       const student = await prisma.student.upsert({
-        where: { code },
+        where: { userId: user.id },
         update: {},
         create: {
           userId: user.id,

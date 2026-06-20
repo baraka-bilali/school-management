@@ -224,7 +224,7 @@ export async function PUT(
     })
 
     // Mise à jour de la classe si spécifiée
-    if (data.classId) {
+    if (data.classId && updatedStudent) {
       const currentEnrollment = updatedStudent.enrollments[0]
       let yearId = data.yearId ? Number(data.yearId) : undefined
       if (!yearId) {

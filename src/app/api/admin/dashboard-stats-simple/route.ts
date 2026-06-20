@@ -18,23 +18,31 @@ export async function GET(request: NextRequest) {
 
     await ensureDefaultFeeType(schoolId)
     const defaultFeeTypeId = await getDefaultFeeTypeId(schoolId)
+    const currentYearId = await getSchoolCurrentYearId(schoolId)
 
-    const [studentsCount, teachersCount, classesCount, maleCount, femaleCount, currentYearId] =
-      await Promise.all([
-        prisma.student.count({ where: { user: { schoolId, isActive: true } } }),
-        prisma.teacher.count({ where: { user: { schoolId, isActive: true } } }),
-        prisma.class.count({ where: { schoolId } }),
-        prisma.student.count({ where: { user: { schoolId, isActive: true }, gender: "M" } }),
-        prisma.student.count({ where: { user: { schoolId, isActive: true }, gender: "F" } }),
-        getSchoolCurrentYearId(schoolId),
-      ])
+    const enrollmentWhere = currentYearId
+      ? {
+          yearId: currentYearId,
+          status: "ACTIVE" as const,
+          student: { user: { schoolId, isActive: true } },
+        }
+      : undefined
+
+    const [teachersCount, classesCount, currentYearIdResolved] = await Promise.all([
+      prisma.teacher.count({ where: { user: { schoolId, isActive: true } } }),
+      prisma.class.count({ where: { schoolId } }),
+      Promise.resolve(currentYearId),
+    ])
 
     let currentYearName: string | null = null
     let sectionStats = emptySectionStats()
+    let studentsCount = 0
+    let maleCount = 0
+    let femaleCount = 0
 
-    if (currentYearId) {
+    if (currentYearIdResolved) {
       const year = await prisma.academicYear.findUnique({
-        where: { id: currentYearId },
+        where: { id: currentYearIdResolved },
         select: { id: true, name: true },
       })
       currentYearName = year?.name ?? null
@@ -44,43 +52,69 @@ export async function GET(request: NextRequest) {
           where: {
             yearId: year.id,
             status: "ACTIVE",
-            student: { user: { schoolId } },
+            student: { user: { schoolId, isActive: true } },
           },
-          select: { class: { select: { section: true } } },
+          select: {
+            class: { select: { section: true } },
+            student: { select: { gender: true } },
+          },
         })
+
+        studentsCount = enrollments.length
+        maleCount = enrollments.filter((e) => e.student.gender === "M").length
+        femaleCount = enrollments.filter((e) => e.student.gender === "F").length
+
         for (const enrollment of enrollments) {
           const section = enrollment.class.section
-          if (section in sectionStats) {
+          if (section && section in sectionStats) {
             sectionStats[section]++
-          } else {
+          } else if (section) {
             sectionStats[section] = (sectionStats[section] ?? 0) + 1
           }
         }
       }
+    } else {
+      studentsCount = await prisma.student.count({
+        where: { user: { schoolId, isActive: true } },
+      })
+      maleCount = await prisma.student.count({
+        where: { user: { schoolId, isActive: true }, gender: "M" },
+      })
+      femaleCount = await prisma.student.count({
+        where: { user: { schoolId, isActive: true }, gender: "F" },
+      })
     }
 
-    // Données mensuelles (12 derniers mois)
     const currentDate = new Date()
     const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 11, 1)
 
-    const [allStudents, allTeachers, allPayments] = await Promise.all([
-      prisma.student.findMany({
-        where: { user: { schoolId } },
-        select: { user: { select: { createdAt: true } } },
-      }),
+    const paymentWhere: {
+      schoolId: number
+      datePaiement: { gte: Date }
+      isAnnule: boolean
+      tarification?: { yearId?: number; typeFraisId?: number }
+    } = {
+      schoolId,
+      datePaiement: { gte: startDate },
+      isAnnule: false,
+    }
+
+    if (currentYearIdResolved) {
+      paymentWhere.tarification = {
+        yearId: currentYearIdResolved,
+        ...(defaultFeeTypeId ? { typeFraisId: defaultFeeTypeId } : {}),
+      }
+    } else if (defaultFeeTypeId) {
+      paymentWhere.tarification = { typeFraisId: defaultFeeTypeId }
+    }
+
+    const [allTeachers, allPayments] = await Promise.all([
       prisma.teacher.findMany({
         where: { user: { schoolId } },
         select: { user: { select: { createdAt: true } } },
       }),
       prisma.paiement.findMany({
-        where: {
-          schoolId,
-          datePaiement: { gte: startDate },
-          isAnnule: false,
-          ...(defaultFeeTypeId
-            ? { tarification: { typeFraisId: defaultFeeTypeId } }
-            : {}),
-        },
+        where: paymentWhere,
         select: {
           datePaiement: true,
           montant: true,
@@ -102,26 +136,24 @@ export async function GET(request: NextRequest) {
       const monthName = date.toLocaleDateString("fr-FR", { month: "short" })
       monthLabels.push(monthName.charAt(0).toUpperCase() + monthName.slice(1))
 
-      monthlyStudents.push(
-        allStudents.filter(s => s.user && new Date(s.user.createdAt) <= nextMonth).length
-      )
+      monthlyStudents.push(studentsCount)
       monthlyTeachers.push(
-        allTeachers.filter(t => t.user && new Date(t.user.createdAt) <= nextMonth).length
+        allTeachers.filter((t) => t.user && new Date(t.user.createdAt) <= nextMonth).length
       )
 
-      const monthPayments = allPayments.filter(p => {
+      const monthPayments = allPayments.filter((p) => {
         const d = new Date(p.datePaiement)
         return d >= date && d < nextMonth
       })
 
       monthlyPaymentsUsd.push(
         monthPayments
-          .filter(p => p.tarification.devise !== "CDF")
+          .filter((p) => p.tarification.devise !== "CDF")
           .reduce((sum, p) => sum + Number(p.montant), 0)
       )
       monthlyPaymentsCdf.push(
         monthPayments
-          .filter(p => p.tarification.devise === "CDF")
+          .filter((p) => p.tarification.devise === "CDF")
           .reduce((sum, p) => sum + Number(p.montant), 0)
       )
     }
@@ -138,11 +170,11 @@ export async function GET(request: NextRequest) {
       monthlyPaymentsCdf,
       genderStats: { male: maleCount, female: femaleCount },
       sectionStats,
-      currentYearId,
+      currentYearId: currentYearIdResolved,
       currentYearName,
     })
   } catch (error) {
-    console.error('[ERROR] Dashboard stats:', error)
+    console.error("[ERROR] Dashboard stats:", error)
     return handleApiError(error)
   }
 }

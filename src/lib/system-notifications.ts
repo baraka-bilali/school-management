@@ -47,7 +47,6 @@ export async function showSystemNotification(
       icon: "/icons/icon.svg",
       badge: "/icons/icon.svg",
       tag: "digischool-notification",
-      renotify: true,
       silent: options?.silent ?? false,
       data: { url: payload.url },
     })

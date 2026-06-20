@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback, type ComponentType } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useEffect, useMemo, useState, useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_CONFIGS } from "@/lib/react-query-config"
 import dynamic from "next/dynamic"
 import {
@@ -12,6 +12,7 @@ import {
   PieChart as PieIcon,
   School,
   Users,
+  type LucideIcon,
 } from "lucide-react"
 import {
   Area,
@@ -84,7 +85,7 @@ function StatCard({
   title: string
   value: string | number
   subValue?: string
-  icon: ComponentType<{ className?: string }>
+  icon: LucideIcon
   color: string
   theme: Theme
 }) {
@@ -111,6 +112,7 @@ function StatCard({
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient()
   const [theme, setTheme] = useState<Theme>("light")
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
 
@@ -144,12 +146,14 @@ export default function Dashboard() {
     if (currentTheme) setTheme(currentTheme)
   }, [])
 
-  const handleRateChange = useCallback(() => {
+  const handleSettingsChange = useCallback(() => {
     const nextRate = localStorage.getItem("schoolExchangeRate")
-    if (!nextRate) return
-    const parsedRate = Number(nextRate)
-    if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
-  }, [])
+    if (nextRate) {
+      const parsedRate = Number(nextRate)
+      if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
+    }
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] })
+  }, [queryClient])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as Theme | null
@@ -163,16 +167,15 @@ export default function Dashboard() {
 
     window.addEventListener("storage", handleThemeChange)
     window.addEventListener("themeChange", handleThemeChange)
-    window.addEventListener("schoolSettingsChange", handleRateChange)
+    window.addEventListener("schoolSettingsChange", handleSettingsChange)
     return () => {
       window.removeEventListener("storage", handleThemeChange)
       window.removeEventListener("themeChange", handleThemeChange)
-      window.removeEventListener("schoolSettingsChange", handleRateChange)
+      window.removeEventListener("schoolSettingsChange", handleSettingsChange)
     }
-  }, [handleThemeChange, handleRateChange]) // ✅ Dépendances stables
+  }, [handleThemeChange, handleSettingsChange])
 
-  // ✅ Safe stats fallback
-  const safeStats = stats ?? {
+  const safeStats: DashboardStatsResponse = stats ?? {
     students: 0,
     teachers: 0,
     classes: 0,
@@ -180,9 +183,12 @@ export default function Dashboard() {
     monthLabels: [],
     monthlyStudents: [],
     monthlyTeachers: [],
-    monthlyPayments: [],
+    monthlyPaymentsUsd: [],
+    monthlyPaymentsCdf: [],
     genderStats: { male: 0, female: 0 },
     sectionStats: Object.fromEntries(SECTION_ORDER.map((s) => [s, 0])),
+    currentYearId: null,
+    currentYearName: null,
   }
 
   const palette = {
@@ -326,8 +332,8 @@ export default function Dashboard() {
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
                   <YAxis stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} allowDecimals={false} domain={[1, 100]} />
                   <Tooltip
-                    formatter={(value: number) => [value, "Eleves cumules"]}
-                    labelFormatter={(label: string) => `Mois: ${label}`}
+                    formatter={(value) => [Number(value ?? 0), "Eleves cumules"]}
+                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
                   <Area type="monotone" dataKey="students" stroke={palette.students} fill={palette.students} fillOpacity={0.22} strokeWidth={3} />
@@ -359,8 +365,8 @@ export default function Dashboard() {
                     width={44}
                   />
                   <Tooltip
-                    formatter={(value: number) => [formatUsd(value), "USD"]}
-                    labelFormatter={(label: string) => `Mois: ${label}`}
+                    formatter={(value) => [formatUsd(Number(value ?? 0)), "USD"]}
+                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
                   <Bar dataKey="paymentsUsd" radius={[4, 4, 0, 0]} fill={palette.payment} name="USD" />
@@ -382,8 +388,8 @@ export default function Dashboard() {
                     width={44}
                   />
                   <Tooltip
-                    formatter={(value: number) => [`${new Intl.NumberFormat("fr-FR").format(value)} FC`, "CDF"]}
-                    labelFormatter={(label: string) => `Mois: ${label}`}
+                    formatter={(value) => [`${new Intl.NumberFormat("fr-FR").format(Number(value ?? 0))} FC`, "CDF"]}
+                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
                   <Bar dataKey="paymentsCdf" radius={[4, 4, 0, 0]} fill="#06b6d4" name="CDF" />
@@ -415,8 +421,8 @@ export default function Dashboard() {
                     ticks={[0, 5, 10, 15, 20, 25, 30]}
                   />
                   <Tooltip
-                    formatter={(value: number) => [value, "Enseignants cumules"]}
-                    labelFormatter={(label: string) => `Mois: ${label}`}
+                    formatter={(value) => [Number(value ?? 0), "Enseignants cumules"]}
+                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
                   <Area type="monotone" dataKey="teachers" stroke={palette.teachers} fill={palette.teachers} fillOpacity={0.22} strokeWidth={3} />
@@ -436,7 +442,7 @@ export default function Dashboard() {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip formatter={(value: number) => [value, "Eleves"]} contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }} />
+                  <Tooltip formatter={(value) => [Number(value ?? 0), "Eleves"]} contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }} />
                   <Pie data={genderData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
                     {genderData.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
@@ -490,9 +496,11 @@ export default function Dashboard() {
                         stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
                       />
                       <Tooltip
-                        formatter={(value: number, _name: string, props: { payload?: { name: string } }) => {
-                          const pct = sectionTotal > 0 ? Math.round((value / sectionTotal) * 100) : 0
-                          return [`${value} élève${value > 1 ? "s" : ""} (${pct}%)`, props.payload?.name ?? "Section"]
+                        formatter={(value, _name, item) => {
+                          const num = Number(value ?? 0)
+                          const pct = sectionTotal > 0 ? Math.round((num / sectionTotal) * 100) : 0
+                          const sectionName = (item?.payload as { name?: string } | undefined)?.name ?? "Section"
+                          return [`${num} élève${num > 1 ? "s" : ""} (${pct}%)`, sectionName]
                         }}
                         contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                       />

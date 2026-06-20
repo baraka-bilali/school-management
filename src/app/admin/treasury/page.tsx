@@ -56,6 +56,8 @@ interface TeacherOption {
 }
 
 interface TreasuryData {
+  activeYearId?: number | null
+  activeYearName?: string | null
   totalIncomeUsd: number
   totalIncomeCdf: number
   scolaireIncomeUsd: number
@@ -69,6 +71,21 @@ interface TreasuryData {
     usd: number
     cdf: number
   }>
+  allYears?: {
+    totalIncomeUsd: number
+    totalIncomeCdf: number
+    scolaireIncomeUsd: number
+    scolaireIncomeCdf: number
+    otherIncomeUsd: number
+    otherIncomeCdf: number
+    incomeByType: Array<{
+      typeFraisId: number
+      typeFrais: string
+      isDefault: boolean
+      usd: number
+      cdf: number
+    }>
+  }
   totalTeacherPayments: number
   totalExpensesUsd: number
   totalExpensesCdf: number
@@ -218,6 +235,15 @@ export default function AdminTreasuryPage() {
 
   useEffect(() => {
     fetchTreasury()
+  }, [fetchTreasury])
+
+  // Recharger quand l'année scolaire change dans Paramètres
+  useEffect(() => {
+    const handleYearChange = () => {
+      void fetchTreasury()
+    }
+    window.addEventListener("schoolSettingsChange", handleYearChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleYearChange)
   }, [fetchTreasury])
 
   const handleSubmitTeacherPayment = async () => {
@@ -386,6 +412,11 @@ export default function AdminTreasuryPage() {
               Trésorerie
             </h1>
             <p className={`${textSecondary} mt-1`}>Gestion des salaires, dépenses et budget de l&apos;école</p>
+            {treasury?.activeYearName && (
+              <span className={`inline-flex items-center mt-2 rounded-full px-3 py-1 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
+                Recettes frais élèves : année {treasury.activeYearName}
+              </span>
+            )}
           </div>
         </div>
 
@@ -406,6 +437,11 @@ export default function AdminTreasuryPage() {
                     </div>
                     <div>
                       <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Recettes (frais élèves)</p>
+                      {treasury.activeYearName && (
+                        <p className={`text-[10px] ${textSecondary} mt-0.5 uppercase tracking-wide`}>
+                          Année en cours : {treasury.activeYearName}
+                        </p>
+                      )}
                       {treasury.scolaireIncomeUsd > 0 && (
                         <p className={`text-sm font-semibold text-green-600`}>
                           Scolaire : {new Intl.NumberFormat("fr-FR").format(treasury.scolaireIncomeUsd)} $
@@ -431,6 +467,26 @@ export default function AdminTreasuryPage() {
                       )}
                       {treasury.totalIncomeUsd === 0 && treasury.totalIncomeCdf === 0 && (
                         <p className={`text-xl font-bold text-green-600`}>0 $</p>
+                      )}
+                      {treasury.allYears && (
+                        <div className={`mt-2 pt-2 border-t ${borderColor}`}>
+                          <p className={`text-[10px] ${textSecondary} uppercase tracking-wide font-semibold`}>Toutes les années</p>
+                          {(treasury.allYears.scolaireIncomeUsd > 0 || treasury.allYears.otherIncomeUsd > 0) && (
+                            <p className={`text-xs font-medium text-green-600/80`}>
+                              {treasury.allYears.scolaireIncomeUsd > 0 && `Scolaire : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.scolaireIncomeUsd)} $`}
+                              {treasury.allYears.otherIncomeUsd > 0 && ` · Autres : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.otherIncomeUsd)} $`}
+                            </p>
+                          )}
+                          {(treasury.allYears.scolaireIncomeCdf > 0 || treasury.allYears.otherIncomeCdf > 0) && (
+                            <p className={`text-xs font-medium text-green-500/80`}>
+                              {treasury.allYears.scolaireIncomeCdf > 0 && `Scolaire : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.scolaireIncomeCdf)} FC`}
+                              {treasury.allYears.otherIncomeCdf > 0 && ` · Autres : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.otherIncomeCdf)} FC`}
+                            </p>
+                          )}
+                          {treasury.allYears.totalIncomeUsd === 0 && treasury.allYears.totalIncomeCdf === 0 && (
+                            <p className={`text-xs ${textSecondary}`}>Aucune recette enregistrée</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
