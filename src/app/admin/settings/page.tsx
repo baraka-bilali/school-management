@@ -12,7 +12,10 @@ import {
   Loader2,
   CheckCircle,
   Star,
+  Building2,
 } from "lucide-react"
+import BrandingUploadCard from "@/components/branding-upload-card"
+import { resizeLogoFile, resizeProfilePhotoFile, resizeSealFile } from "@/lib/image-utils"
 
 interface AcademicYear {
   id: number
@@ -31,6 +34,13 @@ interface SchoolSettings {
   currentYearId: number | null
 }
 
+interface SchoolBranding {
+  nomEtablissement: string
+  logoUrl: string | null
+  sealUrl: string | null
+  profilePhotoUrl: string | null
+}
+
 export default function SettingsPage() {
   // ---- Settings state ----
   const [settings, setSettings] = useState<SchoolSettings>({
@@ -46,6 +56,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loadingSettings, setLoadingSettings] = useState(true)
+
+  // ---- Branding ----
+  const [branding, setBranding] = useState<SchoolBranding>({
+    nomEtablissement: "",
+    logoUrl: null,
+    sealUrl: null,
+    profilePhotoUrl: null,
+  })
+  const [loadingBranding, setLoadingBranding] = useState(true)
+  const [uploadingField, setUploadingField] = useState<"logo" | "seal" | "profile" | null>(null)
+  const [brandingSaved, setBrandingSaved] = useState(false)
 
   // ---- Academic years state ----
   const [years, setYears] = useState<AcademicYear[]>([])
@@ -95,6 +116,87 @@ export default function SettingsPage() {
     }
   }, [])
 
+  const loadBranding = useCallback(async () => {
+    setLoadingBranding(true)
+    try {
+      const res = await fetch("/api/admin/school", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        const s = data.school
+        setBranding({
+          nomEtablissement: s.nomEtablissement || "",
+          logoUrl: s.logoUrl || null,
+          sealUrl: s.sealUrl || null,
+          profilePhotoUrl: s.profilePhotoUrl || null,
+        })
+        if (s.profilePhotoUrl) {
+          localStorage.setItem("schoolProfilePhoto", s.profilePhotoUrl)
+        } else {
+          localStorage.removeItem("schoolProfilePhoto")
+        }
+        window.dispatchEvent(new Event("schoolBrandingChange"))
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingBranding(false)
+    }
+  }, [])
+
+  const saveBrandingField = async (field: "logoUrl" | "sealUrl" | "profilePhotoUrl", value: string | null) => {
+    const res = await fetch("/api/admin/school", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ [field]: value }),
+    })
+    if (!res.ok) throw new Error("Erreur enregistrement")
+    const data = await res.json()
+    setBranding({
+      nomEtablissement: data.school.nomEtablissement,
+      logoUrl: data.school.logoUrl,
+      sealUrl: data.school.sealUrl,
+      profilePhotoUrl: data.school.profilePhotoUrl,
+    })
+    if (data.school.profilePhotoUrl) {
+      localStorage.setItem("schoolProfilePhoto", data.school.profilePhotoUrl)
+    } else {
+      localStorage.removeItem("schoolProfilePhoto")
+    }
+    window.dispatchEvent(new Event("schoolBrandingChange"))
+    setBrandingSaved(true)
+    setTimeout(() => setBrandingSaved(false), 2500)
+  }
+
+  const handleBrandingUpload = async (
+    field: "logoUrl" | "sealUrl" | "profilePhotoUrl",
+    uploadKey: "logo" | "seal" | "profile",
+    file: File,
+    resizeFn: (f: File) => Promise<string>
+  ) => {
+    setUploadingField(uploadKey)
+    try {
+      const dataUrl = await resizeFn(file)
+      await saveBrandingField(field, dataUrl)
+    } catch (e) {
+      console.error(e)
+      alert("Impossible d'importer cette image.")
+    } finally {
+      setUploadingField(null)
+    }
+  }
+
+  const handleBrandingRemove = async (field: "logoUrl" | "sealUrl" | "profilePhotoUrl", uploadKey: "logo" | "seal" | "profile") => {
+    setUploadingField(uploadKey)
+    try {
+      await saveBrandingField(field, null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUploadingField(null)
+    }
+  }
+
   // ---- Load academic years ----
   const loadYears = useCallback(async () => {
     setLoadingYears(true)
@@ -114,7 +216,8 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings()
     loadYears()
-  }, [loadSettings, loadYears])
+    loadBranding()
+  }, [loadSettings, loadYears, loadBranding])
 
   // ---- Save settings ----
   const handleSave = async () => {
@@ -307,6 +410,72 @@ export default function SettingsPage() {
                     Paramètres enregistrés
                   </span>
                 )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ===== IDENTITÉ VISUELLE ===== */}
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <Building2 className="w-5 h-5 text-indigo-500" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Identité visuelle de l&apos;établissement</h2>
+          </div>
+          <p className={`text-sm ${textSecondary} mb-4`}>
+            Logo, sceau et photo de profil utilisés dans l&apos;application et sur les reçus de paiement.
+          </p>
+
+          {loadingBranding ? (
+            <div className="flex items-center gap-2 py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+              <span className={`text-sm ${textSecondary}`}>Chargement...</span>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <BrandingUploadCard
+                  theme={theme}
+                  title="Logo de l'école"
+                  description="Affiché en en-tête des reçus PDF."
+                  previewUrl={branding.logoUrl}
+                  uploading={uploadingField === "logo"}
+                  onUpload={(file) => handleBrandingUpload("logoUrl", "logo", file, resizeLogoFile)}
+                  onRemove={() => handleBrandingRemove("logoUrl", "logo")}
+                  aspect="square"
+                />
+                <BrandingUploadCard
+                  theme={theme}
+                  title="Sceau / cachet"
+                  description="Tampon officiel en bas du reçu."
+                  previewUrl={branding.sealUrl}
+                  uploading={uploadingField === "seal"}
+                  onUpload={(file) => handleBrandingUpload("sealUrl", "seal", file, resizeSealFile)}
+                  onRemove={() => handleBrandingRemove("sealUrl", "seal")}
+                  aspect="square"
+                />
+                <BrandingUploadCard
+                  theme={theme}
+                  title="Photo de profil"
+                  description="Avatar de l'établissement dans l'en-tête admin."
+                  previewUrl={branding.profilePhotoUrl}
+                  uploading={uploadingField === "profile"}
+                  onUpload={(file) => handleBrandingUpload("profilePhotoUrl", "profile", file, resizeProfilePhotoFile)}
+                  onRemove={() => handleBrandingRemove("profilePhotoUrl", "profile")}
+                  aspect="square"
+                />
+              </div>
+
+              {brandingSaved && (
+                <p className="mt-4 text-sm text-green-600 dark:text-green-400 inline-flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Identité visuelle enregistrée
+                </p>
+              )}
+
+              <div className="mt-4 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 p-3">
+                <p className={`text-xs ${textSecondary}`}>
+                  Formats acceptés : PNG, JPG, WebP. Les images sont redimensionnées automatiquement. Le logo et le sceau apparaîtront sur les prochains reçus générés.
+                </p>
               </div>
             </>
           )}

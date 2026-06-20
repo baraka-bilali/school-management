@@ -32,6 +32,7 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [schoolName, setSchoolName] = useState("")
+  const [schoolPhoto, setSchoolPhoto] = useState<string | null>(null)
   const [userRole, setUserRole] = useState("")
 
   useEffect(() => {
@@ -72,6 +73,8 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
         
         // Vérifier si le nom de l'école est déjà en cache
         const cachedSchoolName = localStorage.getItem("schoolName")
+        const cachedSchoolPhoto = localStorage.getItem("schoolProfilePhoto")
+        if (cachedSchoolPhoto) setSchoolPhoto(cachedSchoolPhoto)
         // Ignorer le cache s'il contient la valeur par défaut "Établissement"
         if (cachedSchoolName && cachedSchoolName !== "Établissement") {
           console.log("📦 Nom de l'école récupéré du cache:", cachedSchoolName)
@@ -83,6 +86,8 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       } catch (error) {
         console.error("Erreur lors du décodage du token:", error)
         const cachedSchoolName = localStorage.getItem("schoolName")
+        const cachedSchoolPhoto = localStorage.getItem("schoolProfilePhoto")
+        if (cachedSchoolPhoto) setSchoolPhoto(cachedSchoolPhoto)
         if (cachedSchoolName && cachedSchoolName !== "Établissement") {
           setSchoolName(cachedSchoolName)
         } else {
@@ -105,6 +110,13 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       setTheme(savedTheme)
       document.documentElement.classList.toggle("dark", savedTheme === "dark")
     }
+
+    const onBrandingChange = () => {
+      const photo = localStorage.getItem("schoolProfilePhoto")
+      setSchoolPhoto(photo)
+    }
+    window.addEventListener("schoolBrandingChange", onBrandingChange)
+    return () => window.removeEventListener("schoolBrandingChange", onBrandingChange)
   }, [])
 
   const fetchSchoolName = async () => {
@@ -120,6 +132,14 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
         const data = await res.json()
         console.log("Données école:", data)
         const nom = data.school?.nomEtablissement || data.nom
+        const photo = data.school?.profilePhotoUrl || data.school?.logoUrl || null
+        if (photo) {
+          setSchoolPhoto(photo)
+          localStorage.setItem("schoolProfilePhoto", photo)
+        } else {
+          setSchoolPhoto(null)
+          localStorage.removeItem("schoolProfilePhoto")
+        }
         if (nom && nom.trim() !== "") {
           setSchoolName(nom)
           // Sauvegarder en localStorage pour les prochaines navigations
@@ -157,7 +177,8 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
       setLoggingOut(true)
       await fetch("/api/auth/logout", { method: "POST" })
       localStorage.removeItem("token")
-      localStorage.removeItem("schoolName") // Nettoyer le cache du nom de l'école
+      localStorage.removeItem("schoolName")
+      localStorage.removeItem("schoolProfilePhoto")
       console.log("🗑️ Cache du nom de l'école nettoyé")
       // Attendre un peu pour montrer l'animation
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -187,8 +208,13 @@ export default function Header({ onSidebarToggle, role, onNotificationClick }: H
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                <School className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center overflow-hidden">
+                {schoolPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={schoolPhoto} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <School className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                )}
               </div>
               <h1 className={`text-xl font-semibold ${textColor}`}>
                 {schoolName || "Chargement..."}

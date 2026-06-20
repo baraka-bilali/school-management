@@ -126,6 +126,8 @@ CREATE TABLE "School" (
     "anneeCreation" INTEGER,
     "slogan" TEXT,
     "logoUrl" TEXT,
+    "sealUrl" TEXT,
+    "profilePhotoUrl" TEXT,
     "statutJuridique" TEXT,
     "rccm" TEXT,
     "idNat" TEXT,

@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
             school: {
               select: {
                 nomEtablissement: true,
+                profilePhotoUrl: true,
+                logoUrl: true,
                 dateFinAbonnement: true,
                 planAbonnement: true,
                 etatCompte: true,
@@ -123,6 +125,7 @@ export async function GET(request: NextRequest) {
         email: student.user.email,
         temporaryPassword: student.user.temporaryPassword,
         school: school?.nomEtablissement,
+        schoolPhotoUrl: school?.profilePhotoUrl || school?.logoUrl || null,
         isPremium,
         class: currentEnrollment?.class?.name,
         year: currentEnrollment?.year?.name

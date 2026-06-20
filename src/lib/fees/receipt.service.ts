@@ -125,7 +125,16 @@ export async function getReceiptData(paiementId: number) {
 
   const school = await prisma.school.findUnique({
     where: { id: paiement.schoolId },
-    select: { nomEtablissement: true },
+    select: {
+      nomEtablissement: true,
+      adresse: true,
+      ville: true,
+      telephone: true,
+      email: true,
+      logoUrl: true,
+      sealUrl: true,
+      profilePhotoUrl: true,
+    },
   })
 
   return {
@@ -145,5 +154,10 @@ export async function getReceiptData(paiementId: number) {
     notes: paiement.notes,
     isAnnule: paiement.isAnnule,
     schoolName: school?.nomEtablissement ?? "",
+    schoolAddress: [school?.adresse, school?.ville].filter(Boolean).join(", ") || null,
+    schoolPhone: school?.telephone ?? null,
+    schoolEmail: school?.email ?? null,
+    logoUrl: school?.logoUrl ?? null,
+    sealUrl: school?.sealUrl ?? null,
   }
 }

@@ -1,4 +1,4 @@
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer"
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer"
 
 export interface ReceiptData {
   numeroRecu: string
@@ -13,6 +13,11 @@ export interface ReceiptData {
   anneeScolaire: string
   notes: string | null
   schoolName: string
+  schoolAddress?: string | null
+  schoolPhone?: string | null
+  schoolEmail?: string | null
+  logoUrl?: string | null
+  sealUrl?: string | null
 }
 
 const modePaiementLabel: Record<string, string> = {
@@ -29,8 +34,10 @@ const fmt = (d: string) =>
 const s = StyleSheet.create({
   page:         { padding: 44, fontFamily: "Helvetica", fontSize: 10, color: "#1f2937", backgroundColor: "#ffffff" },
   header:       { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, paddingBottom: 20, borderBottomWidth: 2, borderBottomColor: "#16a34a", borderBottomStyle: "solid" },
-  title:        { fontSize: 26, fontFamily: "Helvetica-Bold", color: "#111827", letterSpacing: 2 },
-  recuNum:      { fontSize: 12, color: "#16a34a", fontFamily: "Helvetica-Bold", marginTop: 5 },
+  headerLeft:   { flexDirection: "row", alignItems: "center", gap: 12, maxWidth: "55%" },
+  logo:         { width: 56, height: 56, objectFit: "contain" },
+  title:        { fontSize: 22, fontFamily: "Helvetica-Bold", color: "#111827", letterSpacing: 1.5 },
+  recuNum:      { fontSize: 11, color: "#16a34a", fontFamily: "Helvetica-Bold", marginTop: 4 },
   labelSmall:   { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 },
   bold:         { fontFamily: "Helvetica-Bold", color: "#111827" },
   normal:       { color: "#4b5563", marginTop: 2 },
@@ -53,7 +60,9 @@ const s = StyleSheet.create({
   notesBox:     { backgroundColor: "#fefce8", borderWidth: 1, borderColor: "#fde68a", borderStyle: "solid", borderRadius: 6, padding: 10, marginBottom: 16 },
   notesLabel:   { fontSize: 8, fontFamily: "Helvetica-Bold", color: "#92400e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 3 },
   notesText:    { fontSize: 9, color: "#78350f" },
-  divider:      { borderBottomWidth: 1, borderBottomColor: "#e5e7eb", borderBottomStyle: "solid", marginBottom: 12 },
+  sealRow:      { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginBottom: 12, minHeight: 72 },
+  seal:         { width: 72, height: 72, objectFit: "contain" },
+  sealCaption:  { fontSize: 8, color: "#6b7280", textAlign: "center", marginTop: 4 },
   footer:       { marginTop: "auto", paddingTop: 14, borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid", textAlign: "center", color: "#9ca3af", fontSize: 9 },
 })
 
@@ -67,10 +76,13 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
 
         {/* Header */}
         <View style={s.header}>
-          <View>
-            <Text style={s.title}>REÇU DE PAIEMENT</Text>
-            <Text style={s.recuNum}>{data.numeroRecu}</Text>
-            <View style={s.badge}><Text style={s.badgeText}>PAYÉ</Text></View>
+          <View style={s.headerLeft}>
+            {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : null}
+            <View>
+              <Text style={s.title}>REÇU DE PAIEMENT</Text>
+              <Text style={s.recuNum}>{data.numeroRecu}</Text>
+              <View style={s.badge}><Text style={s.badgeText}>PAYÉ</Text></View>
+            </View>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={s.labelSmall}>Date d&apos;émission</Text>
@@ -85,6 +97,9 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
           <View style={s.partyBlock}>
             <Text style={s.labelSmall}>Établissement</Text>
             <Text style={[s.bold, { fontSize: 11 }]}>{data.schoolName}</Text>
+            {data.schoolAddress ? <Text style={s.normal}>{data.schoolAddress}</Text> : null}
+            {data.schoolPhone ? <Text style={s.normal}>Tél. {data.schoolPhone}</Text> : null}
+            {data.schoolEmail ? <Text style={s.normal}>{data.schoolEmail}</Text> : null}
           </View>
           <View style={s.partyBlock}>
             <Text style={s.labelSmall}>Élève</Text>
@@ -136,6 +151,16 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
           <View style={s.notesBox}>
             <Text style={s.notesLabel}>Notes</Text>
             <Text style={s.notesText}>{data.notes}</Text>
+          </View>
+        )}
+
+        {/* Sceau officiel */}
+        {data.sealUrl && (
+          <View style={s.sealRow}>
+            <View style={{ alignItems: "center" }}>
+              <Image src={data.sealUrl} style={s.seal} />
+              <Text style={s.sealCaption}>Cachet de l&apos;établissement</Text>
+            </View>
           </View>
         )}
 

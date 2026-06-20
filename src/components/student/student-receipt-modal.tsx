@@ -134,6 +134,18 @@ export default function StudentReceiptModal({ paiementId, onClose }: StudentRece
 
             {receiptData && !loading && (
               <div className="space-y-4">
+                {(receiptData.logoUrl || receiptData.sealUrl) && (
+                  <div className="flex items-center justify-between gap-3">
+                    {receiptData.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={receiptData.logoUrl} alt="Logo" className="h-12 max-w-[120px] object-contain" />
+                    ) : <span />}
+                    {receiptData.sealUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={receiptData.sealUrl} alt="Sceau" className="h-14 w-14 object-contain opacity-90" />
+                    ) : null}
+                  </div>
+                )}
                 <div className={cn("flex items-center justify-between border-b pb-3 text-sm", border)}>
                   <span className={sub}>Date d&apos;émission</span>
                   <span className={cn("font-semibold", text)}>{fmt(receiptData.datePaiement)}</span>

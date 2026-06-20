@@ -163,7 +163,9 @@ model School {
   codeEtablissement           String?           @unique
   anneeCreation               Int?
   slogan                      String?
-  logoUrl                     String?
+  logoUrl                     String?           @db.Text
+  sealUrl                     String?           @db.Text
+  profilePhotoUrl             String?           @db.Text
   statutJuridique             String?
   rccm                        String?
   idNat                       String?
