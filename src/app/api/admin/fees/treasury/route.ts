@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { ensureDefaultFeeType, getDefaultFeeTypeId, isDefaultFeeType } from "@/lib/fees/default-fee-type"
-import { getSchoolCurrentYearName } from "@/lib/fees/school-year"
 
 type IncomeSummary = {
   totalIncomeUsd: number
@@ -23,16 +22,21 @@ type IncomeSummary = {
 async function computeStudentIncome(
   schoolId: number,
   defaultFeeTypeId: number | null,
-  yearId?: number
+  yearId: number,
+  dateFrom?: Date,
+  dateTo?: Date
 ): Promise<IncomeSummary> {
+  const dateFilter =
+    dateFrom && dateTo ? { datePaiement: { gte: dateFrom, lte: dateTo } } : {}
+
   const baseWhere = {
     schoolId,
     isAnnule: false,
-    ...(yearId ? { tarification: { yearId } } : {}),
+    tarification: { yearId },
+    ...dateFilter,
   }
 
-  const tarifFilter = (extra: Record<string, unknown> = {}) =>
-    yearId ? { yearId, ...extra } : extra
+  const tarifFilter = (extra: Record<string, unknown> = {}) => ({ yearId, ...extra })
 
   const [
     incomeAggUsd,
@@ -118,7 +122,7 @@ async function computeStudentIncome(
   }
 }
 
-// GET /api/admin/fees/treasury — Vue d'ensemble trésorerie
+// GET /api/admin/fees/treasury — Vue d'ensemble trésorerie (année scolaire + période)
 export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
@@ -128,33 +132,81 @@ export async function GET(req: NextRequest) {
     const defaultFeeTypeId = await getDefaultFeeTypeId(user.schoolId)
 
     const { searchParams } = new URL(req.url)
-    const yearId = searchParams.get("yearId")
+    const yearIdParam = searchParams.get("yearId")
+    const dateFromParam = searchParams.get("dateFrom")
+    const dateToParam = searchParams.get("dateTo")
+    const monthsParam = searchParams.get("months")
 
-    // Année scolaire
-    let activeYearId: number | undefined
-    if (yearId) {
-      activeYearId = parseInt(yearId)
+    let selectedYearId: number | undefined
+    if (yearIdParam) {
+      selectedYearId = parseInt(yearIdParam)
     } else {
-      activeYearId = (await getSchoolCurrentYearId(user.schoolId)) ?? undefined
+      selectedYearId = (await getSchoolCurrentYearId(user.schoolId)) ?? undefined
     }
 
-    if (!activeYearId) {
+    const dateFrom = dateFromParam ? new Date(dateFromParam) : undefined
+    const dateTo = dateToParam ? new Date(dateToParam) : undefined
+    const monthValues = monthsParam
+      ? monthsParam.split(",").map((m) => m.trim()).filter(Boolean)
+      : []
+
+    const selectedYear = selectedYearId
+      ? await prisma.academicYear.findUnique({
+          where: { id: selectedYearId },
+          select: { id: true, name: true },
+        })
+      : null
+
+    const teacherPaymentWhere: {
+      schoolId: number
+      mois?: { in: string[] }
+      datePaiement?: { gte: Date; lte: Date }
+    } = { schoolId: user.schoolId }
+
+    if (monthValues.length > 0) {
+      teacherPaymentWhere.mois = { in: monthValues }
+    }
+    if (dateFrom && dateTo) {
+      teacherPaymentWhere.datePaiement = { gte: dateFrom, lte: dateTo }
+    }
+
+    const expenseWhere: {
+      schoolId: number
+      dateDepense?: { gte: Date; lte: Date }
+    } = { schoolId: user.schoolId }
+
+    if (dateFrom && dateTo) {
+      expenseWhere.dateDepense = { gte: dateFrom, lte: dateTo }
+    } else if (monthValues.length > 0) {
+      // Filtrer dépenses par mois calendaire de la période
+      expenseWhere.dateDepense = {
+        gte: new Date(`${monthValues[0]}-01`),
+        lte: new Date(
+          new Date(`${monthValues[monthValues.length - 1]}-01`).getFullYear(),
+          new Date(`${monthValues[monthValues.length - 1]}-01`).getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        ),
+      }
+    }
+
+    if (!selectedYearId) {
       const [teacherPaymentsAgg, expensesAggUsd, expensesAggCdf, teacherPayments, expenses, teachers] =
         await Promise.all([
-          prisma.teacherPayment.aggregate({
-            where: { schoolId: user.schoolId },
+          prisma.teacherPayment.aggregate({ where: teacherPaymentWhere, _sum: { montant: true } }),
+          prisma.schoolExpense.aggregate({
+            where: { ...expenseWhere, devise: "USD" },
             _sum: { montant: true },
           }),
           prisma.schoolExpense.aggregate({
-            where: { schoolId: user.schoolId, devise: "USD" },
-            _sum: { montant: true },
-          }),
-          prisma.schoolExpense.aggregate({
-            where: { schoolId: user.schoolId, devise: "CDF" },
+            where: { ...expenseWhere, devise: "CDF" },
             _sum: { montant: true },
           }),
           prisma.teacherPayment.findMany({
-            where: { schoolId: user.schoolId },
+            where: teacherPaymentWhere,
             include: {
               teacher: {
                 select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
@@ -164,7 +216,7 @@ export async function GET(req: NextRequest) {
             take: 50,
           }),
           prisma.schoolExpense.findMany({
-            where: { schoolId: user.schoolId },
+            where: expenseWhere,
             orderBy: { dateDepense: "desc" },
             take: 50,
           }),
@@ -181,6 +233,8 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({
         data: {
+          selectedYearId: null,
+          selectedYearName: null,
           totalIncomeUsd: 0,
           totalIncomeCdf: 0,
           scolaireIncomeUsd: 0,
@@ -193,56 +247,51 @@ export async function GET(req: NextRequest) {
           totalExpensesCdf,
           balanceUsd: -totalTeacherPayments - totalExpensesUsd,
           balanceCdf: -totalExpensesCdf,
-          teacherPayments: teacherPayments.map((tp) => ({
-            id: tp.id,
-            teacherId: tp.teacherId,
-            teacherName: `${tp.teacher.lastName} ${tp.teacher.middleName} ${tp.teacher.firstName}`,
-            specialty: tp.teacher.specialty,
-            montant: tp.montant,
-            type: tp.type,
-            mois: tp.mois,
-            description: tp.description,
-            modePaiement: tp.modePaiement,
-            reference: tp.reference,
-            datePaiement: tp.datePaiement,
-          })),
-          expenses: expenses.map((e) => ({
-            id: e.id,
-            categorie: e.categorie,
-            motif: e.motif,
-            montant: e.montant,
-            devise: e.devise,
-            beneficiaire: e.beneficiaire,
-            modePaiement: e.modePaiement,
-            reference: e.reference,
-            dateDepense: e.dateDepense,
-          })),
-          teachers: teachers.map((t) => ({
-            id: t.id,
-            name: `${t.lastName} ${t.middleName} ${t.firstName}`,
-            specialty: t.specialty,
-          })),
+          teacherPayments: teacherPayments.map(mapTeacherPayment),
+          expenses: expenses.map(mapExpense),
+          teachers: teachers.map(mapTeacher),
         },
       })
     }
 
-    // Revenus élèves : année en cours + cumul toutes années
-    const [currentYearIncome, allYearsIncome, activeYearName, teacherPaymentsAgg, expensesAggUsd, expensesAggCdf] =
+    const yearIncome = await computeStudentIncome(
+      user.schoolId,
+      defaultFeeTypeId,
+      selectedYearId,
+      dateFrom,
+      dateTo
+    )
+
+    const [teacherPaymentsAgg, expensesAggUsd, expensesAggCdf, teacherPayments, expenses, teachers] =
       await Promise.all([
-        computeStudentIncome(user.schoolId, defaultFeeTypeId, activeYearId),
-        computeStudentIncome(user.schoolId, defaultFeeTypeId),
-        getSchoolCurrentYearName(user.schoolId),
-        prisma.teacherPayment.aggregate({
-          where: { schoolId: user.schoolId },
+        prisma.teacherPayment.aggregate({ where: teacherPaymentWhere, _sum: { montant: true } }),
+        prisma.schoolExpense.aggregate({
+          where: { ...expenseWhere, devise: "USD" },
           _sum: { montant: true },
         }),
         prisma.schoolExpense.aggregate({
-          where: { schoolId: user.schoolId, devise: "USD" },
+          where: { ...expenseWhere, devise: "CDF" },
           _sum: { montant: true },
         }),
-        prisma.schoolExpense.aggregate({
-          where: { schoolId: user.schoolId, devise: "CDF" },
-          _sum: { montant: true },
+        prisma.teacherPayment.findMany({
+          where: teacherPaymentWhere,
+          include: {
+            teacher: {
+              select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
+            },
+          },
+          orderBy: { datePaiement: "desc" },
+          take: 50,
+        }),
+        prisma.schoolExpense.findMany({
+          where: expenseWhere,
+          orderBy: { dateDepense: "desc" },
+          take: 50,
+        }),
+        prisma.teacher.findMany({
+          where: { user: { schoolId: user.schoolId } },
+          select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
+          orderBy: { lastName: "asc" },
         }),
       ])
 
@@ -254,43 +303,16 @@ export async function GET(req: NextRequest) {
       otherIncomeUsd,
       otherIncomeCdf,
       incomeByType,
-    } = currentYearIncome
+    } = yearIncome
 
     const totalTeacherPayments = teacherPaymentsAgg._sum.montant ?? 0
     const totalExpensesUsd = expensesAggUsd._sum.montant ?? 0
     const totalExpensesCdf = expensesAggCdf._sum.montant ?? 0
 
-    const balanceUsd = totalIncomeUsd - totalTeacherPayments - totalExpensesUsd
-    const balanceCdf = totalIncomeCdf - totalExpensesCdf
-
-    // Derniers paiements profs + dépenses + liste profs en parallèle
-    const [teacherPayments, expenses, teachers] = await Promise.all([
-      prisma.teacherPayment.findMany({
-        where: { schoolId: user.schoolId },
-        include: {
-          teacher: {
-            select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
-          },
-        },
-        orderBy: { datePaiement: "desc" },
-        take: 50,
-      }),
-      prisma.schoolExpense.findMany({
-        where: { schoolId: user.schoolId },
-        orderBy: { dateDepense: "desc" },
-        take: 50,
-      }),
-      prisma.teacher.findMany({
-        where: { user: { schoolId: user.schoolId } },
-        select: { id: true, lastName: true, middleName: true, firstName: true, specialty: true },
-        orderBy: { lastName: "asc" },
-      }),
-    ])
-
     return NextResponse.json({
       data: {
-        activeYearId,
-        activeYearName,
+        selectedYearId,
+        selectedYearName: selectedYear?.name ?? null,
         totalIncomeUsd,
         totalIncomeCdf,
         scolaireIncomeUsd,
@@ -298,52 +320,82 @@ export async function GET(req: NextRequest) {
         otherIncomeUsd,
         otherIncomeCdf,
         incomeByType,
-        allYears: {
-          totalIncomeUsd: allYearsIncome.totalIncomeUsd,
-          totalIncomeCdf: allYearsIncome.totalIncomeCdf,
-          scolaireIncomeUsd: allYearsIncome.scolaireIncomeUsd,
-          scolaireIncomeCdf: allYearsIncome.scolaireIncomeCdf,
-          otherIncomeUsd: allYearsIncome.otherIncomeUsd,
-          otherIncomeCdf: allYearsIncome.otherIncomeCdf,
-          incomeByType: allYearsIncome.incomeByType,
-        },
         totalTeacherPayments,
         totalExpensesUsd,
         totalExpensesCdf,
-        balanceUsd,
-        balanceCdf,
-        teacherPayments: teacherPayments.map((tp) => ({
-          id: tp.id,
-          teacherId: tp.teacherId,
-          teacherName: `${tp.teacher.lastName} ${tp.teacher.middleName} ${tp.teacher.firstName}`,
-          specialty: tp.teacher.specialty,
-          montant: tp.montant,
-          type: tp.type,
-          mois: tp.mois,
-          description: tp.description,
-          modePaiement: tp.modePaiement,
-          reference: tp.reference,
-          datePaiement: tp.datePaiement,
-        })),
-        expenses: expenses.map((e) => ({
-          id: e.id,
-          categorie: e.categorie,
-          motif: e.motif,
-          montant: e.montant,
-          devise: e.devise,
-          beneficiaire: e.beneficiaire,
-          modePaiement: e.modePaiement,
-          reference: e.reference,
-          dateDepense: e.dateDepense,
-        })),
-        teachers: teachers.map((t) => ({
-          id: t.id,
-          name: `${t.lastName} ${t.middleName} ${t.firstName}`,
-          specialty: t.specialty,
-        })),
+        balanceUsd: totalIncomeUsd - totalTeacherPayments - totalExpensesUsd,
+        balanceCdf: totalIncomeCdf - totalExpensesCdf,
+        teacherPayments: teacherPayments.map(mapTeacherPayment),
+        expenses: expenses.map(mapExpense),
+        teachers: teachers.map(mapTeacher),
       },
     })
   } catch (error) {
     return handleApiError(error)
+  }
+}
+
+function mapTeacherPayment(tp: {
+  id: number
+  teacherId: number
+  montant: number
+  type: string
+  mois: string
+  description: string | null
+  modePaiement: string
+  reference: string | null
+  datePaiement: Date
+  teacher: { lastName: string; middleName: string; firstName: string; specialty: string | null }
+}) {
+  return {
+    id: tp.id,
+    teacherId: tp.teacherId,
+    teacherName: `${tp.teacher.lastName} ${tp.teacher.middleName} ${tp.teacher.firstName}`,
+    specialty: tp.teacher.specialty,
+    montant: tp.montant,
+    type: tp.type,
+    mois: tp.mois,
+    description: tp.description,
+    modePaiement: tp.modePaiement,
+    reference: tp.reference,
+    datePaiement: tp.datePaiement,
+  }
+}
+
+function mapExpense(e: {
+  id: number
+  categorie: string
+  motif: string
+  montant: number
+  devise: string
+  beneficiaire: string | null
+  modePaiement: string
+  reference: string | null
+  dateDepense: Date
+}) {
+  return {
+    id: e.id,
+    categorie: e.categorie,
+    motif: e.motif,
+    montant: e.montant,
+    devise: e.devise,
+    beneficiaire: e.beneficiaire,
+    modePaiement: e.modePaiement,
+    reference: e.reference,
+    dateDepense: e.dateDepense,
+  }
+}
+
+function mapTeacher(t: {
+  id: number
+  lastName: string
+  middleName: string
+  firstName: string
+  specialty: string | null
+}) {
+  return {
+    id: t.id,
+    name: `${t.lastName} ${t.middleName} ${t.firstName}`,
+    specialty: t.specialty,
   }
 }

@@ -22,6 +22,27 @@ export interface MoisScolaire {
 
 export type PeriodShortcut = "this_month" | "this_quarter" | "this_school_year" | "custom"
 
+/** Libellé lisible de la période filtrée (ex. « Juin 2026 », pas « Ce mois-ci »). */
+export function formatPeriodSubtitle(
+  shortcut: PeriodShortcut,
+  monthValues: string[],
+  months: MoisScolaire[]
+): string {
+  if (shortcut === "this_school_year") return "Année complète"
+  if (monthValues.length === 1) {
+    const m = months.find((x) => x.value === monthValues[0])
+    return m?.label ?? monthValues[0]
+  }
+  if (shortcut === "this_quarter" && monthValues.length > 1) {
+    const first = months.find((m) => m.value === monthValues[0])
+    const last = months.find((m) => m.value === monthValues[monthValues.length - 1])
+    if (first && last) return `${first.label} – ${last.label}`
+    return "Trimestre en cours"
+  }
+  if (monthValues.length > 1) return `${monthValues.length} mois`
+  return "Période sélectionnée"
+}
+
 const SCHOOL_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6] as const
 
 const MONTH_NAMES_FR = [

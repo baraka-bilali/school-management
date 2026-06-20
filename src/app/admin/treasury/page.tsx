@@ -7,22 +7,23 @@ import { Card, CardContent } from "@/components/ui/cards"
 import { SelecteurAnneeScolaire } from "@/components/treasury/school-year-select"
 import { SelecteurMois } from "@/components/treasury/school-month-select"
 import { TreasuryPeriodShortcuts } from "@/components/treasury/treasury-period-shortcuts"
+import { TreasurySummaryCards, TreasuryIncomeBreakdown } from "@/components/treasury/treasury-summary-cards"
 import {
   computePeriodBounds,
+  formatPeriodSubtitle,
   getSchoolYearMonths,
   mapAcademicYearsToAnnees,
   type AnneeScolaire,
+  type MoisScolaire,
   type PeriodShortcut,
 } from "@/lib/school-year-utils"
 import {
   Landmark,
-  ArrowDownCircle,
   ArrowUpCircle,
   Users,
   Download,
   Plus,
   Loader2,
-  Calendar,
   Banknote,
   Smartphone,
   Building,
@@ -67,8 +68,8 @@ interface TeacherOption {
 }
 
 interface TreasuryData {
-  activeYearId?: number | null
-  activeYearName?: string | null
+  selectedYearId?: number | null
+  selectedYearName?: string | null
   totalIncomeUsd: number
   totalIncomeCdf: number
   scolaireIncomeUsd: number
@@ -82,21 +83,6 @@ interface TreasuryData {
     usd: number
     cdf: number
   }>
-  allYears?: {
-    totalIncomeUsd: number
-    totalIncomeCdf: number
-    scolaireIncomeUsd: number
-    scolaireIncomeCdf: number
-    otherIncomeUsd: number
-    otherIncomeCdf: number
-    incomeByType: Array<{
-      typeFraisId: number
-      typeFrais: string
-      isDefault: boolean
-      usd: number
-      cdf: number
-    }>
-  }
   totalTeacherPayments: number
   totalExpensesUsd: number
   totalExpensesCdf: number
@@ -137,9 +123,19 @@ const MODES_PAIEMENT = [
   { value: "AUTRE", label: "Autre", icon: CreditCard, color: "text-gray-500" },
 ]
 
-// ============================================================
-// COMPOSANT PRINCIPAL
-// ============================================================
+const MONTH_NAMES_FR = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+]
+
+function formatMoisLabel(mois: string, months: MoisScolaire[]) {
+  const m = months.find((x) => x.value === mois)
+  if (m) return m.label
+  const [y, mo] = mois.split("-")
+  const idx = parseInt(mo ?? "", 10) - 1
+  if (y && idx >= 0 && idx < 12) return `${MONTH_NAMES_FR[idx]} ${y}`
+  return mois
+}
 
 export default function AdminTreasuryPage() {
   const router = useRouter()
@@ -165,7 +161,7 @@ export default function AdminTreasuryPage() {
   const [academicYears, setAcademicYears] = useState<AnneeScolaire[]>([])
   const [trFilterYearId, setTrFilterYearId] = useState<number | null>(null)
   const [trFilterMonth, setTrFilterMonth] = useState("")
-  const [periodShortcut, setPeriodShortcut] = useState<PeriodShortcut>("this_school_year")
+  const [periodShortcut, setPeriodShortcut] = useState<PeriodShortcut>("this_month")
   const [trFilterTeacher, setTrFilterTeacher] = useState("")
   const [trFilterType, setTrFilterType] = useState("")
   const [trFilterCategorie, setTrFilterCategorie] = useState("")
@@ -233,26 +229,6 @@ export default function AdminTreasuryPage() {
     return () => window.removeEventListener("schoolSettingsChange", handleSettingsChange)
   }, [])
 
-  // Charger la trésorerie au montage
-  const fetchTreasury = useCallback(async () => {
-    setTreasuryLoading(true)
-    try {
-      const res = await fetch("/api/admin/fees/treasury")
-      if (res.ok) {
-        const { data } = await res.json()
-        setTreasury(data)
-      }
-    } catch (error) {
-      console.error("Erreur chargement trésorerie:", error)
-    } finally {
-      setTreasuryLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchTreasury()
-  }, [fetchTreasury])
-
   // Charger les années scolaires (meta)
   useEffect(() => {
     const loadYears = async () => {
@@ -265,7 +241,7 @@ export default function AdminTreasuryPage() {
 
         const urlYear = searchParams.get("yearId")
         const urlMonth = searchParams.get("month") ?? ""
-        const urlShortcut = (searchParams.get("period") as PeriodShortcut | null) ?? "this_school_year"
+        const urlShortcut = (searchParams.get("period") as PeriodShortcut | null) ?? "this_month"
 
         const defaultYearId = urlYear
           ? Number(urlYear)
@@ -276,7 +252,7 @@ export default function AdminTreasuryPage() {
         setPeriodShortcut(
           ["this_month", "this_quarter", "this_school_year", "custom"].includes(urlShortcut)
             ? urlShortcut
-            : "this_school_year"
+            : "this_month"
         )
       } catch {
         /* ignore */
@@ -305,12 +281,50 @@ export default function AdminTreasuryPage() {
     return computePeriodBounds(periodShortcut, selectedSchoolYear)
   }, [selectedSchoolYear, periodShortcut, trFilterMonth])
 
+  const periodSubtitle = useMemo(
+    () =>
+      selectedSchoolYear
+        ? formatPeriodSubtitle(periodShortcut, periodBounds.monthValues, schoolYearMonths)
+        : "Période sélectionnée",
+    [selectedSchoolYear, periodShortcut, periodBounds.monthValues, schoolYearMonths]
+  )
+
+  const yearLabel =
+    treasury?.selectedYearName ?? selectedSchoolYear?.label ?? "Année scolaire"
+
+  const fetchTreasury = useCallback(async () => {
+    if (!trFilterYearId) return
+    setTreasuryLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.set("yearId", String(trFilterYearId))
+      params.set("dateFrom", periodBounds.dateFrom.toISOString())
+      params.set("dateTo", periodBounds.dateTo.toISOString())
+      if (periodBounds.monthValues.length > 0) {
+        params.set("months", periodBounds.monthValues.join(","))
+      }
+      const res = await fetch(`/api/admin/fees/treasury?${params}`)
+      if (res.ok) {
+        const { data } = await res.json()
+        setTreasury(data)
+      }
+    } catch (error) {
+      console.error("Erreur chargement trésorerie:", error)
+    } finally {
+      setTreasuryLoading(false)
+    }
+  }, [trFilterYearId, periodBounds])
+
+  useEffect(() => {
+    if (trFilterYearId) void fetchTreasury()
+  }, [fetchTreasury, trFilterYearId])
+
   const syncUrlParams = useCallback(
     (yearId: number | null, month: string, shortcut: PeriodShortcut) => {
       const params = new URLSearchParams()
       if (yearId) params.set("yearId", String(yearId))
       if (month) params.set("month", month)
-      if (shortcut !== "this_school_year") params.set("period", shortcut)
+      if (shortcut !== "this_month") params.set("period", shortcut)
       const qs = params.toString()
       router.replace(qs ? `/admin/treasury?${qs}` : "/admin/treasury", { scroll: false })
     },
@@ -320,8 +334,8 @@ export default function AdminTreasuryPage() {
   const handleYearChange = (yearId: number) => {
     setTrFilterYearId(yearId)
     setTrFilterMonth("")
-    setPeriodShortcut("this_school_year")
-    syncUrlParams(yearId, "", "this_school_year")
+    setPeriodShortcut("this_month")
+    syncUrlParams(yearId, "", "this_month")
   }
 
   const handleMonthChange = (month: string) => {
@@ -466,10 +480,6 @@ export default function AdminTreasuryPage() {
     return true
   }) ?? []
 
-  const filteredTotalPayments = filteredTeacherPayments.reduce((s, tp) => s + tp.montant, 0)
-  const filteredTotalExpensesUsd = filteredExpenses.filter(e => e.devise !== "CDF").reduce((s, e) => s + e.montant, 0)
-  const filteredTotalExpensesCdf = filteredExpenses.filter(e => e.devise === "CDF").reduce((s, e) => s + e.montant, 0)
-
   // Couleurs thème
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
@@ -494,6 +504,8 @@ export default function AdminTreasuryPage() {
     return MODES_PAIEMENT.find(m => m.value === mode)?.label || mode
   }
 
+  const isCompactTables = treasurySubTab === "overview"
+
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-6">
@@ -507,9 +519,9 @@ export default function AdminTreasuryPage() {
               Trésorerie
             </h1>
             <p className={`${textSecondary} mt-1`}>Gestion des salaires, dépenses et budget de l&apos;école</p>
-            {treasury?.activeYearName && (
+            {treasury?.selectedYearName && (
               <span className={`inline-flex items-center mt-2 rounded-full px-3 py-1 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
-                Recettes frais élèves : année {treasury.activeYearName}
+                {yearLabel} · {periodSubtitle}
               </span>
             )}
           </div>
@@ -521,264 +533,127 @@ export default function AdminTreasuryPage() {
             <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
           </div>
         ) : treasury ? (
-          <div className="space-y-4">
-            {/* Cartes résumé budget */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <ArrowDownCircle className="w-5 h-5 text-green-500" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Recettes (frais élèves)</p>
-                      {treasury.activeYearName && (
-                        <p className={`text-[10px] ${textSecondary} mt-0.5 uppercase tracking-wide`}>
-                          Année en cours : {treasury.activeYearName}
-                        </p>
-                      )}
-                      {treasury.scolaireIncomeUsd > 0 && (
-                        <p className={`text-sm font-semibold text-green-600`}>
-                          Scolaire : {new Intl.NumberFormat("fr-FR").format(treasury.scolaireIncomeUsd)} $
-                        </p>
-                      )}
-                      {treasury.scolaireIncomeCdf > 0 && (
-                        <p className={`text-sm font-medium text-green-500`}>
-                          Scolaire : {new Intl.NumberFormat("fr-FR").format(treasury.scolaireIncomeCdf)} FC
-                        </p>
-                      )}
-                      {(treasury.otherIncomeUsd > 0 || treasury.otherIncomeCdf > 0) && (
-                        <p className={`text-xs ${textSecondary} mt-1`}>
-                          Autres types :
-                          {treasury.otherIncomeUsd > 0 && ` ${new Intl.NumberFormat("fr-FR").format(treasury.otherIncomeUsd)} $`}
-                          {treasury.otherIncomeCdf > 0 && ` ${new Intl.NumberFormat("fr-FR").format(treasury.otherIncomeCdf)} FC`}
-                        </p>
-                      )}
-                      {treasury.totalIncomeUsd > 0 && treasury.scolaireIncomeUsd === 0 && treasury.otherIncomeUsd === 0 && (
-                        <p className={`text-xl font-bold text-green-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeUsd)} $</p>
-                      )}
-                      {treasury.totalIncomeCdf > 0 && treasury.scolaireIncomeCdf === 0 && treasury.otherIncomeCdf === 0 && (
-                        <p className={`text-base font-semibold text-green-500`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalIncomeCdf)} FC</p>
-                      )}
-                      {treasury.totalIncomeUsd === 0 && treasury.totalIncomeCdf === 0 && (
-                        <p className={`text-xl font-bold text-green-600`}>0 $</p>
-                      )}
-                      {treasury.allYears && (
-                        <div className={`mt-2 pt-2 border-t ${borderColor}`}>
-                          <p className={`text-[10px] ${textSecondary} uppercase tracking-wide font-semibold`}>Toutes les années</p>
-                          {(treasury.allYears.scolaireIncomeUsd > 0 || treasury.allYears.otherIncomeUsd > 0) && (
-                            <p className={`text-xs font-medium text-green-600/80`}>
-                              {treasury.allYears.scolaireIncomeUsd > 0 && `Scolaire : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.scolaireIncomeUsd)} $`}
-                              {treasury.allYears.otherIncomeUsd > 0 && ` · Autres : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.otherIncomeUsd)} $`}
-                            </p>
-                          )}
-                          {(treasury.allYears.scolaireIncomeCdf > 0 || treasury.allYears.otherIncomeCdf > 0) && (
-                            <p className={`text-xs font-medium text-green-500/80`}>
-                              {treasury.allYears.scolaireIncomeCdf > 0 && `Scolaire : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.scolaireIncomeCdf)} FC`}
-                              {treasury.allYears.otherIncomeCdf > 0 && ` · Autres : ${new Intl.NumberFormat("fr-FR").format(treasury.allYears.otherIncomeCdf)} FC`}
-                            </p>
-                          )}
-                          {treasury.allYears.totalIncomeUsd === 0 && treasury.allYears.totalIncomeCdf === 0 && (
-                            <p className={`text-xs ${textSecondary}`}>Aucune recette enregistrée</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
+          <div className="space-y-6">
+            {/* Filtres : année scolaire + période */}
+            <Card theme={theme} className="rounded-2xl shadow-sm">
+              <CardContent className="pt-5 pb-5 space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <TreasuryPeriodShortcuts
+                    active={periodShortcut}
+                    onChange={handleShortcutChange}
+                    theme={theme}
+                  />
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <SelecteurAnneeScolaire
+                      years={academicYears}
+                      value={trFilterYearId}
+                      onChange={handleYearChange}
+                      theme={theme}
+                    />
+                    <SelecteurMois
+                      months={schoolYearMonths}
+                      value={trFilterMonth}
+                      onChange={handleMonthChange}
+                      theme={theme}
+                      disabled={periodShortcut !== "custom"}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-              <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <Users className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Salaires versés</p>
-                      <p className={`text-xl font-bold text-blue-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalTeacherPayments)} $</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                      <ArrowUpCircle className="w-5 h-5 text-orange-500" />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Dépenses</p>
-                      {treasury.totalExpensesUsd > 0 && (
-                        <p className={`text-xl font-bold text-orange-600`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalExpensesUsd)} $</p>
-                      )}
-                      {treasury.totalExpensesCdf > 0 && (
-                        <p className={`text-base font-semibold text-orange-500`}>{new Intl.NumberFormat("fr-FR").format(treasury.totalExpensesCdf)} FC</p>
-                      )}
-                      {treasury.totalExpensesUsd === 0 && treasury.totalExpensesCdf === 0 && (
-                        <p className={`text-xl font-bold text-orange-600`}>0 $</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${treasury.balanceUsd >= 0 ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-red-100 dark:bg-red-900/30"}`}>
-                      <Landmark className={`w-5 h-5 ${treasury.balanceUsd >= 0 ? "text-emerald-500" : "text-red-500"}`} />
-                    </div>
-                    <div>
-                      <p className={`text-xs ${textSecondary} uppercase font-semibold`}>Solde budget</p>
-                      <p className={`text-xl font-bold ${treasury.balanceUsd >= 0 ? "text-emerald-600" : "text-red-600"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balanceUsd)} $</p>
-                      {treasury.balanceCdf !== 0 && (
-                        <p className={`text-base font-semibold ${treasury.balanceCdf >= 0 ? "text-emerald-500" : "text-red-500"}`}>{new Intl.NumberFormat("fr-FR").format(treasury.balanceCdf)} FC</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
 
-            {treasury.incomeByType && treasury.incomeByType.length > 1 && (
-              <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <p className={`text-sm font-semibold ${textColor} mb-3`}>Recettes par type de frais</p>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {treasury.incomeByType.map((row) => (
-                      <div
-                        key={row.typeFraisId}
-                        className={`rounded-xl border p-3 ${theme === "dark" ? "border-gray-700 bg-gray-800/50" : "border-gray-100 bg-gray-50"}`}
-                      >
-                        <p className={`text-sm font-medium ${textColor}`}>
-                          {row.typeFrais}
-                          {row.isDefault && (
-                            <span className="ml-1.5 text-[10px] font-semibold text-indigo-500">(défaut)</span>
-                          )}
-                        </p>
-                        <div className={`mt-1 text-sm ${textSecondary}`}>
-                          {row.usd > 0 && <span className="text-green-600 font-semibold">{new Intl.NumberFormat("fr-FR").format(row.usd)} $</span>}
-                          {row.usd > 0 && row.cdf > 0 && " · "}
-                          {row.cdf > 0 && <span className="text-green-600 font-semibold">{new Intl.NumberFormat("fr-FR").format(row.cdf)} FC</span>}
-                          {row.usd === 0 && row.cdf === 0 && "0"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                <div className="flex flex-wrap gap-3 items-center pt-1 border-t border-dashed border-gray-200 dark:border-gray-700">
+                  {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
+                    <select
+                      value={trFilterTeacher}
+                      onChange={(e) => setTrFilterTeacher(e.target.value)}
+                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[160px]`}
+                    >
+                      <option value="">Tous les professeurs</option>
+                      {treasury.teachers.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
+                    <select
+                      value={trFilterType}
+                      onChange={(e) => setTrFilterType(e.target.value)}
+                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[130px]`}
+                    >
+                      <option value="">Tous les types</option>
+                      {PAYMENT_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {(treasurySubTab === "overview" || treasurySubTab === "depenses") && (
+                    <select
+                      value={trFilterCategorie}
+                      onChange={(e) => setTrFilterCategorie(e.target.value)}
+                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[140px]`}
+                    >
+                      <option value="">Toutes catégories</option>
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {(periodShortcut !== "this_month" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
+                    <button
+                      onClick={() => {
+                        handleShortcutChange("this_month")
+                        setTrFilterTeacher("")
+                        setTrFilterType("")
+                        setTrFilterCategorie("")
+                      }}
+                      className={`px-3 py-2 text-xs rounded-xl border ${borderColor} ${textSecondary} hover:text-red-500 hover:border-red-400 transition-colors`}
+                    >
+                      Réinitialiser filtres
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <TreasurySummaryCards
+              theme={theme}
+              yearLabel={yearLabel}
+              incomePeriodLabel={periodSubtitle}
+              flowsPeriodLabel={periodSubtitle}
+              scolaireUsd={treasury.scolaireIncomeUsd}
+              scolaireCdf={treasury.scolaireIncomeCdf}
+              otherUsd={treasury.otherIncomeUsd}
+              otherCdf={treasury.otherIncomeCdf}
+              teacherPayments={treasury.totalTeacherPayments}
+              expensesUsd={treasury.totalExpensesUsd}
+              expensesCdf={treasury.totalExpensesCdf}
+              balanceUsd={treasury.balanceUsd}
+              balanceCdf={treasury.balanceCdf}
+            />
+
+            {treasury.incomeByType.length > 0 && (
+              <TreasuryIncomeBreakdown
+                theme={theme}
+                rows={treasury.incomeByType}
+                exchangeRate={exchangeRate}
+                periodLabel={periodSubtitle}
+              />
             )}
 
-            {/* Filtres période scolaire */}
-            <div className="space-y-3">
-              <TreasuryPeriodShortcuts
-                active={periodShortcut}
-                onChange={handleShortcutChange}
-                theme={theme}
-              />
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="flex items-center gap-2">
-                  <Calendar className={`w-4 h-4 ${textSecondary}`} />
-                  <SelecteurAnneeScolaire
-                    years={academicYears}
-                    value={trFilterYearId}
-                    onChange={handleYearChange}
-                    theme={theme}
-                  />
-                  <SelecteurMois
-                    months={schoolYearMonths}
-                    value={trFilterMonth}
-                    onChange={handleMonthChange}
-                    theme={theme}
-                    disabled={periodShortcut !== "custom"}
-                  />
-                </div>
-
-              {/* Par prof (salaires seulement) */}
-              {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-                <select
-                  value={trFilterTeacher}
-                  onChange={(e) => setTrFilterTeacher(e.target.value)}
-                  className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[160px]`}
-                >
-                  <option value="">Tous les professeurs</option>
-                  {treasury?.teachers.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Par type de paiement */}
-              {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-                <select
-                  value={trFilterType}
-                  onChange={(e) => setTrFilterType(e.target.value)}
-                  className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[130px]`}
-                >
-                  <option value="">Tous les types</option>
-                  {PAYMENT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Par catégorie dépense */}
-              {(treasurySubTab === "overview" || treasurySubTab === "depenses") && (
-                <select
-                  value={trFilterCategorie}
-                  onChange={(e) => setTrFilterCategorie(e.target.value)}
-                  className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[140px]`}
-                >
-                  <option value="">Toutes catégories</option>
-                  {EXPENSE_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              )}
-
-              {/* Réinitialiser */}
-              {(periodShortcut !== "this_school_year" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
-                <button
-                  onClick={() => {
-                    handleShortcutChange("this_school_year")
-                    setTrFilterTeacher("")
-                    setTrFilterType("")
-                    setTrFilterCategorie("")
-                  }}
-                  className={`px-3 py-2 text-xs rounded-xl border ${borderColor} ${textSecondary} hover:text-red-500 hover:border-red-400 transition-colors`}
-                >
-                  Réinitialiser filtres
-                </button>
-              )}
-
-              {/* Totaux filtrés */}
-              {(periodShortcut !== "this_school_year" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
-                <div className="flex gap-3 ml-auto text-sm flex-wrap">
-                  {(treasurySubTab !== "depenses") && (
-                    <span className="text-blue-600 font-medium">Salaires : {new Intl.NumberFormat("fr-FR").format(filteredTotalPayments)} $</span>
-                  )}
-                  {(treasurySubTab !== "salaires") && filteredTotalExpensesUsd > 0 && (
-                    <span className="text-orange-600 font-medium">Dépenses : {new Intl.NumberFormat("fr-FR").format(filteredTotalExpensesUsd)} $</span>
-                  )}
-                  {(treasurySubTab !== "salaires") && filteredTotalExpensesCdf > 0 && (
-                    <span className="text-orange-500 font-medium">Dépenses : {new Intl.NumberFormat("fr-FR").format(filteredTotalExpensesCdf)} FC</span>
-                  )}
-                </div>
-              )}
-              </div>
-            </div>
-
-            {/* Sous-onglets + boutons */}
+            {/* Onglets flux + actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 w-fit">
                 {[
-                  { key: "overview" as const, label: "Tout" },
-                  { key: "salaires" as const, label: "Salaires profs" },
+                  { key: "overview" as const, label: "Tout flux" },
+                  { key: "salaires" as const, label: "Salaires" },
                   { key: "depenses" as const, label: "Dépenses" },
                 ].map((st) => (
                   <button
                     key={st.key}
                     onClick={() => setTreasurySubTab(st.key)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${treasurySubTab === st.key ? "bg-white dark:bg-gray-700 shadow text-indigo-600 dark:text-indigo-400" : `${textSecondary} hover:text-indigo-500`}`}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${treasurySubTab === st.key ? "bg-slate-800 dark:bg-slate-700 shadow text-white" : `${textSecondary} hover:text-indigo-500`}`}
                   >
                     {st.label}
                   </button>
@@ -906,17 +781,54 @@ export default function AdminTreasuryPage() {
               </Card>
             )}
 
+            {/* Tableaux */}
+            <div className={isCompactTables ? "grid grid-cols-1 lg:grid-cols-2 gap-4 min-w-0" : "space-y-4"}>
             {/* Tableau salaires profs */}
             {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-              <Card theme={theme}>
+              <Card theme={theme} className="rounded-2xl shadow-sm min-w-0 overflow-hidden">
                 <CardContent className="pt-5">
                   <h3 className={`text-base font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <Users className="w-5 h-5 text-blue-500" /> Paiements professeurs
+                    <Users className="w-5 h-5 text-blue-500 shrink-0" /> Paiements professeurs
                   </h3>
                   {filteredTeacherPayments.length === 0 ? (
                     <p className={`text-center py-8 ${textSecondary}`}>{treasury.teacherPayments.length === 0 ? "Aucun paiement enregistré" : "Aucun résultat pour ces filtres"}</p>
+                  ) : isCompactTables ? (
+                    <div className={`rounded-xl border ${borderColor} overflow-hidden`}>
+                      <table className="w-full table-fixed text-xs">
+                        <thead>
+                          <tr className={headerBg}>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase`}>Professeur</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[18%]`}>Mois</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[22%]`}>Montant</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[20%]`}>Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${borderColor}`}>
+                          {filteredTeacherPayments.map((tp) => (
+                            <tr key={tp.id} className={`${hoverRow} transition-colors`}>
+                              <td className={`px-2 py-2 ${textColor} min-w-0`}>
+                                <div className="font-medium truncate">{tp.teacherName}</div>
+                                <span className={`inline-flex mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  tp.type === "SALAIRE" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                  : tp.type === "PRIME" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                  : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                }`}>
+                                  {PAYMENT_TYPES.find(t => t.value === tp.type)?.label || tp.type}
+                                </span>
+                              </td>
+                              <td className={`px-2 py-2 ${textSecondary} truncate`}>{formatMoisLabel(tp.mois, schoolYearMonths)}</td>
+                              <td className={`px-2 py-2 ${textColor}`}>
+                                <div className="font-semibold">{new Intl.NumberFormat("fr-FR").format(tp.montant)} $</div>
+                                <div className={`text-[10px] ${textSecondary}`}>{getModePaiementLabel(tp.modePaiement)}</div>
+                              </td>
+                              <td className={`px-2 py-2 ${textSecondary}`}>{formatDate(tp.datePaiement)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border ${borderColor}">
+                    <div className={`overflow-x-auto rounded-xl border ${borderColor}`}>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className={headerBg}>
@@ -963,15 +875,45 @@ export default function AdminTreasuryPage() {
 
             {/* Tableau dépenses */}
             {(treasurySubTab === "overview" || treasurySubTab === "depenses") && (
-              <Card theme={theme}>
+              <Card theme={theme} className="rounded-2xl shadow-sm min-w-0 overflow-hidden">
                 <CardContent className="pt-5">
                   <h3 className={`text-base font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <ArrowUpCircle className="w-5 h-5 text-orange-500" /> Dépenses
+                    <ArrowUpCircle className="w-5 h-5 text-orange-500 shrink-0" /> Dépenses diverses
                   </h3>
                   {filteredExpenses.length === 0 ? (
                     <p className={`text-center py-8 ${textSecondary}`}>{treasury.expenses.length === 0 ? "Aucune dépense enregistrée" : "Aucun résultat pour ces filtres"}</p>
+                  ) : isCompactTables ? (
+                    <div className={`rounded-xl border ${borderColor} overflow-hidden`}>
+                      <table className="w-full table-fixed text-xs">
+                        <thead>
+                          <tr className={headerBg}>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase`}>Motif</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[22%]`}>Montant</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[18%]`}>Mode</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[20%]`}>Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${borderColor}`}>
+                          {filteredExpenses.map((e) => (
+                            <tr key={e.id} className={`${hoverRow} transition-colors`}>
+                              <td className={`px-2 py-2 ${textColor} min-w-0`}>
+                                <div className="truncate font-medium">{e.motif}</div>
+                                <span className={`text-[10px] ${textSecondary} uppercase`}>
+                                  {EXPENSE_CATEGORIES.find(c => c.value === e.categorie)?.label || e.categorie}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 font-semibold text-orange-600">
+                                {new Intl.NumberFormat("fr-FR").format(e.montant)} {e.devise === "CDF" ? "FC" : "$"}
+                              </td>
+                              <td className={`px-2 py-2 ${textSecondary} truncate`}>{getModePaiementLabel(e.modePaiement)}</td>
+                              <td className={`px-2 py-2 ${textSecondary}`}>{formatDate(e.dateDepense)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border ${borderColor}">
+                    <div className={`overflow-x-auto rounded-xl border ${borderColor}`}>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className={headerBg}>
@@ -1011,6 +953,7 @@ export default function AdminTreasuryPage() {
                 </CardContent>
               </Card>
             )}
+            </div>
           </div>
         ) : null}
       </div>

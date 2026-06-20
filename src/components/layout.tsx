@@ -13,7 +13,13 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("admin-sidebar-open")
+      if (saved !== null) return saved === "true"
+    }
+    return true
+  })
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [theme, setTheme] = useState<"light" | "dark">("light")
@@ -43,8 +49,12 @@ export default function Layout({ children }: LayoutProps) {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
-      if (mobile) setSidebarOpen(false)
-      else setSidebarOpen(true)
+      if (mobile) {
+        setSidebarOpen(false)
+      } else {
+        const saved = localStorage.getItem("admin-sidebar-open")
+        if (saved !== null) setSidebarOpen(saved === "true")
+      }
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -133,7 +143,13 @@ export default function Layout({ children }: LayoutProps) {
     return () => { supabaseBrowser.removeChannel(channel) }
   }, [studentSchoolId])
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => {
+      const next = !prev
+      localStorage.setItem("admin-sidebar-open", String(next))
+      return next
+    })
+  }
 
   return (
     <div className={`min-h-screen transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>

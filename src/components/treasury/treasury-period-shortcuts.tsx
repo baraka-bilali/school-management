@@ -12,8 +12,8 @@ interface TreasuryPeriodShortcutsProps {
 
 const SHORTCUTS: { id: PeriodShortcut; label: string }[] = [
   { id: "this_month", label: "Ce mois-ci" },
-  { id: "this_quarter", label: "Ce trimestre" },
-  { id: "this_school_year", label: "Cette année scolaire" },
+  { id: "this_quarter", label: "Trimestre" },
+  { id: "this_school_year", label: "Année" },
   { id: "custom", label: "Personnalisé" },
 ]
 
