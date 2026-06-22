@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
         lastName: e.student.lastName,
         middleName: e.student.middleName,
         firstName: e.student.firstName,
-        code: toDisplayCode(e.student.code, e.class.id),
+        code: toDisplayCode(e.student.code, e.class.id, e.yearId),
         gender: e.student.gender,
         classId: e.class.id,
         className: e.class.name,

@@ -216,7 +216,11 @@ export async function GET(req: NextRequest) {
       }
 
       const items = students.map((s: (typeof students)[number]) =>
-        studentWithDisplayCode(s, classId ? parseInt(classId) : s.enrollments?.[0]?.classId)
+        studentWithDisplayCode(
+          s,
+          classId ? parseInt(classId) : s.enrollments?.[0]?.classId,
+          activeYearId ?? s.enrollments?.[0]?.yearId
+        )
       )
 
       return { items, total, page, pageSize }
@@ -249,6 +253,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  let displayCodeForError = ""
   try {
     let adminSchoolId: number
     try {
@@ -331,6 +336,7 @@ export async function POST(req: NextRequest) {
     if (!displayCode) {
       displayCode = String(await getNextClassCode(parsedClassId, parsedYearId))
     }
+    displayCodeForError = displayCode
 
     if (await isCodeUsedInClass(parsedClassId, parsedYearId, displayCode)) {
       return NextResponse.json(
@@ -339,7 +345,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const storedCode = toStoredCode(parsedClassId, displayCode)
+    const storedCode = toStoredCode(parsedClassId, displayCode, parsedYearId)
 
     // Email : année de fin de l'année scolaire d'inscription (2025-2026 → 2026)
     const emailYear = emailYearFromAcademicYear(academicYear)
@@ -401,7 +407,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ...result,
-      student: studentWithDisplayCode(result.student, parsedClassId),
+      student: studentWithDisplayCode(result.student, parsedClassId, parsedYearId),
       plaintextPassword,
     })
   } catch (e: unknown) {
@@ -434,7 +440,12 @@ export async function POST(req: NextRequest) {
         )
       }
       return NextResponse.json(
-        { error: "Conflit de données — vérifiez le code dans cette classe ou l'email", field: "code" },
+        {
+          error: displayCodeForError
+            ? `Le code « ${displayCodeForError} » est déjà utilisé dans cette classe pour l'année sélectionnée. Choisissez un autre numéro ou activez l'auto-incrémentation.`
+            : "Conflit de données — vérifiez le code dans cette classe ou l'email",
+          field: "code",
+        },
         { status: 400 }
       )
     }

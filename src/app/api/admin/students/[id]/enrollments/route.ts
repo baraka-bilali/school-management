@@ -123,7 +123,7 @@ export async function POST(
       }
       await prisma.student.update({
         where: { id: studentId },
-        data: { code: toStoredCode(classId, displayCode) },
+        data: { code: toStoredCode(classId, displayCode, yearId) },
       })
     }
 

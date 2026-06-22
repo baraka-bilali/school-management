@@ -30,6 +30,7 @@ import {
 } from "recharts"
 import DashboardSkeleton from "@/components/dashboard-skeleton"
 import { SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
+import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 
 // ============================================================
 // OPTIMIZATION #4: Lazy Load Charts (40% bundle reduction)
@@ -303,7 +304,7 @@ export default function Dashboard() {
             <h2 className={`text-2xl font-bold ${textColor}`}>Tableau de bord</h2>
             {safeStats.currentYearName && (
               <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
-                Année {safeStats.currentYearName}
+                Année {formatAcademicYearOptionLabel(safeStats.currentYearName, true)}
               </span>
             )}
           </div>

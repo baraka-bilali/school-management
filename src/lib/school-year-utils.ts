@@ -221,6 +221,22 @@ export function computePeriodBounds(
   }
 }
 
+export function formatAcademicYearOptionLabel(name: string, isCurrent: boolean): string {
+  return isCurrent ? `${name} (en cours)` : name
+}
+
+/** Année active définie dans Paramètres (priorité sur le flag Prisma `current`). */
+export function isAcademicYearCurrent(
+  yearId: number,
+  currentYearId?: number | null,
+  year?: { isCurrent?: boolean; current?: boolean }
+): boolean {
+  if (currentYearId != null) return yearId === currentYearId
+  if (year?.isCurrent !== undefined) return year.isCurrent
+  if (year?.current !== undefined) return year.current
+  return false
+}
+
 /** Génère la liste des années scolaires à partir des enregistrements Prisma */
 export function mapAcademicYearsToAnnees(
   years: Array<{ id: number; name: string; startDate?: Date | string | null; endDate?: Date | string | null; current?: boolean }>,

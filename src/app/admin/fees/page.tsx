@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import Portal from "@/components/portal"
 import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
+import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 import type { ReceiptData } from "@/components/receipt-pdf"
 
 const ReceiptDownloadButton = dynamic(
@@ -772,7 +773,7 @@ export default function AdminFeesPage() {
               {isCashier ? "Encaissement et suivi des paiements" : "Gestion des frais et paiements des élèves"}
               {currentYearId && years.find((y) => y.id === currentYearId) && (
                 <span className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
-                  Année {years.find((y) => y.id === currentYearId)?.name}
+                  Année {formatAcademicYearOptionLabel(years.find((y) => y.id === currentYearId)!.name, true)}
                 </span>
               )}
             </p>

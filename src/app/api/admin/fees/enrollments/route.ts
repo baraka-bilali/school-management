@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
       enrollmentId: e.id,
       studentId: e.student.id,
       studentName: `${e.student.lastName} ${e.student.middleName} ${e.student.firstName}`,
-      studentCode: toDisplayCode(e.student.code, e.class.id),
+      studentCode: toDisplayCode(e.student.code, e.class.id, e.yearId),
       classId: e.class.id,
       className: e.class.name,
       yearId: e.year.id,

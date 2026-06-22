@@ -67,7 +67,11 @@ export async function GET(
 
     const enrollment = student.enrollments[0]
     return NextResponse.json({
-      student: studentWithDisplayCode(student, enrollment?.classId),
+      student: studentWithDisplayCode(
+        student,
+        enrollment?.classId,
+        enrollment?.yearId
+      ),
     })
   } catch (error) {
     console.error("Erreur récupération élève:", error)
@@ -146,7 +150,7 @@ export async function PUT(
     }
 
     const storedCode = currentEnrollment
-      ? toStoredCode(currentEnrollment.classId, displayCode)
+      ? toStoredCode(currentEnrollment.classId, displayCode, currentEnrollment.yearId)
       : displayCode
 
     const profileFields = normalizeStudentProfile(data)
@@ -289,7 +293,11 @@ export async function PUT(
     const enrollment = responseStudent?.enrollments[0]
     return NextResponse.json({
       student: responseStudent
-        ? studentWithDisplayCode(responseStudent, enrollment?.classId)
+        ? studentWithDisplayCode(
+            responseStudent,
+            enrollment?.classId,
+            enrollment?.yearId
+          )
         : null,
     })
   } catch (error) {

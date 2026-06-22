@@ -48,8 +48,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       classes,
-      years,
-      currentYearId: currentYearId || null
+      years: years.map((y) => ({
+        ...y,
+        isCurrent: currentYearId ? y.id === currentYearId : false,
+      })),
+      currentYearId: currentYearId || null,
     })
   } catch (error) {
     console.error('Erreur lors de la récupération des métadonnées:', error)

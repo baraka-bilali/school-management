@@ -12,6 +12,10 @@ import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
 import { validateStudentCreateInput, type StudentCreateField } from "@/lib/student-create-validation"
+import {
+  AcademicYearSelect,
+  type AcademicYearOption,
+} from "@/components/academic-year-select"
 
 interface PaginationState {
   page: number
@@ -24,14 +28,16 @@ function CreateStudentModal({
   classes,
   years,
   defaultYearId,
+  currentYearId,
   onCreated,
   theme = "light",
 }: {
   open: boolean
   onClose: () => void
   classes: Array<{ id: number; name: string }>
-  years: Array<{ id: number; name: string }>
+  years: AcademicYearOption[]
   defaultYearId?: number
+  currentYearId?: number | null
   onCreated: (payload: { 
     email: string
     plaintextPassword: string
@@ -318,19 +324,17 @@ function CreateStudentModal({
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Année académique <span className="text-red-500">*</span></label>
-            <select
-              className={inputClass("academicYearId")}
+            <AcademicYearSelect
+              years={years}
+              currentYearId={currentYearId}
               value={form.academicYearId}
-              onChange={(e) => {
+              onChange={(value) => {
                 clearFieldError("academicYearId")
-                setForm({ ...form, academicYearId: e.target.value })
+                setForm({ ...form, academicYearId: value })
               }}
-            >
-              <option value="">Sélectionner</option>
-              {years.map((y) => (
-                <option key={y.id} value={y.id}>{y.name}</option>
-              ))}
-            </select>
+              placeholder="Sélectionner"
+              className={inputClass("academicYearId")}
+            />
             <FieldError field="academicYearId" />
             <p className={`mt-1 text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
               Toute année scolaire disponible — indépendamment du filtre de la liste.
@@ -477,7 +481,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   const [filters, setFilters] = useState<{ q?: string; classId?: string; yearId?: string; sort?: string }>({ sort: "name_asc" })
   const [searchInput, setSearchInput] = useState("")
   const [classes, setClasses] = useState<Array<{ id: number; name: string }>>([])
-  const [years, setYears] = useState<Array<{ id: number; name: string; current: boolean }>>([])
+  const [years, setYears] = useState<AcademicYearOption[]>([])
   const [currentYearId, setCurrentYearId] = useState<number | null>(null)
   const [banner, setBanner] = useState<{
     message?: string;
@@ -686,7 +690,12 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
       .then((r) => r.json())
       .then((res) => {
         setClasses(res.classes || [])
-        setYears(res.years || [])
+        setYears(
+          (res.years || []).map((y: AcademicYearOption) => ({
+            ...y,
+            isCurrent: res.currentYearId ? y.id === res.currentYearId : y.isCurrent,
+          }))
+        )
         if (res.currentYearId) {
           setCurrentYearId(res.currentYearId)
           setFilters((f) => ({ ...f, yearId: String(res.currentYearId) }))
@@ -736,8 +745,12 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
   const cellHover = theme === "dark" ? "group-hover:bg-gray-700" : "group-hover:bg-gray-50"
-  const studentDisplayCode = (student: { code?: string; enrollments?: Array<{ classId?: number }> }) =>
-    toDisplayCode(student.code, student.enrollments?.[0]?.classId)
+  const studentDisplayCode = (student: { code?: string; enrollments?: Array<{ classId?: number; yearId?: number }> }) =>
+    toDisplayCode(
+      student.code,
+      student.enrollments?.[0]?.classId,
+      student.enrollments?.[0]?.yearId
+    )
 
   const exportStudents = () => {
     if (!items.length) return
@@ -837,16 +850,16 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <select
-                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+              <AcademicYearSelect
+                years={years}
+                currentYearId={currentYearId}
                 value={filters.yearId || "all"}
-                onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value === "all" ? "all" : e.target.value }))}
-              >
-                <option value="all">Toutes les années</option>
-                {years.map((y) => (
-                  <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
-                ))}
-              </select>
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, yearId: value === "all" ? "all" : value }))
+                }
+                allowAll
+                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+              />
             </div>
             <select
               className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
@@ -871,16 +884,16 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            <select
-              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+            <AcademicYearSelect
+              years={years}
+              currentYearId={currentYearId}
               value={filters.yearId || "all"}
-              onChange={(e) => setFilters((f) => ({ ...f, yearId: e.target.value === "all" ? "all" : e.target.value }))}
-            >
-              <option value="all">Toutes les années</option>
-              {years.map((y) => (
-                <option key={y.id} value={y.id}>{y.name}{y.current ? " (en cours)" : ""}</option>
-              ))}
-            </select>
+              onChange={(value) =>
+                setFilters((f) => ({ ...f, yearId: value === "all" ? "all" : value }))
+              }
+              allowAll
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+            />
             <select
               className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
               value={filters.sort}
@@ -1175,6 +1188,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           classes={classes}
           years={years}
           defaultYearId={currentYearId || undefined}
+          currentYearId={currentYearId}
           theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)

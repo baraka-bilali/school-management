@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import type { AnneeScolaire } from "@/lib/school-year-utils"
+import { formatAcademicYearOptionLabel, isAcademicYearCurrent } from "@/lib/school-year-utils"
 
 interface SelecteurAnneeScolaireProps {
   years: AnneeScolaire[]
@@ -36,8 +37,7 @@ export function SelecteurAnneeScolaire({
     >
       {years.map((y) => (
         <option key={y.id} value={y.id}>
-          {y.label}
-          {y.isCurrent ? " (en cours)" : ""}
+          {formatAcademicYearOptionLabel(y.label, isAcademicYearCurrent(y.id, undefined, y))}
         </option>
       ))}
     </select>

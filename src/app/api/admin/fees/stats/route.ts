@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
           id: p.id,
           numeroRecu: p.numeroRecu,
           studentName: `${p.student.lastName} ${p.student.middleName} ${p.student.firstName}`,
-          studentCode: toDisplayCode(p.student.code, p.enrollment.class.id),
+          studentCode: toDisplayCode(p.student.code, p.enrollment.class.id, p.enrollment.yearId),
           className: p.enrollment.class.name,
           typeFrais: p.tarification.typeFrais.nom,
           montant: p.montant,

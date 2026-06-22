@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
-        code: toDisplayCode(student.code, currentEnrollment?.classId),
+        code: toDisplayCode(student.code, currentEnrollment?.classId, currentEnrollment?.yearId),
         gender: student.gender,
         birthDate: student.birthDate,
         birthPlace: student.birthPlace,

@@ -145,7 +145,7 @@ export async function getReceiptData(paiementId: number) {
     modePaiement: paiement.modePaiement,
     reference: paiement.reference,
     eleve: {
-      code: toDisplayCode(paiement.student.code, paiement.enrollment.class.id),
+      code: toDisplayCode(paiement.student.code, paiement.enrollment.class.id, paiement.enrollment.yearId),
       nom: `${paiement.student.lastName} ${paiement.student.middleName} ${paiement.student.firstName}`,
     },
     classe: paiement.enrollment.class.name,
