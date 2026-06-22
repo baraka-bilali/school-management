@@ -223,9 +223,9 @@ export async function PUT(
       },
     })
 
-    // Mise à jour de la classe si spécifiée
+    // Mise à jour de la classe / inscription (plusieurs années possibles)
     if (data.classId && updatedStudent) {
-      const currentEnrollment = updatedStudent.enrollments[0]
+      const targetClassId = Number(data.classId)
       let yearId = data.yearId ? Number(data.yearId) : undefined
       if (!yearId) {
         const yId = await getSchoolCurrentYearId(decoded.schoolId || 0)
@@ -234,14 +234,32 @@ export async function PUT(
         }
         yearId = yId
       }
-      if (currentEnrollment) {
+
+      const existingForTarget = await prisma.enrollment.findFirst({
+        where: { studentId, classId: targetClassId, yearId },
+      })
+
+      const currentEnrollment = updatedStudent.enrollments[0]
+
+      if (existingForTarget) {
+        if (existingForTarget.status !== "ACTIVE") {
+          await prisma.enrollment.update({
+            where: { id: existingForTarget.id },
+            data: { status: "ACTIVE" },
+          })
+        }
+      } else if (currentEnrollment && currentEnrollment.yearId !== yearId) {
+        await prisma.enrollment.create({
+          data: { studentId, classId: targetClassId, yearId, status: "ACTIVE" },
+        })
+      } else if (currentEnrollment) {
         await prisma.enrollment.update({
           where: { id: currentEnrollment.id },
-          data: { classId: Number(data.classId), yearId },
+          data: { classId: targetClassId, yearId },
         })
       } else {
         await prisma.enrollment.create({
-          data: { studentId, classId: Number(data.classId), yearId },
+          data: { studentId, classId: targetClassId, yearId, status: "ACTIVE" },
         })
       }
     }

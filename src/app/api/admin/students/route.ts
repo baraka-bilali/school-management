@@ -15,6 +15,7 @@ import {
   studentWithDisplayCode,
   toStoredCode,
 } from "@/lib/student-fields"
+import { validateStudentCreateInput } from "@/lib/student-create-validation"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -287,27 +288,43 @@ export async function POST(req: NextRequest) {
 
     const { lastName, middleName, firstName } = identity
 
-    if (!lastName || !firstName) {
-      return NextResponse.json({ error: "Nom et prénom obligatoires" }, { status: 400 })
+    const validation = validateStudentCreateInput({
+      lastName,
+      firstName,
+      birthDate,
+      classId,
+      academicYearId,
+    })
+    if (!validation.ok) {
+      return NextResponse.json(
+        { error: validation.error, field: validation.field },
+        { status: 400 }
+      )
     }
 
-    // Vérifier que l'année académique existe
-    let yearId = academicYearId
-    if (!yearId) {
-      const currentYear = await prisma.academicYear.findFirst({
-        where: { current: true }
-      })
-      if (!currentYear) {
-        return NextResponse.json(
-          { error: 'Aucune année académique courante configurée' },
-          { status: 400 }
-        )
-      }
-      yearId = currentYear.id
+    const { birthDate: parsedBirthDate, classId: parsedClassId, yearId: parsedYearId } = validation
+
+    const academicYear = await prisma.academicYear.findUnique({
+      where: { id: parsedYearId },
+      select: { id: true, name: true },
+    })
+    if (!academicYear) {
+      return NextResponse.json(
+        { error: "Année académique introuvable", field: "academicYearId" },
+        { status: 400 }
+      )
     }
 
-    const parsedClassId = parseInt(classId)
-    const parsedYearId = parseInt(yearId)
+    const schoolClass = await prisma.class.findFirst({
+      where: { id: parsedClassId, schoolId: adminSchoolId },
+      select: { id: true },
+    })
+    if (!schoolClass) {
+      return NextResponse.json(
+        { error: "Classe introuvable", field: "classId" },
+        { status: 400 }
+      )
+    }
 
     let displayCode = rawCode?.trim() ? String(rawCode).trim() : ""
     if (!displayCode) {
@@ -357,8 +374,8 @@ export async function POST(req: NextRequest) {
           lastName,
           middleName,
           firstName,
-          gender,
-          birthDate: new Date(birthDate),
+          gender: gender || "M",
+          birthDate: parsedBirthDate,
           code: storedCode,
           userId: user.id,
         },
@@ -386,21 +403,41 @@ export async function POST(req: NextRequest) {
       student: studentWithDisplayCode(result.student, parsedClassId),
       plaintextPassword,
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e)
-    if (e.code === 'P2002') {
-      const target = e.meta?.target
-      const field = Array.isArray(target) ? target.join(", ") : String(target || "")
-      if (field.includes("email")) {
+    const err = e as { code?: string; meta?: { target?: string | string[] } }
+    if (err.code === "P2002") {
+      const target = err.meta?.target
+      const fieldStr = Array.isArray(target) ? target.join(", ") : String(target || "")
+      if (fieldStr.includes("email")) {
         return NextResponse.json({ error: "Cet email est déjà utilisé" }, { status: 400 })
       }
+      if (
+        fieldStr.includes("studentId") &&
+        fieldStr.includes("classId") &&
+        fieldStr.includes("yearId")
+      ) {
+        return NextResponse.json(
+          {
+            error: "Cet élève est déjà inscrit dans cette classe pour cette année",
+            field: "academicYearId",
+          },
+          { status: 400 }
+        )
+      }
       return NextResponse.json(
-        { error: "Conflit de données — vérifiez le code dans cette classe ou l'email" },
+        { error: "Conflit de données — vérifiez le code dans cette classe ou l'email", field: "code" },
+        { status: 400 }
+      )
+    }
+    if (err.code === "P2003") {
+      return NextResponse.json(
+        { error: "Classe ou année académique invalide", field: "academicYearId" },
         { status: 400 }
       )
     }
     return NextResponse.json(
-      { error: "Erreur serveur" },
+      { error: "Erreur serveur lors de la création" },
       { status: 500 }
     )
   }

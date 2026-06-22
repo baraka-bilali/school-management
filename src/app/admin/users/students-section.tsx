@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
+import { validateStudentCreateInput, type StudentCreateField } from "@/lib/student-create-validation"
 
 interface PaginationState {
   page: number
@@ -38,6 +39,7 @@ function CreateStudentModal({
     firstName?: string
     code?: string
     classId?: number
+    academicYearId?: number
   }) => void
   theme?: "light" | "dark"
 }) {
@@ -54,12 +56,35 @@ function CreateStudentModal({
   const [autoCode, setAutoCode] = useState(false)
   const [autoCodeLoading, setAutoCodeLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<StudentCreateField, string>>>({})
+  const [formError, setFormError] = useState("")
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
 
-  useEffect(() => {
-    if (defaultYearId) setForm((f) => ({ ...f, academicYearId: String(defaultYearId) }))
-  }, [defaultYearId])
+  const clearFieldError = (field: StudentCreateField) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+    setFormError("")
+  }
+
+  const inputClass = (field?: StudentCreateField) => {
+    const hasError = field && fieldErrors[field]
+    const base =
+      theme === "dark"
+        ? "border-gray-600 bg-gray-700 text-gray-100"
+        : "border-gray-300 bg-white text-gray-900"
+    const err = "border-red-500 focus:ring-red-500"
+    return `w-full rounded-md border px-3 py-2 ${hasError ? err : base}`
+  }
+
+  const FieldError = ({ field }: { field: StudentCreateField }) =>
+    fieldErrors[field] ? (
+      <p className="mt-1 text-xs text-red-500">{fieldErrors[field]}</p>
+    ) : null
 
   // reset form when opening the modal so previous inputs are cleared
   useEffect(() => {
@@ -76,6 +101,8 @@ function CreateStudentModal({
       })
       setAutoCode(false)
       setSubmitting(false)
+      setFieldErrors({})
+      setFormError("")
     }
   }, [open, defaultYearId])
 
@@ -116,6 +143,22 @@ function CreateStudentModal({
   const toUpper = (v: string) => v.toUpperCase()
 
   const submit = async () => {
+    const validation = validateStudentCreateInput({
+      lastName: form.lastName,
+      firstName: form.firstName,
+      birthDate: form.birthDate,
+      classId: form.classId,
+      academicYearId: form.academicYearId,
+    })
+
+    if (!validation.ok) {
+      setFieldErrors(validation.field ? { [validation.field]: validation.error } : {})
+      setFormError(validation.field ? "" : validation.error)
+      return
+    }
+
+    setFieldErrors({})
+    setFormError("")
     setSubmitting(true)
     try {
       const res = await authFetch("/api/admin/students", {
@@ -124,21 +167,30 @@ function CreateStudentModal({
         body: JSON.stringify({
           ...form,
           classId: Number(form.classId),
-          academicYearId: form.academicYearId ? Number(form.academicYearId) : undefined,
+          academicYearId: Number(form.academicYearId),
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Erreur")
-      onCreated({ 
-        email: data.user.email, 
+      if (!res.ok) {
+        const field = data.field as StudentCreateField | undefined
+        if (field) {
+          setFieldErrors({ [field]: data.error || "Erreur de validation" })
+        } else {
+          setFormError(data.error || "Erreur lors de la création")
+        }
+        return
+      }
+      onCreated({
+        email: data.user.email,
         plaintextPassword: data.plaintextPassword,
         lastName: data.student?.lastName ?? form.lastName,
         firstName: data.student?.firstName ?? form.firstName,
         code: data.student?.code ?? form.code,
         classId: Number(form.classId),
+        academicYearId: Number(form.academicYearId),
       })
-    } catch (e) {
-      alert((e as Error).message)
+    } catch {
+      setFormError("Impossible de contacter le serveur. Réessayez.")
     } finally {
       setSubmitting(false)
     }
@@ -157,28 +209,59 @@ function CreateStudentModal({
             <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose} aria-label="Fermer">×</button>
           </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {formError && (
+            <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+              {formError}
+            </div>
+          )}
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2 uppercase`} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: toUpper(e.target.value) })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom <span className="text-red-500">*</span></label>
+            <input
+              className={`${inputClass("lastName")} uppercase`}
+              value={form.lastName}
+              onChange={(e) => {
+                clearFieldError("lastName")
+                setForm({ ...form, lastName: toUpper(e.target.value) })
+              }}
+            />
+            <FieldError field="lastName" />
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Post-nom</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2 uppercase`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: toUpper(e.target.value) })} />
+            <input className={`${inputClass()} uppercase`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: toUpper(e.target.value) })} />
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2 uppercase`} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: toUpper(e.target.value) })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom <span className="text-red-500">*</span></label>
+            <input
+              className={`${inputClass("firstName")} uppercase`}
+              value={form.firstName}
+              onChange={(e) => {
+                clearFieldError("firstName")
+                setForm({ ...form, firstName: toUpper(e.target.value) })
+              }}
+            />
+            <FieldError field="firstName" />
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Sexe</label>
-            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <select className={inputClass()} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
               <option value="M">M</option>
               <option value="F">F</option>
             </select>
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Date de naissance</label>
-            <input type="date" className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Date de naissance <span className="text-red-500">*</span></label>
+            <input
+              type="date"
+              required
+              className={inputClass("birthDate")}
+              value={form.birthDate}
+              onChange={(e) => {
+                clearFieldError("birthDate")
+                setForm({ ...form, birthDate: e.target.value })
+              }}
+            />
+            <FieldError field="birthDate" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -204,26 +287,54 @@ function CreateStudentModal({
                 {autoCodeLoading && <div className="w-3 h-3 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin ml-2" />}
               </div>
             ) : (
-              <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Optionnel — auto si vide" />
+              <input
+                className={inputClass("code")}
+                value={form.code}
+                onChange={(e) => {
+                  clearFieldError("code")
+                  setForm({ ...form, code: e.target.value })
+                }}
+                placeholder="Optionnel — auto si vide"
+              />
             )}
+            <FieldError field="code" />
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Classe</label>
-            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Classe <span className="text-red-500">*</span></label>
+            <select
+              className={inputClass("classId")}
+              value={form.classId}
+              onChange={(e) => {
+                clearFieldError("classId")
+                setForm({ ...form, classId: e.target.value })
+              }}
+            >
               <option value="">Sélectionner</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            <FieldError field="classId" />
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Année académique</label>
-            <select className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.academicYearId} onChange={(e) => setForm({ ...form, academicYearId: e.target.value })}>
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Année académique <span className="text-red-500">*</span></label>
+            <select
+              className={inputClass("academicYearId")}
+              value={form.academicYearId}
+              onChange={(e) => {
+                clearFieldError("academicYearId")
+                setForm({ ...form, academicYearId: e.target.value })
+              }}
+            >
               <option value="">Sélectionner</option>
               {years.map((y) => (
                 <option key={y.id} value={y.id}>{y.name}</option>
               ))}
             </select>
+            <FieldError field="academicYearId" />
+            <p className={`mt-1 text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+              Toute année scolaire disponible — indépendamment du filtre de la liste.
+            </p>
           </div>
         </div>
         <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
@@ -1079,6 +1190,19 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
             setEmailCopied(false)
             setLoading(true)
             setPagination((p) => ({ ...p }))
+            if (
+              payload.academicYearId &&
+              filters.yearId &&
+              filters.yearId !== "all" &&
+              String(payload.academicYearId) !== filters.yearId
+            ) {
+              const yearName = years.find((y) => y.id === payload.academicYearId)?.name
+              toast.info(
+                yearName
+                  ? `Élève inscrit en ${yearName}. Changez le filtre d'année pour l'afficher dans la liste.`
+                  : "Élève créé dans une autre année. Ajustez le filtre pour l'afficher."
+              )
+            }
           }}
         />
 
