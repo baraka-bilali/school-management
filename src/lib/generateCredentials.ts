@@ -58,7 +58,7 @@ export function buildStudentEmailWithSchool({
 /**
  * Génère un email pour un élève avec le code de l'école
  * Format: prenom + nom + année@codeEcole.com
- * Ex: "beckerbaraka2026@donbosco.com"
+ * Ex: "beckerbaraka2026@donbosco.com" (année = fin de l'année scolaire d'inscription)
  * Avec suffixe (doublons): "beckerbaraka22026@donbosco.com"
  */
 export function buildStudentEmailByCode({

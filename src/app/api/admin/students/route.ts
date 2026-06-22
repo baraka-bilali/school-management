@@ -16,6 +16,7 @@ import {
   toStoredCode,
 } from "@/lib/student-fields"
 import { validateStudentCreateInput } from "@/lib/student-create-validation"
+import { emailYearFromAcademicYear } from "@/lib/school-year-utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -306,7 +307,7 @@ export async function POST(req: NextRequest) {
 
     const academicYear = await prisma.academicYear.findUnique({
       where: { id: parsedYearId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, endDate: true },
     })
     if (!academicYear) {
       return NextResponse.json(
@@ -340,14 +341,14 @@ export async function POST(req: NextRequest) {
 
     const storedCode = toStoredCode(parsedClassId, displayCode)
 
-    // Générer email avec le code de l'école et gestion des doublons
-    const calendarYear = new Date().getFullYear()
+    // Email : année de fin de l'année scolaire d'inscription (2025-2026 → 2026)
+    const emailYear = emailYearFromAcademicYear(academicYear)
     const schoolCode = school.codeEtablissement || school.nomEtablissement
 
-    let email = buildStudentEmailByCode({ firstName, lastName, year: calendarYear, schoolCode })
+    let email = buildStudentEmailByCode({ firstName, lastName, year: emailYear, schoolCode })
     let suffix = 2
     while (await prisma.user.findUnique({ where: { email } })) {
-      email = buildStudentEmailByCode({ firstName, lastName, year: calendarYear, schoolCode, suffix })
+      email = buildStudentEmailByCode({ firstName, lastName, year: emailYear, schoolCode, suffix })
       suffix++
       if (suffix > 100) break
     }
@@ -410,7 +411,14 @@ export async function POST(req: NextRequest) {
       const target = err.meta?.target
       const fieldStr = Array.isArray(target) ? target.join(", ") : String(target || "")
       if (fieldStr.includes("email")) {
-        return NextResponse.json({ error: "Cet email est déjà utilisé" }, { status: 400 })
+        return NextResponse.json(
+          {
+            error:
+              "Un compte avec cet email existe déjà. Vérifiez l'année scolaire ou utilisez un autre élève.",
+            field: "academicYearId",
+          },
+          { status: 400 }
+        )
       }
       if (
         fieldStr.includes("studentId") &&

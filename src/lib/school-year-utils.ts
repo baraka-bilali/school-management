@@ -60,6 +60,22 @@ export function parseSchoolYearLabel(name: string): { startYear: number; endYear
   return { startYear, endYear }
 }
 
+/**
+ * Année calendaire incluse dans l'email élève (fin d'année scolaire).
+ * Ex. inscription 2025-2026 → 2026 ; 2026-2027 → 2027.
+ */
+export function emailYearFromAcademicYear(record: {
+  name: string
+  endDate?: Date | string | null
+}): number {
+  const parsed = parseSchoolYearLabel(record.name)
+  if (parsed) return parsed.endYear
+  if (record.endDate) {
+    return new Date(record.endDate).getFullYear()
+  }
+  return new Date().getFullYear()
+}
+
 /** Bornes sept→juin à partir du libellé ou des dates en base */
 export function schoolYearFromRecord(record: {
   id: number
