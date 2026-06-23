@@ -90,6 +90,8 @@ export async function GET(req: NextRequest) {
       usd: { totalExpected: 0, totalCollected: 0, totalPending: 0, studentsFullyPaid: 0, studentsPartiallyPaid: 0, studentsUnpaid: 0 },
       cdf: { totalExpected: 0, totalCollected: 0, totalPending: 0, studentsFullyPaid: 0, studentsPartiallyPaid: 0, studentsUnpaid: 0 },
       totalStudents: 0,
+      tarificationCount: 0,
+      studentsWithoutTarif: 0,
       recentPayments: [],
       tarificationsSummary: [],
       feeTypesSummary: [],
@@ -183,6 +185,10 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    const studentsWithoutTarif = enrollments.filter(
+      (e) => !scolaireTarifs.some((t) => t.classId === null || t.classId === e.classId)
+    ).length
+
     const recentPayments = await prisma.paiement.findMany({
       where: {
         schoolId: user.schoolId,
@@ -221,6 +227,8 @@ export async function GET(req: NextRequest) {
         tarificationsSummary,
         feeTypesSummary,
         otherTypesSummary,
+        tarificationCount: tarifications.length,
+        studentsWithoutTarif,
       },
     })
   } catch (error) {

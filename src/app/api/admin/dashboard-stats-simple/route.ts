@@ -4,7 +4,12 @@ import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import { ensureDefaultFeeType, getDefaultFeeTypeId } from "@/lib/fees/default-fee-type"
 import { SECTION_ORDER } from "@/lib/class-sort"
-import { getSchoolYearMonths, schoolYearFromRecord } from "@/lib/school-year-utils"
+import {
+  getSchoolYearMonths,
+  schoolYearFromRecord,
+  buildSchoolYearChartCumulative,
+  schoolYearMonthlyNewFromCumulative,
+} from "@/lib/school-year-utils"
 
 function emptySectionStats(): Record<string, number> {
   return Object.fromEntries(SECTION_ORDER.map((s) => [s, 0]))
@@ -43,6 +48,10 @@ export async function GET(request: NextRequest) {
     type EnrollmentPoint = { enrolledAt: Date; gender: string; section: string | null }
 
     let enrollmentTimeline: EnrollmentPoint[] = []
+    let anneeBounds = schoolYearFromRecord({
+      id: 0,
+      name: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    })
 
     if (currentYearIdResolved) {
       const year = await prisma.academicYear.findUnique({
@@ -52,8 +61,8 @@ export async function GET(request: NextRequest) {
       currentYearName = year?.name ?? null
 
       if (year) {
-        const annee = schoolYearFromRecord(year)
-        schoolYearMonths = getSchoolYearMonths(annee)
+        anneeBounds = schoolYearFromRecord(year)
+        schoolYearMonths = getSchoolYearMonths(anneeBounds)
 
         const enrollments = await prisma.enrollment.findMany({
           where: {
@@ -144,25 +153,44 @@ export async function GET(request: NextRequest) {
 
     const monthLabels: string[] = []
     const monthlyStudents: number[] = []
+    const monthlyStudentsNew: number[] = []
     const monthlyTeachers: number[] = []
+    const monthlyTeachersNew: number[] = []
     const monthlyPaymentsUsd: number[] = []
     const monthlyPaymentsCdf: number[] = []
+
+    const enrollmentDates = enrollmentTimeline.map((e) => e.enrolledAt)
+    const teacherDates = allTeachers
+      .filter((t) => t.user)
+      .map((t) => new Date(t.user!.createdAt))
+
+    monthlyStudents.push(
+      ...buildSchoolYearChartCumulative(
+        enrollmentDates,
+        schoolYearMonths,
+        anneeBounds.dateDebut,
+        anneeBounds.dateFin
+      )
+    )
+    monthlyStudentsNew.push(...schoolYearMonthlyNewFromCumulative(monthlyStudents))
+
+    monthlyTeachers.push(
+      ...buildSchoolYearChartCumulative(
+        teacherDates,
+        schoolYearMonths,
+        anneeBounds.dateDebut,
+        anneeBounds.dateFin
+      )
+    )
+    monthlyTeachersNew.push(...schoolYearMonthlyNewFromCumulative(monthlyTeachers))
 
     for (const month of schoolYearMonths) {
       const shortName = month.dateDebut.toLocaleDateString("fr-FR", { month: "short" })
       monthLabels.push(shortName.charAt(0).toUpperCase() + shortName.slice(1))
+    }
 
-      // Inscriptions cumulées jusqu'à la fin du mois (courbe réelle, pas plate)
-      const cumulative = enrollmentTimeline.filter(
-        (e) => e.enrolledAt <= month.dateFin
-      ).length
-      monthlyStudents.push(cumulative)
-
-      monthlyTeachers.push(
-        allTeachers.filter(
-          (t) => t.user && new Date(t.user.createdAt) <= month.dateFin
-        ).length
-      )
+    for (let i = 0; i < schoolYearMonths.length; i++) {
+      const month = schoolYearMonths[i]
 
       const monthPayments = allPayments.filter((p) => {
         const d = new Date(p.datePaiement)
@@ -188,7 +216,9 @@ export async function GET(request: NextRequest) {
       attendance: "--",
       monthLabels,
       monthlyStudents,
+      monthlyStudentsNew,
       monthlyTeachers,
+      monthlyTeachersNew,
       monthlyPaymentsUsd,
       monthlyPaymentsCdf,
       genderStats: { male: maleCount, female: femaleCount },

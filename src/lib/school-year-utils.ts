@@ -31,12 +31,14 @@ export function formatPeriodSubtitle(
   if (shortcut === "this_school_year") return "Année complète"
   if (monthValues.length === 1) {
     const m = months.find((x) => x.value === monthValues[0])
-    return m?.label ?? monthValues[0]
+    return m?.label ?? formatMonthLabel(monthValues[0])
   }
   if (shortcut === "this_quarter" && monthValues.length > 1) {
     const first = months.find((m) => m.value === monthValues[0])
     const last = months.find((m) => m.value === monthValues[monthValues.length - 1])
-    if (first && last) return `${first.label} – ${last.label}`
+    const firstLabel = first?.label ?? formatMonthLabel(monthValues[0])
+    const lastLabel = last?.label ?? formatMonthLabel(monthValues[monthValues.length - 1])
+    if (firstLabel && lastLabel) return `${firstLabel} – ${lastLabel}`
     return "Trimestre en cours"
   }
   if (monthValues.length > 1) return `${monthValues.length} mois`
@@ -144,7 +146,24 @@ export function getCurrentQuarterMonthValues(annee: AnneeScolaire, now = new Dat
   const months = getSchoolYearMonths(annee)
   const current = getCurrentSchoolMonthValue(now)
   const idx = months.findIndex((m) => m.value === current)
-  if (idx < 0) return months.map((m) => m.value)
+  if (idx < 0) {
+    // Trimestre calendaire actuel si le mois n'appartient pas à l'année sélectionnée
+    const cal = calendarMonthBounds(current)
+    const cm = cal.dateDebut.getMonth() + 1
+    const cy = cal.dateDebut.getFullYear()
+    let startM: number
+    if (cm <= 3) startM = 1
+    else if (cm <= 6) startM = 4
+    else if (cm <= 9) startM = 7
+    else startM = 10
+    const values: string[] = []
+    for (let i = 0; i < 3; i++) {
+      const m = startM + i
+      if (m > 12) break
+      values.push(`${cy}-${String(m).padStart(2, "0")}`)
+    }
+    return values
+  }
 
   let startIdx = 0
   if (idx <= 2) startIdx = 0
@@ -180,11 +199,21 @@ export function computePeriodBounds(
 
   if (shortcut === "this_month") {
     const current = getCurrentSchoolMonthValue(now)
-    const month = allMonths.find((m) => m.value === current) ?? allMonths[allMonths.length - 1]
+    const monthInYear = allMonths.find((m) => m.value === current)
+    if (monthInYear) {
+      return {
+        monthValues: [monthInYear.value],
+        dateFrom: monthInYear.dateDebut,
+        dateTo: monthInYear.dateFin,
+        shortcut,
+      }
+    }
+    // Mois calendaire actuel hors de l'année sélectionnée → garder le vrai mois (ex. juin 2026)
+    const cal = calendarMonthBounds(current)
     return {
-      monthValues: [month.value],
-      dateFrom: month.dateDebut,
-      dateTo: month.dateFin,
+      monthValues: [cal.value],
+      dateFrom: cal.dateDebut,
+      dateTo: cal.dateFin,
       shortcut,
     }
   }
@@ -225,6 +254,76 @@ export function formatAcademicYearOptionLabel(name: string, isCurrent: boolean):
   return isCurrent ? `${name} (en cours)` : name
 }
 
+/**
+ * Mois scolaire (index 0 = sept.) où placer un événement hors bornes exactes.
+ * Les pré-inscriptions sont comptées dès septembre via buildSchoolYearChartCumulative.
+ */
+export function schoolMonthChartIndex(
+  date: Date,
+  schoolYearMonths: MoisScolaire[],
+  schoolYearStart: Date,
+  schoolYearEnd: Date
+): number {
+  if (!schoolYearMonths.length) return 0
+
+  const calYear = date.getFullYear()
+  const calMonth = date.getMonth() + 1
+
+  const exactIdx = schoolYearMonths.findIndex((m) => {
+    const [y, mo] = m.value.split("-").map(Number)
+    return y === calYear && mo === calMonth
+  })
+  if (exactIdx >= 0) return exactIdx
+
+  const monthSlotIdx = schoolYearMonths.findIndex((m) => {
+    const [, mo] = m.value.split("-").map(Number)
+    return mo === calMonth
+  })
+  if (monthSlotIdx >= 0) return monthSlotIdx
+
+  if (date < schoolYearStart) return 0
+  if (date > schoolYearEnd) return schoolYearMonths.length - 1
+  return 0
+}
+
+/** Cumul d'inscriptions / créations par mois scolaire (comportement image 1). */
+export function buildSchoolYearChartCumulative(
+  dates: Date[],
+  schoolYearMonths: MoisScolaire[],
+  schoolYearStart: Date,
+  schoolYearEnd: Date
+): number[] {
+  return schoolYearMonths.map((month, monthIdx) =>
+    dates.filter((d) => {
+      // Inscription pendant l'année scolaire → date réelle (montée progressive)
+      if (d >= schoolYearStart && d <= schoolYearEnd) {
+        return d <= month.dateFin
+      }
+      // Pré-inscription avant septembre → comptée dès le 1er mois scolaire (septembre)
+      if (d < schoolYearStart) {
+        return true
+      }
+      return d <= month.dateFin
+    }).length
+  )
+}
+
+/** Nouvelles entrées par mois (dérivé du cumul, pour infobulle). */
+export function schoolYearMonthlyNewFromCumulative(cumulative: number[]): number[] {
+  return cumulative.map((value, i) => value - (i > 0 ? cumulative[i - 1] : 0))
+}
+
+/** @deprecated Utiliser buildSchoolYearChartCumulative */
+export function buildSchoolYearCumulativeSeries(
+  dates: Date[],
+  schoolYearMonths: MoisScolaire[],
+  schoolYearStart: Date,
+  schoolYearEnd: Date
+): { monthlyNew: number[]; cumulative: number[] } {
+  const cumulative = buildSchoolYearChartCumulative(dates, schoolYearMonths, schoolYearStart, schoolYearEnd)
+  return { monthlyNew: schoolYearMonthlyNewFromCumulative(cumulative), cumulative }
+}
+
 /** Année active définie dans Paramètres (priorité sur le flag Prisma `current`). */
 export function isAcademicYearCurrent(
   yearId: number,
@@ -256,4 +355,17 @@ export function formatMonthLabel(yyyyMM: string): string {
   const [y, m] = yyyyMM.split("-").map(Number)
   if (!y || !m) return yyyyMM
   return `${MONTH_NAMES_FR[m - 1]} ${y}`
+}
+
+/** Bornes calendaires d'un mois YYYY-MM (hors liste scolaire). */
+export function calendarMonthBounds(yyyyMM: string): MoisScolaire {
+  const [y, m] = yyyyMM.split("-").map(Number)
+  const dateDebut = new Date(y, m - 1, 1)
+  const dateFin = new Date(y, m, 0, 23, 59, 59, 999)
+  return {
+    value: yyyyMM,
+    label: formatMonthLabel(yyyyMM),
+    dateDebut,
+    dateFin,
+  }
 }

@@ -352,12 +352,38 @@ export default function AdminTreasuryPage() {
 
   // Recharger quand l'année scolaire change dans Paramètres
   useEffect(() => {
-    const handleYearChange = () => {
-      void fetchTreasury()
+    const handleSettingsYearChange = async () => {
+      const stored = localStorage.getItem("schoolCurrentYearId")
+      if (stored) {
+        const yearId = Number(stored)
+        if (!Number.isNaN(yearId)) {
+          setTrFilterYearId(yearId)
+          setTrFilterMonth("")
+          setPeriodShortcut("this_month")
+          syncUrlParams(yearId, "", "this_month")
+          return
+        }
+      }
+      try {
+        const res = await fetch("/api/admin/meta")
+        if (!res.ok) return
+        const meta = await res.json()
+        const mapped = mapAcademicYearsToAnnees(meta.years || [], meta.currentYearId)
+        setAcademicYears(mapped)
+        const yearId = meta.currentYearId ?? mapped[0]?.id ?? null
+        if (yearId) {
+          setTrFilterYearId(yearId)
+          setTrFilterMonth("")
+          setPeriodShortcut("this_month")
+          syncUrlParams(yearId, "", "this_month")
+        }
+      } catch {
+        /* ignore */
+      }
     }
-    window.addEventListener("schoolSettingsChange", handleYearChange)
-    return () => window.removeEventListener("schoolSettingsChange", handleYearChange)
-  }, [fetchTreasury])
+    window.addEventListener("schoolSettingsChange", handleSettingsYearChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleSettingsYearChange)
+  }, [syncUrlParams])
 
   const handleSubmitTeacherPayment = async () => {
     if (!tpTeacherId || !tpMontant || !tpMois) return

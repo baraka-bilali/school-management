@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
@@ -685,7 +685,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   }
 
   // Load filter data (classes and academic years)
-  useEffect(() => {
+  const loadMeta = useCallback(() => {
     authFetch("/api/admin/meta")
       .then((r) => r.json())
       .then((res) => {
@@ -702,6 +702,13 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
         }
       })
   }, [])
+
+  useEffect(() => {
+    loadMeta()
+    const onSettingsChange = () => loadMeta()
+    window.addEventListener("schoolSettingsChange", onSettingsChange)
+    return () => window.removeEventListener("schoolSettingsChange", onSettingsChange)
+  }, [loadMeta])
 
   useEffect(() => {
     const fetchData = async () => {

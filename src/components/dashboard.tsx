@@ -49,7 +49,9 @@ interface DashboardStatsResponse {
   attendance: string
   monthLabels?: string[]
   monthlyStudents?: number[]
+  monthlyStudentsNew?: number[]
   monthlyTeachers?: number[]
+  monthlyTeachersNew?: number[]
   monthlyPaymentsUsd?: number[]
   monthlyPaymentsCdf?: number[]
   genderStats?: {
@@ -116,13 +118,17 @@ export default function Dashboard() {
   const queryClient = useQueryClient()
   const [theme, setTheme] = useState<Theme>("light")
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
+  const [activeYearKey, setActiveYearKey] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem("schoolCurrentYearId")
+  })
 
-  // ✅ OPTIMISÉ - React Query avec config centralisée
+  // ✅ OPTIMISÉ - React Query avec config centralisée (clé par année scolaire)
   const { data: stats, isLoading: loading, isFetching, error } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ["dashboard-stats", activeYearKey],
     queryFn: async () => {
-      const res = await fetch("/api/admin/dashboard-stats-simple", { 
-        credentials: "include" 
+      const res = await fetch("/api/admin/dashboard-stats-simple", {
+        credentials: "include",
       })
       
       const contentType = res.headers.get("content-type")
@@ -153,6 +159,8 @@ export default function Dashboard() {
       const parsedRate = Number(nextRate)
       if (!Number.isNaN(parsedRate) && parsedRate > 0) setUsdToCdfRate(parsedRate)
     }
+    const nextYear = localStorage.getItem("schoolCurrentYearId")
+    setActiveYearKey(nextYear)
     void queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] })
   }, [queryClient])
 
@@ -183,7 +191,9 @@ export default function Dashboard() {
     attendance: "--",
     monthLabels: [],
     monthlyStudents: [],
+    monthlyStudentsNew: [],
     monthlyTeachers: [],
+    monthlyTeachersNew: [],
     monthlyPaymentsUsd: [],
     monthlyPaymentsCdf: [],
     genderStats: { male: 0, female: 0 },
@@ -217,7 +227,9 @@ export default function Dashboard() {
   const monthlySeries = useMemo(() => {
     const labels = safeStats.monthLabels ?? []
     const students = safeStats.monthlyStudents ?? []
+    const studentsNew = safeStats.monthlyStudentsNew ?? []
     const teachers = safeStats.monthlyTeachers ?? []
+    const teachersNew = safeStats.monthlyTeachersNew ?? []
     const paymentsUsd = safeStats.monthlyPaymentsUsd ?? []
     const paymentsCdf = safeStats.monthlyPaymentsCdf ?? []
 
@@ -225,11 +237,21 @@ export default function Dashboard() {
     return Array.from({ length: max }, (_, i) => ({
       month: labels[i] ?? `M${i + 1}`,
       students: students[i] ?? 0,
+      studentsNew: studentsNew[i] ?? 0,
       teachers: teachers[i] ?? 0,
+      teachersNew: teachersNew[i] ?? 0,
       paymentsUsd: paymentsUsd[i] ?? 0,
       paymentsCdf: paymentsCdf[i] ?? 0,
     }))
-  }, [safeStats.monthLabels, safeStats.monthlyStudents, safeStats.monthlyTeachers, safeStats.monthlyPaymentsUsd, safeStats.monthlyPaymentsCdf])
+  }, [
+    safeStats.monthLabels,
+    safeStats.monthlyStudents,
+    safeStats.monthlyStudentsNew,
+    safeStats.monthlyTeachers,
+    safeStats.monthlyTeachersNew,
+    safeStats.monthlyPaymentsUsd,
+    safeStats.monthlyPaymentsCdf,
+  ])
 
   const genderData = useMemo(() => [
     { name: "Garcons", value: safeStats.genderStats?.male ?? 0, color: palette.male },
@@ -264,6 +286,14 @@ export default function Dashboard() {
     if (max <= 1000) return Math.ceil(max / 100) * 100
     return Math.ceil(max / 200) * 200
   }, [monthlySeries, safeStats.students])
+
+  const teachersYMax = useMemo(() => {
+    const max = Math.max(...monthlySeries.map((d) => d.teachers), safeStats.teachers, 1)
+    if (max <= 5) return 5
+    if (max <= 20) return Math.ceil(max / 5) * 5
+    if (max <= 50) return Math.ceil(max / 10) * 10
+    return Math.ceil(max / 20) * 20
+  }, [monthlySeries, safeStats.teachers])
 
   const sectionXMax = useMemo(() => {
     const max = Math.max(...sectionData.map((d) => d.value), 1)
@@ -357,11 +387,28 @@ export default function Dashboard() {
                     domain={[0, enrollmentYMax]}
                   />
                   <Tooltip
-                    formatter={(value) => [Number(value ?? 0), "Eleves cumules"]}
+                    formatter={(value, _name, item) => {
+                      const n = Number(value ?? 0)
+                      const payload = item?.payload as { studentsNew?: number } | undefined
+                      const extra =
+                        payload?.studentsNew && payload.studentsNew > 0
+                          ? ` (+${payload.studentsNew} ce mois)`
+                          : ""
+                      return [`${n}${extra}`, "Élèves cumulés"]
+                    }}
                     labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Area type="monotone" dataKey="students" stroke={palette.students} fill={palette.students} fillOpacity={0.22} strokeWidth={3} />
+                  <Area
+                    type="monotone"
+                    dataKey="students"
+                    stroke={palette.students}
+                    fill={palette.students}
+                    fillOpacity={0.22}
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, fill: palette.students }}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -430,7 +477,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des enseignants</p>
-                <p className={`text-xs ${textSecondary}`}>Basee sur la creation des comptes enseignants</p>
+                <p className={`text-xs ${textSecondary}`}>
+                  Basée sur la création des comptes enseignants
+                  {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
+                </p>
               </div>
               <Users className={`w-4 h-4 ${textSecondary}`} />
             </div>
@@ -442,15 +492,31 @@ export default function Dashboard() {
                   <YAxis
                     stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
                     allowDecimals={false}
-                    domain={[0, 30]}
-                    ticks={[0, 5, 10, 15, 20, 25, 30]}
+                    domain={[0, teachersYMax]}
                   />
                   <Tooltip
-                    formatter={(value) => [Number(value ?? 0), "Enseignants cumules"]}
+                    formatter={(value, _name, item) => {
+                      const n = Number(value ?? 0)
+                      const payload = item?.payload as { teachersNew?: number } | undefined
+                      const extra =
+                        payload?.teachersNew && payload.teachersNew > 0
+                          ? ` (+${payload.teachersNew} ce mois)`
+                          : ""
+                      return [`${n}${extra}`, "Enseignants cumulés"]
+                    }}
                     labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Area type="monotone" dataKey="teachers" stroke={palette.teachers} fill={palette.teachers} fillOpacity={0.22} strokeWidth={3} />
+                  <Area
+                    type="monotone"
+                    dataKey="teachers"
+                    stroke={palette.teachers}
+                    fill={palette.teachers}
+                    fillOpacity={0.22}
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, fill: palette.teachers }}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

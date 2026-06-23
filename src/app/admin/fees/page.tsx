@@ -72,6 +72,8 @@ interface FeeStats {
     studentsUnpaid: number
   }
   totalStudents: number
+  tarificationCount?: number
+  studentsWithoutTarif?: number
   recentPayments: RecentPayment[]
   tarificationsSummary: TarificationSummary[]
   feeTypesSummary?: FeeTypeSummary[]
@@ -443,6 +445,7 @@ export default function AdminFeesPage() {
     const handleYearChange = () => {
       const stored = localStorage.getItem("schoolCurrentYearId")
       if (stored) setCurrentYearId(Number(stored))
+      setLoading(true)
       void fetchAll()
       setStudentFeesFetched(false)
     }
@@ -758,6 +761,12 @@ export default function AdminFeesPage() {
   const percentPaidCdf = stats ? Math.round((stats.cdf.totalCollected / Math.max(stats.cdf.totalExpected, 1)) * 100) : 0
   const hasUsd = stats ? stats.usd.totalExpected > 0 : false
   const hasCdf = stats ? stats.cdf.totalExpected > 0 : false
+  const configuredTarifCount =
+    stats?.tarificationCount ??
+    stats?.feeTypesSummary?.reduce((sum, t) => sum + t.tarificationCount, 0) ??
+    stats?.tarificationsSummary?.length ??
+    0
+  const studentsWithoutTarif = stats?.studentsWithoutTarif ?? 0
 
   return (
     <Layout>
@@ -947,6 +956,63 @@ export default function AdminFeesPage() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {stats && stats.totalStudents > 0 && configuredTarifCount === 0 && !isCashier && (
+          <div
+            className={`rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+              theme === "dark"
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+                : "bg-amber-50 border-amber-200 text-amber-900"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">Aucune tarification pour {years.find((y) => y.id === currentYearId)?.name ?? "cette année"}</p>
+                <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-amber-100/80" : "text-amber-800"}`}>
+                  {stats.totalStudents} élève{stats.totalStudents > 1 ? "s" : ""} inscrit{stats.totalStudents > 1 ? "s" : ""}, mais aucun tarif n&apos;a encore été créé pour cette année.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("tarifications")}
+              className="shrink-0 px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+            >
+              Configurer les tarifs
+            </button>
+          </div>
+        )}
+
+        {stats && stats.totalStudents > 0 && configuredTarifCount > 0 && studentsWithoutTarif > 0 && !isCashier && (
+          <div
+            className={`rounded-xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+              theme === "dark"
+                ? "bg-blue-500/10 border-blue-500/30 text-blue-200"
+                : "bg-blue-50 border-blue-200 text-blue-900"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">
+                  {configuredTarifCount} tarification{configuredTarifCount > 1 ? "s" : ""} créée{configuredTarifCount > 1 ? "s" : ""}, mais {studentsWithoutTarif} élève{studentsWithoutTarif > 1 ? "s" : ""} sans tarif applicable
+                </p>
+                <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-blue-100/80" : "text-blue-800"}`}>
+                  Les totaux restent à 0 tant que les élèves inscrits ne sont pas dans une classe tarifée.
+                  Ajoutez une tarification pour leurs classes ou réinscrivez-les dans une classe déjà configurée.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("tarifications")}
+              className="shrink-0 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            >
+              Voir les tarifications
+            </button>
           </div>
         )}
 
