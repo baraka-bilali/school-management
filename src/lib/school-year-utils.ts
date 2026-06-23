@@ -286,7 +286,7 @@ export function schoolMonthChartIndex(
   return 0
 }
 
-/** Cumul d'inscriptions / créations par mois scolaire (comportement image 1). */
+/** Cumul d'inscriptions / créations par mois scolaire. */
 export function buildSchoolYearChartCumulative(
   dates: Date[],
   schoolYearMonths: MoisScolaire[],
@@ -308,7 +308,34 @@ export function buildSchoolYearChartCumulative(
   )
 }
 
-/** Nouvelles entrées par mois (dérivé du cumul, pour infobulle). */
+/**
+ * Nouvelles inscriptions / créations par mois (date réelle).
+ * Les pré-inscriptions avant septembre sont comptées sur le mois calendaire
+ * d'inscription (ex. juin 2026 → colonne « Juin »), pas en septembre.
+ */
+export function buildSchoolYearChartMonthlyNew(
+  dates: Date[],
+  schoolYearMonths: MoisScolaire[],
+  schoolYearStart: Date,
+  schoolYearEnd: Date
+): number[] {
+  return schoolYearMonths.map((month) => {
+    const [targetYear, targetMonth] = month.value.split("-").map(Number)
+    return dates.filter((d) => {
+      const calYear = d.getFullYear()
+      const calMonth = d.getMonth() + 1
+      if (d >= schoolYearStart && d <= schoolYearEnd) {
+        return calYear === targetYear && calMonth === targetMonth
+      }
+      if (d < schoolYearStart) {
+        return calMonth === targetMonth
+      }
+      return calYear === targetYear && calMonth === targetMonth
+    }).length
+  })
+}
+
+/** Nouvelles entrées par mois (dérivé du cumul — préférer buildSchoolYearChartMonthlyNew). */
 export function schoolYearMonthlyNewFromCumulative(cumulative: number[]): number[] {
   return cumulative.map((value, i) => value - (i > 0 ? cumulative[i - 1] : 0))
 }

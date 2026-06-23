@@ -8,7 +8,7 @@ import {
   getSchoolYearMonths,
   schoolYearFromRecord,
   buildSchoolYearChartCumulative,
-  schoolYearMonthlyNewFromCumulative,
+  buildSchoolYearChartMonthlyNew,
 } from "@/lib/school-year-utils"
 
 function emptySectionStats(): Record<string, number> {
@@ -172,7 +172,14 @@ export async function GET(request: NextRequest) {
         anneeBounds.dateFin
       )
     )
-    monthlyStudentsNew.push(...schoolYearMonthlyNewFromCumulative(monthlyStudents))
+    monthlyStudentsNew.push(
+      ...buildSchoolYearChartMonthlyNew(
+        enrollmentDates,
+        schoolYearMonths,
+        anneeBounds.dateDebut,
+        anneeBounds.dateFin
+      )
+    )
 
     monthlyTeachers.push(
       ...buildSchoolYearChartCumulative(
@@ -182,7 +189,14 @@ export async function GET(request: NextRequest) {
         anneeBounds.dateFin
       )
     )
-    monthlyTeachersNew.push(...schoolYearMonthlyNewFromCumulative(monthlyTeachers))
+    monthlyTeachersNew.push(
+      ...buildSchoolYearChartMonthlyNew(
+        teacherDates,
+        schoolYearMonths,
+        anneeBounds.dateDebut,
+        anneeBounds.dateFin
+      )
+    )
 
     for (const month of schoolYearMonths) {
       const shortName = month.dateDebut.toLocaleDateString("fr-FR", { month: "short" })

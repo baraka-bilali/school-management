@@ -16,11 +16,11 @@ import {
 } from "lucide-react"
 import {
   Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -370,7 +370,7 @@ export default function Dashboard() {
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des inscriptions</p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Inscriptions cumulées par mois scolaire
+                  Barres = inscriptions du mois · Courbe = total cumulé
                   {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
                 </p>
               </div>
@@ -378,7 +378,7 @@ export default function Dashboard() {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlySeries}>
+                <ComposedChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
                   <YAxis
@@ -387,29 +387,44 @@ export default function Dashboard() {
                     domain={[0, enrollmentYMax]}
                   />
                   <Tooltip
-                    formatter={(value, _name, item) => {
-                      const n = Number(value ?? 0)
-                      const payload = item?.payload as { studentsNew?: number } | undefined
-                      const extra =
-                        payload?.studentsNew && payload.studentsNew > 0
-                          ? ` (+${payload.studentsNew} ce mois)`
-                          : ""
-                      return [`${n}${extra}`, "Élèves cumulés"]
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      const row = payload[0]?.payload as {
+                        students?: number
+                        studentsNew?: number
+                      }
+                      return (
+                        <div
+                          className={`rounded-xl border px-3 py-2 text-xs shadow-md ${
+                            theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100" : "bg-white border-gray-200 text-gray-800"
+                          }`}
+                        >
+                          <p className="font-semibold mb-1">Mois : {String(label ?? "")}</p>
+                          <p>Nouvelles inscriptions : <strong>{row.studentsNew ?? 0}</strong></p>
+                          <p>Total cumulé : <strong>{row.students ?? 0}</strong></p>
+                        </div>
+                      )
                     }}
-                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
-                    contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
+                  />
+                  <Bar
+                    dataKey="studentsNew"
+                    fill={palette.students}
+                    fillOpacity={0.35}
+                    radius={[4, 4, 0, 0]}
+                    name="Nouvelles inscriptions"
                   />
                   <Area
                     type="monotone"
                     dataKey="students"
                     stroke={palette.students}
                     fill={palette.students}
-                    fillOpacity={0.22}
+                    fillOpacity={0.12}
                     strokeWidth={3}
                     dot={false}
                     activeDot={{ r: 5, fill: palette.students }}
+                    name="Total cumulé"
                   />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -478,7 +493,7 @@ export default function Dashboard() {
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des enseignants</p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Basée sur la création des comptes enseignants
+                  Barres = nouveaux comptes du mois · Courbe = total cumulé
                   {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
                 </p>
               </div>
@@ -486,7 +501,7 @@ export default function Dashboard() {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlySeries}>
+                <ComposedChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
                   <YAxis
@@ -495,29 +510,44 @@ export default function Dashboard() {
                     domain={[0, teachersYMax]}
                   />
                   <Tooltip
-                    formatter={(value, _name, item) => {
-                      const n = Number(value ?? 0)
-                      const payload = item?.payload as { teachersNew?: number } | undefined
-                      const extra =
-                        payload?.teachersNew && payload.teachersNew > 0
-                          ? ` (+${payload.teachersNew} ce mois)`
-                          : ""
-                      return [`${n}${extra}`, "Enseignants cumulés"]
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      const row = payload[0]?.payload as {
+                        teachers?: number
+                        teachersNew?: number
+                      }
+                      return (
+                        <div
+                          className={`rounded-xl border px-3 py-2 text-xs shadow-md ${
+                            theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100" : "bg-white border-gray-200 text-gray-800"
+                          }`}
+                        >
+                          <p className="font-semibold mb-1">Mois : {String(label ?? "")}</p>
+                          <p>Nouveaux enseignants : <strong>{row.teachersNew ?? 0}</strong></p>
+                          <p>Total cumulé : <strong>{row.teachers ?? 0}</strong></p>
+                        </div>
+                      )
                     }}
-                    labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
-                    contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
+                  />
+                  <Bar
+                    dataKey="teachersNew"
+                    fill={palette.teachers}
+                    fillOpacity={0.35}
+                    radius={[4, 4, 0, 0]}
+                    name="Nouveaux enseignants"
                   />
                   <Area
                     type="monotone"
                     dataKey="teachers"
                     stroke={palette.teachers}
                     fill={palette.teachers}
-                    fillOpacity={0.22}
+                    fillOpacity={0.12}
                     strokeWidth={3}
                     dot={false}
                     activeDot={{ r: 5, fill: palette.teachers }}
+                    name="Total cumulé"
                   />
-                </AreaChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
