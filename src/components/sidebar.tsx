@@ -109,10 +109,10 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
     { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
     { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
-    { icon: Calendar, label: "Horaire", href: "/admin/schedule", proOnly: true },
-    { icon: GraduationCap, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
     { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
+    { icon: Calendar, label: "Horaire", href: "/admin/schedule", proOnly: true },
+    { icon: FileText, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
   ]
 
   // Menu caissier (POS — encaissement uniquement)

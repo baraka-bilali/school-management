@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import {
@@ -44,6 +45,7 @@ import Portal from "@/components/portal"
 import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 import { formatAcademicYearOptionLabel, parseSchoolYearLabel } from "@/lib/school-year-utils"
 import { formatRelativeDateLabel, formatDateSidebar, formatTimeLabel } from "@/lib/date-labels"
+import { FeesStatsSkeleton, FeesTabSkeleton } from "@/components/fees/fees-tab-skeletons"
 import type { ReceiptData } from "@/components/receipt-pdf"
 
 const ReceiptDownloadButton = dynamic(
@@ -282,6 +284,7 @@ function formatMontant(amount: number, devise: "USD" | "CDF"): string {
 // ============================================================
 
 export default function AdminFeesPage() {
+  const router = useRouter()
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [isCashier, setIsCashier] = useState(false)
   const [activeTab, setActiveTab] = useState<"overview" | "types" | "tarifications" | "students" | "payments">("overview")
@@ -315,6 +318,7 @@ export default function AdminFeesPage() {
   // Par élève
   const [studentFees, setStudentFees] = useState<StudentFeeRow[]>([])
   const [studentFeesLoading, setStudentFeesLoading] = useState(false)
+  const [studentFeesFetched, setStudentFeesFetched] = useState(false)
   const [sfSearch, setSfSearch] = useState("")
   const [sfClassFilter, setSfClassFilter] = useState("")
   const [sfStatusFilter, setSfStatusFilter] = useState<"" | "solde" | "partiel" | "impaye">("")
@@ -458,7 +462,6 @@ export default function AdminFeesPage() {
   }, [fetchAll])
 
   // Charger les élèves quand l'onglet "students" est actif
-  const [studentFeesFetched, setStudentFeesFetched] = useState(false)
   const fetchStudentFees = useCallback(async () => {
     setStudentFeesLoading(true)
     try {
@@ -478,6 +481,13 @@ export default function AdminFeesPage() {
       setStudentFeesFetched(true)
     }
   }, [currentYearId, sfTypeFilter])
+
+  // Précharger les élèves en arrière-plan pour un onglet « Par élève » plus rapide
+  useEffect(() => {
+    if (!loading && currentYearId && !studentFeesFetched) {
+      void fetchStudentFees()
+    }
+  }, [loading, currentYearId, studentFeesFetched, fetchStudentFees])
 
   const fetchPaiements = useCallback(async () => {
     setPaiementsLoading(true)
@@ -849,6 +859,9 @@ export default function AdminFeesPage() {
     stats?.tarificationsSummary?.length ??
     0
   const studentsWithoutTarif = stats?.studentsWithoutTarif ?? 0
+  const isInitialLoad = loading && !stats
+  const isRefreshing = loading && !!stats
+  const showTabSkeleton = isInitialLoad || isRefreshing
 
   return (
     <Layout>
@@ -890,8 +903,10 @@ export default function AdminFeesPage() {
         </div>
 
         {/* Statistiques */}
-        {stats && (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCashier ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-4`}>
+        {isInitialLoad ? (
+          <FeesStatsSkeleton theme={theme} isCashier={isCashier} />
+        ) : stats ? (
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCashier ? "lg:grid-cols-3" : "lg:grid-cols-4"} gap-4 transition-opacity ${isRefreshing ? "opacity-50" : ""}`}>
             {isCashier && stats.dailyCollected && (
             <Card theme={theme} className="relative overflow-hidden border-green-500/30">
               <CardContent className="pt-5 pb-4">
@@ -1039,7 +1054,7 @@ export default function AdminFeesPage() {
               </CardContent>
             </Card>
           </div>
-        )}
+        ) : null}
 
         {stats && stats.totalStudents > 0 && configuredTarifCount === 0 && !isCashier && (
           <div
@@ -1120,13 +1135,8 @@ export default function AdminFeesPage() {
         </div>
 
         {/* Contenu */}
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-              <p className={textSecondary}>Chargement des données...</p>
-            </div>
-          </div>
+        {showTabSkeleton ? (
+          <FeesTabSkeleton tab={activeTab} theme={theme} />
         ) : (
           <>
             {/* === VUE D'ENSEMBLE === */}
@@ -1843,15 +1853,25 @@ export default function AdminFeesPage() {
                                   </td>
                                   <td className={`px-4 py-3 text-center ${textSecondary}`}>{s.paymentCount}</td>
                                   <td className="px-4 py-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => openPaymentModal(studentRowToEnrollment(s))}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
-                                      title="Enregistrer un paiement pour cet élève"
-                                    >
-                                      <DollarSign className="w-3.5 h-3.5" />
-                                      Payer
-                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => router.push(`/admin/students/${s.studentId}`)}
+                                        className={`inline-flex items-center justify-center p-1.5 rounded-lg border ${borderColor} ${textSecondary} hover:text-indigo-600 hover:border-indigo-400 dark:hover:text-indigo-400 transition-colors`}
+                                        title="Voir la fiche élève"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openPaymentModal(studentRowToEnrollment(s))}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                                        title="Enregistrer un paiement pour cet élève"
+                                      >
+                                        <DollarSign className="w-3.5 h-3.5" />
+                                        Payer
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
