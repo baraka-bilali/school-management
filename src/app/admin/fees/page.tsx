@@ -325,6 +325,7 @@ export default function AdminFeesPage() {
   const [paymentsTypeFilter, setPaymentsTypeFilter] = useState<string>("")
   const [paymentsYearFilter, setPaymentsYearFilter] = useState<number | null>(null)
   const [paymentsPage, setPaymentsPage] = useState(1)
+  const [paiementsLoading, setPaiementsLoading] = useState(false)
   const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
   const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
   const [sfPage, setSfPage] = useState(1)
@@ -479,6 +480,7 @@ export default function AdminFeesPage() {
   }, [currentYearId, sfTypeFilter])
 
   const fetchPaiements = useCallback(async () => {
+    setPaiementsLoading(true)
     try {
       const params = new URLSearchParams({
         page: String(paymentsPage),
@@ -494,6 +496,8 @@ export default function AdminFeesPage() {
       }
     } catch (error) {
       console.error("Erreur chargement paiements:", error)
+    } finally {
+      setPaiementsLoading(false)
     }
   }, [paymentsTypeFilter, paymentsYearFilter, paymentsPage])
 
@@ -509,9 +513,17 @@ export default function AdminFeesPage() {
     }
   }, [activeTab, paymentsTypeFilter, paymentsYearFilter, paymentsPage, fetchPaiements])
 
-  useEffect(() => {
+  const applyPaymentsYearFilter = (yearId: number | null) => {
+    setPaiements([])
     setPaymentsPage(1)
-  }, [paymentsTypeFilter, paymentsYearFilter])
+    setPaymentsYearFilter(yearId)
+  }
+
+  const applyPaymentsTypeFilter = (typeId: string) => {
+    setPaiements([])
+    setPaymentsPage(1)
+    setPaymentsTypeFilter(typeId)
+  }
 
   useEffect(() => {
     setSfPage(1)
@@ -1379,7 +1391,7 @@ export default function AdminFeesPage() {
                               <button
                                 key={f.id ?? "all"}
                                 type="button"
-                                onClick={() => setPaymentsYearFilter(f.id)}
+                                onClick={() => applyPaymentsYearFilter(f.id)}
                                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                   active
                                     ? "bg-indigo-600 text-white shadow-sm"
@@ -1394,7 +1406,7 @@ export default function AdminFeesPage() {
                                     className="w-3.5 h-3.5 opacity-80"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      setPaymentsYearFilter(null)
+                                      applyPaymentsYearFilter(null)
                                     }}
                                   />
                                 )}
@@ -1409,7 +1421,7 @@ export default function AdminFeesPage() {
                               <button
                                 key={f.id || "all-types"}
                                 type="button"
-                                onClick={() => setPaymentsTypeFilter(f.id)}
+                                onClick={() => applyPaymentsTypeFilter(f.id)}
                                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                   active
                                     ? "bg-violet-600 text-white shadow-sm"
@@ -1424,7 +1436,7 @@ export default function AdminFeesPage() {
                                     className="w-3.5 h-3.5 opacity-80"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      setPaymentsTypeFilter("")
+                                      applyPaymentsTypeFilter("")
                                     }}
                                   />
                                 )}
@@ -1449,7 +1461,31 @@ export default function AdminFeesPage() {
                       </button>
                     </div>
 
-                    {paiements.length === 0 ? (
+                    {paiementsLoading ? (
+                      <div className="space-y-6" aria-live="polite" aria-busy="true">
+                        <div className="flex items-center justify-center gap-2 py-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                          <span className={`text-sm ${textSecondary}`}>Chargement des paiements…</span>
+                        </div>
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="flex gap-4 sm:gap-6 animate-pulse">
+                            <div className="w-12 sm:w-14 shrink-0">
+                              <div className={`h-8 w-10 mx-auto rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                            </div>
+                            <div className={`flex-1 rounded-2xl border ${borderColor} p-4 space-y-3`}>
+                              <div className="flex gap-3">
+                                <div className={`w-10 h-10 rounded-full shrink-0 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                <div className="flex-1 space-y-2">
+                                  <div className={`h-4 w-2/3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                  <div className={`h-3 w-1/2 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                </div>
+                                <div className={`h-5 w-16 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : paiements.length === 0 ? (
                       <div className="text-center py-12">
                         <Receipt className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
                         <p className={`text-lg font-medium ${textColor}`}>Aucun paiement</p>
