@@ -36,8 +36,8 @@ export function TreasuryPeriodShortcuts({
             active === s.id
               ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
               : theme === "dark"
-                ? "border-gray-600 text-gray-200 hover:bg-gray-700"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-gray-600 bg-gray-800 text-gray-200 hover:bg-gray-700"
+                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
           )}
         >
           {s.label}

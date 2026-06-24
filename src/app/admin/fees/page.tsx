@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import dynamic from "next/dynamic"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
@@ -42,7 +42,8 @@ import {
 } from "lucide-react"
 import Portal from "@/components/portal"
 import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
-import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
+import { formatAcademicYearOptionLabel, parseSchoolYearLabel } from "@/lib/school-year-utils"
+import { formatRelativeDateLabel, formatDateSidebar, formatTimeLabel } from "@/lib/date-labels"
 import type { ReceiptData } from "@/components/receipt-pdf"
 
 const ReceiptDownloadButton = dynamic(
@@ -322,6 +323,8 @@ export default function AdminFeesPage() {
   const [sfCurrencyFilter, setSfCurrencyFilter] = useState<"" | "USD" | "CDF">("")
   const [sfTypeFilter, setSfTypeFilter] = useState<string>("")
   const [paymentsTypeFilter, setPaymentsTypeFilter] = useState<string>("")
+  const [paymentsYearFilter, setPaymentsYearFilter] = useState<number | null>(null)
+  const [paymentsPage, setPaymentsPage] = useState(1)
   const [sfSortKey, setSfSortKey] = useState<"name" | "paid" | "remaining" | "percent" | "class">("name")
   const [sfSortDir, setSfSortDir] = useState<"asc" | "desc">("asc")
   const [sfPage, setSfPage] = useState(1)
@@ -477,8 +480,12 @@ export default function AdminFeesPage() {
 
   const fetchPaiements = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ page: "1", pageSize: "15" })
+      const params = new URLSearchParams({
+        page: String(paymentsPage),
+        pageSize: "20",
+      })
       if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
+      if (paymentsYearFilter != null) params.set("yearId", String(paymentsYearFilter))
       const res = await fetch(`/api/admin/fees/paiements?${params}`)
       if (res.ok) {
         const result = await res.json()
@@ -488,7 +495,7 @@ export default function AdminFeesPage() {
     } catch (error) {
       console.error("Erreur chargement paiements:", error)
     }
-  }, [paymentsTypeFilter])
+  }, [paymentsTypeFilter, paymentsYearFilter, paymentsPage])
 
   useEffect(() => {
     if (activeTab === "students") {
@@ -500,7 +507,11 @@ export default function AdminFeesPage() {
     if (activeTab === "payments") {
       fetchPaiements()
     }
-  }, [activeTab, paymentsTypeFilter, fetchPaiements])
+  }, [activeTab, paymentsTypeFilter, paymentsYearFilter, paymentsPage, fetchPaiements])
+
+  useEffect(() => {
+    setPaymentsPage(1)
+  }, [paymentsTypeFilter, paymentsYearFilter])
 
   useEffect(() => {
     setSfPage(1)
@@ -657,6 +668,7 @@ export default function AdminFeesPage() {
     try {
       const params = new URLSearchParams({ page: "1", pageSize: "10000" })
       if (paymentsTypeFilter) params.set("typeFraisId", paymentsTypeFilter)
+      if (paymentsYearFilter != null) params.set("yearId", String(paymentsYearFilter))
       const res = await fetch(`/api/admin/fees/paiements?${params}`)
       if (!res.ok) return
       const { data } = await res.json() as { data: PaiementRecord[] }
@@ -734,6 +746,64 @@ export default function AdminFeesPage() {
 
   const getModePaiementLabel = (mode: string) => {
     return MODES_PAIEMENT.find((m) => m.value === mode)?.label || mode
+  }
+
+  const paymentTypeFilters = useMemo(() => {
+    const filters: { id: string; label: string }[] = [{ id: "", label: "Tous les types de frais" }]
+    for (const t of typesFrais.filter((x) => x.isActive)) {
+      filters.push({
+        id: String(t.id),
+        label: t.isDefault ? `${t.nom} (défaut)` : t.nom,
+      })
+    }
+    return filters
+  }, [typesFrais])
+
+  const paymentYearFilters = useMemo(() => {
+    const filters: { id: number | null; label: string }[] = [
+      { id: null, label: "Toute l'historique" },
+    ]
+    const current = years.find((y) => y.id === currentYearId)
+    if (!current) return filters
+    filters.push({
+      id: current.id,
+      label: formatAcademicYearOptionLabel(current.name, true),
+    })
+    const parsed = parseSchoolYearLabel(current.name)
+    if (parsed) {
+      const nextLabel = `${parsed.endYear}-${parsed.endYear + 1}`
+      const next = years.find((y) => y.name === nextLabel)
+      if (next && next.id !== current.id) {
+        filters.push({ id: next.id, label: next.name })
+      }
+    }
+    return filters
+  }, [years, currentYearId])
+
+  const paiementsGrouped = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        title: string
+        sidebar: ReturnType<typeof formatDateSidebar>
+        items: PaiementRecord[]
+      }
+    >()
+    for (const p of paiements) {
+      const sidebar = formatDateSidebar(p.datePaiement)
+      const title = formatRelativeDateLabel(p.datePaiement)
+      if (!groups.has(sidebar.groupKey)) {
+        groups.set(sidebar.groupKey, { title, sidebar, items: [] })
+      }
+      groups.get(sidebar.groupKey)!.items.push(p)
+    }
+    return Array.from(groups.values())
+  }, [paiements])
+
+  const getStudentInitials = (p: PaiementRecord) => {
+    const a = p.student.firstName?.[0] ?? ""
+    const b = p.student.lastName?.[0] ?? ""
+    return `${b}${a}`.toUpperCase()
   }
 
   const tabs = [
@@ -1299,107 +1369,208 @@ export default function AdminFeesPage() {
             {activeTab === "payments" && (
               <Card theme={theme}>
                 <CardContent className="pt-5">
-                  {paiements.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Receipt className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
-                      <p className={`text-lg font-medium ${textColor}`}>Aucun paiement</p>
-                      <p className={`text-sm ${textSecondary} mt-1`}>Les paiements enregistrés apparaîtront ici</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
-                        <select
-                          value={paymentsTypeFilter}
-                          onChange={(e) => setPaymentsTypeFilter(e.target.value)}
-                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[200px]`}
-                        >
-                          <option value="">Tous les types de frais</option>
-                          {typesFrais.filter((t) => t.isActive).map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.nom}{t.isDefault ? " (défaut)" : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={exportPaiementsExcel}
-                          disabled={exportingPaiements}
-                          title="Télécharger l'historique en Excel"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-                        >
-                          {exportingPaiements ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Download className="w-4 h-4" />
-                          )}
-                          Excel
-                        </button>
-                      </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className={headerBg}>
-                          <tr>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>N° Reçu</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Élève</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Classe</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Année</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Type</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Date</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Mode</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                          {paiements.map((p) => (
-                            <tr key={p.id} className={hoverRow}>
-                              <td className={`px-4 py-3`}>
-                                <span className="font-mono text-xs px-2 py-1 rounded bg-green-500/10 text-green-600 dark:text-green-400">{p.numeroRecu}</span>
-                              </td>
-                              <td className={`px-4 py-3`}>
-                                <p className={`text-sm font-medium ${textColor}`}>{p.student.lastName} {p.student.firstName}</p>
-                                <p className={`text-xs ${textSecondary}`}>{p.student.code}</p>
-                              </td>
-                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.enrollment.class.name}</td>
-                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.tarification.year.name}</td>
-                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{p.tarification.typeFrais.nom}</td>
-                              <td className="px-4 py-3 text-sm font-bold text-green-500">{formatMontant(p.montant, p.tarification.devise)}</td>
-                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{formatDate(p.datePaiement)}</td>
-                              <td className={`px-4 py-3 text-sm ${textSecondary}`}>{getModePaiementLabel(p.modePaiement)}</td>
-                              <td className="px-4 py-3">
-                                {p.isAnnule ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
-                                    <X className="w-3 h-3" /> Annulé
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
-                                    <Check className="w-3 h-3" /> Valide
-                                  </span>
+                  <div className="space-y-5">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                      <div className="space-y-3 flex-1">
+                        <div className="flex flex-wrap gap-2">
+                          {paymentYearFilters.map((f) => {
+                            const active = paymentsYearFilter === f.id
+                            return (
+                              <button
+                                key={f.id ?? "all"}
+                                type="button"
+                                onClick={() => setPaymentsYearFilter(f.id)}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                  active
+                                    ? "bg-indigo-600 text-white shadow-sm"
+                                    : theme === "dark"
+                                      ? "bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25"
+                                      : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                                }`}
+                              >
+                                {f.label}
+                                {active && f.id != null && (
+                                  <X
+                                    className="w-3.5 h-3.5 opacity-80"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setPaymentsYearFilter(null)
+                                    }}
+                                  />
                                 )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-
-                      {/* Pagination */}
-                      {paiementsPagination.totalPages > 1 && (
-                        <div className={`flex items-center justify-between pt-4 border-t ${borderColor} mt-4`}>
-                          <p className={`text-sm ${textSecondary}`}>
-                            {paiementsPagination.total} paiements au total
-                          </p>
-                          <div className="flex gap-2">
-                            <span className={`text-sm ${textSecondary}`}>
-                              Page {paiementsPagination.page} / {paiementsPagination.totalPages}
-                            </span>
-                          </div>
+                              </button>
+                            )
+                          })}
                         </div>
-                      )}
+                        <div className="flex flex-wrap gap-2">
+                          {paymentTypeFilters.map((f) => {
+                            const active = paymentsTypeFilter === f.id
+                            return (
+                              <button
+                                key={f.id || "all-types"}
+                                type="button"
+                                onClick={() => setPaymentsTypeFilter(f.id)}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                  active
+                                    ? "bg-violet-600 text-white shadow-sm"
+                                    : theme === "dark"
+                                      ? "bg-violet-500/15 text-violet-300 hover:bg-violet-500/25"
+                                      : "bg-violet-100 text-violet-700 hover:bg-violet-200"
+                                }`}
+                              >
+                                {f.label}
+                                {active && f.id !== "" && (
+                                  <X
+                                    className="w-3.5 h-3.5 opacity-80"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setPaymentsTypeFilter("")
+                                    }}
+                                  />
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={exportPaiementsExcel}
+                        disabled={exportingPaiements}
+                        title="Télécharger l'historique en Excel"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors shrink-0"
+                      >
+                        {exportingPaiements ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Excel
+                      </button>
                     </div>
-                    </div>
-                  )}
+
+                    {paiements.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Receipt className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
+                        <p className={`text-lg font-medium ${textColor}`}>Aucun paiement</p>
+                        <p className={`text-sm ${textSecondary} mt-1`}>
+                          {paymentsYearFilter != null || paymentsTypeFilter
+                            ? "Aucun résultat pour ces filtres"
+                            : "Les paiements enregistrés apparaîtront ici"}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {paiementsGrouped.map((group) => (
+                          <div key={group.sidebar.groupKey} className="flex gap-4 sm:gap-6">
+                            <div className="w-12 sm:w-14 shrink-0 text-center pt-1">
+                              <p className={`text-xl sm:text-2xl font-bold leading-none ${textColor}`}>
+                                {group.sidebar.primary}
+                              </p>
+                              {group.sidebar.secondary && (
+                                <p className={`text-xs font-medium uppercase mt-1 ${textSecondary}`}>
+                                  {group.sidebar.secondary}
+                                </p>
+                              )}
+                            </div>
+                            <div className={`flex-1 rounded-2xl border ${borderColor} ${cardBg} shadow-sm overflow-hidden`}>
+                              <div className={`px-4 py-2 border-b ${borderColor} ${headerBg}`}>
+                                <p className={`text-xs font-semibold ${textSecondary}`}>{group.title}</p>
+                              </div>
+                              <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
+                                {group.items.map((p) => (
+                                  <div key={p.id} className={`flex items-start gap-3 p-4 ${hoverRow}`}>
+                                    <div className="w-10 h-10 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">
+                                      {getStudentInitials(p)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-sm font-semibold ${textColor}`}>
+                                        {p.student.lastName} {p.student.firstName}
+                                        <span className={`font-normal ${textSecondary}`}>
+                                          {" "}· {p.tarification.typeFrais.nom}
+                                        </span>
+                                      </p>
+                                      <p className={`text-xs ${textSecondary} mt-0.5`}>
+                                        {formatTimeLabel(p.datePaiement)} · {p.enrollment.class.name} · {p.tarification.year.name}
+                                      </p>
+                                      <p className={`text-xs ${textSecondary} mt-0.5`}>
+                                        {getModePaiementLabel(p.modePaiement)} ·{" "}
+                                        <span className="font-mono">{p.numeroRecu}</span>
+                                      </p>
+                                    </div>
+                                    <div className="text-right shrink-0 space-y-1">
+                                      <p className="text-sm font-bold text-green-500">
+                                        {formatMontant(p.montant, p.tarification.devise)}
+                                      </p>
+                                      {p.isAnnule ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
+                                          <X className="w-3 h-3" /> Annulé
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
+                                          <Check className="w-3 h-3" /> Valide
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {paiementsPagination.totalPages > 1 && (
+                          <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t ${borderColor}`}>
+                            <p className={`text-sm ${textSecondary}`}>
+                              {paiementsPagination.total} paiement{paiementsPagination.total > 1 ? "s" : ""} · page {paiementsPagination.page} / {paiementsPagination.totalPages}
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={paymentsPage <= 1}
+                                onClick={() => setPaymentsPage((p) => Math.max(1, p - 1))}
+                                className={`p-2 rounded-lg border ${borderColor} disabled:opacity-40 ${hoverRow}`}
+                                aria-label="Page précédente"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              {Array.from({ length: Math.min(paiementsPagination.totalPages, 5) }, (_, i) => {
+                                const start = Math.max(
+                                  1,
+                                  Math.min(paymentsPage - 2, paiementsPagination.totalPages - 4)
+                                )
+                                const pageNum = start + i
+                                if (pageNum > paiementsPagination.totalPages) return null
+                                return (
+                                  <button
+                                    key={pageNum}
+                                    type="button"
+                                    onClick={() => setPaymentsPage(pageNum)}
+                                    className={`min-w-[2.25rem] h-9 px-2 rounded-lg text-sm font-medium transition-colors ${
+                                      pageNum === paymentsPage
+                                        ? "bg-indigo-600 text-white"
+                                        : `${borderColor} border ${hoverRow} ${textSecondary}`
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                )
+                              })}
+                              <button
+                                type="button"
+                                disabled={paymentsPage >= paiementsPagination.totalPages}
+                                onClick={() => setPaymentsPage((p) => Math.min(paiementsPagination.totalPages, p + 1))}
+                                className={`p-2 rounded-lg border ${borderColor} disabled:opacity-40 ${hoverRow}`}
+                                aria-label="Page suivante"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -2887,8 +3058,8 @@ function CreateTarificationModal({
         .map((t) => t.classId as number)
     : []
 
-  // Classes disponibles (pas encore assignées)
-  const availableClasses = classes.filter((c) => !alreadyAssignedClassIds.includes(c.id))
+  // Classes disponibles (pas encore assignées), triées de la plus petite à la plus grande
+  const availableClasses = sortClasses(classes.filter((c) => !alreadyAssignedClassIds.includes(c.id)))
   const [montant, setMontant] = useState("")
   const [devise, setDevise] = useState<"USD" | "CDF">("USD")
   const [description, setDescription] = useState("")
@@ -2982,7 +3153,7 @@ function CreateTarificationModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-        <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-lg overflow-hidden`}>
+        <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-4xl overflow-hidden animate-scale-up`}>
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-600 to-purple-600">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -3121,7 +3292,7 @@ function CreateTarificationModal({
                 </div>
               )}
 
-              <div className={`border ${borderColor} rounded-xl p-3 max-h-48 overflow-y-auto space-y-1`}>
+              <div className={`border ${borderColor} rounded-xl p-3 max-h-56 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1`}>
                 {availableClasses.length === 0 ? (
                   <div className="text-center py-4">
                     <CheckCircle className={`w-8 h-8 mx-auto mb-2 ${
@@ -3141,9 +3312,7 @@ function CreateTarificationModal({
                     )}
                   </div>
                 ) : (
-                  availableClasses
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((cls) => (
+                  availableClasses.map((cls) => (
                       <label
                         key={cls.id}
                         className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${

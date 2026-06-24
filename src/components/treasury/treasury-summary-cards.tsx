@@ -23,13 +23,17 @@ function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n)
 }
 
-function FlowBadge({ type }: { type: "in" | "out" }) {
+function FlowBadge({ type, theme }: { type: "in" | "out"; theme: "light" | "dark" }) {
   return (
     <span
       className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
         type === "in"
-          ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-          : "bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400"
+          ? theme === "dark"
+            ? "bg-green-500/20 text-green-400"
+            : "bg-green-100 text-green-700"
+          : theme === "dark"
+            ? "bg-red-500/20 text-red-400"
+            : "bg-red-100 text-red-600"
       }`}
     >
       {type === "in" ? "Entrée" : "Sortie"}
@@ -54,6 +58,11 @@ export function TreasurySummaryCards({
 }: TreasurySummaryCardsProps) {
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-500"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+  const greenAmount = theme === "dark" ? "text-green-400" : "text-green-600"
+  const greenAmountSoft = theme === "dark" ? "text-green-500" : "text-green-500"
+  const blueAmount = theme === "dark" ? "text-blue-400" : "text-blue-600"
+  const orangeAmount = theme === "dark" ? "text-orange-400" : "text-orange-600"
+  const orangeAmountSoft = theme === "dark" ? "text-orange-500" : "text-orange-500"
   const totalUsd = scolaireUsd + otherUsd
   const totalCdf = scolaireCdf + otherCdf
 
@@ -66,7 +75,7 @@ export function TreasurySummaryCards({
             <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
               <ArrowDownCircle className="w-5 h-5 text-green-500" />
             </div>
-            <FlowBadge type="in" />
+            <FlowBadge type="in" theme={theme} />
           </div>
           <p className={`text-xs ${textSecondary} uppercase font-semibold tracking-wide`}>
             Recettes (frais élèves)
@@ -79,13 +88,13 @@ export function TreasurySummaryCards({
           </p>
           <div className="mt-2 space-y-0.5">
             {(totalUsd > 0 || totalCdf === 0) && (
-              <p className="text-2xl font-bold text-green-600">{fmt(totalUsd)} $</p>
+              <p className={`text-2xl font-bold ${greenAmount}`}>{fmt(totalUsd)} $</p>
             )}
             {totalCdf > 0 && (
-              <p className={`text-base font-semibold text-green-500`}>{fmt(totalCdf)} FC</p>
+              <p className={`text-base font-semibold ${greenAmountSoft}`}>{fmt(totalCdf)} FC</p>
             )}
             {totalUsd === 0 && totalCdf === 0 && (
-              <p className="text-2xl font-bold text-green-600">0 $</p>
+              <p className={`text-2xl font-bold ${greenAmount}`}>0 $</p>
             )}
           </div>
         </CardContent>
@@ -98,13 +107,13 @@ export function TreasurySummaryCards({
             <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5 text-blue-500" />
             </div>
-            <FlowBadge type="out" />
+            <FlowBadge type="out" theme={theme} />
           </div>
           <p className={`text-xs ${textSecondary} uppercase font-semibold tracking-wide`}>
             Salaires versés
           </p>
           <p className={`text-[11px] ${textSecondary} mt-0.5`}>{flowsPeriodLabel}</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{fmt(teacherPayments)} $</p>
+          <p className={`text-2xl font-bold ${blueAmount} mt-2`}>{fmt(teacherPayments)} $</p>
         </CardContent>
       </Card>
 
@@ -115,7 +124,7 @@ export function TreasurySummaryCards({
             <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
               <ArrowUpCircle className="w-5 h-5 text-orange-500" />
             </div>
-            <FlowBadge type="out" />
+            <FlowBadge type="out" theme={theme} />
           </div>
           <p className={`text-xs ${textSecondary} uppercase font-semibold tracking-wide`}>
             Dépenses diverses
@@ -123,13 +132,13 @@ export function TreasurySummaryCards({
           <p className={`text-[11px] ${textSecondary} mt-0.5`}>{flowsPeriodLabel}</p>
           <div className="mt-2 space-y-0.5">
             {expensesUsd > 0 && (
-              <p className="text-2xl font-bold text-orange-600">{fmt(expensesUsd)} $</p>
+              <p className={`text-2xl font-bold ${orangeAmount}`}>{fmt(expensesUsd)} $</p>
             )}
             {expensesCdf > 0 && (
-              <p className="text-base font-semibold text-orange-500">{fmt(expensesCdf)} FC</p>
+              <p className={`text-base font-semibold ${orangeAmountSoft}`}>{fmt(expensesCdf)} FC</p>
             )}
             {expensesUsd === 0 && expensesCdf === 0 && (
-              <p className="text-2xl font-bold text-orange-600">0 $</p>
+              <p className={`text-2xl font-bold ${orangeAmount}`}>0 $</p>
             )}
           </div>
         </CardContent>
@@ -222,9 +231,9 @@ export function TreasuryIncomeBreakdown({
                   />
                 </div>
                 <div className={`mt-1 text-xs ${textSecondary}`}>
-                  {row.usd > 0 && <span className="text-green-600 font-medium">{fmt(row.usd)} $</span>}
+                  {row.usd > 0 && <span className={`font-medium ${theme === "dark" ? "text-green-400" : "text-green-600"}`}>{fmt(row.usd)} $</span>}
                   {row.usd > 0 && row.cdf > 0 && " · "}
-                  {row.cdf > 0 && <span className="text-green-600 font-medium">{fmt(row.cdf)} FC</span>}
+                  {row.cdf > 0 && <span className={`font-medium ${theme === "dark" ? "text-green-400" : "text-green-600"}`}>{fmt(row.cdf)} FC</span>}
                 </div>
               </div>
             )

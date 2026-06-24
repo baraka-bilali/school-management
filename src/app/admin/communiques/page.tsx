@@ -10,11 +10,12 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import Color from "@tiptap/extension-color"
 import { authFetch } from "@/lib/auth-fetch"
 import {
-  Megaphone, Send, Clock, Eye, ChevronRight, Loader2, Trash2,
+  Megaphone, Send, Clock, Eye, ChevronRight, Loader2, Trash2, Pencil,
   Bold, Italic, UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, Undo, Redo, Type, Check, X
 } from "lucide-react"
 import Link from "next/link"
+import Portal from "@/components/portal"
 
 interface Communique {
   id: number
@@ -87,6 +88,10 @@ export default function AdminCommuniquesPage() {
   const [hasMore, setHasMore] = useState(false)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [editingCommunique, setEditingCommunique] = useState<Communique | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editStatus, setEditStatus] = useState<"idle" | "success" | "error">("idle")
 
   const [editorEmpty, setEditorEmpty] = useState(true)
 
@@ -108,6 +113,29 @@ export default function AdminCommuniquesPage() {
       },
     },
   })
+
+  const editEditor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TextStyle,
+      Color,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+    ],
+    content: "",
+    editorProps: {
+      attributes: {
+        class: "prose prose-sm dark:prose-invert max-w-none min-h-[180px] p-4 outline-none focus:ring-0",
+      },
+    },
+  })
+
+  useEffect(() => {
+    if (editingCommunique && editEditor) {
+      setEditTitle(editingCommunique.title)
+      editEditor.commands.setContent(editingCommunique.content)
+    }
+  }, [editingCommunique, editEditor])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -179,6 +207,35 @@ export default function AdminCommuniquesPage() {
         setDeleteConfirmId(null)
       }
     } catch {}
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingCommunique || !editEditor || !editTitle.trim()) return
+    setSavingEdit(true)
+    setEditStatus("idle")
+    try {
+      const res = await authFetch(`/api/admin/communiques/${editingCommunique.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle.trim(), content: editEditor.getHTML() }),
+      })
+      if (res.ok) {
+        const { communique } = await res.json()
+        setCommuniques((prev) => prev.map((c) => (c.id === communique.id ? communique : c)))
+        setEditStatus("success")
+        setTimeout(() => {
+          setEditingCommunique(null)
+          setEditStatus("idle")
+        }, 800)
+      } else {
+        setEditStatus("error")
+      }
+    } catch {
+      setEditStatus("error")
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -347,6 +404,13 @@ export default function AdminCommuniquesPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => setEditingCommunique(c)}
+                            className={`p-1.5 rounded-lg transition-colors ${textSecondary} ${hoverBg}`}
+                            title="Modifier"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                           <Link
                             href={`/admin/communiques/${c.id}`}
                             className={`p-1.5 rounded-lg transition-colors ${textSecondary} ${hoverBg}`}
@@ -398,6 +462,89 @@ export default function AdminCommuniquesPage() {
             </div>
           )}
         </div>
+
+        {editingCommunique && (
+          <Portal>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => !savingEdit && setEditingCommunique(null)}
+              />
+              <div
+                className={`relative ${bgCard} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-up`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className={`px-6 py-4 border-b ${borderColor} shrink-0`}>
+                  <h3 className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+                    <div className="p-2 bg-indigo-500/20 rounded-lg">
+                      <Pencil className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    Modifier le communiqué
+                  </h3>
+                </div>
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                  <div>
+                    <label className={`text-sm font-medium ${textSecondary} block mb-1.5`}>Objet</label>
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className={`w-full px-3 py-2.5 rounded-lg border text-sm outline-none focus:border-indigo-500 ${inputBg}`}
+                      maxLength={200}
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-sm font-medium ${textSecondary} block mb-1.5`}>Contenu</label>
+                    <div className={`border ${borderColor} rounded-xl overflow-hidden ${editorBg}`}>
+                      <EditorToolbar editor={editEditor} />
+                      <EditorContent editor={editEditor} />
+                    </div>
+                  </div>
+                </div>
+                <div className={`px-6 py-4 border-t ${borderColor} shrink-0`}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      {editStatus === "success" && (
+                        <span className="text-sm text-green-500">Modifications enregistrées</span>
+                      )}
+                      {editStatus === "error" && (
+                        <span className="text-sm text-red-500">Erreur lors de la modification</span>
+                      )}
+                    </div>
+                    <div className="flex gap-3 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => setEditingCommunique(null)}
+                        disabled={savingEdit}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                          theme === "dark"
+                            ? "bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                        }`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={savingEdit || !editTitle.trim()}
+                        className="px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white"
+                      >
+                        {savingEdit ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        Enregistrer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
       </div>
     </Layout>
   )

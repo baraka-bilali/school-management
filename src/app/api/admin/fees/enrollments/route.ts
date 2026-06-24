@@ -40,10 +40,10 @@ export async function GET(req: NextRequest) {
       where.student = {
         user: { schoolId: user.schoolId },
         OR: [
-          { lastName: { contains: q.trim() } },
-          { firstName: { contains: q.trim() } },
-          { middleName: { contains: q.trim() } },
-          { code: { contains: q.trim() } },
+          { lastName: { contains: q.trim(), mode: "insensitive" } },
+          { firstName: { contains: q.trim(), mode: "insensitive" } },
+          { middleName: { contains: q.trim(), mode: "insensitive" } },
+          { code: { contains: q.trim(), mode: "insensitive" } },
         ],
       }
     }

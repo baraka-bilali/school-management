@@ -670,7 +670,7 @@ export default function AdminTreasuryPage() {
 
             {/* Onglets flux + actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 w-fit">
+              <div className={`flex gap-1 p-1 rounded-xl w-fit ${theme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}>
                 {[
                   { key: "overview" as const, label: "Tout flux" },
                   { key: "salaires" as const, label: "Salaires" },
@@ -679,7 +679,13 @@ export default function AdminTreasuryPage() {
                   <button
                     key={st.key}
                     onClick={() => setTreasurySubTab(st.key)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${treasurySubTab === st.key ? "bg-slate-800 dark:bg-slate-700 shadow text-white" : `${textSecondary} hover:text-indigo-500`}`}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      treasurySubTab === st.key
+                        ? theme === "dark"
+                          ? "bg-slate-700 shadow text-white"
+                          : "bg-indigo-600 shadow text-white"
+                        : `${textSecondary} hover:text-indigo-500`
+                    }`}
                   >
                     {st.label}
                   </button>
