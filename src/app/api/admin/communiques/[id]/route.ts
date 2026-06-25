@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -9,11 +10,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { id } = await params
     const communiqueId = parseInt(id)
+    const yearId = await getSchoolCurrentYearId(user.schoolId)
 
     const communique = await prisma.communique.findFirst({
-      where: { id: communiqueId, schoolId: user.schoolId },
+      where: {
+        id: communiqueId,
+        schoolId: user.schoolId,
+        ...(yearId ? { yearId } : {}),
+      },
       include: {
         createdBy: { select: { name: true, nom: true, prenom: true } },
+        year: { select: { id: true, name: true } },
         _count: { select: { reads: true } },
       },
     })
@@ -35,9 +42,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id } = await params
     const communiqueId = parseInt(id)
+    const yearId = await getSchoolCurrentYearId(user.schoolId)
 
     const communique = await prisma.communique.findFirst({
-      where: { id: communiqueId, schoolId: user.schoolId },
+      where: {
+        id: communiqueId,
+        schoolId: user.schoolId,
+        ...(yearId ? { yearId } : {}),
+      },
     })
 
     if (!communique) {
@@ -62,6 +74,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       },
       include: {
         createdBy: { select: { name: true, nom: true, prenom: true } },
+        year: { select: { id: true, name: true } },
         _count: { select: { reads: true } },
       },
     })
@@ -79,9 +92,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const { id } = await params
     const communiqueId = parseInt(id)
+    const yearId = await getSchoolCurrentYearId(user.schoolId)
 
     const communique = await prisma.communique.findFirst({
-      where: { id: communiqueId, schoolId: user.schoolId },
+      where: {
+        id: communiqueId,
+        schoolId: user.schoolId,
+        ...(yearId ? { yearId } : {}),
+      },
     })
 
     if (!communique) {

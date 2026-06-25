@@ -48,6 +48,7 @@ model AcademicYear {
   receiptCounters ReceiptCounter[]
   assignments     CourseAssignment[]
   slots           ScheduleSlot[]
+  communiques     Communique[]
 }
 
 model Class {
@@ -652,20 +653,24 @@ enum BreakType {
 // ============================================================
 
 model Communique {
-  id          Int      @id @default(autoincrement())
+  id          Int           @id @default(autoincrement())
   title       String
-  content     String   @db.Text
+  content     String        @db.Text
   schoolId    Int
+  yearId      Int?
   createdById Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  school      School   @relation(fields: [schoolId], references: [id])
-  createdBy   User     @relation("CommuniquesCreated", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  school      School        @relation(fields: [schoolId], references: [id])
+  year        AcademicYear? @relation(fields: [yearId], references: [id])
+  createdBy   User          @relation("CommuniquesCreated", fields: [createdById], references: [id])
   reads       CommuniqueRead[]
 
   @@index([schoolId])
+  @@index([yearId])
   @@index([createdAt])
   @@index([schoolId, createdAt])
+  @@index([schoolId, yearId])
 }
 
 model CommuniqueRead {

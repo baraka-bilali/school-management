@@ -9,6 +9,7 @@ import Underline from "@tiptap/extension-underline"
 import { TextStyle } from "@tiptap/extension-text-style"
 import Color from "@tiptap/extension-color"
 import { authFetch } from "@/lib/auth-fetch"
+import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 import {
   Megaphone, Send, Clock, Eye, ChevronRight, Loader2, Trash2, Pencil,
   Bold, Italic, UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
@@ -82,6 +83,8 @@ export default function AdminCommuniquesPage() {
   const [title, setTitle] = useState("")
   const [communiques, setCommuniques] = useState<Communique[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentYearId, setCurrentYearId] = useState<number | null>(null)
+  const [currentYearName, setCurrentYearName] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [sendStatus, setSendStatus] = useState<"idle" | "success" | "error">("idle")
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
@@ -169,6 +172,46 @@ export default function AdminCommuniquesPage() {
       setLoadingMore(false)
     }
   }, [])
+
+  useEffect(() => {
+    const loadYear = async () => {
+      try {
+        const res = await authFetch("/api/admin/meta", { credentials: "include" })
+        if (res.ok) {
+          const meta = await res.json()
+          const yearId = meta.currentYearId ?? null
+          setCurrentYearId(yearId)
+          const year = (meta.years || []).find((y: { id: number }) => y.id === yearId)
+          setCurrentYearName(year?.name ?? null)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    void loadYear()
+
+    const handleYearChange = () => {
+      const stored = localStorage.getItem("schoolCurrentYearId")
+      if (stored) setCurrentYearId(Number(stored))
+      void (async () => {
+        try {
+          const res = await authFetch("/api/admin/meta", { credentials: "include" })
+          if (res.ok) {
+            const meta = await res.json()
+            const yearId = meta.currentYearId ?? null
+            setCurrentYearId(yearId)
+            const year = (meta.years || []).find((y: { id: number }) => y.id === yearId)
+            setCurrentYearName(year?.name ?? null)
+          }
+        } catch {
+          /* ignore */
+        }
+        await fetchCommuniques(1, false)
+      })()
+    }
+    window.addEventListener("schoolSettingsChange", handleYearChange)
+    return () => window.removeEventListener("schoolSettingsChange", handleYearChange)
+  }, [fetchCommuniques])
 
   useEffect(() => { fetchCommuniques(1, false) }, [fetchCommuniques])
 
@@ -260,8 +303,15 @@ export default function AdminCommuniquesPage() {
               <Megaphone className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h1 className={`text-lg font-bold ${textColor}`}>Communiqués</h1>
-              <p className={`text-xs ${textSecondary}`}>Envoyer des messages aux élèves</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className={`text-lg font-bold ${textColor}`}>Communiqués</h1>
+                {currentYearName && (
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    Année {formatAcademicYearOptionLabel(currentYearName, true)}
+                  </span>
+                )}
+              </div>
+              <p className={`text-xs ${textSecondary}`}>Messages visibles par les élèves inscrits sur l&apos;année active</p>
             </div>
           </div>
         </div>

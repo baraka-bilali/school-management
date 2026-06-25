@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { getStudentActiveYearId } from "@/lib/communique-year"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 type JwtPayload = { id: number; role: string; schoolId?: number }
@@ -19,9 +20,13 @@ export async function GET(req: NextRequest) {
     })
     if (!student) return NextResponse.json({ unread: 0 })
 
+    const yearId = await getStudentActiveYearId(student.id)
+    if (!yearId) return NextResponse.json({ unread: 0 })
+
     const unread = await prisma.communique.count({
       where: {
         schoolId: decoded.schoolId,
+        yearId,
         reads: { none: { studentId: student.id } },
       },
     })

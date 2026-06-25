@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { getStudentActiveYearId } from "@/lib/communique-year"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -32,8 +33,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const communiqueId = parseInt(id)
   const schoolId = student.user.schoolId
 
+  const yearId = await getStudentActiveYearId(student.id)
+  if (!yearId) {
+    return NextResponse.json({ error: "Communiqué introuvable" }, { status: 404 })
+  }
+
   const communique = await prisma.communique.findFirst({
-    where: { id: communiqueId, schoolId: schoolId ?? undefined },
+    where: { id: communiqueId, schoolId: schoolId ?? undefined, yearId },
     include: {
       createdBy: { select: { name: true, nom: true, prenom: true } },
     },

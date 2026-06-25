@@ -395,8 +395,8 @@ export default function AdminFeesPage() {
   }, [])
 
   // Charger les données initiales
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
+  const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     try {
       const metaRes = await fetch("/api/admin/meta")
       let resolvedYearId: number | null = null
@@ -440,7 +440,7 @@ export default function AdminFeesPage() {
     } catch (error) {
       console.error("Erreur lors du chargement:", error)
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }, [])
 
@@ -462,8 +462,8 @@ export default function AdminFeesPage() {
   }, [fetchAll])
 
   // Charger les élèves quand l'onglet "students" est actif
-  const fetchStudentFees = useCallback(async () => {
-    setStudentFeesLoading(true)
+  const fetchStudentFees = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setStudentFeesLoading(true)
     try {
       const params = new URLSearchParams()
       if (currentYearId) params.set("yearId", String(currentYearId))
@@ -477,7 +477,7 @@ export default function AdminFeesPage() {
     } catch (error) {
       console.error("Erreur chargement élèves:", error)
     } finally {
-      setStudentFeesLoading(false)
+      if (!opts?.silent) setStudentFeesLoading(false)
       setStudentFeesFetched(true)
     }
   }, [currentYearId, sfTypeFilter])
@@ -510,6 +510,14 @@ export default function AdminFeesPage() {
       setPaiementsLoading(false)
     }
   }, [paymentsTypeFilter, paymentsYearFilter, paymentsPage])
+
+  const refreshFeesData = useCallback(async () => {
+    await fetchAll({ silent: true })
+    await fetchStudentFees({ silent: true })
+    if (activeTab === "payments") {
+      await fetchPaiements()
+    }
+  }, [fetchAll, fetchStudentFees, fetchPaiements, activeTab])
 
   useEffect(() => {
     if (activeTab === "students") {
@@ -1932,11 +1940,11 @@ export default function AdminFeesPage() {
             setShowPaymentModal(false)
             setPaymentInitialEnrollment(null)
           }}
+          onPaymentRecorded={() => { void refreshFeesData() }}
           onSuccess={() => {
             setShowPaymentModal(false)
             setPaymentInitialEnrollment(null)
-            fetchAll()
-            if (activeTab === "students") fetchStudentFees()
+            void refreshFeesData()
           }}
         />
       )}
@@ -1985,12 +1993,14 @@ function PaymentFormModal({
   initialEnrollment,
   onClose,
   onSuccess,
+  onPaymentRecorded,
 }: {
   theme: "light" | "dark"
   tarifications: Tarification[]
   initialEnrollment?: EnrollmentOption | null
   onClose: () => void
   onSuccess: () => void
+  onPaymentRecorded?: () => void
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(initialEnrollment ? 2 : 1)
   const [submitting, setSubmitting] = useState(false)
@@ -2139,6 +2149,7 @@ function PaymentFormModal({
         studentName: `${data.student.lastName} ${data.student.middleName} ${data.student.firstName}`,
       })
       setSuccess(true)
+      onPaymentRecorded?.()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur inconnue")
     } finally {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import { supabaseAdmin } from "@/lib/supabase-server"
 
 export async function GET(req: NextRequest) {
@@ -13,18 +14,29 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20")
     const skip = (page - 1) * limit
 
+    const yearIdParam = searchParams.get("yearId")
+    const yearId = yearIdParam
+      ? parseInt(yearIdParam)
+      : await getSchoolCurrentYearId(user.schoolId)
+
+    const where = {
+      schoolId: user.schoolId,
+      ...(yearId ? { yearId } : {}),
+    }
+
     const [communiques, total] = await Promise.all([
       prisma.communique.findMany({
-        where: { schoolId: user.schoolId },
+        where,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
         include: {
           createdBy: { select: { name: true, nom: true, prenom: true } },
+          year: { select: { id: true, name: true } },
           _count: { select: { reads: true } },
         },
       }),
-      prisma.communique.count({ where: { schoolId: user.schoolId } }),
+      prisma.communique.count({ where }),
     ])
 
     return NextResponse.json({
@@ -32,6 +44,7 @@ export async function GET(req: NextRequest) {
       total,
       page,
       hasMore: skip + communiques.length < total,
+      yearId,
     })
   } catch (error) {
     return handleApiError(error)
@@ -53,15 +66,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Le contenu est requis" }, { status: 400 })
     }
 
+    const yearId = await getSchoolCurrentYearId(user.schoolId)
+    if (!yearId) {
+      return NextResponse.json(
+        { error: "Aucune année scolaire active. Configurez l'année dans Paramètres." },
+        { status: 400 }
+      )
+    }
+
     const communique = await prisma.communique.create({
       data: {
         title: title.trim(),
         content: content.trim(),
         schoolId: user.schoolId,
+        yearId,
         createdById: user.id,
       },
       include: {
         createdBy: { select: { name: true, nom: true, prenom: true } },
+        year: { select: { id: true, name: true } },
       },
     })
 
@@ -71,7 +94,7 @@ export async function POST(req: NextRequest) {
       .send({
         type: "broadcast",
         event: "new_communique",
-        payload: { communiqueId: communique.id },
+        payload: { communiqueId: communique.id, yearId },
       })
 
     return NextResponse.json({ communique }, { status: 201 })
