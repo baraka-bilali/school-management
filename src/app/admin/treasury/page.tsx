@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/cards"
@@ -8,6 +8,11 @@ import { SelecteurAnneeScolaire } from "@/components/treasury/school-year-select
 import { SelecteurMois } from "@/components/treasury/school-month-select"
 import { TreasuryPeriodShortcuts } from "@/components/treasury/treasury-period-shortcuts"
 import { TreasurySummaryCards, TreasuryIncomeBreakdown } from "@/components/treasury/treasury-summary-cards"
+import {
+  TreasuryPageSkeleton,
+  TreasuryOverviewContentSkeleton,
+  TreasuryOutflowsContentSkeleton,
+} from "@/components/treasury/treasury-skeletons"
 import {
   computePeriodBounds,
   formatPeriodSubtitle,
@@ -298,8 +303,11 @@ export default function AdminTreasuryPage() {
   const yearLabel =
     treasury?.selectedYearName ?? selectedSchoolYear?.label ?? "Année scolaire"
 
+  const fetchIdRef = useRef(0)
+
   const fetchTreasury = useCallback(async () => {
     if (!trFilterYearId) return
+    const fetchId = ++fetchIdRef.current
     setTreasuryLoading(true)
     try {
       const params = new URLSearchParams()
@@ -310,19 +318,28 @@ export default function AdminTreasuryPage() {
         params.set("months", periodBounds.monthValues.join(","))
       }
       const res = await fetch(`/api/admin/fees/treasury?${params}`)
+      if (fetchId !== fetchIdRef.current) return
       if (res.ok) {
         const { data } = await res.json()
         setTreasury(data)
       }
     } catch (error) {
-      console.error("Erreur chargement trésorerie:", error)
+      if (fetchId === fetchIdRef.current) {
+        console.error("Erreur chargement trésorerie:", error)
+      }
     } finally {
-      setTreasuryLoading(false)
+      if (fetchId === fetchIdRef.current) {
+        setTreasuryLoading(false)
+      }
     }
   }, [trFilterYearId, periodBounds])
 
   useEffect(() => {
-    if (trFilterYearId) void fetchTreasury()
+    if (!trFilterYearId) return
+    const timer = setTimeout(() => {
+      void fetchTreasury()
+    }, 180)
+    return () => clearTimeout(timer)
   }, [fetchTreasury, trFilterYearId])
 
   const syncUrlParams = useCallback(
@@ -426,8 +443,7 @@ export default function AdminTreasuryPage() {
       if (res.ok) {
         setShowTeacherPaymentForm(false)
         setTpTeacherId(""); setTpMontant(""); setTpType("SALAIRE"); setTpDescription(""); setTpReference("")
-        setTreasury(null)
-        fetchTreasury()
+        void fetchTreasury()
       } else {
         const err = await res.json()
         alert(err.error || "Erreur lors de l'enregistrement")
@@ -455,8 +471,7 @@ export default function AdminTreasuryPage() {
       if (res.ok) {
         setShowExpenseForm(false)
         setExpMotif(""); setExpMontant(""); setExpCategorie("AUTRE"); setExpBeneficiaire(""); setExpReference(""); setExpDevise("USD")
-        setTreasury(null)
-        fetchTreasury()
+        void fetchTreasury()
       } else {
         const err = await res.json()
         alert(err.error || "Erreur lors de l'enregistrement")
@@ -527,6 +542,21 @@ export default function AdminTreasuryPage() {
     return true
   }) ?? []
 
+  const outflowTeacherTotal = useMemo(
+    () => filteredTeacherPayments.reduce((s, p) => s + p.montant, 0),
+    [filteredTeacherPayments]
+  )
+  const outflowExpensesUsd = useMemo(
+    () => filteredExpenses.filter((e) => e.devise === "USD").reduce((s, e) => s + e.montant, 0),
+    [filteredExpenses]
+  )
+  const outflowExpensesCdf = useMemo(
+    () => filteredExpenses.filter((e) => e.devise === "CDF").reduce((s, e) => s + e.montant, 0),
+    [filteredExpenses]
+  )
+
+  const hasOutflowClientFilters = !!(trFilterTeacher || trFilterType || trFilterCategorie)
+
   // Couleurs thème
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
@@ -552,6 +582,8 @@ export default function AdminTreasuryPage() {
   }
 
   const isCompactTables = treasurySubTab === "overview"
+  const isInitialLoad = treasuryLoading && !treasury
+  const isRefreshing = treasuryLoading && !!treasury
   const mainTabBtnClass = (active: boolean) =>
     `px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
       active
@@ -603,11 +635,9 @@ export default function AdminTreasuryPage() {
         </div>
 
         {/* Contenu */}
-        {treasuryLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-          </div>
-        ) : treasury ? (
+        {isInitialLoad ? (
+          <TreasuryPageSkeleton theme={theme} variant={treasuryMainTab} />
+        ) : (
           <div className="space-y-6">
             {/* Filtres : année scolaire + période */}
             <Card theme={theme} className="rounded-2xl shadow-sm">
@@ -644,7 +674,7 @@ export default function AdminTreasuryPage() {
                       className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[160px]`}
                     >
                       <option value="">Tous les professeurs</option>
-                      {treasury.teachers.map((t) => (
+                      {(treasury?.teachers ?? []).map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
@@ -694,6 +724,14 @@ export default function AdminTreasuryPage() {
               </CardContent>
             </Card>
 
+            {isRefreshing ? (
+              treasuryMainTab === "overview" ? (
+                <TreasuryOverviewContentSkeleton theme={theme} />
+              ) : (
+                <TreasuryOutflowsContentSkeleton theme={theme} compactTables={isCompactTables} />
+              )
+            ) : treasury ? (
+            <>
             {treasuryMainTab === "overview" ? (
               <>
                 <TreasurySummaryCards
@@ -733,9 +771,9 @@ export default function AdminTreasuryPage() {
                   scolaireCdf={treasury.scolaireIncomeCdf}
                   otherUsd={treasury.otherIncomeUsd}
                   otherCdf={treasury.otherIncomeCdf}
-                  teacherPayments={treasury.totalTeacherPayments}
-                  expensesUsd={treasury.totalExpensesUsd}
-                  expensesCdf={treasury.totalExpensesCdf}
+                  teacherPayments={hasOutflowClientFilters ? outflowTeacherTotal : treasury.totalTeacherPayments}
+                  expensesUsd={hasOutflowClientFilters ? outflowExpensesUsd : treasury.totalExpensesUsd}
+                  expensesCdf={hasOutflowClientFilters ? outflowExpensesCdf : treasury.totalExpensesCdf}
                   balanceUsd={treasury.balanceUsd}
                   balanceCdf={treasury.balanceCdf}
                   sections="outflows"
@@ -1061,8 +1099,10 @@ export default function AdminTreasuryPage() {
             </div>
               </>
             )}
+            </>
+            ) : null}
           </div>
-        ) : null}
+        )}
       </div>
     </Layout>
   )
