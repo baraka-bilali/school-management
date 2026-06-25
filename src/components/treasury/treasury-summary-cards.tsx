@@ -17,6 +17,8 @@ interface TreasurySummaryCardsProps {
   expensesCdf: number
   balanceUsd: number
   balanceCdf: number
+  /** "all" = 4 cartes · "outflows" = salaires + dépenses uniquement */
+  sections?: "all" | "outflows"
 }
 
 function fmt(n: number) {
@@ -55,9 +57,9 @@ export function TreasurySummaryCards({
   expensesCdf,
   balanceUsd,
   balanceCdf,
+  sections = "all",
 }: TreasurySummaryCardsProps) {
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-500"
-  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const greenAmount = theme === "dark" ? "text-green-400" : "text-green-600"
   const greenAmountSoft = theme === "dark" ? "text-green-500" : "text-green-500"
   const blueAmount = theme === "dark" ? "text-blue-400" : "text-blue-600"
@@ -65,10 +67,17 @@ export function TreasurySummaryCards({
   const orangeAmountSoft = theme === "dark" ? "text-orange-500" : "text-orange-500"
   const totalUsd = scolaireUsd + otherUsd
   const totalCdf = scolaireCdf + otherCdf
+  const showIncome = sections === "all"
+  const showOutflows = sections === "all" || sections === "outflows"
+  const gridClass =
+    sections === "outflows"
+      ? "grid grid-cols-1 sm:grid-cols-2 gap-4"
+      : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className={gridClass}>
       {/* Recettes */}
+      {showIncome && (
       <Card theme={theme} className="rounded-2xl shadow-sm">
         <CardContent className="pt-5 pb-5">
           <div className="flex items-start justify-between gap-2 mb-3">
@@ -99,8 +108,10 @@ export function TreasurySummaryCards({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Salaires */}
+      {showOutflows && (
       <Card theme={theme} className="rounded-2xl shadow-sm">
         <CardContent className="pt-5 pb-5">
           <div className="flex items-start justify-between gap-2 mb-3">
@@ -116,8 +127,10 @@ export function TreasurySummaryCards({
           <p className={`text-2xl font-bold ${blueAmount} mt-2`}>{fmt(teacherPayments)} $</p>
         </CardContent>
       </Card>
+      )}
 
       {/* Dépenses */}
+      {showOutflows && (
       <Card theme={theme} className="rounded-2xl shadow-sm">
         <CardContent className="pt-5 pb-5">
           <div className="flex items-start justify-between gap-2 mb-3">
@@ -143,8 +156,10 @@ export function TreasurySummaryCards({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Solde global — carte mise en avant */}
+      {showIncome && (
       <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-indigo-900 text-white p-5 shadow-lg flex flex-col justify-between min-h-[140px]">
         <div className="flex items-start justify-between">
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -169,6 +184,7 @@ export function TreasurySummaryCards({
           </p>
         </div>
       </div>
+      )}
     </div>
   )
 }

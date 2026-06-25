@@ -137,6 +137,8 @@ function formatMoisLabel(mois: string, months: MoisScolaire[]) {
   return mois
 }
 
+type TreasuryMainTab = "overview" | "outflows"
+
 export default function AdminTreasuryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -157,6 +159,7 @@ export default function AdminTreasuryPage() {
   // Trésorerie
   const [treasury, setTreasury] = useState<TreasuryData | null>(null)
   const [treasuryLoading, setTreasuryLoading] = useState(false)
+  const [treasuryMainTab, setTreasuryMainTab] = useState<TreasuryMainTab>("overview")
   const [treasurySubTab, setTreasurySubTab] = useState<"overview" | "salaires" | "depenses">("overview")
   const [academicYears, setAcademicYears] = useState<AnneeScolaire[]>([])
   const [trFilterYearId, setTrFilterYearId] = useState<number | null>(null)
@@ -254,6 +257,9 @@ export default function AdminTreasuryPage() {
             ? urlShortcut
             : "this_month"
         )
+
+        const urlView = searchParams.get("view")
+        if (urlView === "outflows") setTreasuryMainTab("outflows")
       } catch {
         /* ignore */
       }
@@ -330,6 +336,21 @@ export default function AdminTreasuryPage() {
     },
     [router]
   )
+
+  const handleMainTabChange = (tab: TreasuryMainTab) => {
+    setTreasuryMainTab(tab)
+    if (tab === "overview") {
+      setShowTeacherPaymentForm(false)
+      setShowExpenseForm(false)
+    }
+    const params = new URLSearchParams()
+    if (trFilterYearId) params.set("yearId", String(trFilterYearId))
+    if (trFilterMonth) params.set("month", trFilterMonth)
+    if (periodShortcut !== "this_month") params.set("period", periodShortcut)
+    if (tab === "outflows") params.set("view", "outflows")
+    const qs = params.toString()
+    router.replace(qs ? `/admin/treasury?${qs}` : "/admin/treasury", { scroll: false })
+  }
 
   const handleYearChange = (yearId: number) => {
     setTrFilterYearId(yearId)
@@ -531,12 +552,22 @@ export default function AdminTreasuryPage() {
   }
 
   const isCompactTables = treasurySubTab === "overview"
+  const mainTabBtnClass = (active: boolean) =>
+    `px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+      active
+        ? theme === "dark"
+          ? "bg-indigo-600 border-indigo-500 text-white shadow-md"
+          : "bg-indigo-600 border-indigo-600 text-white shadow-md"
+        : theme === "dark"
+          ? "border-gray-600 text-gray-400 hover:border-indigo-500/50 hover:text-indigo-300"
+          : "border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 bg-white"
+    }`
 
   return (
     <Layout>
       <div className="p-4 md:p-6 space-y-6">
         {/* En-tête */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <h1 className={`text-2xl font-bold ${textColor} flex items-center gap-3`}>
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -550,6 +581,24 @@ export default function AdminTreasuryPage() {
                 {yearLabel} · {periodSubtitle}
               </span>
             )}
+          </div>
+
+          {/* Onglets principaux */}
+          <div className="flex gap-2 shrink-0 self-start">
+            <button
+              type="button"
+              onClick={() => handleMainTabChange("overview")}
+              className={mainTabBtnClass(treasuryMainTab === "overview")}
+            >
+              Vue d&apos;ensemble
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMainTabChange("outflows")}
+              className={mainTabBtnClass(treasuryMainTab === "outflows")}
+            >
+              Dépenses & salaires
+            </button>
           </div>
         </div>
 
@@ -586,6 +635,7 @@ export default function AdminTreasuryPage() {
                   </div>
                 </div>
 
+                {treasuryMainTab === "outflows" && (
                 <div className="flex flex-wrap gap-3 items-center pt-1 border-t border-dashed border-gray-200 dark:border-gray-700">
                   {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
                     <select
@@ -640,33 +690,56 @@ export default function AdminTreasuryPage() {
                     </button>
                   )}
                 </div>
+                )}
               </CardContent>
             </Card>
 
-            <TreasurySummaryCards
-              theme={theme}
-              yearLabel={yearLabel}
-              incomePeriodLabel={periodSubtitle}
-              flowsPeriodLabel={periodSubtitle}
-              scolaireUsd={treasury.scolaireIncomeUsd}
-              scolaireCdf={treasury.scolaireIncomeCdf}
-              otherUsd={treasury.otherIncomeUsd}
-              otherCdf={treasury.otherIncomeCdf}
-              teacherPayments={treasury.totalTeacherPayments}
-              expensesUsd={treasury.totalExpensesUsd}
-              expensesCdf={treasury.totalExpensesCdf}
-              balanceUsd={treasury.balanceUsd}
-              balanceCdf={treasury.balanceCdf}
-            />
+            {treasuryMainTab === "overview" ? (
+              <>
+                <TreasurySummaryCards
+                  theme={theme}
+                  yearLabel={yearLabel}
+                  incomePeriodLabel={periodSubtitle}
+                  flowsPeriodLabel={periodSubtitle}
+                  scolaireUsd={treasury.scolaireIncomeUsd}
+                  scolaireCdf={treasury.scolaireIncomeCdf}
+                  otherUsd={treasury.otherIncomeUsd}
+                  otherCdf={treasury.otherIncomeCdf}
+                  teacherPayments={treasury.totalTeacherPayments}
+                  expensesUsd={treasury.totalExpensesUsd}
+                  expensesCdf={treasury.totalExpensesCdf}
+                  balanceUsd={treasury.balanceUsd}
+                  balanceCdf={treasury.balanceCdf}
+                  sections="all"
+                />
 
-            {treasury.incomeByType.length > 0 && (
-              <TreasuryIncomeBreakdown
-                theme={theme}
-                rows={treasury.incomeByType}
-                exchangeRate={exchangeRate}
-                periodLabel={periodSubtitle}
-              />
-            )}
+                {treasury.incomeByType.length > 0 && (
+                  <TreasuryIncomeBreakdown
+                    theme={theme}
+                    rows={treasury.incomeByType}
+                    exchangeRate={exchangeRate}
+                    periodLabel={periodSubtitle}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <TreasurySummaryCards
+                  theme={theme}
+                  yearLabel={yearLabel}
+                  incomePeriodLabel={periodSubtitle}
+                  flowsPeriodLabel={periodSubtitle}
+                  scolaireUsd={treasury.scolaireIncomeUsd}
+                  scolaireCdf={treasury.scolaireIncomeCdf}
+                  otherUsd={treasury.otherIncomeUsd}
+                  otherCdf={treasury.otherIncomeCdf}
+                  teacherPayments={treasury.totalTeacherPayments}
+                  expensesUsd={treasury.totalExpensesUsd}
+                  expensesCdf={treasury.totalExpensesCdf}
+                  balanceUsd={treasury.balanceUsd}
+                  balanceCdf={treasury.balanceCdf}
+                  sections="outflows"
+                />
 
             {/* Onglets flux + actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -986,6 +1059,8 @@ export default function AdminTreasuryPage() {
               </Card>
             )}
             </div>
+              </>
+            )}
           </div>
         ) : null}
       </div>
