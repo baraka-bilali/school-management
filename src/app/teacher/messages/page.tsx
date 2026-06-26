@@ -17,6 +17,10 @@ import {
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
+import {
+  displayNotificationMessage,
+  parseCommuniqueIdFromNotification,
+} from "@/lib/communique-user-read"
 
 interface Notification {
   id: number
@@ -89,6 +93,15 @@ function MessagesContent() {
   }, [fetchNotifications, fetchCommuniques])
 
   useEffect(() => {
+    const onNew = () => {
+      void fetchNotifications()
+      void fetchCommuniques()
+    }
+    window.addEventListener("teacherNewCommunique", onNew)
+    return () => window.removeEventListener("teacherNewCommunique", onNew)
+  }, [fetchNotifications, fetchCommuniques])
+
+  useEffect(() => {
     if (searchParams.get("tab") === "communiques") setTab("communiques")
   }, [searchParams])
 
@@ -137,8 +150,12 @@ function MessagesContent() {
     try {
       const res = await fetch(`/api/teacher/communiques/${id}`, { credentials: "include" })
       if (res.ok) {
-        setCommuniques((prev) => prev.map((c) => (c.id === id ? { ...c, isRead: true } : c)))
-        window.dispatchEvent(new Event("teacherCommuniqueRead"))
+        setCommuniques((prev) => {
+          const next = prev.map((c) => (c.id === id ? { ...c, isRead: true } : c))
+          const unread = next.filter((c) => !c.isRead).length
+          window.dispatchEvent(new CustomEvent("teacherCommuniqueRead", { detail: { unread } }))
+          return next
+        })
         return true
       }
     } catch {}
@@ -152,15 +169,21 @@ function MessagesContent() {
         credentials: "include",
       })
       if (res.ok) {
-        setCommuniques((prev) => prev.map((c) => ({ ...c, isRead: true })))
-        window.dispatchEvent(new Event("teacherCommuniqueRead"))
+        setCommuniques((prev) => {
+          const next = prev.map((c) => ({ ...c, isRead: true }))
+          window.dispatchEvent(new CustomEvent("teacherCommuniqueRead", { detail: { unread: 0 } }))
+          return next
+        })
         return true
       }
     } catch {}
     return false
   }
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, message: string) => {
+    if (parseCommuniqueIdFromNotification(message)) {
+      return <Megaphone className="h-5 w-5 text-indigo-500" />
+    }
     switch (type) {
       case "FEE":
       case "PAYMENT":
@@ -254,7 +277,14 @@ function MessagesContent() {
                 type="button"
                 onClick={async () => {
                   if (!n.isRead) await markAsRead(n.id)
-                  if (n.type === "FEE" || n.type === "PAYMENT") router.push("/teacher/wallet")
+                  const communiqueId = parseCommuniqueIdFromNotification(n.message)
+                  if (communiqueId) {
+                    router.push(`/teacher/communiques/${communiqueId}`)
+                    return
+                  }
+                  if (n.type === "FEE" || n.type === "PAYMENT" || n.message.includes("Paiement reçu")) {
+                    router.push("/teacher/wallet")
+                  }
                 }}
                 className={cn(
                   "w-full rounded-2xl border p-4 text-left",
@@ -265,10 +295,12 @@ function MessagesContent() {
               >
                 <div className="flex items-start gap-3">
                   <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", n.isRead ? (isDark ? "bg-gray-800" : "bg-gray-100") : "bg-indigo-100 dark:bg-indigo-500/20")}>
-                    {getNotificationIcon(n.type)}
+                    {getNotificationIcon(n.type, n.message)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={cn("text-sm", n.isRead ? textMuted : cn(text, "font-medium"))}>{n.message}</p>
+                    <p className={cn("text-sm", n.isRead ? textMuted : cn(text, "font-medium"))}>
+                      {displayNotificationMessage(n.message)}
+                    </p>
                     <p className={cn("mt-1 flex items-center gap-1 text-xs", textMuted)}>
                       <Clock className="h-3 w-3" />
                       {formatDate(n.createdAt)}

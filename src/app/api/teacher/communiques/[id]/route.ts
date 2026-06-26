@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import { markCommuniqueReadForUser } from "@/lib/communique-user-read"
 
 export async function GET(
   req: NextRequest,
@@ -20,7 +21,9 @@ export async function GET(
     where: {
       id: communiqueId,
       schoolId: ctx.schoolId,
-      ...(yearId ? { yearId } : {}),
+      ...(yearId
+        ? { OR: [{ yearId }, { yearId: null }] }
+        : {}),
     },
     include: {
       createdBy: { select: { name: true, nom: true, prenom: true } },
@@ -31,12 +34,16 @@ export async function GET(
     return NextResponse.json({ error: "Communiqué introuvable" }, { status: 404 })
   }
 
-  await prisma.communiqueUserRead.upsert({
+  await markCommuniqueReadForUser(ctx.userId, communiqueId)
+
+  // Marquer aussi la notification associée comme lue
+  await prisma.notification.updateMany({
     where: {
-      communiqueId_userId: { communiqueId, userId: ctx.userId },
+      userId: ctx.userId,
+      isRead: false,
+      message: { startsWith: `COMMUNIQUE:${communiqueId}|` },
     },
-    create: { communiqueId, userId: ctx.userId },
-    update: {},
+    data: { isRead: true },
   })
 
   return NextResponse.json({ communique })

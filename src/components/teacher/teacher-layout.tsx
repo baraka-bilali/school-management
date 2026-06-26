@@ -108,15 +108,25 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       }
       void fetchUnreadNotifications().then(setUnreadNotifications)
     }
-    const handleCommuniqueRead = () => {
+    const handleCommuniqueRead = (evt?: Event) => {
+      const custom = evt as CustomEvent<{ unread?: number }>
+      if (typeof custom?.detail?.unread === "number") {
+        setUnreadCommuniques(custom.detail.unread)
+        return
+      }
       void fetchUnreadCommuniques().then(setUnreadCommuniques)
+    }
+    const handleNewCommunique = () => {
+      void refreshCounts()
     }
 
     window.addEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
-    window.addEventListener("teacherCommuniqueRead", handleCommuniqueRead)
+    window.addEventListener("teacherCommuniqueRead", handleCommuniqueRead as EventListener)
+    window.addEventListener("teacherNewCommunique", handleNewCommunique)
     return () => {
       window.removeEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
-      window.removeEventListener("teacherCommuniqueRead", handleCommuniqueRead)
+      window.removeEventListener("teacherCommuniqueRead", handleCommuniqueRead as EventListener)
+      window.removeEventListener("teacherNewCommunique", handleNewCommunique)
     }
   }, [])
 
@@ -145,9 +155,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((p) => p + 1)
+        setUnreadNotifications((p) => p + 1)
         void showSystemNotification("digiSchool", "Nouveau communiqué", {
           url: "/teacher/messages?tab=communiques",
         })
+        window.dispatchEvent(new Event("teacherNewCommunique"))
       })
       .subscribe()
     return () => { supabaseBrowser.removeChannel(channel) }

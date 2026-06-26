@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import {
+  communiqueYearFilter,
+  getUserReadCommuniqueIds,
+} from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
   const ctx = await getTeacherFromRequest(req)
@@ -10,16 +14,14 @@ export async function GET(req: NextRequest) {
   }
 
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
-  if (!yearId) {
-    return NextResponse.json({ communiques: [], total: 0, page: 1, hasMore: false })
-  }
 
   const { searchParams } = new URL(req.url)
   const page = parseInt(searchParams.get("page") || "1")
   const limit = parseInt(searchParams.get("limit") || "20")
   const skip = (page - 1) * limit
 
-  const where = { schoolId: ctx.schoolId, yearId }
+  const where = communiqueYearFilter(ctx.schoolId, yearId)
+  const readIds = await getUserReadCommuniqueIds(ctx.userId)
 
   const [communiques, total] = await Promise.all([
     prisma.communique.findMany({
@@ -29,20 +31,15 @@ export async function GET(req: NextRequest) {
       take: limit,
       include: {
         createdBy: { select: { name: true, nom: true, prenom: true } },
-        userReads: {
-          where: { userId: ctx.userId },
-          select: { id: true },
-          take: 1,
-        },
       },
     }),
     prisma.communique.count({ where }),
   ])
 
   return NextResponse.json({
-    communiques: communiques.map(({ userReads, ...c }) => ({
+    communiques: communiques.map((c) => ({
       ...c,
-      isRead: userReads.length > 0,
+      isRead: readIds.has(c.id),
     })),
     total,
     page,

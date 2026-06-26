@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import {
+  communiqueYearFilter,
+  getUserReadCommuniqueIds,
+} from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
   const ctx = await getTeacherFromRequest(req)
@@ -10,17 +14,17 @@ export async function GET(req: NextRequest) {
   }
 
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
-  if (!yearId) {
-    return NextResponse.json({ unread: 0 })
-  }
+  const where = communiqueYearFilter(ctx.schoolId, yearId)
 
-  const unread = await prisma.communique.count({
+  const readIds = await getUserReadCommuniqueIds(ctx.userId)
+
+  const communiques = await prisma.communique.findMany({
     where: {
-      schoolId: ctx.schoolId,
-      yearId,
-      userReads: { none: { userId: ctx.userId } },
+      ...where,
+      ...(readIds.size > 0 ? { id: { notIn: Array.from(readIds) } } : {}),
     },
+    select: { id: true },
   })
 
-  return NextResponse.json({ unread })
+  return NextResponse.json({ unread: communiques.length })
 }

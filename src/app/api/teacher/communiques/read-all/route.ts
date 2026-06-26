@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import {
+  communiqueYearFilter,
+  getUserReadCommuniqueIds,
+  markAllCommuniquesReadForUser,
+} from "@/lib/communique-user-read"
 
 export async function POST(req: NextRequest) {
   const ctx = await getTeacherFromRequest(req)
@@ -10,25 +15,21 @@ export async function POST(req: NextRequest) {
   }
 
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
-  if (!yearId) {
-    return NextResponse.json({ success: true })
-  }
+  const where = communiqueYearFilter(ctx.schoolId, yearId)
+  const readIds = await getUserReadCommuniqueIds(ctx.userId)
 
   const unread = await prisma.communique.findMany({
     where: {
-      schoolId: ctx.schoolId,
-      yearId,
-      userReads: { none: { userId: ctx.userId } },
+      ...where,
+      ...(readIds.size > 0 ? { id: { notIn: Array.from(readIds) } } : {}),
     },
     select: { id: true },
   })
 
-  if (unread.length > 0) {
-    await prisma.communiqueUserRead.createMany({
-      data: unread.map((c) => ({ communiqueId: c.id, userId: ctx.userId })),
-      skipDuplicates: true,
-    })
-  }
+  await markAllCommuniquesReadForUser(
+    ctx.userId,
+    unread.map((c) => c.id)
+  )
 
   return NextResponse.json({ success: true })
 }

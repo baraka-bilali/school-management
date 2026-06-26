@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { communiqueNotificationMessage } from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
   try {
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Broadcast realtime to all students of this school
+    // Broadcast realtime + notifications professeurs
     await supabaseAdmin
       .channel(`communiques:school:${user.schoolId}`)
       .send({
@@ -96,6 +97,25 @@ export async function POST(req: NextRequest) {
         event: "new_communique",
         payload: { communiqueId: communique.id, yearId },
       })
+
+    const teachers = await prisma.teacher.findMany({
+      where: {
+        user: { schoolId: user.schoolId, isActive: true },
+      },
+      select: { userId: true },
+    })
+
+    if (teachers.length > 0) {
+      await prisma.notification.createMany({
+        data: teachers.map((t) => ({
+          type: "SYSTEM_MESSAGE" as const,
+          message: communiqueNotificationMessage(title.trim(), communique.id),
+          schoolId: user.schoolId,
+          userId: t.userId,
+          targetRole: "SCHOOL_USER_ONLY" as const,
+        })),
+      })
+    }
 
     return NextResponse.json({ communique }, { status: 201 })
   } catch (error) {
