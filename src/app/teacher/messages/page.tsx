@@ -105,6 +105,10 @@ function MessagesContent() {
     if (searchParams.get("tab") === "communiques") setTab("communiques")
   }, [searchParams])
 
+  const syncBell = () => {
+    window.dispatchEvent(new Event("teacherMessagesUpdated"))
+  }
+
   const markAsRead = async (id: number) => {
     try {
       const res = await fetch("/api/teacher/notifications", {
@@ -114,12 +118,8 @@ function MessagesContent() {
         body: JSON.stringify({ id }),
       })
       if (res.ok) {
-        setNotifications((prev) => {
-          const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-          const unread = next.filter((n) => !n.isRead).length
-          window.dispatchEvent(new CustomEvent("teacherNotificationsUpdated", { detail: { unread } }))
-          return next
-        })
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+        syncBell()
         return true
       }
     } catch {}
@@ -135,11 +135,8 @@ function MessagesContent() {
         body: JSON.stringify({ readAll: true }),
       })
       if (res.ok) {
-        setNotifications((prev) => {
-          const next = prev.map((n) => ({ ...n, isRead: true }))
-          window.dispatchEvent(new CustomEvent("teacherNotificationsUpdated", { detail: { unread: 0 } }))
-          return next
-        })
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+        syncBell()
         return true
       }
     } catch {}
@@ -150,12 +147,13 @@ function MessagesContent() {
     try {
       const res = await fetch(`/api/teacher/communiques/${id}`, { credentials: "include" })
       if (res.ok) {
-        setCommuniques((prev) => {
-          const next = prev.map((c) => (c.id === id ? { ...c, isRead: true } : c))
-          const unread = next.filter((c) => !c.isRead).length
-          window.dispatchEvent(new CustomEvent("teacherCommuniqueRead", { detail: { unread } }))
-          return next
-        })
+        setCommuniques((prev) => prev.map((c) => (c.id === id ? { ...c, isRead: true } : c)))
+        setNotifications((prev) =>
+          prev.map((n) =>
+            parseCommuniqueIdFromNotification(n.message) === id ? { ...n, isRead: true } : n
+          )
+        )
+        syncBell()
         return true
       }
     } catch {}
@@ -169,11 +167,13 @@ function MessagesContent() {
         credentials: "include",
       })
       if (res.ok) {
-        setCommuniques((prev) => {
-          const next = prev.map((c) => ({ ...c, isRead: true }))
-          window.dispatchEvent(new CustomEvent("teacherCommuniqueRead", { detail: { unread: 0 } }))
-          return next
-        })
+        setCommuniques((prev) => prev.map((c) => ({ ...c, isRead: true })))
+        setNotifications((prev) =>
+          prev.map((n) =>
+            parseCommuniqueIdFromNotification(n.message) ? { ...n, isRead: true } : n
+          )
+        )
+        syncBell()
         return true
       }
     } catch {}
@@ -276,12 +276,14 @@ function MessagesContent() {
                 key={n.id}
                 type="button"
                 onClick={async () => {
-                  if (!n.isRead) await markAsRead(n.id)
                   const communiqueId = parseCommuniqueIdFromNotification(n.message)
                   if (communiqueId) {
+                    await fetch(`/api/teacher/communiques/${communiqueId}`, { credentials: "include" })
+                    syncBell()
                     router.push(`/teacher/communiques/${communiqueId}`)
                     return
                   }
+                  if (!n.isRead) await markAsRead(n.id)
                   if (n.type === "FEE" || n.type === "PAYMENT" || n.message.includes("Paiement reçu")) {
                     router.push("/teacher/wallet")
                   }

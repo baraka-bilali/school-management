@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { supabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
+import { parseCommuniqueIdFromNotification } from "@/lib/communique-user-read"
 import { cn } from "@/lib/utils"
 import TeacherHeader from "./teacher-header"
 import TeacherDesktopHeader from "./teacher-desktop-header"
@@ -11,26 +12,28 @@ import TeacherSidebar from "./teacher-sidebar"
 import TeacherBottomNav from "./teacher-bottom-nav"
 import { useTeacherTheme } from "./use-teacher-theme"
 
-async function fetchUnreadNotifications(): Promise<number> {
+async function fetchMessageCounts(): Promise<{ comm: number; otherNotif: number }> {
   try {
-    const res = await fetch("/api/teacher/notifications", { credentials: "include" })
-    if (res.ok) {
-      const data = await res.json()
-      return (data.notifications || []).filter((n: { isRead: boolean }) => !n.isRead).length
+    const [notifRes, commRes] = await Promise.all([
+      fetch("/api/teacher/notifications", { credentials: "include", cache: "no-store" }),
+      fetch("/api/teacher/communiques/count", { credentials: "include", cache: "no-store" }),
+    ])
+    let otherNotif = 0
+    let comm = 0
+    if (notifRes.ok) {
+      const data = await notifRes.json()
+      otherNotif = (data.notifications || []).filter(
+        (n: { isRead: boolean; message: string }) =>
+          !n.isRead && !parseCommuniqueIdFromNotification(n.message)
+      ).length
     }
-  } catch {}
-  return 0
-}
-
-async function fetchUnreadCommuniques(): Promise<number> {
-  try {
-    const res = await fetch("/api/teacher/communiques/count", { credentials: "include" })
-    if (res.ok) {
-      const data = await res.json()
-      return data.unread || 0
+    if (commRes.ok) {
+      comm = (await commRes.json()).unread || 0
     }
-  } catch {}
-  return 0
+    return { comm, otherNotif }
+  } catch {
+    return { comm: 0, otherNotif: 0 }
+  }
 }
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
@@ -44,13 +47,19 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     userId: number
     schoolId: number
   } | null>(null)
-  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
+  const [unreadOtherNotifications, setUnreadOtherNotifications] = useState(0)
   const [walletPulse, setWalletPulse] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
 
-  const totalUnread = unreadNotifications + unreadCommuniques
+  const totalUnread = unreadCommuniques + unreadOtherNotifications
+
+  const refreshCounts = useCallback(async () => {
+    const { comm, otherNotif } = await fetchMessageCounts()
+    setUnreadCommuniques(comm)
+    setUnreadOtherNotifications(otherNotif)
+  }, [])
 
   useEffect(() => {
     const saved = localStorage.getItem("teacher-sidebar-open")
@@ -65,11 +74,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     })
   }
 
-  const refreshCounts = async () => {
-    const [notif, comm] = await Promise.all([fetchUnreadNotifications(), fetchUnreadCommuniques()])
-    setUnreadNotifications(notif)
-    setUnreadCommuniques(comm)
-  }
+  // Charger les compteurs immédiatement (sans attendre /me)
+  useEffect(() => {
+    void refreshCounts()
+  }, [refreshCounts])
 
   useEffect(() => {
     const load = async () => {
@@ -94,41 +102,34 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       } catch (e) {
         console.error(e)
       }
-      await refreshCounts()
     }
     void load()
   }, [])
 
   useEffect(() => {
+    const handleMessagesUpdated = () => {
+      void refreshCounts()
+    }
     const handleNotifUpdate = (evt: Event) => {
-      const custom = evt as CustomEvent<{ unread?: number }>
-      if (typeof custom.detail?.unread === "number") {
-        setUnreadNotifications(custom.detail.unread)
+      const custom = evt as CustomEvent<{ unread?: number; otherOnly?: number }>
+      if (typeof custom.detail?.otherOnly === "number") {
+        setUnreadOtherNotifications(custom.detail.otherOnly)
         return
       }
-      void fetchUnreadNotifications().then(setUnreadNotifications)
-    }
-    const handleCommuniqueRead = (evt?: Event) => {
-      const custom = evt as CustomEvent<{ unread?: number }>
-      if (typeof custom?.detail?.unread === "number") {
-        setUnreadCommuniques(custom.detail.unread)
-        return
-      }
-      void fetchUnreadCommuniques().then(setUnreadCommuniques)
-    }
-    const handleNewCommunique = () => {
       void refreshCounts()
     }
 
+    window.addEventListener("teacherMessagesUpdated", handleMessagesUpdated)
     window.addEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
-    window.addEventListener("teacherCommuniqueRead", handleCommuniqueRead as EventListener)
-    window.addEventListener("teacherNewCommunique", handleNewCommunique)
+    window.addEventListener("teacherCommuniqueRead", handleMessagesUpdated)
+    window.addEventListener("teacherNewCommunique", handleMessagesUpdated)
     return () => {
+      window.removeEventListener("teacherMessagesUpdated", handleMessagesUpdated)
       window.removeEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
-      window.removeEventListener("teacherCommuniqueRead", handleCommuniqueRead as EventListener)
-      window.removeEventListener("teacherNewCommunique", handleNewCommunique)
+      window.removeEventListener("teacherCommuniqueRead", handleMessagesUpdated)
+      window.removeEventListener("teacherNewCommunique", handleMessagesUpdated)
     }
-  }, [])
+  }, [refreshCounts])
 
   useEffect(() => {
     if (!teacher?.userId) return
@@ -136,7 +137,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       .channel(`payments:teacher:${teacher.userId}`)
       .on("broadcast", { event: "payment_received" }, (payload) => {
         setWalletPulse(true)
-        setUnreadNotifications((p) => p + 1)
+        setUnreadOtherNotifications((p) => p + 1)
         const inv = (payload.payload as { invoiceNumber?: string })?.invoiceNumber
         void showSystemNotification(
           "digiSchool",
@@ -155,7 +156,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((p) => p + 1)
-        setUnreadNotifications((p) => p + 1)
         void showSystemNotification("digiSchool", "Nouveau communiqué", {
           url: "/teacher/messages?tab=communiques",
         })
@@ -167,12 +167,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (pathname === "/teacher/wallet") setWalletPulse(false)
-  }, [pathname])
-
-  useEffect(() => {
-    if (pathname.startsWith("/teacher/messages") || pathname.startsWith("/teacher/communiques")) {
-      void refreshCounts()
-    }
   }, [pathname])
 
   const handleLogout = async () => {

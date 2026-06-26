@@ -31,5 +31,18 @@ export async function POST(req: NextRequest) {
     unread.map((c) => c.id)
   )
 
+  if (unread.length > 0) {
+    await prisma.notification.updateMany({
+      where: {
+        userId: ctx.userId,
+        isRead: false,
+        OR: unread.map((c) => ({
+          message: { startsWith: `COMMUNIQUE:${c.id}|` },
+        })),
+      },
+      data: { isRead: true },
+    })
+  }
+
   return NextResponse.json({ success: true })
 }

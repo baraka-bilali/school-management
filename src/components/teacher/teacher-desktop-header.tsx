@@ -25,6 +25,7 @@ export default function TeacherDesktopHeader({
       <div className="flex h-14 items-center justify-end gap-3 px-6 xl:px-8">
         <Link
           href="/teacher/messages"
+          onMouseDown={() => window.dispatchEvent(new Event("teacherMessagesUpdated"))}
           className={cn(
             "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors",
             isDark ? "text-gray-300 hover:bg-white/10" : "text-indigo-600 hover:bg-white"

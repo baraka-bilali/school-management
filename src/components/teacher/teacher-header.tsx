@@ -42,6 +42,7 @@ export default function TeacherHeader({
         </h1>
         <Link
           href="/teacher/messages"
+          onMouseDown={() => window.dispatchEvent(new Event("teacherMessagesUpdated"))}
           className={cn(
             "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
             isDark ? "text-gray-300 hover:bg-gray-800" : "text-indigo-600 hover:bg-white"
