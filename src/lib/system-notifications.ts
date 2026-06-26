@@ -1,7 +1,5 @@
 "use client"
 
-import { playBing } from "@/lib/play-bing"
-
 export type NotificationPermissionState = "default" | "granted" | "denied"
 
 export function getNotificationPermission(): NotificationPermissionState {
@@ -17,25 +15,23 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return result as NotificationPermissionState
 }
 
-/** Affiche une notification système (son natif OS) via le service worker ou l'API Notification. */
+/** Affiche une notification système avec le son natif de l'appareil (via le service worker ou l'API Notification). */
 export async function showSystemNotification(
   title: string,
   body: string,
   options?: { url?: string; silent?: boolean }
 ) {
   if (typeof window === "undefined") return
-  if (!("Notification" in window) || Notification.permission !== "granted") {
-    if (!options?.silent) playBing()
-    return
-  }
+  if (!("Notification" in window) || Notification.permission !== "granted") return
 
   const payload = { title, body, url: options?.url || "/" }
+  const silent = options?.silent ?? false
 
   try {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready
       if (reg.active) {
-        reg.active.postMessage({ type: "SHOW_NOTIFICATION", payload })
+        reg.active.postMessage({ type: "SHOW_NOTIFICATION", payload: { ...payload, silent } })
         return
       }
     }
@@ -47,7 +43,7 @@ export async function showSystemNotification(
       icon: "/icons/icon.svg",
       badge: "/icons/icon.svg",
       tag: "digischool-notification",
-      silent: options?.silent ?? false,
+      silent,
       data: { url: payload.url },
     })
     n.onclick = () => {
@@ -55,7 +51,5 @@ export async function showSystemNotification(
       if (payload.url) window.location.href = payload.url
       n.close()
     }
-  } catch {
-    if (!options?.silent) playBing()
-  }
+  } catch {}
 }

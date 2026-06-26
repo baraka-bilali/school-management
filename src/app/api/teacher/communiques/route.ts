@@ -29,13 +29,21 @@ export async function GET(req: NextRequest) {
       take: limit,
       include: {
         createdBy: { select: { name: true, nom: true, prenom: true } },
+        userReads: {
+          where: { userId: ctx.userId },
+          select: { id: true },
+          take: 1,
+        },
       },
     }),
     prisma.communique.count({ where }),
   ])
 
   return NextResponse.json({
-    communiques,
+    communiques: communiques.map(({ userReads, ...c }) => ({
+      ...c,
+      isRead: userReads.length > 0,
+    })),
     total,
     page,
     hasMore: skip + communiques.length < total,

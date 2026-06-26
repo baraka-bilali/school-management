@@ -13,10 +13,11 @@ import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
 import { StudentsSection, Toolbar, Pagination } from "./students-section"
+import { CoursesSection } from "./courses-section"
 
 import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
 
-type TabKey = "students" | "teachers" | "staff"
+type TabKey = "students" | "teachers" | "staff" | "courses"
 
 interface PaginationState {
   page: number
@@ -113,12 +114,24 @@ export default function UsersPage() {
           >
             Personnel
           </button>
+          <button
+            className={cn(
+              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              tab === "courses"
+                ? "border-indigo-600 text-indigo-700"
+                : `border-transparent ${textSecondary} hover:${textColor}`
+            )}
+            onClick={() => setTab("courses")}
+          >
+            Cours & Affectations
+          </button>
         </div>
 
         <div className={`transition-all duration-250 ease-out transform ${tabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
           {tab === "students" && <StudentsSection theme={theme} />}
           {tab === "teachers" && <TeachersSection theme={theme} />}
           {tab === "staff" && <StaffSection theme={theme} />}
+          {tab === "courses" && <CoursesSection theme={theme} />}
         </div>
       </div>
     </Layout>

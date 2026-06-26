@@ -31,6 +31,7 @@ interface Communique {
   title: string
   content: string
   createdAt: string
+  isRead: boolean
 }
 
 type Tab = "notifications" | "communiques"
@@ -100,7 +101,12 @@ function MessagesContent() {
         body: JSON.stringify({ id }),
       })
       if (res.ok) {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+        setNotifications((prev) => {
+          const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+          const unread = next.filter((n) => !n.isRead).length
+          window.dispatchEvent(new CustomEvent("teacherNotificationsUpdated", { detail: { unread } }))
+          return next
+        })
         return true
       }
     } catch {}
@@ -116,7 +122,38 @@ function MessagesContent() {
         body: JSON.stringify({ readAll: true }),
       })
       if (res.ok) {
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+        setNotifications((prev) => {
+          const next = prev.map((n) => ({ ...n, isRead: true }))
+          window.dispatchEvent(new CustomEvent("teacherNotificationsUpdated", { detail: { unread: 0 } }))
+          return next
+        })
+        return true
+      }
+    } catch {}
+    return false
+  }
+
+  const markCommuniqueAsRead = async (id: number) => {
+    try {
+      const res = await fetch(`/api/teacher/communiques/${id}`, { credentials: "include" })
+      if (res.ok) {
+        setCommuniques((prev) => prev.map((c) => (c.id === id ? { ...c, isRead: true } : c)))
+        window.dispatchEvent(new Event("teacherCommuniqueRead"))
+        return true
+      }
+    } catch {}
+    return false
+  }
+
+  const markAllCommuniquesAsRead = async () => {
+    try {
+      const res = await fetch("/api/teacher/communiques/read-all", {
+        method: "POST",
+        credentials: "include",
+      })
+      if (res.ok) {
+        setCommuniques((prev) => prev.map((c) => ({ ...c, isRead: true })))
+        window.dispatchEvent(new Event("teacherCommuniqueRead"))
         return true
       }
     } catch {}
@@ -136,6 +173,8 @@ function MessagesContent() {
   }
 
   const unreadNotif = notifications.filter((n) => !n.isRead).length
+  const unreadComm = communiques.filter((c) => !c.isRead).length
+  const unreadTotal = unreadNotif + unreadComm
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -144,12 +183,12 @@ function MessagesContent() {
           <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Messages</h1>
           <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>Notifications et communiqués de l&apos;école</p>
         </div>
-        {unreadNotif > 0 && (
+        {unreadTotal > 0 && (
           <button
             type="button"
             onClick={async () => {
               setMarkingAll(true)
-              await markAllAsRead()
+              await Promise.all([markAllAsRead(), markAllCommuniquesAsRead()])
               setMarkingAll(false)
             }}
             disabled={markingAll}
@@ -159,7 +198,7 @@ function MessagesContent() {
             )}
           >
             {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-            Tout marquer comme lu ({unreadNotif})
+            Tout marquer comme lu ({unreadTotal})
           </button>
         )}
       </div>
@@ -191,6 +230,11 @@ function MessagesContent() {
         >
           <Megaphone className="h-4 w-4" />
           Communiqués
+          {unreadComm > 0 && (
+            <span className={cn("rounded-full px-1.5 text-[10px] font-bold", tab === "communiques" ? "bg-white/20" : "bg-red-500 text-white")}>
+              {unreadComm}
+            </span>
+          )}
         </button>
       </div>
 
@@ -251,7 +295,13 @@ function MessagesContent() {
               <Link
                 key={c.id}
                 href={`/teacher/communiques/${c.id}`}
-                className={cn("flex items-center gap-3 rounded-2xl border p-4 transition-colors", card, border, shadow)}
+                onClick={() => { if (!c.isRead) void markCommuniqueAsRead(c.id) }}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border p-4 transition-colors",
+                  c.isRead
+                    ? cn(card, border, shadow)
+                    : "border-indigo-200 bg-indigo-50/50 dark:border-indigo-500/30 dark:bg-indigo-500/5"
+                )}
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
                   <Megaphone className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />

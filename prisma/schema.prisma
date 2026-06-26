@@ -31,6 +31,7 @@ model User {
   school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
   subscriptionPayments SubscriptionPayment[] @relation("SubscriptionPayments")
   communiques          Communique[]           @relation("CommuniquesCreated")
+  communiqueUserReads  CommuniqueUserRead[]
 
   @@index([schoolId])
   @@index([schoolId, isActive])
@@ -664,13 +665,27 @@ model Communique {
   school      School        @relation(fields: [schoolId], references: [id])
   year        AcademicYear? @relation(fields: [yearId], references: [id])
   createdBy   User          @relation("CommuniquesCreated", fields: [createdById], references: [id])
-  reads       CommuniqueRead[]
+  reads           CommuniqueRead[]
+  userReads       CommuniqueUserRead[]
 
   @@index([schoolId])
   @@index([yearId])
   @@index([createdAt])
   @@index([schoolId, createdAt])
   @@index([schoolId, yearId])
+}
+
+model CommuniqueUserRead {
+  id           Int        @id @default(autoincrement())
+  communiqueId Int
+  userId       Int
+  readAt       DateTime   @default(now())
+  communique   Communique @relation(fields: [communiqueId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@unique([communiqueId, userId])
+  @@index([userId])
+  @@index([communiqueId])
 }
 
 model CommuniqueRead {

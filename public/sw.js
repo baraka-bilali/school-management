@@ -51,13 +51,14 @@ self.addEventListener("notificationclick", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "SHOW_NOTIFICATION") return
-  const { title, body, url } = event.data.payload || {}
+  const { title, body, url, silent } = event.data.payload || {}
   self.registration.showNotification(title || "digiSchool", {
     body: body || "Nouvelle notification",
     icon: "/icons/icon.svg",
     badge: "/icons/icon.svg",
     tag: "digischool-notification",
     renotify: true,
+    silent: silent === true,
     data: { url: url || "/" },
   })
 })

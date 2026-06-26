@@ -31,5 +31,13 @@ export async function GET(
     return NextResponse.json({ error: "Communiqué introuvable" }, { status: 404 })
   }
 
+  await prisma.communiqueUserRead.upsert({
+    where: {
+      communiqueId_userId: { communiqueId, userId: ctx.userId },
+    },
+    create: { communiqueId, userId: ctx.userId },
+    update: {},
+  })
+
   return NextResponse.json({ communique })
 }

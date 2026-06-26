@@ -11,6 +11,28 @@ import TeacherSidebar from "./teacher-sidebar"
 import TeacherBottomNav from "./teacher-bottom-nav"
 import { useTeacherTheme } from "./use-teacher-theme"
 
+async function fetchUnreadNotifications(): Promise<number> {
+  try {
+    const res = await fetch("/api/teacher/notifications", { credentials: "include" })
+    if (res.ok) {
+      const data = await res.json()
+      return (data.notifications || []).filter((n: { isRead: boolean }) => !n.isRead).length
+    }
+  } catch {}
+  return 0
+}
+
+async function fetchUnreadCommuniques(): Promise<number> {
+  try {
+    const res = await fetch("/api/teacher/communiques/count", { credentials: "include" })
+    if (res.ok) {
+      const data = await res.json()
+      return data.unread || 0
+    }
+  } catch {}
+  return 0
+}
+
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useTeacherTheme()
@@ -23,9 +45,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     schoolId: number
   } | null>(null)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [walletPulse, setWalletPulse] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
+
+  const totalUnread = unreadNotifications + unreadCommuniques
 
   useEffect(() => {
     const saved = localStorage.getItem("teacher-sidebar-open")
@@ -38,6 +63,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       localStorage.setItem("teacher-sidebar-open", String(next))
       return next
     })
+  }
+
+  const refreshCounts = async () => {
+    const [notif, comm] = await Promise.all([fetchUnreadNotifications(), fetchUnreadCommuniques()])
+    setUnreadNotifications(notif)
+    setUnreadCommuniques(comm)
   }
 
   useEffect(() => {
@@ -63,15 +94,30 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       } catch (e) {
         console.error(e)
       }
-      try {
-        const notifRes = await fetch("/api/teacher/notifications", { credentials: "include" })
-        if (notifRes.ok) {
-          const data = await notifRes.json()
-          setUnreadNotifications((data.notifications || []).filter((n: { isRead: boolean }) => !n.isRead).length)
-        }
-      } catch {}
+      await refreshCounts()
     }
     void load()
+  }, [])
+
+  useEffect(() => {
+    const handleNotifUpdate = (evt: Event) => {
+      const custom = evt as CustomEvent<{ unread?: number }>
+      if (typeof custom.detail?.unread === "number") {
+        setUnreadNotifications(custom.detail.unread)
+        return
+      }
+      void fetchUnreadNotifications().then(setUnreadNotifications)
+    }
+    const handleCommuniqueRead = () => {
+      void fetchUnreadCommuniques().then(setUnreadCommuniques)
+    }
+
+    window.addEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
+    window.addEventListener("teacherCommuniqueRead", handleCommuniqueRead)
+    return () => {
+      window.removeEventListener("teacherNotificationsUpdated", handleNotifUpdate as EventListener)
+      window.removeEventListener("teacherCommuniqueRead", handleCommuniqueRead)
+    }
   }, [])
 
   useEffect(() => {
@@ -98,8 +144,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     const channel = supabaseBrowser
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
-        setUnreadNotifications((p) => p + 1)
-        void showSystemNotification("digiSchool", "Nouveau communiqué", { url: "/teacher/messages" })
+        setUnreadCommuniques((p) => p + 1)
+        void showSystemNotification("digiSchool", "Nouveau communiqué", {
+          url: "/teacher/messages?tab=communiques",
+        })
       })
       .subscribe()
     return () => { supabaseBrowser.removeChannel(channel) }
@@ -107,6 +155,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (pathname === "/teacher/wallet") setWalletPulse(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (pathname.startsWith("/teacher/messages") || pathname.startsWith("/teacher/communiques")) {
+      void refreshCounts()
+    }
   }, [pathname])
 
   const handleLogout = async () => {
@@ -130,7 +184,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         }
         expanded={sidebarExpanded}
         onToggle={toggleSidebar}
-        unreadMessages={unreadNotifications}
+        unreadMessages={totalUnread}
         walletPulse={walletPulse}
         onLogout={handleLogout}
         loggingOut={loggingOut}
@@ -146,10 +200,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <TeacherHeader
           schoolName={teacher?.school}
           firstName={teacher?.firstName}
-          unreadCount={unreadNotifications}
+          unreadCount={totalUnread}
           isDark={isDark}
         />
-        <TeacherDesktopHeader firstName={teacher?.firstName} unreadCount={unreadNotifications} isDark={isDark} />
+        <TeacherDesktopHeader firstName={teacher?.firstName} unreadCount={totalUnread} isDark={isDark} />
 
         <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-2 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6 xl:max-w-6xl xl:px-8">
           {children}
