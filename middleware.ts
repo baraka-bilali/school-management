@@ -23,6 +23,7 @@ export async function middleware(req: NextRequest) {
   const isSuperAdminLogin = pathname === "/super-admin/login"
   const isAdminArea = pathname.startsWith("/admin")
   const isStudentArea = pathname.startsWith("/student")
+  const isTeacherArea = pathname.startsWith("/teacher")
   const isGeneralLogin = pathname === "/login"
   const isRegister = pathname === "/register"
 
@@ -100,10 +101,33 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url)
     }
     if (role !== "ELEVE") {
-      // Si ce n'est pas un élève, rediriger vers la bonne zone
       const url = req.nextUrl.clone()
       if (role === "SUPER_ADMIN") {
         url.pathname = "/super-admin"
+      } else if (role === "PROFESSEUR") {
+        url.pathname = "/teacher"
+      } else if (adminAllowed.has(role) || role === "ADMIN") {
+        url.pathname = "/admin"
+      } else {
+        url.pathname = "/login"
+      }
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Teacher space protection
+  if (isTeacherArea) {
+    if (!role) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/login"
+      return NextResponse.redirect(url)
+    }
+    if (role !== "PROFESSEUR") {
+      const url = req.nextUrl.clone()
+      if (role === "SUPER_ADMIN") {
+        url.pathname = "/super-admin"
+      } else if (role === "ELEVE") {
+        url.pathname = "/student"
       } else if (adminAllowed.has(role) || role === "ADMIN") {
         url.pathname = "/admin"
       } else {
@@ -120,6 +144,8 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/super-admin"
     } else if (role === "ELEVE") {
       url.pathname = "/student"
+    } else if (role === "PROFESSEUR") {
+      url.pathname = "/teacher"
     } else if (role === "CAISSIER") {
       url.pathname = "/admin/fees"
     } else {
@@ -136,6 +162,7 @@ export const config = {
     "/admin/:path*",
     "/super-admin/:path*",
     "/student/:path*",
+    "/teacher/:path*",
     "/login",
     "/super-admin/login",
     "/register",

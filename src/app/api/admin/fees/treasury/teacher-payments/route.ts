@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { supabaseAdmin } from "@/lib/supabase-server"
+
+const TYPE_LABELS: Record<string, string> = {
+  SALAIRE: "Salaire",
+  PRIME: "Prime",
+  BONUS: "Bonus",
+  AVANCE: "Avance",
+  AUTRE: "Autre",
+}
 
 // GET /api/admin/fees/treasury/teacher-payments — Liste paiements profs
 // POST — Créer un paiement prof
@@ -74,6 +83,7 @@ export async function POST(req: NextRequest) {
     // Vérifier que le prof appartient à l'école
     const teacher = await prisma.teacher.findFirst({
       where: { id: parseInt(teacherId), user: { schoolId: user.schoolId } },
+      include: { user: { select: { id: true } } },
     })
     if (!teacher) {
       return NextResponse.json({ error: "Professeur introuvable" }, { status: 404 })
@@ -97,6 +107,27 @@ export async function POST(req: NextRequest) {
         },
       },
     })
+
+    const typeLabel = TYPE_LABELS[payment.type] ?? payment.type
+    const invoiceNumber = `PAY-${String(payment.id).padStart(5, "0")}`
+
+    await prisma.notification.create({
+      data: {
+        type: "SYSTEM_MESSAGE",
+        message: `Paiement reçu : ${payment.montant} $ (${typeLabel}) — ${mois}. Facture ${invoiceNumber}${reference ? ` · Réf. ${reference}` : ""}`,
+        schoolId: user.schoolId,
+        userId: teacher.user.id,
+        targetRole: "SCHOOL_USER_ONLY",
+      },
+    })
+
+    await supabaseAdmin
+      .channel(`payments:teacher:${teacher.user.id}`)
+      .send({
+        type: "broadcast",
+        event: "payment_received",
+        payload: { paymentId: payment.id, montant: payment.montant, invoiceNumber },
+      })
 
     return NextResponse.json({ data: payment }, { status: 201 })
   } catch (error) {

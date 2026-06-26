@@ -84,6 +84,9 @@ export default function LoginPage() {
 			case "ELEVE":
 				router.push("/student")
 				break
+			case "PROFESSEUR":
+				router.push("/teacher")
+				break
 			default:
 				router.push("/")
 		}
