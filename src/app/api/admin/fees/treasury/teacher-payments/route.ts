@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 
 const TYPE_LABELS: Record<string, string> = {
   SALAIRE: "Salaire",
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .channel(`payments:teacher:${teacher.user.id}`)
       .send({
         type: "broadcast",

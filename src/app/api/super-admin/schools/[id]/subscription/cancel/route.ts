@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -81,7 +81,7 @@ export async function POST(
       select: { id: true },
     })
     for (const admin of adminUsers) {
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .channel(`notifications:user:${admin.id}`)
         .send({
           type: "broadcast",
@@ -91,7 +91,7 @@ export async function POST(
     }
 
     // Push Realtime → super-admin
-    await supabaseAdmin.channel("notifications:super-admin").send({
+    await getSupabaseAdmin().channel("notifications:super-admin").send({
       type: "broadcast",
       event: "new_notification",
       payload: {

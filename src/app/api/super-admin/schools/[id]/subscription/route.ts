@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 import { extendSubscriptionEnd, newSubscriptionPeriod } from "@/lib/subscription-period"
 import jwt from "jsonwebtoken"
 
@@ -196,7 +196,7 @@ export async function PUT(
       select: { id: true },
     })
     for (const admin of adminUsers) {
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .channel(`notifications:user:${admin.id}`)
         .send({
           type: "broadcast",
@@ -205,7 +205,7 @@ export async function PUT(
         })
     }
 
-    await supabaseAdmin.channel("notifications:super-admin").send({
+    await getSupabaseAdmin().channel("notifications:super-admin").send({
       type: "broadcast",
       event: "new_notification",
       payload: {

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
-import { supabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 
 interface LayoutProps {
@@ -132,7 +132,7 @@ export default function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (!studentSchoolId) return
 
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`communiques:school:${studentSchoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques(prev => prev + 1)
@@ -140,7 +140,7 @@ export default function Layout({ children }: LayoutProps) {
       })
       .subscribe()
 
-    return () => { supabaseBrowser.removeChannel(channel) }
+    return () => { getSupabaseBrowser().removeChannel(channel) }
   }, [studentSchoolId])
 
   const toggleSidebar = () => {

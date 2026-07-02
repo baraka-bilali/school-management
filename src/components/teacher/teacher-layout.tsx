@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
-import { supabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 import { parseCommuniqueIdFromNotification } from "@/lib/communique-user-read"
 import { cn } from "@/lib/utils"
@@ -133,7 +133,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (!teacher?.userId) return
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`payments:teacher:${teacher.userId}`)
       .on("broadcast", { event: "payment_received" }, (payload) => {
         setWalletPulse(true)
@@ -147,12 +147,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         window.dispatchEvent(new Event("teacherPaymentReceived"))
       })
       .subscribe()
-    return () => { supabaseBrowser.removeChannel(channel) }
+    return () => { getSupabaseBrowser().removeChannel(channel) }
   }, [teacher?.userId])
 
   useEffect(() => {
     if (!teacher?.schoolId) return
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((p) => p + 1)
@@ -162,7 +162,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         window.dispatchEvent(new Event("teacherNewCommunique"))
       })
       .subscribe()
-    return () => { supabaseBrowser.removeChannel(channel) }
+    return () => { getSupabaseBrowser().removeChannel(channel) }
   }, [teacher?.schoolId])
 
   useEffect(() => {

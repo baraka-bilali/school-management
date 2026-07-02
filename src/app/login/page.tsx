@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
+import KelasiLogo from "@/components/kelasi-logo"
 import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -280,7 +280,7 @@ export default function LoginPage() {
 			<div className="w-full max-w-md">
 				<div className="flex flex-col items-center mb-4">
 					<div className="mb-2">
-						<Image src="/Kelasi360.png" alt="Kelasi 360" width={180} height={180} priority />
+						<KelasiLogo variant="light" priority />
 					</div>
 					<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
 				</div>

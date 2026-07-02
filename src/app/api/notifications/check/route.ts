@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -77,7 +77,7 @@ async function generateExpirationNotifications() {
             })
 
             // Broadcast Realtime → tous les Super Admins connectés
-            await supabaseAdmin.channel("notifications:super-admin").send({
+            await getSupabaseAdmin().channel("notifications:super-admin").send({
               type: "broadcast",
               event: "new_notification",
               payload: {
@@ -108,7 +108,7 @@ async function generateExpirationNotifications() {
 
             // Broadcast Realtime → l'admin de l'école spécifique
             if (school.creeParId) {
-              await supabaseAdmin
+              await getSupabaseAdmin()
                 .channel(`notifications:user:${school.creeParId}`)
                 .send({
                   type: "broadcast",

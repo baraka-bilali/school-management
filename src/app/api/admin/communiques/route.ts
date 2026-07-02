@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 import { communiqueNotificationMessage } from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Broadcast realtime + notifications professeurs
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .channel(`communiques:school:${user.schoolId}`)
       .send({
         type: "broadcast",

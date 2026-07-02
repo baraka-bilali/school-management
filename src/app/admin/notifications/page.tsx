@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
-import { supabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser } from "@/lib/supabase-client"
 import {
   Bell,
   ArrowLeft,
@@ -69,13 +69,13 @@ export default function NotificationsPage() {
         const channelName = user.role === "SUPER_ADMIN"
           ? "notifications:super-admin"
           : `notifications:user:${user.id}`
-        const channel = supabaseBrowser
+        const channel = getSupabaseBrowser()
           .channel(channelName)
           .on("broadcast", { event: "new_notification" }, () => {
             fetchNotifications()
           })
           .subscribe()
-        cleanup = () => supabaseBrowser.removeChannel(channel)
+        cleanup = () => getSupabaseBrowser().removeChannel(channel)
       } catch {}
     }
     initRealtime()

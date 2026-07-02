@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { supabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 import { cn } from "@/lib/utils"
 import StudentHeader from "./student-header"
@@ -131,7 +131,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
   useEffect(() => {
     if (!schoolId) return
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`communiques:school:${schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((prev) => prev + 1)
@@ -139,13 +139,13 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      supabaseBrowser.removeChannel(channel)
+      getSupabaseBrowser().removeChannel(channel)
     }
   }, [schoolId])
 
   useEffect(() => {
     if (!student?.studentId) return
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`fees:student:${student.studentId}`)
       .on("broadcast", { event: "payment_received" }, () => {
         setFeePulse(true)
@@ -154,13 +154,13 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      supabaseBrowser.removeChannel(channel)
+      getSupabaseBrowser().removeChannel(channel)
     }
   }, [student?.studentId])
 
   useEffect(() => {
     if (!student?.classId) return
-    const channel = supabaseBrowser
+    const channel = getSupabaseBrowser()
       .channel(`tasks:class:${student.classId}`)
       .on("broadcast", { event: "new_task" }, () => {
         void showSystemNotification("Kelasi 360", "Nouvelle tâche assignée", { url: "/student/tasks" })
@@ -168,7 +168,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      supabaseBrowser.removeChannel(channel)
+      getSupabaseBrowser().removeChannel(channel)
     }
   }, [student?.classId])
 

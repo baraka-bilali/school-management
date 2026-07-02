@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Bell } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
-import { supabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 
 interface NotificationBellProps {
@@ -76,14 +76,14 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
           ? "notifications:super-admin"
           : `notifications:user:${user.id}`
 
-        const channel = supabaseBrowser
+        const channel = getSupabaseBrowser()
           .channel(channelName)
           .on("broadcast", { event: "new_notification" }, () => {
             fetchUnreadCount()
           })
           .subscribe()
 
-        cleanup = () => supabaseBrowser.removeChannel(channel)
+        cleanup = () => getSupabaseBrowser().removeChannel(channel)
       } catch {}
     }
     initRealtime()

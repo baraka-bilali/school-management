@@ -7,7 +7,7 @@ import {
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
 import { FEE_COLLECT_ROLES, FEE_VIEW_ROLES } from "@/lib/fees/roles"
 import { prisma } from "@/lib/prisma"
-import { supabaseAdmin } from "@/lib/supabase-server"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
 
 // GET /api/admin/fees/paiements
 export async function GET(req: NextRequest) {
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .channel(`fees:student:${paiement.studentId}`)
       .send({
         type: "broadcast",

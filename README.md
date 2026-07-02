@@ -201,7 +201,8 @@ school-management/
 │   ├── seed_super_admin.sql   # Super admin SQL (Supabase)
 │   └── init_supabase.sql      # Script d'initialisation complet
 ├── public/
-│   └── Kelasi360.png          # Logo officiel
+│   ├── Kelasi360-light.png    # Logo fond clair (K/360 noirs)
+│   └── Kelasi360-dark.png     # Logo fond sombre (K/360 blancs, transparent)
 └── src/
     ├── app/                   # Pages et API (App Router)
     ├── components/            # Layout, sidebar, header, UI
@@ -387,7 +388,9 @@ Chaque école (`School`) est isolée par `schoolId` présent dans le JWT. Les AP
 | Élément | Valeur |
 |---------|--------|
 | Nom plateforme | **Kelasi 360** |
-| Logo | `public/Kelasi360.png` |
+| Logo fond clair | `public/Kelasi360-light.png` |
+| Logo fond sombre | `public/Kelasi360-dark.png` |
+| Composant | `src/components/kelasi-logo.tsx` (`variant`: `light` / `dark` / `auto`) |
 | Metadata | `src/app/layout.tsx` |
 | Pages login | `src/app/login/page.tsx`, `src/app/super-admin/login/page.tsx` |
 | Support | `support@kelasi360.com` |
