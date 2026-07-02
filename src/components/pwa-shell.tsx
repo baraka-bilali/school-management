@@ -112,7 +112,7 @@ export default function PwaShell() {
               {iosHint ? <Smartphone className="w-5 h-5 text-indigo-500" /> : <Download className="w-5 h-5 text-indigo-500" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Installer digiSchool</p>
+              <p className="font-semibold text-sm">Installer Kelasi 360</p>
               <p className={`text-xs mt-1 ${muted}`}>
                 {iosHint
                   ? "Sur iPhone/iPad : touchez Partager puis « Sur l'écran d'accueil »."

@@ -135,7 +135,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       .channel(`communiques:school:${schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((prev) => prev + 1)
-        void showSystemNotification("digiSchool", "Nouveau communiqué", { url: "/student/communiques" })
+        void showSystemNotification("Kelasi 360", "Nouveau communiqué", { url: "/student/communiques" })
       })
       .subscribe()
     return () => {
@@ -149,7 +149,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       .channel(`fees:student:${student.studentId}`)
       .on("broadcast", { event: "payment_received" }, () => {
         setFeePulse(true)
-        void showSystemNotification("digiSchool", "Paiement enregistré", { url: "/student/fees" })
+        void showSystemNotification("Kelasi 360", "Paiement enregistré", { url: "/student/fees" })
         window.dispatchEvent(new Event("feePaymentReceived"))
       })
       .subscribe()
@@ -163,7 +163,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     const channel = supabaseBrowser
       .channel(`tasks:class:${student.classId}`)
       .on("broadcast", { event: "new_task" }, () => {
-        void showSystemNotification("digiSchool", "Nouvelle tâche assignée", { url: "/student/tasks" })
+        void showSystemNotification("Kelasi 360", "Nouvelle tâche assignée", { url: "/student/tasks" })
         window.dispatchEvent(new Event("newTaskReceived"))
       })
       .subscribe()

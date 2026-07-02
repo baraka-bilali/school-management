@@ -6,13 +6,13 @@ import PwaShell from "@/components/pwa-shell";
 import { ReactQueryProvider } from "@/lib/react-query";
 
 export const metadata: Metadata = {
-  title: "digiSchool",
-  description: "Plateforme de gestion scolaire digitale",
+  title: "Kelasi 360",
+  description: "Plateforme de gestion scolaire 360° pour les établissements en RDC",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "digiSchool",
+    title: "Kelasi 360",
   },
   icons: {
     icon: "/icons/icon.svg",

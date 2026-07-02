@@ -44,7 +44,7 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
         if (latest?.message) message = latest.message
       }
     } catch {}
-    await showSystemNotification("digiSchool", message, { url: href })
+    await showSystemNotification("Kelasi 360", message, { url: href })
   }
 
   const fetchUnreadCount = async () => {

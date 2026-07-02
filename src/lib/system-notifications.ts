@@ -42,7 +42,7 @@ export async function showSystemNotification(
       body,
       icon: "/icons/icon.svg",
       badge: "/icons/icon.svg",
-      tag: "digischool-notification",
+      tag: "kelasi360-notification",
       silent,
       data: { url: payload.url },
     })

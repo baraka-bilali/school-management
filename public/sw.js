@@ -1,6 +1,6 @@
-/* Service worker digiSchool — notifications système + cache léger */
+/* Service worker Kelasi 360 — notifications système + cache léger */
 
-const CACHE = "digischool-v1"
+const CACHE = "kelasi360-v1"
 
 self.addEventListener("install", (event) => {
   self.skipWaiting()
@@ -16,7 +16,7 @@ self.addEventListener("activate", (event) => {
 })
 
 self.addEventListener("push", (event) => {
-  let data = { title: "digiSchool", body: "Nouvelle notification" }
+  let data = { title: "Kelasi 360", body: "Nouvelle notification" }
   try {
     if (event.data) data = { ...data, ...event.data.json() }
   } catch {}
@@ -26,7 +26,7 @@ self.addEventListener("push", (event) => {
       body: data.body,
       icon: "/icons/icon.svg",
       badge: "/icons/icon.svg",
-      tag: "digischool-notification",
+      tag: "kelasi360-notification",
       renotify: true,
       data: { url: data.url || "/" },
     })
@@ -52,11 +52,11 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "SHOW_NOTIFICATION") return
   const { title, body, url, silent } = event.data.payload || {}
-  self.registration.showNotification(title || "digiSchool", {
+  self.registration.showNotification(title || "Kelasi 360", {
     body: body || "Nouvelle notification",
     icon: "/icons/icon.svg",
     badge: "/icons/icon.svg",
-    tag: "digischool-notification",
+    tag: "kelasi360-notification",
     renotify: true,
     silent: silent === true,
     data: { url: url || "/" },

@@ -136,7 +136,7 @@ export default function Layout({ children }: LayoutProps) {
       .channel(`communiques:school:${studentSchoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques(prev => prev + 1)
-        void showSystemNotification("digiSchool", "Nouveau communiqué publié", { url: "/student/communiques" })
+        void showSystemNotification("Kelasi 360", "Nouveau communiqué publié", { url: "/student/communiques" })
       })
       .subscribe()
 

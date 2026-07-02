@@ -57,7 +57,7 @@ export async function POST(
     await prisma.notification.create({
       data: {
         type: "SUBSCRIPTION_CANCELLED",
-        message: `⛔ Votre abonnement a été résilié par l'administration.${motifTexte} Pour renouveler, contactez DigiSchool.`,
+        message: `⛔ Votre abonnement a été résilié par l'administration.${motifTexte} Pour renouveler, contactez Kelasi 360.`,
         schoolId,
         userId: null,
         targetRole: "SCHOOL_USER_ONLY",

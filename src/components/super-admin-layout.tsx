@@ -277,7 +277,7 @@ export default function SuperAdminLayout({
       <footer className={`mt-12 border-t ${borderColor} ${cardBg}`}>
         <div className="max-w-[95rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
           <p className={`text-sm ${textSecondary}`}>
-            © 2026 digiSchool. Tous droits réservés. Développé avec ❤️ par Becker Baraka-Bilali
+            © 2026 Kelasi 360. Tous droits réservés. Développé avec ❤️ par Becker Baraka-Bilali
           </p>
         </div>
       </footer>

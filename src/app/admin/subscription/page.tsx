@@ -258,8 +258,8 @@ function InvoicePrintModal({
           <div className="grid grid-cols-2 gap-3">
             <div className={`${rowBg} rounded-xl p-3`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1.5`}>Émetteur</p>
-              <p className={`font-bold ${text} text-sm`}>DigiSchool Platform</p>
-              <p className={`text-xs ${sub} mt-0.5`}>support@digischool.com</p>
+              <p className={`font-bold ${text} text-sm`}>Kelasi 360</p>
+              <p className={`text-xs ${sub} mt-0.5`}>support@kelasi360.com</p>
             </div>
             <div className={`${rowBg} rounded-xl p-3`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1.5`}>Destinataire</p>
@@ -317,7 +317,7 @@ function InvoicePrintModal({
           )}
 
           <p className={`text-center text-[11px] ${sub} pt-1`}>
-            Merci de votre confiance — DigiSchool Platform
+            Merci de votre confiance — Kelasi 360
           </p>
         </div>
 
@@ -674,7 +674,7 @@ export default function SubscriptionPage() {
                             Pour renouveler votre abonnement
                           </p>
                           <p className={`text-sm mt-1 ${theme === "dark" ? "text-blue-400" : "text-blue-700"}`}>
-                            Contactez l'équipe DigiSchool via email ou téléphone ci-dessous.
+                            Contactez l'équipe Kelasi 360 via email ou téléphone ci-dessous.
                           </p>
                         </div>
                       </div>
@@ -749,7 +749,7 @@ export default function SubscriptionPage() {
 
             {/* Besoin d'aide */}
             <Card theme={theme}>
-              <CardHeader><CardTitle>Contacter DigiSchool</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Contacter Kelasi 360</CardTitle></CardHeader>
               <CardContent>
                 <p className={`${textSecondary} mb-6`}>
                   Pour renouveler votre abonnement, signaler un problème ou toute autre question,
@@ -757,7 +757,7 @@ export default function SubscriptionPage() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <a
-                    href="mailto:support@digischool.com"
+                    href="mailto:support@kelasi360.com"
                     className="flex items-center justify-center gap-3 px-6 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
                     <Mail className="w-5 h-5" />
@@ -773,7 +773,7 @@ export default function SubscriptionPage() {
                 </div>
                 <div className={`mt-6 p-4 rounded-lg ${theme === "dark" ? "bg-gray-800/50 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
                   <p className={`${textSecondary} text-sm leading-relaxed`}>
-                    <strong className={textColor}>Email :</strong> support@digischool.com<br />
+                    <strong className={textColor}>Email :</strong> support@kelasi360.com<br />
                     <strong className={textColor}>Téléphone :</strong> +243 859 628 644<br />
                     <strong className={textColor}>Horaires :</strong> Lun - Sam : 7h00 - 15h00 (fermé le dimanche)
                   </p>

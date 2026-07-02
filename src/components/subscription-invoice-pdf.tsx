@@ -67,7 +67,7 @@ export default function SubscriptionInvoicePDF({ data }: { data: InvoiceData }) 
   return (
     <Document
       title={`Facture ${data.numeroFacture}`}
-      author="DigiSchool Platform"
+      author="Kelasi 360"
       subject="Facture abonnement"
     >
       <Page size="A4" style={s.page}>
@@ -76,7 +76,7 @@ export default function SubscriptionInvoicePDF({ data }: { data: InvoiceData }) 
           <View>
             <Text style={s.title}>FACTURE</Text>
             <Text style={s.invoiceNum}>{data.numeroFacture}</Text>
-            <View style={s.badge}><Text style={s.badgeText}>DigiSchool</Text></View>
+            <View style={s.badge}><Text style={s.badgeText}>Kelasi 360</Text></View>
           </View>
           <View style={{ textAlign: "right" }}>
             <Text style={s.labelSmall}>Date d'émission</Text>
@@ -90,8 +90,8 @@ export default function SubscriptionInvoicePDF({ data }: { data: InvoiceData }) 
         <View style={s.parties}>
           <View style={s.partyBlock}>
             <Text style={s.labelSmall}>Émetteur</Text>
-            <Text style={s.bold}>DigiSchool Platform</Text>
-            <Text style={s.normal}>support@digischool.com</Text>
+            <Text style={s.bold}>Kelasi 360</Text>
+            <Text style={s.normal}>support@kelasi360.com</Text>
             {data.createdByName && (
               <Text style={s.normal}>Enregistré par : {data.createdByName}</Text>
             )}
@@ -160,7 +160,7 @@ export default function SubscriptionInvoicePDF({ data }: { data: InvoiceData }) 
 
         {/* Footer */}
         <View style={s.footer}>
-          <Text>Merci de votre confiance — DigiSchool Platform</Text>
+          <Text>Merci de votre confiance — Kelasi 360</Text>
           <Text style={{ marginTop: 3 }}>Ce document tient lieu de facture officielle</Text>
         </View>
       </Page>

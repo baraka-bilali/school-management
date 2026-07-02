@@ -370,8 +370,8 @@ export default function SuperAdminSubscriptionPayments() {
               <div className="grid grid-cols-2 gap-3">
                 <div className={`${theme === "dark" ? "bg-gray-800/50" : "bg-gray-50"} rounded-xl p-3`}>
                   <p className={`text-[10px] font-bold uppercase tracking-wider ${textSecondary} mb-1.5`}>Émetteur</p>
-                  <p className={`font-bold ${textColor} text-sm`}>DigiSchool Platform</p>
-                  <p className={`text-xs ${textSecondary} mt-0.5`}>support@digischool.com</p>
+                  <p className={`font-bold ${textColor} text-sm`}>Kelasi 360</p>
+                  <p className={`text-xs ${textSecondary} mt-0.5`}>support@kelasi360.com</p>
                   {selectedPayment.createdBy && (
                     <p className={`text-xs ${textSecondary} mt-1`}>
                       Par : {selectedPayment.createdBy.prenom} {selectedPayment.createdBy.nom}
@@ -434,7 +434,7 @@ export default function SuperAdminSubscriptionPayments() {
               )}
 
               <p className={`text-center text-[11px] ${textSecondary} pt-1`}>
-                DigiSchool Platform — Ce document tient lieu de facture officielle
+                Kelasi 360 — Ce document tient lieu de facture officielle
               </p>
             </div>
 

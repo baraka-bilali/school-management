@@ -174,7 +174,7 @@ export default function ReceiptPDF({ data }: { data: ReceiptData }) {
         <View style={s.footer}>
           <Text>{data.schoolName} — Ce document tient lieu de reçu officiel de paiement</Text>
           <Text style={{ marginTop: 4 }}>
-            Imprimé le {new Date().toLocaleDateString("fr-FR")} — Système DigiSchool
+            Imprimé le {new Date().toLocaleDateString("fr-FR")} — Kelasi 360
           </Text>
         </View>
       </Page>

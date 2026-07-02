@@ -140,7 +140,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         setUnreadOtherNotifications((p) => p + 1)
         const inv = (payload.payload as { invoiceNumber?: string })?.invoiceNumber
         void showSystemNotification(
-          "digiSchool",
+          "Kelasi 360",
           inv ? `Paiement reçu — ${inv}` : "Paiement reçu",
           { url: "/teacher/wallet" }
         )
@@ -156,7 +156,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, () => {
         setUnreadCommuniques((p) => p + 1)
-        void showSystemNotification("digiSchool", "Nouveau communiqué", {
+        void showSystemNotification("Kelasi 360", "Nouveau communiqué", {
           url: "/teacher/messages?tab=communiques",
         })
         window.dispatchEvent(new Event("teacherNewCommunique"))

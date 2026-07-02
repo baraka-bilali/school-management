@@ -1,7 +1,7 @@
 {
-  "name": "digiSchool",
-  "short_name": "digiSchool",
-  "description": "Plateforme de gestion scolaire digitale",
+  "name": "Kelasi 360",
+  "short_name": "Kelasi 360",
+  "description": "Plateforme de gestion scolaire 360° pour les établissements en RDC",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
