@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import Portal from "@/components/portal"
@@ -195,7 +196,9 @@ function FormModal({
 }
 
 export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
-  const [subTab, setSubTab] = useState<SubTab>("subjects")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const subTab: SubTab = searchParams.get("view") === "assignments" ? "assignments" : "subjects"
   const [tabVisible, setTabVisible] = useState(true)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -229,13 +232,15 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     isDark ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"
   )
 
-  const switchTab = (tab: SubTab) => {
-    if (tab === subTab) return
+  const switchTab = (next: SubTab) => {
+    if (next === subTab) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", "courses")
+    if (next === "assignments") params.set("view", "assignments")
+    else params.delete("view")
+    router.replace(`/admin/users?${params}`, { scroll: false })
     setTabVisible(false)
-    setTimeout(() => {
-      setSubTab(tab)
-      setTabVisible(true)
-    }, 150)
+    setTimeout(() => setTabVisible(true), 150)
   }
 
   const loadData = async () => {

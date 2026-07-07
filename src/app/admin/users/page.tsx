@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
@@ -20,16 +20,38 @@ import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-role
 
 type TabKey = "students" | "teachers" | "staff" | "courses"
 
+const TAB_KEYS: TabKey[] = ["students", "teachers", "staff", "courses"]
+
+function parseTab(value: string | null): TabKey {
+  if (value && TAB_KEYS.includes(value as TabKey)) return value as TabKey
+  return "students"
+}
+
 interface PaginationState {
   page: number
   pageSize: number
 }
 
 export default function UsersPage() {
-  const [tab, setTab] = useState<TabKey>("students")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tab = useMemo(() => parseTab(searchParams.get("tab")), [searchParams])
   const [tabVisible, setTabVisible] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
+
+  const changeTab = (next: TabKey) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "students") {
+      params.delete("tab")
+      params.delete("view")
+    } else {
+      params.set("tab", next)
+      if (next !== "courses") params.delete("view")
+    }
+    const qs = params.toString()
+    router.replace(qs ? `/admin/users?${qs}` : "/admin/users", { scroll: false })
+  }
 
   // Gestion du thème
   useEffect(() => {
@@ -89,7 +111,7 @@ export default function UsersPage() {
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
             )}
-            onClick={() => setTab("students")}
+            onClick={() => changeTab("students")}
           >
             Élèves
           </button>
@@ -100,7 +122,7 @@ export default function UsersPage() {
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
             )}
-            onClick={() => setTab("teachers")}
+            onClick={() => changeTab("teachers")}
           >
             Enseignants
           </button>
@@ -111,7 +133,7 @@ export default function UsersPage() {
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
             )}
-            onClick={() => setTab("staff")}
+            onClick={() => changeTab("staff")}
           >
             Personnel
           </button>
@@ -122,7 +144,7 @@ export default function UsersPage() {
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
             )}
-            onClick={() => setTab("courses")}
+            onClick={() => changeTab("courses")}
           >
             Cours & Affectations
           </button>
