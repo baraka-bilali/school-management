@@ -279,8 +279,8 @@ export default function LoginPage() {
 		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
 			<div className="w-full max-w-md">
 				<div className="flex flex-col items-center mb-4">
-					<div className="mb-2">
-						<KelasiLogo variant="light" priority />
+					<div className="mb-3">
+						<KelasiLogo variant="light" priority className="h-36 w-36 sm:h-44 sm:w-44 object-contain drop-shadow-md" />
 					</div>
 					<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
 				</div>
