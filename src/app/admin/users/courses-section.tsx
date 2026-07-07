@@ -206,6 +206,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
   const [showSubjectForm, setShowSubjectForm] = useState(false)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [showAssignForm, setShowAssignForm] = useState(false)
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -319,19 +320,43 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     }
   }
 
-  const handleCreateAssignment = async (e: React.FormEvent) => {
+  const openCreateAssignment = () => {
+    setEditingAssignment(null)
+    setAssignForm({ subjectId: "", teacherId: "", classId: "", weeklyHours: "2" })
+    setShowAssignForm(true)
+  }
+
+  const openEditAssignment = (a: Assignment) => {
+    setEditingAssignment(a)
+    setAssignForm({
+      subjectId: String(a.subjectId),
+      teacherId: String(a.teacherId),
+      classId: String(a.classId),
+      weeklyHours: String(a.weeklyHours),
+    })
+    setShowAssignForm(true)
+  }
+
+  const handleAssignmentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const res = await authFetch("/api/admin/course-assignments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(assignForm),
-      })
+      const isEdit = !!editingAssignment
+      const res = await authFetch(
+        isEdit
+          ? `/api/admin/course-assignments/${editingAssignment!.id}`
+          : "/api/admin/course-assignments",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(assignForm),
+        }
+      )
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
-      toast.success("Affectation enregistrée")
+      toast.success(isEdit ? "Affectation modifiée" : "Affectation enregistrée")
       setShowAssignForm(false)
+      setEditingAssignment(null)
       setAssignForm({ subjectId: "", teacherId: "", classId: "", weeklyHours: "2" })
       await loadData()
     } catch (err) {
@@ -532,7 +557,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
               </div>
               <button
                 type="button"
-                onClick={() => setShowAssignForm(true)}
+                onClick={openCreateAssignment}
                 disabled={subjects.length === 0}
                 title={subjects.length === 0 ? "Créez d'abord une matière" : "Nouvelle affectation"}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-transform hover:scale-105 hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
@@ -590,20 +615,33 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                           <td className={cn("px-4 py-3.5", textSecondary)}>{a.className}</td>
                           <td className={cn("px-4 py-3.5", textSecondary)}>{a.weeklyHours}h</td>
                           <td className="px-4 py-3.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDeleteTarget({
-                                  type: "assignment",
-                                  id: a.id,
-                                  name: `${a.subjectName} — ${a.className}`,
-                                })
-                              }
-                              title="Retirer"
-                              className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-500/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openEditAssignment(a)}
+                                title="Modifier"
+                                className={cn(
+                                  "rounded-lg p-2 transition-colors",
+                                  isDark ? "text-indigo-400 hover:bg-indigo-500/10" : "text-indigo-600 hover:bg-indigo-50"
+                                )}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDeleteTarget({
+                                    type: "assignment",
+                                    id: a.id,
+                                    name: `${a.subjectName} — ${a.className}`,
+                                  })
+                                }
+                                title="Retirer"
+                                className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-500/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -663,8 +701,15 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
       {/* Modal affectation */}
       {showAssignForm && (
-        <FormModal theme={theme} title="Nouvelle affectation" onClose={() => setShowAssignForm(false)}>
-          <form onSubmit={handleCreateAssignment} className="space-y-4">
+        <FormModal
+          theme={theme}
+          title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
+          onClose={() => {
+            setShowAssignForm(false)
+            setEditingAssignment(null)
+          }}
+        >
+          <form onSubmit={handleAssignmentSubmit} className="space-y-4">
             <div>
               <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Professeur *</label>
               <select className={inputClass} value={assignForm.teacherId} onChange={(e) => setAssignForm({ ...assignForm, teacherId: e.target.value })} required>
@@ -703,8 +748,14 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
               disabled={submitting}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 disabled:opacity-50"
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {submitting ? "Enregistrement..." : "Assigner"}
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : editingAssignment ? (
+                <Pencil className="h-4 w-4" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              {submitting ? "Enregistrement..." : editingAssignment ? "Enregistrer" : "Assigner"}
             </button>
           </form>
         </FormModal>

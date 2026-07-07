@@ -145,14 +145,22 @@ export default function TeacherDashboard() {
 
       {/* Classes + Cours */}
       <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:gap-4 lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
-        <div className={cn("flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-4 lg:min-w-0 lg:p-6", card, border, shadow)}>
+        <Link
+          href="/teacher/classes"
+          className={cn(
+            "flex min-w-[9.5rem] shrink-0 flex-col items-center rounded-2xl border p-4 transition-colors hover:border-indigo-500/40 lg:min-w-0 lg:p-6",
+            card,
+            border,
+            shadow
+          )}
+        >
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 lg:mb-4 lg:h-16 lg:w-16">
             <GraduationCap className="h-6 w-6 text-indigo-600 dark:text-indigo-400 lg:h-8 lg:w-8" />
           </div>
           <p className="text-[10px] font-bold tracking-wide text-indigo-600 dark:text-indigo-400 lg:text-xs">MES CLASSES</p>
           <p className={cn("mt-1 text-2xl font-bold lg:text-4xl", text)}>{dashboard?.classCount ?? 0}</p>
-          <p className={cn("mt-0.5 text-center text-[10px] lg:text-sm", textMuted)}>Classes affiliées</p>
-        </div>
+          <p className={cn("mt-0.5 text-center text-[10px] lg:text-sm", textMuted)}>Voir mes classes</p>
+        </Link>
 
         <div className={cn("min-w-[9.5rem] shrink-0 rounded-2xl border p-4 text-center lg:min-w-0 lg:p-6", card, border, shadow)}>
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 lg:mb-4 lg:h-16 lg:w-16">

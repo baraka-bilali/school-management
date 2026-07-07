@@ -1,5 +1,6 @@
 import {
   LayoutGrid,
+  GraduationCap,
   Wallet,
   ClipboardList,
   Bell,
@@ -21,6 +22,12 @@ export const teacherNavItems: TeacherNavItem[] = [
     label: "Accueil",
     icon: LayoutGrid,
     match: (p) => p === "/teacher",
+  },
+  {
+    href: "/teacher/classes",
+    label: "Classes",
+    icon: GraduationCap,
+    match: (p) => p.startsWith("/teacher/classes"),
   },
   {
     href: "/teacher/wallet",
