@@ -1,12 +1,12 @@
 /* Service worker Kelasi 360 — notifications système + cache léger */
 
-const CACHE = "kelasi360-v1"
+const CACHE = "kelasi360-v2"
 
 self.addEventListener("install", (event) => {
   self.skipWaiting()
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache.addAll(["/", "/manifest.webmanifest", "/icons/icon.svg"])
+      cache.addAll(["/", "/manifest.webmanifest", "/icons/favicon.png"])
     )
   )
 })
@@ -24,8 +24,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icons/icon.svg",
-      badge: "/icons/icon.svg",
+      icon: "/icons/favicon.png",
+      badge: "/icons/favicon.png",
       tag: "kelasi360-notification",
       renotify: true,
       data: { url: data.url || "/" },
@@ -54,8 +54,8 @@ self.addEventListener("message", (event) => {
   const { title, body, url, silent } = event.data.payload || {}
   self.registration.showNotification(title || "Kelasi 360", {
     body: body || "Nouvelle notification",
-    icon: "/icons/icon.svg",
-    badge: "/icons/icon.svg",
+    icon: "/icons/favicon.png",
+    badge: "/icons/favicon.png",
     tag: "kelasi360-notification",
     renotify: true,
     silent: silent === true,

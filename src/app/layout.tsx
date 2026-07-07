@@ -15,8 +15,10 @@ export const metadata: Metadata = {
     title: "Kelasi 360",
   },
   icons: {
-    icon: "/icons/icon.svg",
-    apple: "/icons/icon.svg",
+    icon: [
+      { url: "/icons/favicon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 

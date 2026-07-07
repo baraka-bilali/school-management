@@ -40,8 +40,8 @@ export async function showSystemNotification(
   try {
     const n = new Notification(title, {
       body,
-      icon: "/icons/icon.svg",
-      badge: "/icons/icon.svg",
+      icon: "/icons/favicon.png",
+      badge: "/icons/favicon.png",
       tag: "kelasi360-notification",
       silent,
       data: { url: payload.url },
