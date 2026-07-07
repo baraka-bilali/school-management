@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import Portal from "@/components/portal"
 import { cn } from "@/lib/utils"
+import { TableLoadingRow } from "@/components/ui/table-loading"
 
 // Options spécialisées où la lettre est optionnelle (une seule classe par option)
 const STREAM_LETTER_OPTIONAL = new Set([
@@ -315,18 +316,7 @@ export default function ClassesPage() {
                 </thead>
                 <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
                   {loading ? (
-                    <tr>
-                      <td colSpan={7} className={`px-3 py-12 text-center ${textSecondary}`}>
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="flex gap-1">
-                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                          </div>
-                          <span>Chargement des classes...</span>
-                        </div>
-                      </td>
-                    </tr>
+                    <TableLoadingRow colSpan={7} textClassName={textSecondary} cellClassName={textSecondary} message="Chargement..." />
                   ) : (
                     <>
                       {classes.length === 0 ? (

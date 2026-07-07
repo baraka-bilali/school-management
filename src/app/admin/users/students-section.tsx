@@ -16,6 +16,7 @@ import {
   AcademicYearSelect,
   type AcademicYearOption,
 } from "@/components/academic-year-select"
+import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
 interface PaginationState {
   page: number
@@ -917,16 +918,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           {/* Mobile: stacked cards */}
           <div className="md:hidden space-y-3">
             {loading && (
-              <div className={`px-3 py-8 text-center ${textSecondary}`}>
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                  <p>Chargement des données...</p>
-                </div>
-              </div>
+              <TableLoadingBlock textClassName={textSecondary} message="Chargement..." />
             )}
             {!loading && items.map((s) => {
               const enr = s.enrollments?.[0]
@@ -987,18 +979,11 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
             </thead>
             <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
               {loading && (
-                <tr>
-                  <td colSpan={enrollmentOnly ? 8 : 9} className={`px-3 py-12 ${textSecondary}`}>
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      <p>Chargement des données...</p>
-                    </div>
-                  </td>
-                </tr>
+                <TableLoadingRow
+                  colSpan={enrollmentOnly ? 8 : 9}
+                  textClassName={textSecondary}
+                  cellClassName={textSecondary}
+                />
               )}
               {!loading && items.map((s) => {
                 const enr = s.enrollments?.[0]

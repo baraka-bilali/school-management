@@ -14,6 +14,7 @@ import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
 import { StudentsSection, Toolbar, Pagination } from "./students-section"
 import { CoursesSection } from "./courses-section"
+import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
 import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
 
@@ -385,16 +386,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
           {/* Mobile: stacked cards for teachers */}
           <div className="md:hidden space-y-3">
             {loading && (
-              <div className={`px-3 py-8 text-center ${textSecondary}`}>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                  Chargement des données...
-                </div>
-              </div>
+              <TableLoadingBlock textClassName={textSecondary} message="Chargement..." />
             )}
             {!loading && items.map((t) => (
               <div key={`mobile-teacher-${t.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
@@ -449,18 +441,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
             </thead>
             <tbody className={theme === "dark" ? "divide-y divide-gray-700" : "divide-y divide-gray-200"}>
               {loading && (
-                <tr>
-                  <td colSpan={9} className={`px-3 py-12 ${textSecondary}`}>
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                      <p>Chargement des données...</p>
-                    </div>
-                  </td>
-                </tr>
+                <TableLoadingRow colSpan={9} textClassName={textSecondary} cellClassName={textSecondary} />
               )}
               {!loading && items.map((t) => {
                 const isOpen = false // no separate expanded id for teachers; could reuse editingId but keep closed by default
@@ -1039,9 +1020,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
             </thead>
             <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"}`}>
               {loading ? (
-                <tr>
-                  <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Chargement...</td>
-                </tr>
+                <TableLoadingRow colSpan={9} textClassName={textSecondary} cellClassName={textSecondary} />
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={9} className={`px-3 py-8 text-center ${textSecondary}`}>Aucun membre du personnel trouvé.</td>

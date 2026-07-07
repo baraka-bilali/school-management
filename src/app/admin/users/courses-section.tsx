@@ -7,6 +7,7 @@ import Portal from "@/components/portal"
 import { Plus, Trash2, BookOpen, Users, X, Loader2, Pencil, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { authFetch } from "@/lib/auth-fetch"
+import { TableLoadingBlock } from "@/components/ui/table-loading"
 
 interface Subject {
   id: number
@@ -363,8 +364,30 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+      <div className="space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className={cn("rounded-xl border px-4 py-2.5", borderColor, isDark ? "bg-gray-800/60" : "bg-indigo-50/50")}>
+            <p className={textSecondary}>
+              Année scolaire : <span className={cn("font-semibold", textColor)}>{currentYearName || "—"}</span>
+            </p>
+          </div>
+          <div className={cn("flex gap-1 rounded-xl border p-1", borderColor, isDark ? "bg-gray-800/80" : "bg-gray-100/80")}>
+            <button type="button" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-600/25">
+              Matières
+            </button>
+            <button type="button" className={cn("rounded-lg px-4 py-2 text-sm font-medium", textSecondary)}>
+              Affectations
+            </button>
+          </div>
+        </div>
+        <Card theme={theme}>
+          <CardHeader>
+            <CardTitle className={textColor}>Matières / Cours</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TableLoadingBlock textClassName={textSecondary} />
+          </CardContent>
+        </Card>
       </div>
     )
   }
