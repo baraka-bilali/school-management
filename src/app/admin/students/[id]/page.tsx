@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import Layout from "@/components/layout"
+import Portal from "@/components/portal"
 import StudentDetailSkeleton from "@/components/admin/student-detail-skeleton"
 import { authFetch } from "@/lib/auth-fetch"
 import {
@@ -410,41 +411,43 @@ export default function StudentDetailsPage() {
     <Layout>
       {/* ──────────────────── QR modal ──────────────────── */}
       {showQR && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowQR(false)}
-          />
-          <div
-            className={`relative ${cardBg} rounded-2xl border ${border} shadow-2xl w-full max-w-xs animate-scale-up`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={`flex items-center justify-between border-b ${border} p-5`}>
-              <h3 className={`text-base font-semibold ${txt}`}>Code QR</h3>
-              <button onClick={() => setShowQR(false)} className={`rounded-lg p-1 ${hover}`}>
-                <X className={`w-5 h-5 ${txtSec}`} />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className="flex justify-center bg-white p-4 rounded-xl mb-4">
-                <QRCodeSVG
-                  id="student-qr-svg"
-                  value={`STUDENT:${student.code}:${student.id}`}
-                  size={200}
-                  bgColor="#ffffff"
-                  fgColor="#1e1b4b"
-                  level="H"
-                />
+        <Portal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowQR(false)}
+            />
+            <div
+              className={`relative mx-auto ${cardBg} rounded-2xl border ${border} shadow-2xl w-full max-w-xs animate-scale-up`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={`flex items-center justify-between border-b ${border} p-5`}>
+                <h3 className={`text-base font-semibold ${txt}`}>Code QR</h3>
+                <button onClick={() => setShowQR(false)} className={`rounded-lg p-1 ${hover}`}>
+                  <X className={`w-5 h-5 ${txtSec}`} />
+                </button>
               </div>
-              <p className={`text-xs ${txtMut} text-center mb-4`}>
-                Matricule : <span className="font-mono font-semibold">{student.code}</span>
-              </p>
-              <button onClick={downloadQR} className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 text-sm">
-                Telecharger (SVG)
-              </button>
+              <div className="p-6">
+                <div className="flex justify-center bg-white p-4 rounded-xl mb-4">
+                  <QRCodeSVG
+                    id="student-qr-svg"
+                    value={`STUDENT:${student.code}:${student.id}`}
+                    size={200}
+                    bgColor="#ffffff"
+                    fgColor="#1e1b4b"
+                    level="H"
+                  />
+                </div>
+                <p className={`text-xs ${txtMut} text-center mb-4`}>
+                  Matricule : <span className="font-mono font-semibold">{student.code}</span>
+                </p>
+                <button onClick={downloadQR} className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 text-sm">
+                  Telecharger (SVG)
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
 
       {/* ──────────────────── Page content ──────────────────── */}

@@ -37,6 +37,10 @@ export default function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="google" content="notranslate" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icons/favicon.png" type="image/png" sizes="512x512" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="shortcut icon" href="/favicon.ico" />
       </head>
       <body className="bg-gray-50 font-sans antialiased notranslate" suppressHydrationWarning>
         <ReactQueryProvider>
