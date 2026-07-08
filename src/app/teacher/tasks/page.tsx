@@ -34,6 +34,23 @@ interface Assignment {
   subjectName: string
 }
 
+function getMinDueAtValue() {
+  const now = new Date()
+  now.setSeconds(0, 0)
+  const offset = now.getTimezoneOffset()
+  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 16)
+}
+
+function formatDateTime(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export default function TeacherTasksPage() {
   const { card, text, textMuted, shadow, border, isDark } = useTeacherTheme()
   const [loading, setLoading] = useState(true)
@@ -42,6 +59,7 @@ export default function TeacherTasksPage() {
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
+  const [minDueAt, setMinDueAt] = useState(getMinDueAtValue())
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -83,6 +101,12 @@ export default function TeacherTasksPage() {
       }
     }
     void load()
+  }, [])
+
+  useEffect(() => {
+    setMinDueAt(getMinDueAtValue())
+    const id = window.setInterval(() => setMinDueAt(getMinDueAtValue()), 60_000)
+    return () => window.clearInterval(id)
   }, [])
 
   const openCreateForClass = (classId: number) => {
@@ -237,7 +261,7 @@ export default function TeacherTasksPage() {
                     <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Dernière tâche</p>
                     <p className={cn("mt-1 truncate text-sm font-semibold", text)}>{cls.latestTask.title}</p>
                     <p className={cn("mt-1 text-xs", textMuted)}>
-                      Créée récemment · échéance {new Date(cls.latestTask.dueAt).toLocaleDateString("fr-FR")}
+                      Créée le {formatDateTime(cls.latestTask.createdAt)} · échéance {formatDateTime(cls.latestTask.dueAt)}
                     </p>
                   </div>
                 ) : (
@@ -248,7 +272,7 @@ export default function TeacherTasksPage() {
               </div>
 
               <Link
-                href={`/teacher/classes/${cls.id}`}
+                href={`/teacher/tasks/${cls.id}`}
                 className={cn(
                   "mt-4 inline-flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-sm font-semibold transition-colors",
                   border,
@@ -323,10 +347,14 @@ export default function TeacherTasksPage() {
                   type="datetime-local"
                   value={form.dueAt}
                   onChange={(e) => setForm({ ...form, dueAt: e.target.value })}
+                  min={minDueAt}
                   className={cn("rounded-xl", isDark && "border-gray-700 bg-gray-800")}
                   required
                 />
               </div>
+              <p className={cn("-mt-1 text-xs", textMuted)}>
+                Date autorisée : maintenant ou dans le futur.
+              </p>
               <div>
                 <label className={cn("mb-1.5 block text-sm font-medium", textMuted)}>Description</label>
                 <textarea

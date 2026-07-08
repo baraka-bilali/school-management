@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       : Promise.resolve([]),
     prisma.studentTask.findMany({
       where: { teacherId, schoolId, isActive: true },
-      orderBy: { dueAt: "asc" },
+      orderBy: [{ createdAt: "desc" }, { dueAt: "desc" }],
       take: 5,
       include: {
         class: { select: { name: true } },

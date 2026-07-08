@@ -118,7 +118,14 @@ export default function TeacherDashboard() {
   if (loading) return <StudentLoading variant="dashboard" />
 
   const activeTasks = dashboard?.tasks.filter((t) => new Date(t.dueAt) >= new Date()) ?? []
-  const overdueTasks = dashboard?.tasks.filter((t) => new Date(t.dueAt) < new Date()) ?? []
+
+  const formatCreatedAt = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
 
   return (
     <div className="space-y-5 lg:space-y-8">
@@ -246,25 +253,14 @@ export default function TeacherDashboard() {
             Voir tout
           </Link>
         </div>
-        {activeTasks.length === 0 && overdueTasks.length === 0 ? (
-          <div className={cn("rounded-2xl border p-8 text-center", card, border, shadow)}>
+        {activeTasks.length === 0 ? (
+          <Link href="/teacher/tasks" className={cn("block rounded-2xl border p-8 text-center transition-colors hover:border-indigo-500/30", card, border, shadow)}>
             <ClipboardList className="mx-auto mb-3 h-10 w-10 text-indigo-500/50" />
             <p className={cn("text-sm font-medium", text)}>Aucune tâche pour le moment</p>
-            <p className={cn("mt-1 text-xs", textMuted)}>Créez des devoirs depuis l&apos;onglet Tâches</p>
-          </div>
+            <p className={cn("mt-1 text-xs", textMuted)}>Ouvrez l&apos;espace Tâches pour en créer.</p>
+          </Link>
         ) : (
           <div className="space-y-2">
-            {overdueTasks.slice(0, 2).map((t) => (
-              <div key={t.id} className={cn("rounded-2xl border border-red-200 bg-red-50/50 p-4 dark:border-red-500/30 dark:bg-red-500/5", shadow)}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">EN RETARD</span>
-                    <p className={cn("mt-1 font-semibold truncate", text)}>{t.title}</p>
-                    <p className={cn("text-xs", textMuted)}>{t.class.name} · {formatDue(t.dueAt)}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
             {activeTasks.slice(0, 3).map((t) => (
               <button
                 key={t.id}
@@ -276,6 +272,9 @@ export default function TeacherDashboard() {
                 <p className={cn("mt-0.5 text-xs", textMuted)}>
                   {t.class.name}
                   {t.subject?.name ? ` · ${t.subject.name}` : ""} · Échéance {formatDue(t.dueAt)}
+                </p>
+                <p className={cn("mt-1 text-[11px]", textMuted)}>
+                  Créée le {formatCreatedAt(t.createdAt)}
                 </p>
               </button>
             ))}

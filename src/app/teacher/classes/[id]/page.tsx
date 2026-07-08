@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Search, Users, BookOpen, ListTodo, CircleCheckBig, Clock } from "lucide-react"
+import { ArrowLeft, Search, Users, BookOpen, ClipboardList } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
@@ -28,15 +28,6 @@ interface ClassDetail {
     stream: string | null
   }
   subjects: Array<{ id: number; name: string; color: string | null; weeklyHours: number }>
-  tasks: Array<{
-    id: number
-    title: string
-    question: string | null
-    description: string | null
-    dueAt: string
-    createdAt: string
-    subject: { id: number; name: string; color: string | null } | null
-  }>
   students: StudentRow[]
 }
 
@@ -49,15 +40,6 @@ function initials(s: StudentRow) {
   return `${s.firstName?.charAt(0) || ""}${s.lastName?.charAt(0) || ""}`.toUpperCase()
 }
 
-function formatDue(dueAt: string) {
-  return new Date(dueAt).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 export default function TeacherClassDetailPage() {
   const params = useParams()
   const classId = params.id as string
@@ -66,7 +48,6 @@ export default function TeacherClassDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<ClassDetail | null>(null)
   const [search, setSearch] = useState("")
-  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     const load = async () => {
@@ -78,18 +59,18 @@ export default function TeacherClassDetailPage() {
           setError(data.error || "Impossible de charger la classe")
           return
         }
-        setDetail(await res.json())
+        const data = await res.json()
+        setDetail({
+          class: data.class,
+          subjects: data.subjects,
+          students: data.students,
+        })
       } finally {
         setLoading(false)
       }
     }
     void load()
   }, [classId])
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 30_000)
-    return () => window.clearInterval(id)
-  }, [])
 
   const filtered = useMemo(() => {
     if (!detail?.students) return []
@@ -120,9 +101,7 @@ export default function TeacherClassDetailPage() {
     )
   }
 
-  const { class: cls, subjects, tasks } = detail
-  const todoTasks = tasks.filter((task) => new Date(task.dueAt).getTime() >= now)
-  const doneTasks = tasks.filter((task) => new Date(task.dueAt).getTime() < now)
+  const { class: cls, subjects } = detail
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -162,110 +141,26 @@ export default function TeacherClassDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <section className={cn("rounded-3xl border p-4 lg:p-5", card, border, shadow)}>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className={cn("text-base font-bold", text)}>Tâches à faire</h2>
-              <p className={cn("text-sm", textMuted)}>Du plus récent au plus ancien</p>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400">
-              <ListTodo className="h-5 w-5" />
-            </div>
+      <Link
+        href={`/teacher/tasks/${cls.id}`}
+        className={cn(
+          "flex items-center justify-between rounded-2xl border px-4 py-3.5 transition-colors",
+          border,
+          isDark ? "bg-indigo-500/5 hover:bg-indigo-500/10" : "bg-indigo-50/50 hover:bg-indigo-50",
+          shadow
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600/10">
+            <ClipboardList className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="space-y-3">
-            {todoTasks.length > 0 ? (
-              todoTasks.map((task) => (
-                <div key={task.id} className={cn("rounded-2xl border p-4", border, isDark ? "bg-gray-950/40" : "bg-gray-50/80")}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                          À faire
-                        </span>
-                        {task.subject?.name && (
-                          <span
-                            className="rounded-full px-2.5 py-1 text-[11px] font-medium"
-                            style={{
-                              backgroundColor: `${task.subject.color || "#4f46e5"}22`,
-                              color: task.subject.color || "#4f46e5",
-                            }}
-                          >
-                            {task.subject.name}
-                          </span>
-                        )}
-                      </div>
-                      <p className={cn("text-sm font-semibold", text)}>{task.title}</p>
-                      {task.description && (
-                        <p className={cn("mt-1.5 line-clamp-3 text-xs", textMuted)}>{task.description}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className={cn("mt-3 flex items-center gap-1.5 text-xs", textMuted)}>
-                    <Clock className="h-3.5 w-3.5" />
-                    Échéance : {formatDue(task.dueAt)}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className={cn("rounded-2xl border border-dashed p-5 text-center text-sm", border, textMuted)}>
-                Aucune tâche en attente dans cette classe.
-              </div>
-            )}
+          <div>
+            <p className={cn("text-sm font-semibold", text)}>Tableau des tâches</p>
+            <p className={cn("text-xs", textMuted)}>Gérer les tâches à faire et terminées de cette classe</p>
           </div>
-        </section>
-
-        <section className="rounded-3xl border border-emerald-500/15 bg-emerald-500/5 p-4 lg:p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className={cn("text-base font-bold", text)}>Tâches terminées</h2>
-              <p className={cn("text-sm", textMuted)}>Déplacées automatiquement après échéance</p>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <CircleCheckBig className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            {doneTasks.length > 0 ? (
-              doneTasks.map((task) => (
-                <div key={task.id} className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                          Terminée
-                        </span>
-                        {task.subject?.name && (
-                          <span
-                            className="rounded-full px-2.5 py-1 text-[11px] font-medium"
-                            style={{
-                              backgroundColor: `${task.subject.color || "#4f46e5"}22`,
-                              color: task.subject.color || "#4f46e5",
-                            }}
-                          >
-                            {task.subject.name}
-                          </span>
-                        )}
-                      </div>
-                      <p className={cn("text-sm font-semibold", text)}>{task.title}</p>
-                      {task.description && (
-                        <p className={cn("mt-1.5 line-clamp-3 text-xs", textMuted)}>{task.description}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 text-xs text-emerald-600 dark:text-emerald-400">
-                    Échéance atteinte : {formatDue(task.dueAt)}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-emerald-500/20 p-5 text-center text-sm text-emerald-600 dark:text-emerald-400">
-                Rien n&apos;est encore terminé dans cette classe.
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+        </div>
+        <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">Ouvrir →</span>
+      </Link>
 
       <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

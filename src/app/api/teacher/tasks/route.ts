@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Classe et date limite requises" }, { status: 400 })
   }
 
+  const dueDate = new Date(dueAt)
+  if (Number.isNaN(dueDate.getTime())) {
+    return NextResponse.json({ error: "Date limite invalide" }, { status: 400 })
+  }
+  if (dueDate.getTime() < Date.now()) {
+    return NextResponse.json({ error: "La date limite doit être au présent ou dans le futur" }, { status: 400 })
+  }
+
   const assignment = await prisma.courseAssignment.findFirst({
     where: {
       teacherId: ctx.teacherId,
@@ -66,7 +74,7 @@ export async function POST(req: NextRequest) {
       title: title.trim(),
       question: question?.trim() || null,
       description: description?.trim() || null,
-      dueAt: new Date(dueAt),
+      dueAt: dueDate,
       classId: parseInt(classId),
       subjectId: subjectId ? parseInt(subjectId) : assignment.subjectId,
       teacherId: ctx.teacherId,
