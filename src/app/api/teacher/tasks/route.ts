@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       isActive: true,
       ...(classId ? { classId } : {}),
     },
-    orderBy: { dueAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { dueAt: "desc" }],
     take: limit,
     include: {
       class: { select: { id: true, name: true } },

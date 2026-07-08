@@ -1,12 +1,20 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
-import { ClipboardList, Plus, Loader2, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import {
+  ClipboardList,
+  Plus,
+  Loader2,
+  X,
+  Sparkles,
+  ChevronRight,
+  BookOpen,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
-import TeacherTaskCard from "@/components/teacher/teacher-task-card"
 
 interface Task {
   id: number
@@ -31,7 +39,6 @@ export default function TeacherTasksPage() {
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [classFilter, setClassFilter] = useState<number | "all">("all")
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
@@ -54,9 +61,8 @@ export default function TeacherTasksPage() {
     return assignments.filter((a) => a.classId === parseInt(form.classId))
   }, [assignments, form.classId])
 
-  const fetchTasks = async (classId?: number) => {
-    const params = classId ? `?classId=${classId}` : ""
-    const res = await fetch(`/api/teacher/tasks${params}`, { credentials: "include" })
+  const fetchTasks = async () => {
+    const res = await fetch("/api/teacher/tasks", { credentials: "include" })
     if (res.ok) {
       const data = await res.json()
       setTasks(data.tasks || [])
@@ -79,10 +85,11 @@ export default function TeacherTasksPage() {
     void load()
   }, [])
 
-  useEffect(() => {
-    if (loading) return
-    void fetchTasks(classFilter === "all" ? undefined : classFilter)
-  }, [classFilter, loading])
+  const openCreateForClass = (classId: number) => {
+    setForm((prev) => ({ ...prev, classId: String(classId), subjectId: "" }))
+    setFormError("")
+    setShowForm(true)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,7 +112,7 @@ export default function TeacherTasksPage() {
       if (!res.ok) throw new Error(data.error || "Erreur")
       setShowForm(false)
       setForm({ title: "", description: "", dueAt: "", classId: "", subjectId: "" })
-      await fetchTasks(classFilter === "all" ? undefined : classFilter)
+      await fetchTasks()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Erreur")
     } finally {
@@ -115,16 +122,35 @@ export default function TeacherTasksPage() {
 
   if (loading) return <StudentLoading variant="tasks" />
 
-  const now = new Date()
-  const activeTasks = tasks.filter((t) => new Date(t.dueAt) >= now)
-  const overdueTasks = tasks.filter((t) => new Date(t.dueAt) < now)
+  const classBoards = classes.map((cls) => {
+    const classTasks = tasks.filter((task) => task.class.id === cls.id)
+    const now = Date.now()
+    const todoCount = classTasks.filter((task) => new Date(task.dueAt).getTime() >= now).length
+    const doneCount = classTasks.length - todoCount
+
+    return {
+      ...cls,
+      todoCount,
+      doneCount,
+      latestTask: classTasks[0] || null,
+      subjects: Array.from(
+        new Set(
+          assignments
+            .filter((assignment) => assignment.classId === cls.id)
+            .map((assignment) => assignment.subjectName)
+        )
+      ),
+    }
+  })
 
   return (
     <div className="space-y-5 lg:space-y-8">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Mes tâches</h1>
-          <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>Devoirs assignés à vos classes</p>
+          <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Gestion des tâches</h1>
+          <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>
+            Choisissez une classe pour entrer dans son espace de travail avec les colonnes « À faire » et « Terminées ».
+          </p>
         </div>
         <button
           type="button"
@@ -136,65 +162,106 @@ export default function TeacherTasksPage() {
         </button>
       </div>
 
-      {classes.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={() => setClassFilter("all")}
-            className={cn(
-              "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
-              classFilter === "all"
-                ? "bg-indigo-600 text-white"
-                : cn(card, border, textMuted)
-            )}
-          >
-            Toutes
-          </button>
-          {classes.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setClassFilter(c.id)}
-              className={cn(
-                "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
-                classFilter === c.id
-                  ? "bg-indigo-600 text-white"
-                  : cn(card, border, textMuted)
-              )}
-            >
-              {c.name}
-            </button>
-          ))}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
+          <p className={cn("text-xs font-bold uppercase tracking-wide text-indigo-500")}>Classes</p>
+          <p className={cn("mt-2 text-3xl font-bold", text)}>{classBoards.length}</p>
+          <p className={cn("text-sm", textMuted)}>espaces de tâches</p>
         </div>
-      )}
+        <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
+          <p className={cn("text-xs font-bold uppercase tracking-wide text-amber-500")}>À faire</p>
+          <p className={cn("mt-2 text-3xl font-bold", text)}>
+            {classBoards.reduce((sum, cls) => sum + cls.todoCount, 0)}
+          </p>
+          <p className={cn("text-sm", textMuted)}>tâches visibles côté élèves</p>
+        </div>
+        <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
+          <p className={cn("text-xs font-bold uppercase tracking-wide text-emerald-500")}>Terminées</p>
+          <p className={cn("mt-2 text-3xl font-bold", text)}>
+            {classBoards.reduce((sum, cls) => sum + cls.doneCount, 0)}
+          </p>
+          <p className={cn("text-sm", textMuted)}>basculées après échéance</p>
+        </div>
+      </div>
 
-      {tasks.length === 0 ? (
+      {classBoards.length === 0 ? (
         <div className={cn("rounded-2xl border p-10 text-center lg:mx-auto lg:max-w-2xl", card, border, shadow)}>
           <ClipboardList className="mx-auto mb-4 h-12 w-12 text-indigo-500/50" />
-          <p className={cn("text-lg font-semibold", text)}>Aucune tâche</p>
+          <p className={cn("text-lg font-semibold", text)}>Aucune classe disponible</p>
           <p className={cn("mx-auto mt-2 max-w-md text-sm", textMuted)}>
-            Créez des devoirs pour vos élèves en appuyant sur « Nouvelle tâche ».
+            Dès qu&apos;une classe vous est assignée, vous pourrez créer et piloter ses tâches depuis cet espace.
           </p>
         </div>
       ) : (
-        <>
-          {overdueTasks.length > 0 && (
-            <section className="space-y-3">
-              <h2 className={cn("text-sm font-semibold text-red-600", textMuted)}>Échues — à corriger</h2>
-              {overdueTasks.map((task) => (
-                <TeacherTaskCard key={task.id} task={task} overdue />
-              ))}
-            </section>
-          )}
-          {activeTasks.length > 0 && (
-            <section className="space-y-3">
-              <h2 className={cn("text-sm font-semibold", textMuted)}>En cours</h2>
-              {activeTasks.map((task) => (
-                <TeacherTaskCard key={task.id} task={task} />
-              ))}
-            </section>
-          )}
-        </>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {classBoards.map((cls) => (
+            <div key={cls.id} className={cn("group rounded-3xl border p-4", card, border, shadow)}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className={cn("truncate text-base font-bold", text)}>{cls.name}</p>
+                      <p className={cn("truncate text-xs", textMuted)}>
+                        {cls.subjects.length > 0 ? cls.subjects.join(" · ") : "Aucune matière liée"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openCreateForClass(cls.id)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20 transition-transform hover:scale-105"
+                  title={`Créer une tâche pour ${cls.name}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className={cn("rounded-2xl border px-3 py-3", border, isDark ? "bg-gray-950/50" : "bg-gray-50")}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-500">À faire</p>
+                  <p className={cn("mt-1 text-xl font-bold", text)}>{cls.todoCount}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-500">Terminées</p>
+                  <p className={cn("mt-1 text-xl font-bold", text)}>{cls.doneCount}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {cls.latestTask ? (
+                  <div className={cn("rounded-2xl border px-3 py-3", border, isDark ? "bg-gray-950/30" : "bg-gray-50/80")}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Dernière tâche</p>
+                    <p className={cn("mt-1 truncate text-sm font-semibold", text)}>{cls.latestTask.title}</p>
+                    <p className={cn("mt-1 text-xs", textMuted)}>
+                      Créée récemment · échéance {new Date(cls.latestTask.dueAt).toLocaleDateString("fr-FR")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className={cn("rounded-2xl border border-dashed px-3 py-4 text-center text-sm", border, textMuted)}>
+                    Aucune tâche pour cette classe.
+                  </div>
+                )}
+              </div>
+
+              <Link
+                href={`/teacher/classes/${cls.id}`}
+                className={cn(
+                  "mt-4 inline-flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-sm font-semibold transition-colors",
+                  border,
+                  isDark ? "hover:bg-gray-800" : "hover:bg-gray-50",
+                  text
+                )}
+              >
+                <span>Ouvrir le tableau de la classe</span>
+                <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Modal création */}

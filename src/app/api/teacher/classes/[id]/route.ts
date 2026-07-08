@@ -28,7 +28,7 @@ export async function GET(
     return NextResponse.json({ error: "Classe non assignée" }, { status: 403 })
   }
 
-  const [classRow, assignments, enrollments] = await Promise.all([
+  const [classRow, assignments, enrollments, tasks] = await Promise.all([
     prisma.class.findFirst({
       where: { id: classId, schoolId },
       select: { id: true, name: true, level: true, section: true, letter: true, stream: true },
@@ -55,6 +55,13 @@ export async function GET(
       },
       orderBy: [{ student: { lastName: "asc" } }, { student: { firstName: "asc" } }],
     }),
+    prisma.studentTask.findMany({
+      where: { teacherId, schoolId, classId, isActive: true },
+      include: {
+        subject: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: [{ createdAt: "desc" }, { dueAt: "desc" }],
+    }),
   ])
 
   if (!classRow) {
@@ -68,6 +75,21 @@ export async function GET(
       name: a.subject.name,
       color: a.subject.color,
       weeklyHours: a.weeklyHours,
+    })),
+    tasks: tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      question: task.question,
+      description: task.description,
+      dueAt: task.dueAt,
+      createdAt: task.createdAt,
+      subject: task.subject
+        ? {
+            id: task.subject.id,
+            name: task.subject.name,
+            color: task.subject.color,
+          }
+        : null,
     })),
     students: enrollments.map((e) => ({
       id: e.student.id,

@@ -2,11 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import {
-  Wallet,
   Receipt,
-  TrendingUp,
-  Gift,
-  Banknote,
   Loader2,
   X,
   FileText,
@@ -26,15 +22,6 @@ interface Payment {
   reference: string | null
   datePaiement: string
   invoiceNumber: string
-}
-
-interface Totals {
-  salaire: number
-  prime: number
-  bonus: number
-  avance: number
-  autre: number
-  total: number
 }
 
 interface Invoice {
@@ -67,19 +54,13 @@ function formatDate(dateStr: string) {
   })
 }
 
-const TYPE_ICONS: Record<string, React.ElementType> = {
-  SALAIRE: Banknote,
-  PRIME: Gift,
-  BONUS: TrendingUp,
-  AVANCE: Wallet,
-}
+const TYPE_ICONS: Record<string, React.ElementType> = {}
 
 export default function TeacherWalletPage() {
   const { card, text, textMuted, shadow, border, isDark } = useTeacherTheme()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [payments, setPayments] = useState<Payment[]>([])
-  const [totals, setTotals] = useState<Totals | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [invoiceOpen, setInvoiceOpen] = useState(false)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -93,7 +74,6 @@ export default function TeacherWalletPage() {
       if (res.ok) {
         const data = await res.json()
         setPayments(data.payments || [])
-        setTotals(data.totals || null)
       }
     } finally {
       setLoading(false)
@@ -140,38 +120,11 @@ export default function TeacherWalletPage() {
         <div>
           <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Portefeuille</h1>
           <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>
-            Historique des paiements, salaires, primes et avances.
+            Historique des paiements.
           </p>
         </div>
         {refreshing && <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />}
       </div>
-
-      {/* Totaux */}
-      {totals && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className={cn("rounded-2xl border p-4 lg:col-span-2 lg:p-5", card, border, shadow)}>
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-              <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>Total perçu</p>
-            <p className={cn("mt-1 text-2xl font-bold lg:text-3xl", text)}>{formatMoney(totals.total)}</p>
-          </div>
-          <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
-            <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>Salaires</p>
-            <p className="mt-1 text-xl font-bold text-green-600">{formatMoney(totals.salaire)}</p>
-          </div>
-          <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
-            <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>Primes & bonus</p>
-            <p className="mt-1 text-xl font-bold text-amber-600">{formatMoney(totals.prime + totals.bonus)}</p>
-          </div>
-          {totals.avance > 0 && (
-            <div className={cn("rounded-2xl border p-4 sm:col-span-2", card, border, shadow)}>
-              <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>Avances</p>
-              <p className="mt-1 text-xl font-bold text-sky-600">{formatMoney(totals.avance)}</p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Historique */}
       <section>
