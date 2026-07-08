@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma"
 
-export async function ensureSchoolSettingsTable() {
+// Le DDL "CREATE TABLE IF NOT EXISTS" ne doit s'exécuter qu'une fois par
+// instance de serveur (et non à chaque requête, ce qui était très coûteux
+// en production). On mémorise la promesse résolue.
+let settingsTableEnsured: Promise<void> | null = null
+
+async function runEnsureSchoolSettingsTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS school_settings (
       school_id INTEGER PRIMARY KEY,
@@ -10,6 +15,28 @@ export async function ensureSchoolSettingsTable() {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `)
+}
+
+export async function ensureSchoolSettingsTable() {
+  if (!settingsTableEnsured) {
+    settingsTableEnsured = runEnsureSchoolSettingsTable().catch((e) => {
+      // En cas d'échec, on autorise une nouvelle tentative au prochain appel.
+      settingsTableEnsured = null
+      throw e
+    })
+  }
+  return settingsTableEnsured
+}
+
+// Cache mémoire de l'année scolaire courante par école (TTL court).
+// Évite plusieurs requêtes DB sur quasiment chaque requête API authentifiée.
+const YEAR_CACHE_TTL_MS = 60_000
+const yearCache = new Map<number, { value: number | null; expires: number }>()
+
+/** À appeler après modification de l'année courante (paramètres école). */
+export function invalidateSchoolYearCache(schoolId?: number) {
+  if (schoolId == null) yearCache.clear()
+  else yearCache.delete(schoolId)
 }
 
 export async function countActiveEnrollments(schoolId: number, yearId: number): Promise<number> {
@@ -41,11 +68,7 @@ async function readSettingsYearId(schoolId: number): Promise<number | null> {
   }
 }
 
-/**
- * Année scolaire active pour une école.
- * Priorité stricte : choix explicite dans Paramètres (school_settings.current_year_id).
- */
-export async function getSchoolCurrentYearId(schoolId: number): Promise<number | null> {
+async function resolveSchoolCurrentYearId(schoolId: number): Promise<number | null> {
   const fromSettings = await readSettingsYearId(schoolId)
   if (fromSettings) return fromSettings
 
@@ -60,6 +83,20 @@ export async function getSchoolCurrentYearId(schoolId: number): Promise<number |
     select: { id: true },
   })
   return latest?.id ?? null
+}
+
+/**
+ * Année scolaire active pour une école.
+ * Priorité stricte : choix explicite dans Paramètres (school_settings.current_year_id).
+ * Résultat mis en cache mémoire pendant {@link YEAR_CACHE_TTL_MS}.
+ */
+export async function getSchoolCurrentYearId(schoolId: number): Promise<number | null> {
+  const cached = yearCache.get(schoolId)
+  if (cached && cached.expires > Date.now()) return cached.value
+
+  const value = await resolveSchoolCurrentYearId(schoolId)
+  yearCache.set(schoolId, { value, expires: Date.now() + YEAR_CACHE_TTL_MS })
+  return value
 }
 
 export async function getSchoolCurrentYearName(schoolId: number): Promise<string | null> {

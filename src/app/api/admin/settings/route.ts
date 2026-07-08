@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
-import { ensureSchoolSettingsTable } from "@/lib/fees/school-year"
+import { ensureSchoolSettingsTable, invalidateSchoolYearCache } from "@/lib/fees/school-year"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -99,6 +99,8 @@ export async function PUT(req: NextRequest) {
       exchangeRate,
       currentYearId
     )
+
+    invalidateSchoolYearCache(user.schoolId)
 
     const settings = await getSchoolSettings(user.schoolId)
     return NextResponse.json(settings)
