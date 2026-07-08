@@ -10,31 +10,33 @@ import StudentDesktopHeader from "./student-desktop-header"
 import StudentSidebar from "./student-sidebar"
 import StudentBottomNav from "./student-bottom-nav"
 import { useStudentTheme } from "./use-student-theme"
+import { useStudentMe } from "./student-context"
 
 interface StudentLayoutProps {
   children: React.ReactNode
 }
 
-interface StudentContext {
-  firstName: string
-  lastName: string
-  middleName: string
-  fullName: string
-  className?: string
-  school: string
-  photoUrl: string | null
-  isPremium: boolean
-  studentId: number | null
-  classId: number | null
-}
-
 export default function StudentLayout({ children }: StudentLayoutProps) {
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useStudentTheme()
-  const [student, setStudent] = useState<StudentContext | null>(null)
+  const { student: me } = useStudentMe()
+  const student = me
+    ? {
+        firstName: me.firstName,
+        lastName: me.lastName,
+        middleName: me.middleName || "",
+        fullName: `${me.lastName} ${me.middleName || ""} ${me.firstName}`.replace(/\s+/g, " ").trim(),
+        className: me.class,
+        school: me.school || "Mon école",
+        photoUrl: me.photoUrl || null,
+        isPremium: me.isPremium === true,
+        studentId: me.id,
+        classId: me.classId ?? null,
+      }
+    : null
+  const schoolId = me?.schoolId ?? null
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
-  const [schoolId, setSchoolId] = useState<number | null>(null)
   const [feePulse, setFeePulse] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
@@ -53,51 +55,25 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch("/api/student/me", { credentials: "include" })
-        if (res.status === 401) {
-          window.location.href = "/login"
-          return
-        }
-        if (res.ok) {
-          const data = await res.json()
-          const s = data.student
-          const fullName = `${s.lastName} ${s.middleName || ""} ${s.firstName}`.replace(/\s+/g, " ").trim()
-          setStudent({
-            firstName: s.firstName,
-            lastName: s.lastName,
-            middleName: s.middleName || "",
-            fullName,
-            className: s.class,
-            school: s.school || "Mon école",
-            photoUrl: s.photoUrl || null,
-            isPremium: s.isPremium === true,
-            studentId: s.id,
-            classId: s.classId ?? null,
-          })
-          if (s.schoolId) setSchoolId(s.schoolId)
-        }
-      } catch (e) {
-        console.error("Erreur chargement profil élève:", e)
-      }
-      try {
-        const countRes = await fetch("/api/student/communiques/count", { credentials: "include" })
-        if (countRes.ok) {
-          const countData = await countRes.json()
+    const fetchCounts = async () => {
+      const [countRes, notifRes] = await Promise.allSettled([
+        fetch("/api/student/communiques/count", { credentials: "include" }),
+        fetch("/api/student/notifications/count", { credentials: "include" }),
+      ])
+      if (countRes.status === "fulfilled" && countRes.value.ok) {
+        try {
+          const countData = await countRes.value.json()
           setUnreadCommuniques(countData.unread || 0)
-        }
-      } catch {}
-      try {
-        const notifRes = await fetch("/api/student/notifications", { credentials: "include" })
-        if (notifRes.ok) {
-          const notifData = await notifRes.json()
-          const unread = (notifData.notifications || []).filter((n: { isRead: boolean }) => !n.isRead).length
-          setUnreadNotifications(unread)
-        }
-      } catch {}
+        } catch {}
+      }
+      if (notifRes.status === "fulfilled" && notifRes.value.ok) {
+        try {
+          const notifData = await notifRes.value.json()
+          setUnreadNotifications(notifData.unread || 0)
+        } catch {}
+      }
     }
-    fetchData()
+    void fetchCounts()
   }, [])
 
   // Sync badge notifications (lu/non lu) après lecture dans /student/notifications

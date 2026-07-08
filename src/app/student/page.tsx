@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
+import { useStudentMe } from "@/components/student/student-context"
 import StudentLoading from "@/components/student/student-loading"
 import TaskCard from "@/components/student/task-card"
 import Portal from "@/components/portal"
@@ -113,8 +114,11 @@ function timeAgo(dateStr: string) {
 export default function StudentDashboard() {
   const router = useRouter()
   const { card, text, textMuted, shadow, border, isDark } = useStudentTheme()
+  const { student: me, loading: meLoading } = useStudentMe()
+  const studentInfo: StudentInfo | null = me
+    ? { id: me.id, firstName: me.firstName, code: me.code, class: me.class, year: me.year }
+    : null
   const [loading, setLoading] = useState(true)
-  const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null)
   const [latestCommunique, setLatestCommunique] = useState<Communique | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [feeBalance, setFeeBalance] = useState<FeeBalance | null>(null)
@@ -147,7 +151,7 @@ export default function StudentDashboard() {
 
   const fetchFees = async () => {
     try {
-      const res = await fetch("/api/student/fees", { credentials: "include" })
+      const res = await fetch("/api/student/fees?summary=1", { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
         if (data.scolaire) setFeeBalance(data.scolaire)
@@ -158,22 +162,17 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const fetchCommunique = async () => {
+        try {
+          const commRes = await fetch("/api/student/communiques?page=1&limit=1", { credentials: "include" })
+          if (commRes.ok) {
+            const data = await commRes.json()
+            if (data.communiques?.length > 0) setLatestCommunique(data.communiques[0])
+          }
+        } catch {}
+      }
       try {
-        const [meRes, commRes] = await Promise.all([
-          fetch("/api/student/me", { credentials: "include" }),
-          fetch("/api/student/communiques?page=1&limit=1", { credentials: "include" }),
-        ])
-        if (meRes.ok) {
-          const data = await meRes.json()
-          setStudentInfo(data.student)
-        }
-        if (commRes.ok) {
-          const data = await commRes.json()
-          if (data.communiques?.length > 0) setLatestCommunique(data.communiques[0])
-        }
-        await Promise.all([fetchTasks(), fetchFees()])
-      } catch (error) {
-        console.error("Erreur chargement:", error)
+        await Promise.all([fetchCommunique(), fetchTasks(), fetchFees()])
       } finally {
         setLoading(false)
       }
@@ -189,7 +188,7 @@ export default function StudentDashboard() {
     }
   }, [])
 
-  if (loading) return <StudentLoading variant="dashboard" />
+  if (loading || meLoading) return <StudentLoading variant="dashboard" />
 
   const feeProgress = computeFeeProgress(feeBalance)
 

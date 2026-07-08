@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
+import { useTeacherMe } from "@/components/teacher/teacher-context"
 import StudentLoading from "@/components/student/student-loading"
 import { getGreeting } from "@/lib/student-auth"
 
@@ -37,11 +38,6 @@ interface DashboardData {
     subject: { name: string; color: string | null } | null
   }>
   latestCommunique: { id: number; title: string; createdAt: string } | null
-}
-
-interface TeacherInfo {
-  firstName: string
-  year?: string
 }
 
 const DAY_LABELS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
@@ -69,8 +65,8 @@ function timeAgo(dateStr: string) {
 export default function TeacherDashboard() {
   const router = useRouter()
   const { card, text, textMuted, shadow, border, isDark } = useTeacherTheme()
+  const { teacher: me } = useTeacherMe()
   const [loading, setLoading] = useState(true)
-  const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
 
@@ -97,14 +93,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [meRes, dashRes] = await Promise.all([
-          fetch("/api/teacher/me", { credentials: "include" }),
-          fetch("/api/teacher/dashboard", { credentials: "include" }),
-        ])
-        if (meRes.ok) {
-          const { teacher } = await meRes.json()
-          setTeacherInfo({ firstName: teacher.firstName, year: teacher.year })
-        }
+        const dashRes = await fetch("/api/teacher/dashboard", { credentials: "include" })
         if (dashRes.ok) {
           setDashboard(await dashRes.json())
         }
@@ -129,21 +118,21 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-5 lg:space-y-8">
-      {teacherInfo && (
+      {me && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className={cn("text-xl font-bold tracking-tight lg:text-3xl", text)}>
-              {getGreeting()}, {teacherInfo.firstName}
+              {getGreeting()}, {me.firstName}
             </p>
             <p className={cn("mt-1 hidden text-sm lg:block", textMuted)}>
               Votre espace enseignant
             </p>
           </div>
-          {(teacherInfo.year || dashboard?.yearName) && (
+          {(me.year || dashboard?.yearName) && (
             <div className={cn("shrink-0 rounded-2xl border px-4 py-2.5 lg:px-5 lg:py-3 lg:text-right", card, border, shadow)}>
               <p className={cn("text-[10px] font-bold uppercase tracking-wider", textMuted)}>Année scolaire</p>
               <p className={cn("mt-0.5 text-sm font-bold lg:text-lg", text)}>
-                Session {teacherInfo.year || dashboard?.yearName}
+                Session {me.year || dashboard?.yearName}
               </p>
             </div>
           )}

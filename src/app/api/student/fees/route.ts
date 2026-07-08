@@ -20,7 +20,21 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  // Le dashboard n'a besoin que du résumé : ?summary=1 évite de charger l'historique.
+  const summaryOnly = new URL(req.url).searchParams.get("summary") === "1"
+
   try {
+    if (summaryOnly) {
+      const breakdown = await calculateStudentFeesBreakdown(studentId, yearId, schoolId)
+      return NextResponse.json({
+        scolaire: breakdown.scolaire,
+        autres: breakdown.autres,
+        balance: breakdown.scolaire,
+        paiements: [],
+        yearId,
+      })
+    }
+
     const [breakdown, paiementsResult] = await Promise.all([
       calculateStudentFeesBreakdown(studentId, yearId, schoolId),
       listPaiements({

@@ -4,28 +4,24 @@ import { useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
-import { parseCommuniqueIdFromNotification } from "@/lib/communique-user-read"
 import { cn } from "@/lib/utils"
 import TeacherHeader from "./teacher-header"
 import TeacherDesktopHeader from "./teacher-desktop-header"
 import TeacherSidebar from "./teacher-sidebar"
 import TeacherBottomNav from "./teacher-bottom-nav"
 import { useTeacherTheme } from "./use-teacher-theme"
+import { useTeacherMe } from "./teacher-context"
 
 async function fetchMessageCounts(): Promise<{ comm: number; otherNotif: number }> {
   try {
     const [notifRes, commRes] = await Promise.all([
-      fetch("/api/teacher/notifications", { credentials: "include", cache: "no-store" }),
+      fetch("/api/teacher/notifications/count", { credentials: "include", cache: "no-store" }),
       fetch("/api/teacher/communiques/count", { credentials: "include", cache: "no-store" }),
     ])
     let otherNotif = 0
     let comm = 0
     if (notifRes.ok) {
-      const data = await notifRes.json()
-      otherNotif = (data.notifications || []).filter(
-        (n: { isRead: boolean; message: string }) =>
-          !n.isRead && !parseCommuniqueIdFromNotification(n.message)
-      ).length
+      otherNotif = (await notifRes.json()).unread || 0
     }
     if (commRes.ok) {
       comm = (await commRes.json()).unread || 0
@@ -39,14 +35,17 @@ async function fetchMessageCounts(): Promise<{ comm: number; otherNotif: number 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useTeacherTheme()
-  const [teacher, setTeacher] = useState<{
-    firstName: string
-    fullName: string
-    specialty?: string | null
-    school: string
-    userId: number
-    schoolId: number
-  } | null>(null)
+  const { teacher: me } = useTeacherMe()
+  const teacher = me
+    ? {
+        firstName: me.firstName,
+        fullName: `${me.lastName} ${me.middleName || ""} ${me.firstName}`.replace(/\s+/g, " ").trim(),
+        specialty: me.specialty,
+        school: me.school || "Mon école",
+        userId: me.userId,
+        schoolId: me.schoolId,
+      }
+    : null
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [unreadOtherNotifications, setUnreadOtherNotifications] = useState(0)
   const [walletPulse, setWalletPulse] = useState(false)
@@ -78,33 +77,6 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     void refreshCounts()
   }, [refreshCounts])
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/teacher/me", { credentials: "include" })
-        if (res.status === 401) {
-          window.location.href = "/login"
-          return
-        }
-        if (res.ok) {
-          const { teacher: t } = await res.json()
-          const fullName = `${t.lastName} ${t.middleName || ""} ${t.firstName}`.replace(/\s+/g, " ").trim()
-          setTeacher({
-            firstName: t.firstName,
-            fullName,
-            specialty: t.specialty,
-            school: t.school || "Mon école",
-            userId: t.userId,
-            schoolId: t.schoolId,
-          })
-        }
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    void load()
-  }, [])
 
   useEffect(() => {
     const handleMessagesUpdated = () => {

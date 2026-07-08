@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
+import { useTeacherMe } from "@/components/teacher/teacher-context"
 import StudentLoading from "@/components/student/student-loading"
 
 interface Task {
@@ -53,9 +54,9 @@ function formatDateTime(dateStr: string) {
 
 export default function TeacherTasksPage() {
   const { card, text, textMuted, shadow, border, isDark } = useTeacherTheme()
-  const [loading, setLoading] = useState(true)
+  const { teacher: me, loading: meLoading } = useTeacherMe()
+  const [tasksLoading, setTasksLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
@@ -67,6 +68,17 @@ export default function TeacherTasksPage() {
     classId: "",
     subjectId: "",
   })
+
+  const assignments = useMemo<Assignment[]>(
+    () =>
+      (me?.assignments || []).map((a) => ({
+        classId: a.classId,
+        className: a.className,
+        subjectId: a.subjectId,
+        subjectName: a.subjectName,
+      })),
+    [me?.assignments]
+  )
 
   const classes = useMemo(() => {
     const map = new Map<number, string>()
@@ -90,14 +102,9 @@ export default function TeacherTasksPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const meRes = await fetch("/api/teacher/me", { credentials: "include" })
-        if (meRes.ok) {
-          const { teacher } = await meRes.json()
-          setAssignments(teacher.assignments || [])
-        }
         await fetchTasks()
       } finally {
-        setLoading(false)
+        setTasksLoading(false)
       }
     }
     void load()
@@ -144,7 +151,7 @@ export default function TeacherTasksPage() {
     }
   }
 
-  if (loading) return <StudentLoading variant="tasks" />
+  if (meLoading || tasksLoading) return <StudentLoading variant="tasks" />
 
   const classBoards = classes.map((cls) => {
     const classTasks = tasks.filter((task) => task.class.id === cls.id)

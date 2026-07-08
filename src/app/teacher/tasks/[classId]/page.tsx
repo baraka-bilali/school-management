@@ -45,13 +45,6 @@ interface Subject {
   weeklyHours: number
 }
 
-interface Assignment {
-  classId: number
-  className: string
-  subjectId: number
-  subjectName: string
-}
-
 function getMinDueAtValue() {
   const now = new Date()
   now.setSeconds(0, 0)
@@ -166,7 +159,6 @@ export default function TeacherClassTaskBoardPage() {
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [now, setNow] = useState(() => Date.now())
 
   const [showForm, setShowForm] = useState(false)
@@ -181,8 +173,8 @@ export default function TeacherClassTaskBoardPage() {
   })
 
   const subjectsForClass = useMemo(
-    () => assignments.filter((a) => a.classId === parseInt(classId, 10)),
-    [assignments, classId]
+    () => subjects.map((s) => ({ subjectId: s.id, subjectName: s.name })),
+    [subjects]
   )
 
   const fetchBoard = async () => {
@@ -201,11 +193,6 @@ export default function TeacherClassTaskBoardPage() {
     const load = async () => {
       try {
         setError(null)
-        const meRes = await fetch("/api/teacher/me", { credentials: "include" })
-        if (meRes.ok) {
-          const { teacher } = await meRes.json()
-          setAssignments(teacher.assignments || [])
-        }
         await fetchBoard()
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur de chargement")

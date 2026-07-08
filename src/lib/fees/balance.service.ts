@@ -49,6 +49,37 @@ export async function calculateBalance(
 }
 
 /**
+ * Somme des paiements valides (non annulés) d'un élève, groupée par tarification.
+ * Une seule requête agrégée pour éviter le N+1.
+ */
+async function sumPaiementsByTarification(
+  studentId: number,
+  tarificationIds: number[]
+): Promise<Map<number, { totalPaye: number; nombrePaiements: number }>> {
+  const result = new Map<number, { totalPaye: number; nombrePaiements: number }>()
+  if (tarificationIds.length === 0) return result
+
+  const grouped = await prisma.paiement.groupBy({
+    by: ["tarificationId"],
+    where: {
+      studentId,
+      tarificationId: { in: tarificationIds },
+      isAnnule: false,
+    },
+    _sum: { montant: true },
+    _count: { id: true },
+  })
+
+  for (const row of grouped) {
+    result.set(row.tarificationId, {
+      totalPaye: row._sum.montant ?? 0,
+      nombrePaiements: row._count.id,
+    })
+  }
+  return result
+}
+
+/**
  * Calcul du solde global d'un élève pour toutes les tarifications
  * d'une année scolaire donnée. Les totaux sont séparés par devise.
  */
@@ -92,19 +123,22 @@ export async function calculateStudentYearBalance(
     },
   })
 
-  const details = await Promise.all(
-    tarifications.map(async (t) => {
-      const balance = await calculateBalance(studentId, t.id)
-      return {
-        tarificationId: t.id,
-        typeFrais: t.typeFrais.nom,
-        montantTotal: balance.montantTotal,
-        totalPaye: balance.totalPaye,
-        solde: balance.solde,
-        devise: balance.devise,
-      }
-    })
+  const paiementsByTarif = await sumPaiementsByTarification(
+    studentId,
+    tarifications.map((t) => t.id)
   )
+
+  const details = tarifications.map((t) => {
+    const paid = paiementsByTarif.get(t.id)?.totalPaye ?? 0
+    return {
+      tarificationId: t.id,
+      typeFrais: t.typeFrais.nom,
+      montantTotal: t.montant,
+      totalPaye: paid,
+      solde: t.montant - paid,
+      devise: t.devise as "USD" | "CDF",
+    }
+  })
 
   const usdDetails = details.filter((d) => d.devise === "USD")
   const cdfDetails = details.filter((d) => d.devise === "CDF")
@@ -212,22 +246,24 @@ export async function calculateStudentFeesBreakdown(
     },
   })
 
-  const details = await Promise.all(
-    tarifications.map(async (t) => {
-      const balance = await calculateBalance(studentId, t.id)
-      const defaultType = isDefaultFeeType(t.typeFrais)
-      return {
-        tarificationId: t.id,
-        typeFraisId: t.typeFrais.id,
-        typeFrais: t.typeFrais.nom,
-        isDefault: defaultType,
-        montantTotal: balance.montantTotal,
-        totalPaye: balance.totalPaye,
-        solde: balance.solde,
-        devise: balance.devise,
-      }
-    })
+  const paiementsByTarif = await sumPaiementsByTarification(
+    studentId,
+    tarifications.map((t) => t.id)
   )
+
+  const details = tarifications.map((t) => {
+    const paid = paiementsByTarif.get(t.id)?.totalPaye ?? 0
+    return {
+      tarificationId: t.id,
+      typeFraisId: t.typeFrais.id,
+      typeFrais: t.typeFrais.nom,
+      isDefault: isDefaultFeeType(t.typeFrais),
+      montantTotal: t.montant,
+      totalPaye: paid,
+      solde: t.montant - paid,
+      devise: t.devise as "USD" | "CDF",
+    }
+  })
 
   const byType = aggregateDetailsByType(details)
   const scolaireEntry = byType.find((t) => t.isDefault)

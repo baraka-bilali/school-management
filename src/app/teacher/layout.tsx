@@ -1,5 +1,10 @@
 import TeacherLayout from "@/components/teacher/teacher-layout"
+import { TeacherProvider } from "@/components/teacher/teacher-context"
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <TeacherLayout>{children}</TeacherLayout>
+  return (
+    <TeacherProvider>
+      <TeacherLayout>{children}</TeacherLayout>
+    </TeacherProvider>
+  )
 }
