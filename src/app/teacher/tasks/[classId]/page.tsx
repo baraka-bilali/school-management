@@ -510,7 +510,7 @@ export default function TeacherClassTaskBoardPage() {
       {/* Create task modal */}
       {showForm && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={() => setShowForm(false)}
         >
           <div

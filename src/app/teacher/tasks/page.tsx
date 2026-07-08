@@ -297,7 +297,7 @@ export default function TeacherTasksPage() {
 
       {/* Modal création */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setShowForm(false)}>
           <div
             className={cn("max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border p-5 shadow-xl", card, border)}
             onClick={(e) => e.stopPropagation()}
