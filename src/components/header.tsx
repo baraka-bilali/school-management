@@ -201,16 +201,16 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
   return (
     <>
       <nav className={`fixed top-0 left-0 right-0 ${bgColor} border-b ${borderColor} z-40 transition-colors`}>
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center">
+        <div className="px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center min-w-0">
             <button 
               onClick={onSidebarToggle}
-              className={`${textSecondary} hover:${textColor} mr-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+              className={`${textSecondary} hover:${textColor} mr-2 md:mr-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors hidden md:inline-flex`}
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center overflow-hidden">
+            <div className="flex items-center space-x-2 md:space-x-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center overflow-hidden shrink-0">
                 {schoolPhoto ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={schoolPhoto} alt="" className="h-full w-full object-cover" />
@@ -218,13 +218,13 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
                   <School className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 )}
               </div>
-              <h1 className={`text-xl font-semibold ${textColor}`}>
+              <h1 className={`text-base md:text-xl font-semibold ${textColor} truncate`}>
                 {schoolName || "Chargement..."}
               </h1>
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2 shrink-0">
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}

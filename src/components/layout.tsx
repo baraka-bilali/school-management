@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Header from "./header"
 import Sidebar from "./sidebar"
+import AdminBottomNav from "./admin-bottom-nav"
 import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 
@@ -27,6 +28,7 @@ export default function Layout({ children }: LayoutProps) {
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [studentSchoolId, setStudentSchoolId] = useState<number | null>(null)
+  const [canEnrollStudents, setCanEnrollStudents] = useState(false)
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -88,6 +90,9 @@ export default function Layout({ children }: LayoutProps) {
           const data = await res.json()
           const userRole = data.user?.role || null
           setRole(userRole)
+          if (typeof data.user?.canEnrollStudents === "boolean") {
+            setCanEnrollStudents(data.user.canEnrollStudents)
+          }
           if (userRole === "SUPER_ADMIN") {
             router.replace("/super-admin")
             return
@@ -170,12 +175,20 @@ export default function Layout({ children }: LayoutProps) {
           : sidebarOpen ? 'ml-64' : 'ml-16'
         }
       `}>
-        <div className="p-6">
+        <div className="p-6 pb-24 md:pb-6">
           <RouteTransition>
             {children}
           </RouteTransition>
         </div>
       </main>
+
+      {/* Mobile bottom navigation (GitHub-style) — masqué sur tablette/desktop */}
+      <AdminBottomNav
+        role={role}
+        theme={theme}
+        canEnrollStudents={canEnrollStudents}
+        onMore={toggleSidebar}
+      />
     </div>
   )
 }
