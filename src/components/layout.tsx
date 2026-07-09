@@ -175,7 +175,7 @@ export default function Layout({ children }: LayoutProps) {
           : sidebarOpen ? 'ml-64' : 'ml-16'
         }
       `}>
-        <div className="p-6 pb-24 md:pb-6">
+        <div className="p-4 pb-24 md:p-6">
           <RouteTransition>
             {children}
           </RouteTransition>

@@ -182,8 +182,8 @@ function FormModal({
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className={cn("relative w-full max-w-md rounded-2xl border shadow-2xl animate-scale-up", bgColor, borderColor)}>
-        <div className={cn("flex items-center justify-between border-b p-5", borderColor)}>
+      <div className={cn("relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl animate-scale-up", bgColor, borderColor)}>
+        <div className={cn("sticky top-0 z-10 flex items-center justify-between border-b p-5", bgColor, borderColor)}>
           <h3 className={cn("text-lg font-bold", textColor)}>{title}</h3>
           <button type="button" onClick={onClose} className={cn("rounded-lg p-1 transition-colors hover:bg-black/5 dark:hover:bg-white/10", textSecondary)}>
             <X className="h-5 w-5" />
@@ -493,7 +493,40 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   <p className={cn("mt-1 text-xs", textSecondary)}>Commencez par créer une matière.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-inherit">
+                <>
+                {/* Mobile: cartes matières */}
+                <div className="md:hidden space-y-2.5">
+                  {subjects.map((s) => (
+                    <div key={`m-subj-${s.id}`} className={cn("flex items-center gap-3 rounded-xl border p-3.5", borderColor)}>
+                      <span className="h-4 w-4 shrink-0 rounded-full ring-2 ring-white/20" style={{ backgroundColor: s.color || "#4f46e5" }} />
+                      <div className="min-w-0 flex-1">
+                        <div className={cn("truncate text-sm font-semibold", textColor)}>{s.name}</div>
+                        <div className={cn("mt-0.5 truncate text-xs", textSecondary)}>
+                          Code {s.code} · Coef {s.coefficient} · {s.maxWeeklyHours}h/sem
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openEditSubject(s)}
+                        title="Modifier"
+                        className={cn("shrink-0 rounded-lg p-2 transition-colors", isDark ? "text-indigo-400 hover:bg-indigo-500/10" : "text-indigo-600 hover:bg-indigo-50")}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget({ type: "subject", id: s.id, name: s.name })}
+                        title="Supprimer"
+                        className="shrink-0 rounded-lg p-2 text-red-500 transition-colors hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop/tablet: tableau matières */}
+                <div className="hidden md:block overflow-x-auto rounded-lg border border-inherit">
                   <table className="w-full text-sm">
                     <thead className={isDark ? "bg-gray-700/50" : "bg-gray-50"}>
                       <tr className={cn("border-b text-left", borderColor)}>
@@ -546,6 +579,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -589,7 +623,53 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   <p className={cn("mt-1 text-xs", textSecondary)}>Assignez un cours à un professeur pour une classe.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-inherit">
+                <>
+                {/* Mobile: cartes affectations */}
+                <div className="md:hidden space-y-2.5">
+                  {assignments.map((a) => (
+                    <div key={`m-assign-${a.id}`} className={cn("rounded-xl border p-3.5 space-y-2.5", borderColor)}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className={cn("flex items-center gap-2 text-sm font-semibold", textColor)}>
+                            <BookOpen className="h-4 w-4 shrink-0" style={{ color: a.subjectColor || "#4f46e5" }} />
+                            <span className="truncate">{a.subjectName}</span>
+                          </div>
+                          <div className={cn("mt-1 flex items-center gap-1.5 truncate text-xs", textSecondary)}>
+                            <Users className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                            <span className="truncate">{a.teacherName}</span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditAssignment(a)}
+                            title="Modifier"
+                            className={cn("rounded-lg p-2 transition-colors", isDark ? "text-indigo-400 hover:bg-indigo-500/10" : "text-indigo-600 hover:bg-indigo-50")}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget({ type: "assignment", id: a.id, name: `${a.subjectName} — ${a.className}` })}
+                            title="Retirer"
+                            className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-500/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700")}>
+                          {a.className}
+                        </span>
+                        <span className={cn("text-xs", textSecondary)}>{a.weeklyHours}h/sem</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop/tablet: tableau affectations */}
+                <div className="hidden md:block overflow-x-auto rounded-lg border border-inherit">
                   <table className="w-full text-sm">
                     <thead className={isDark ? "bg-gray-700/50" : "bg-gray-50"}>
                       <tr className={cn("border-b text-left", borderColor)}>
@@ -653,6 +733,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </CardContent>
           </Card>

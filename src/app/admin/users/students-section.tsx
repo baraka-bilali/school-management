@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
 import Portal from "@/components/portal"
-import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download } from "lucide-react"
+import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
@@ -206,12 +206,12 @@ function CreateStudentModal({
   return (
     <Portal>
       {/* overlay */}
-      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
         {/* dialog */}
-        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
-          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+        <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className={`sticky top-0 z-10 flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} px-4 py-3`}>
             <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un élève</div>
             <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose} aria-label="Fermer">×</button>
           </div>
@@ -828,7 +828,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
             onClick={exportStudents}
             aria-label="Télécharger CSV"
             title="Télécharger la liste en CSV"
-            className="inline-flex items-center justify-center rounded-full bg-green-600 p-2 text-white hover:bg-green-700 transition-colors"
+            className="hidden md:inline-flex items-center justify-center rounded-full bg-green-600 p-2 text-white hover:bg-green-700 transition-colors"
           >
             <Download className="h-4 w-4" />
           </button>
@@ -837,7 +837,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
             onClick={() => setShowCreate(true)}
             aria-label="Ajouter"
             title="Ajouter"
-            className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
+            className="hidden md:inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -849,7 +849,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           <div className="md:hidden flex flex-col gap-2 w-full">
             <div className="grid grid-cols-2 gap-2">
               <select
-                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+                className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                 value={filters.classId || ""}
                 onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
               >
@@ -866,17 +866,17 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                   setFilters((f) => ({ ...f, yearId: value === "all" ? "all" : value }))
                 }
                 allowAll
-                className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+                className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
               />
             </div>
             <select
-              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+              className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
               value={filters.sort}
               onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
             >
-              <option value="name_asc">Nom (A→Z)</option>
-              <option value="name_desc">Nom (Z→A)</option>
-              <option value="class">Classe</option>
+              <option value="name_asc">Trier : Nom (A→Z)</option>
+              <option value="name_desc">Trier : Nom (Z→A)</option>
+              <option value="class">Trier : Classe</option>
             </select>
           </div>
 
@@ -915,45 +915,52 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
         </div>
 
         <div>
-          {/* Mobile: stacked cards */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile: compact list rows (nom + classe, flèche vers les détails) */}
+          <div className="md:hidden space-y-2.5">
             {loading && (
               <TableLoadingBlock textClassName={textSecondary} message="Chargement..." />
             )}
             {!loading && items.map((s) => {
               const enr = s.enrollments?.[0]
-              return (
-                <div key={`mobile-${s.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
-                  {/* En-tête avec code et actions */}
-                  <div className="flex items-center justify-between">
-                    <div className={`font-medium ${textColor}`}>Code: {studentDisplayCode(s)}</div>
-                    {!enrollmentOnly && (
-                    <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); router.push(`/admin/students/${s.id}`); }}>
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    )}
-                  </div>
-
-                  {/* Informations personnelles */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className={`text-sm font-medium ${textSecondary}`}>Nom complet</div>
-                      <div className={`mt-1 text-sm ${textColor}`}>{s.lastName} {s.middleName}</div>
-                    </div>
-                    <div>
-                      <div className={`text-sm font-medium ${textSecondary}`}>Prénom</div>
-                      <div className={`mt-1 text-sm ${textColor}`}>{s.firstName}</div>
-                    </div>
-                    <div>
-                      <div className={`text-sm font-medium ${textSecondary}`}>Classe</div>
-                      <div className={`mt-1 text-sm ${textColor}`}>{enr?.class?.name || '-'}</div>
-                    </div>
-                    <div>
-                      <div className={`text-sm font-medium ${textSecondary}`}>Année</div>
-                      <div className={`mt-1 text-sm ${textColor}`}>{enr?.year?.name || '-'}</div>
-                    </div>
-                  </div>
+              const fullName = [s.lastName, s.middleName, s.firstName].filter(Boolean).join(" ")
+              const initials = `${(s.firstName?.[0] || "").toUpperCase()}${(s.lastName?.[0] || "").toUpperCase()}` || "?"
+              const avatar = (
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}>
+                  {initials}
                 </div>
+              )
+              const info = (
+                <div className="min-w-0 flex-1 text-left">
+                  <div className={`truncate text-[15px] font-semibold ${textColor}`}>{fullName || "—"}</div>
+                  <div className={`mt-0.5 truncate text-xs ${textSecondary}`}>{enr?.class?.name || "Classe non définie"}</div>
+                </div>
+              )
+
+              if (enrollmentOnly) {
+                return (
+                  <div
+                    key={`mobile-${s.id}`}
+                    className={`flex items-center gap-3 rounded-2xl border ${borderColor} ${bgCard} p-3.5 shadow-sm`}
+                  >
+                    {avatar}
+                    {info}
+                  </div>
+                )
+              }
+
+              return (
+                <button
+                  key={`mobile-${s.id}`}
+                  type="button"
+                  onClick={() => router.push(`/admin/students/${s.id}`)}
+                  className={`flex w-full items-center gap-3 rounded-2xl border ${borderColor} ${bgCard} p-3.5 shadow-sm transition-colors active:scale-[0.99] ${hoverBg}`}
+                >
+                  {avatar}
+                  {info}
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${theme === "dark" ? "bg-gray-700/60 text-gray-300" : "bg-gray-100 text-gray-500"}`}>
+                    <ChevronRight className="h-4 w-4" />
+                  </span>
+                </button>
               )
             })}
             {!loading && items.length === 0 && (

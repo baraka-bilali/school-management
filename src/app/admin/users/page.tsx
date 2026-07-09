@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
 import Portal from "@/components/portal"
-import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download } from "lucide-react"
+import { Eye, Pencil, Check, X, Plus, KeyRound, Copy, Mail, User, Download, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { Banner } from "@/components/ui/banner"
 import { authFetch } from "@/lib/auth-fetch"
@@ -96,17 +96,17 @@ export default function UsersPage() {
 
   return (
     <Layout>
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 md:p-6">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Utilisateurs</h1>
           <p className={textSecondary}>Gestion des élèves, enseignants et personnel administratif.</p>
         </div>
 
         {/* Tabs */}
-        <div className={`flex items-center space-x-2 border-b ${borderColor}`}>
+        <div className={`flex items-center space-x-2 border-b ${borderColor} overflow-x-auto scrollbar-hide`}>
           <button
             className={cn(
-              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              "shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "students"
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
@@ -117,7 +117,7 @@ export default function UsersPage() {
           </button>
           <button
             className={cn(
-              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              "shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "teachers"
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
@@ -128,7 +128,7 @@ export default function UsersPage() {
           </button>
           <button
             className={cn(
-              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              "shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "staff"
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
@@ -139,7 +139,7 @@ export default function UsersPage() {
           </button>
           <button
             className={cn(
-              "px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              "shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium -mb-px border-b-2",
               tab === "courses"
                 ? "border-indigo-600 text-indigo-700"
                 : `border-transparent ${textSecondary} hover:${textColor}`
@@ -178,6 +178,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [mobileExpandedId, setMobileExpandedId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [editForm, setEditForm] = useState({
     lastName: "",
@@ -405,41 +406,60 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
         />
 
         <div>
-          {/* Mobile: stacked cards for teachers */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile: compact expandable cards for teachers */}
+          <div className="md:hidden space-y-2.5">
             {loading && (
               <TableLoadingBlock textClassName={textSecondary} message="Chargement..." />
             )}
-            {!loading && items.map((t) => (
-              <div key={`mobile-teacher-${t.id}`} className={`p-4 ${bgCard} rounded-md shadow-sm border ${borderColor} space-y-4`}>
-                {/* En-tête avec actions */}
-                <div className="flex items-center justify-end">
-                  <button className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${hoverBg}`} onClick={(e) => { e.stopPropagation(); }}>
-                    <Eye className="h-4 w-4" />
+            {!loading && items.map((t) => {
+              const fullName = [t.lastName, t.middleName, t.firstName].filter(Boolean).join(" ")
+              const initials = `${(t.firstName?.[0] || "").toUpperCase()}${(t.lastName?.[0] || "").toUpperCase()}` || "?"
+              const open = mobileExpandedId === t.id
+              return (
+                <div key={`mobile-teacher-${t.id}`} className={`overflow-hidden rounded-2xl border ${borderColor} ${bgCard} shadow-sm`}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileExpandedId(open ? null : t.id)}
+                    className={`flex w-full items-center gap-3 p-3.5 text-left ${hoverBg}`}
+                  >
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}>
+                      {initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate text-[15px] font-semibold ${textColor}`}>{fullName || "—"}</div>
+                      <div className={`mt-0.5 truncate text-xs ${textSecondary}`}>{t.specialty || "Spécialité non définie"}</div>
+                    </div>
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${theme === "dark" ? "bg-gray-700/60 text-gray-300" : "bg-gray-100 text-gray-500"}`}>
+                      <ChevronRight className={`h-4 w-4 transition-transform ${open ? "rotate-90" : ""}`} />
+                    </span>
                   </button>
+                  {open && (
+                    <div className={`border-t ${borderColor} px-3.5 py-3 space-y-2.5`}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={textSecondary}>Téléphone</span>
+                        <span className={`font-medium ${textColor}`}>{t.phone || "—"}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={textSecondary}>Sexe</span>
+                        <span className={`font-medium ${textColor}`}>{t.gender || "—"}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className={textSecondary}>Naissance</span>
+                        <span className={`font-medium ${textColor}`}>{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "—"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleResetTeacherPassword(t) }}
+                        className={`mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${theme === "dark" ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" : "bg-orange-50 text-orange-600 hover:bg-orange-100"}`}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        Réinitialiser le mot de passe
+                      </button>
+                    </div>
+                  )}
                 </div>
-
-                {/* Informations personnelles */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className={`text-sm font-medium ${textSecondary}`}>Nom complet</div>
-                    <div className={`mt-1 text-sm ${textColor}`}>{t.lastName} {t.middleName}</div>
-                  </div>
-                  <div>
-                    <div className={`text-sm font-medium ${textSecondary}`}>Prénom</div>
-                    <div className={`mt-1 text-sm ${textColor}`}>{t.firstName}</div>
-                  </div>
-                  <div>
-                    <div className={`text-sm font-medium ${textSecondary}`}>Spécialité</div>
-                    <div className={`mt-1 text-sm ${textColor}`}>{t.specialty || '-'}</div>
-                  </div>
-                  <div>
-                    <div className={`text-sm font-medium ${textSecondary}`}>Téléphone</div>
-                    <div className={`mt-1 text-sm ${textColor}`}>{t.phone || '-'}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
+              )
+            })}
             {!loading && items.length === 0 && (
               <div className={`px-3 py-8 text-center ${textSecondary}`}>Aucun enseignant trouvé.</div>
             )}
@@ -824,11 +844,11 @@ function CreateTeacherModal({
 
   return (
     <Portal>
-      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
-          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+        <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
+          <div className={`sticky top-0 z-10 flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} px-4 py-3`}>
             <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un enseignant</div>
             <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose}>×</button>
           </div>
@@ -1025,7 +1045,96 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile: cartes avec tous les paramètres + accès visibles */}
+        <div className="md:hidden space-y-2.5">
+          {loading ? (
+            <TableLoadingBlock textClassName={textSecondary} message="Chargement..." />
+          ) : items.length === 0 ? (
+            <div className={`px-3 py-8 text-center ${textSecondary}`}>Aucun membre du personnel trouvé.</div>
+          ) : (
+            items.map((s) => {
+              const fullName = [s.nom, s.prenom].filter(Boolean).join(" ")
+              const initials = `${(s.prenom?.[0] || "").toUpperCase()}${(s.nom?.[0] || "").toUpperCase()}` || "?"
+              return (
+                <div key={`mobile-staff-${s.id}`} className={`rounded-2xl border ${borderColor} ${theme === "dark" ? "bg-gray-800" : "bg-white"} p-3.5 shadow-sm space-y-3`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${theme === "dark" ? "bg-indigo-500/20 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}>
+                      {initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className={`truncate text-[15px] font-semibold ${textColor}`}>{fullName || "—"}</div>
+                      <span className="mt-1 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                        {STAFF_ROLE_LABELS[s.role as StaffRole] || s.role}
+                      </span>
+                    </div>
+                    <button
+                      className={`shrink-0 rounded-full p-2 ${textSecondary} hover:text-orange-500 ${hoverBg}`}
+                      onClick={() => handleResetPassword(s)}
+                      title="Réinitialiser le mot de passe"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className={`${textSecondary} shrink-0`}>Email</span>
+                      <span className={`font-mono text-xs ${textColor} break-all text-right`}>{s.email}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={textSecondary}>Téléphone</span>
+                      <span className={`font-medium ${textColor}`}>{s.telephone || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={textSecondary}>Fonction</span>
+                      <span className={`font-medium ${textColor} text-right`}>{s.fonction || "—"}</span>
+                    </div>
+                  </div>
+
+                  <div className={`space-y-2.5 border-t ${borderColor} pt-3`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm ${textColor}`}>Accès actif</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={s.isActive}
+                        disabled={togglingId === s.id}
+                        onClick={() => handleToggleActive(s)}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                          s.isActive ? "bg-green-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-300"
+                        )}
+                      >
+                        <span className={cn("pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5", s.isActive ? "translate-x-5" : "translate-x-0.5")} />
+                      </button>
+                    </div>
+                    {s.role === "CAISSIER" && (
+                      <div className="flex items-center justify-between">
+                        <span className={`text-sm ${textColor}`}>Autoriser les inscriptions</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={s.canEnrollStudents}
+                          disabled={togglingEnrollId === s.id}
+                          onClick={() => handleToggleEnrollPermission(s)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                            s.canEnrollStudents ? "bg-indigo-500" : theme === "dark" ? "bg-gray-600" : "bg-gray-300"
+                          )}
+                        >
+                          <span className={cn("pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform mt-0.5", s.canEnrollStudents ? "translate-x-5" : "translate-x-0.5")} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Desktop/tablet: tableau complet */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className={theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-600"}>
               <tr>
@@ -1306,10 +1415,10 @@ function CreateStaffModal({
 
   return (
     <Portal>
-      <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
-          <div className={`flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
+        <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+          <div className={`sticky top-0 z-10 flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} px-4 py-3`}>
             <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un membre du personnel</div>
             <button type="button" className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose}>×</button>
           </div>
