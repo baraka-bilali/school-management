@@ -146,7 +146,8 @@ export default function UsersPage() {
             )}
             onClick={() => changeTab("courses")}
           >
-            Cours & Affectations
+            <span className="md:hidden">Cours</span>
+            <span className="hidden md:inline">Cours &amp; Affectations</span>
           </button>
         </div>
 
@@ -1028,7 +1029,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
   return (
     <Card theme={theme}>
       <CardContent className="pt-5">
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex items-center gap-2 mb-4">
           <input
             type="text"
             placeholder="Rechercher par nom, email ou fonction..."
@@ -1038,10 +1039,11 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
           />
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 text-sm font-medium"
+            aria-label="Créer"
+            title="Créer un membre du personnel"
+            className="inline-flex shrink-0 items-center justify-center rounded-full bg-indigo-600 p-2.5 text-white hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4" />
-            Créer
           </button>
         </div>
 

@@ -381,26 +381,26 @@ function Toolbar({
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div className="flex-1 flex items-center gap-2 relative">
+    <div className="flex items-center gap-2">
+      <div className="relative flex-1">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
-          className={`w-full sm:max-w-sm rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+          className={`w-full rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500`}
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-indigo-600"></div>
           </div>
         )}
-        {rightContent}
       </div>
+      {rightContent}
       <button
         onClick={onCreate}
         aria-label="Créer"
         title="Créer"
-        className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700"
+        className="inline-flex shrink-0 items-center justify-center rounded-full bg-indigo-600 p-2.5 text-white hover:bg-indigo-700"
       >
         <Plus className="h-4 w-4" />
       </button>
@@ -410,6 +410,8 @@ function Toolbar({
 
 function Pagination({ state, setState, total }: { state: PaginationState; setState: (s: PaginationState) => void; total: number }) {
   const totalPages = Math.max(1, Math.ceil(total / state.pageSize))
+  // N'afficher la pagination que lorsqu'il y a plus d'une page (au-delà de la taille de page)
+  if (totalPages <= 1) return null
   const isFirstPage = state.page === 1
   const isLastPage = state.page >= totalPages
   
@@ -846,7 +848,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
         {/* Filtres en dessous */}
         <div className="space-y-3">
           {/* Version mobile : Filtres en colonne */}
-          <div className="md:hidden flex flex-col gap-2 w-full">
+          <div className="md:hidden flex flex-col gap-2.5 w-full">
             <div className="grid grid-cols-2 gap-2">
               <select
                 className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
@@ -869,15 +871,31 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                 className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
               />
             </div>
-            <select
-              className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
-              value={filters.sort}
-              onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
-            >
-              <option value="name_asc">Trier : Nom (A→Z)</option>
-              <option value="name_desc">Trier : Nom (Z→A)</option>
-              <option value="class">Trier : Classe</option>
-            </select>
+            {/* Tri : sélecteur segmenté (plus adapté au mobile qu'une liste déroulante) */}
+            <div className={`flex items-center gap-1 rounded-xl border ${borderColor} ${theme === "dark" ? "bg-gray-800/60" : "bg-gray-100/80"} p-1`}>
+              {[
+                { value: "name_asc", label: "A → Z" },
+                { value: "name_desc", label: "Z → A" },
+                { value: "class", label: "Classe" },
+              ].map((opt) => {
+                const active = (filters.sort || "name_asc") === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFilters((f) => ({ ...f, sort: opt.value }))}
+                    className={cn(
+                      "flex-1 rounded-lg py-2 text-xs font-semibold transition-all",
+                      active
+                        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/25"
+                        : cn(textSecondary, "hover:text-indigo-500")
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Version desktop : Filtres en ligne */}
