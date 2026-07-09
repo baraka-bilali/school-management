@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import KelasiLogo from "@/components/kelasi-logo"
-import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart } from "lucide-react"
+import SplashScreen from "@/components/splash-screen"
+import { SPLASH_SESSION_KEY } from "@/components/splash-screen"
+import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart, LifeBuoy, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
@@ -22,6 +24,24 @@ export default function LoginPage() {
 	const [form, setForm] = useState({ email: "", password: "" })
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState("")
+
+	// Animation de démarrage (une fois par session)
+	const [showSplash, setShowSplash] = useState(false)
+	const [splashLeaving, setSplashLeaving] = useState(false)
+
+	useEffect(() => {
+		if (sessionStorage.getItem(SPLASH_SESSION_KEY)) return
+		setShowSplash(true)
+		const leaveTimer = setTimeout(() => setSplashLeaving(true), 2200)
+		const hideTimer = setTimeout(() => {
+			setShowSplash(false)
+			sessionStorage.setItem(SPLASH_SESSION_KEY, "1")
+		}, 2650)
+		return () => {
+			clearTimeout(leaveTimer)
+			clearTimeout(hideTimer)
+		}
+	}, [])
 
 	// Modal step state
 	const [step, setStep] = useState<ModalStep>("none")
@@ -276,6 +296,8 @@ export default function LoginPage() {
 	}
 
 	return (
+		<>
+		{showSplash && <SplashScreen leaving={splashLeaving} />}
 		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
 			<div className="w-full max-w-md">
 				<div className="flex flex-col items-center mb-4">
@@ -319,6 +341,46 @@ export default function LoginPage() {
 						</form>
 					</CardContent>
 				</Card>
+
+				<footer className="mt-6 flex flex-col items-center gap-3 text-center">
+					<div className="flex flex-col items-center gap-1.5">
+						<span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+							<LifeBuoy className="w-3.5 h-3.5" />
+							Support technique
+						</span>
+						<div className="flex flex-wrap items-center justify-center gap-2">
+							<a
+								href="https://wa.me/243980139630"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
+							>
+								<MessageCircle className="w-3.5 h-3.5" />
+								+243 980 139 630
+							</a>
+							<a
+								href="https://wa.me/243826245169"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
+							>
+								<MessageCircle className="w-3.5 h-3.5" />
+								+243 826 245 169
+							</a>
+						</div>
+					</div>
+					<p className="text-xs text-gray-400">
+						Créé par{" "}
+						<a
+							href="https://digicreateam.com"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="font-semibold text-gray-500 transition-colors hover:text-indigo-600"
+						>
+							digicreateam
+						</a>
+					</p>
+				</footer>
 			</div>
 
 			{/* ── Modal : Choix mot de passe (ELEVE première connexion) ── */}
@@ -744,5 +806,6 @@ export default function LoginPage() {
 				</Portal>
 			)}
 		</div>
+		</>
 	)
 }

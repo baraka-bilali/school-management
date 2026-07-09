@@ -2,86 +2,79 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import SplashScreen, { SPLASH_SESSION_KEY } from "@/components/splash-screen"
+
+/** Durée minimale d'affichage de l'animation de démarrage. */
+const MIN_SPLASH_MS = 2600
+/** Durée du fondu de sortie (doit correspondre à .splash-leaving dans globals.css). */
+const SPLASH_FADE_MS = 450
 
 export default function Home() {
   const router = useRouter()
-  const [checking, setChecking] = useState(true)
+  const [redirectTo, setRedirectTo] = useState<string | null>(null)
+  const [splashDone, setSplashDone] = useState(false)
+  const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
+    const resolveTarget = async (): Promise<string> => {
       try {
-        // Vérifier l'authentification via l'API
         const res = await fetch("/api/auth/me", { credentials: "include" })
-        
         if (res.ok) {
           const data = await res.json()
           const role = data.user?.role
-          
-          // Rediriger selon le rôle
-          if (role === "SUPER_ADMIN") {
-            router.replace("/super-admin")
-          } else if (role === "ELEVE") {
-            router.replace("/student")
-          } else if (role === "ADMIN" || role === "COMPTABLE" || role === "DIRECTEUR_DISCIPLINE" || role === "DIRECTEUR_ETUDES") {
-            router.replace("/admin")
-          } else {
-            router.replace("/login")
+          if (role === "SUPER_ADMIN") return "/super-admin"
+          if (role === "ELEVE") return "/student"
+          if (role === "PROFESSEUR") return "/teacher"
+          if (
+            role === "ADMIN" ||
+            role === "COMPTABLE" ||
+            role === "DIRECTEUR_DISCIPLINE" ||
+            role === "DIRECTEUR_ETUDES" ||
+            role === "CAISSIER"
+          ) {
+            return "/admin"
           }
-        } else {
-          // Non authentifié, rediriger vers login
-          router.replace("/login")
+          return "/login"
         }
+        return "/login"
       } catch {
-        // Fallback: essayer avec le token localStorage
         const token = localStorage.getItem("token")
-        if (!token) {
-          router.replace("/login")
-          return
-        }
-        
+        if (!token) return "/login"
         try {
           const payload = JSON.parse(atob(token.split(".")[1]))
           if (!payload || (payload.exp && Date.now() / 1000 > payload.exp)) {
             localStorage.removeItem("token")
-            router.replace("/login")
-            return
+            return "/login"
           }
-          
-          // Rediriger selon le rôle
-          if (payload.role === "SUPER_ADMIN") {
-            router.replace("/super-admin")
-          } else if (payload.role === "ELEVE") {
-            router.replace("/student")
-          } else {
-            router.replace("/admin")
-          }
+          if (payload.role === "SUPER_ADMIN") return "/super-admin"
+          if (payload.role === "ELEVE") return "/student"
+          if (payload.role === "PROFESSEUR") return "/teacher"
+          return "/admin"
         } catch {
           localStorage.removeItem("token")
-          router.replace("/login")
+          return "/login"
         }
-      } finally {
-        setChecking(false)
       }
     }
 
-    checkAuthAndRedirect()
-  }, [router])
+    void resolveTarget().then(setRedirectTo)
+  }, [])
 
-  // Afficher un loader pendant la vérification
-  if (checking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-          </div>
-          <p className="text-gray-500 dark:text-gray-400">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => setSplashDone(true), MIN_SPLASH_MS)
+    return () => clearTimeout(timer)
+  }, [])
 
-  return null
+  useEffect(() => {
+    if (!redirectTo || !splashDone) return
+    setLeaving(true)
+    // L'animation a déjà été vue : la page login ne la rejouera pas.
+    try {
+      sessionStorage.setItem(SPLASH_SESSION_KEY, "1")
+    } catch {}
+    const timer = setTimeout(() => router.replace(redirectTo), SPLASH_FADE_MS)
+    return () => clearTimeout(timer)
+  }, [redirectTo, splashDone, router])
+
+  return <SplashScreen leaving={leaving} />
 }
