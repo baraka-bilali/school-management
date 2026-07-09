@@ -893,15 +893,16 @@ export default function AdminFeesPage() {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => openPaymentModal()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-green-500/25 font-medium"
+              className="inline-flex items-center gap-2 px-3.5 py-2 md:px-5 md:py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-green-500/25 text-sm md:text-base font-medium"
             >
               <DollarSign className="w-4 h-4" />
-              Enregistrer un paiement
+              <span className="md:hidden">Paiement</span>
+              <span className="hidden md:inline">Enregistrer un paiement</span>
             </button>
             {!isCashier && (
             <button
               onClick={() => setShowCreateTypeModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/25 font-medium"
+              className="hidden md:inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/25 font-medium"
             >
               <Plus className="w-4 h-4" />
               Nouveau type de frais
@@ -1122,14 +1123,14 @@ export default function AdminFeesPage() {
         )}
 
         {/* Onglets */}
-        <div className={`flex items-center gap-1 border-b ${borderColor} flex-wrap`}>
+        <div className={`flex items-center gap-1 border-b ${borderColor} overflow-x-auto scrollbar-hide`}>
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.key
                     ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
                     : `border-transparent ${textSecondary} hover:text-indigo-500`
@@ -1401,8 +1402,8 @@ export default function AdminFeesPage() {
                 <CardContent className="pt-5">
                   <div className="space-y-5">
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                      <div className="space-y-3 flex-1">
-                        <div className="flex flex-wrap gap-2">
+                      <div className="space-y-3 flex-1 min-w-0">
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide md:flex-wrap">
                           {paymentYearFilters.map((f) => {
                             const active = paymentsYearFilter === f.id
                             return (
@@ -1410,7 +1411,7 @@ export default function AdminFeesPage() {
                                 key={f.id ?? "all"}
                                 type="button"
                                 onClick={() => applyPaymentsYearFilter(f.id)}
-                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                className={`inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                   active
                                     ? "bg-indigo-600 text-white shadow-sm"
                                     : theme === "dark"
@@ -1432,7 +1433,7 @@ export default function AdminFeesPage() {
                             )
                           })}
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide md:flex-wrap">
                           {paymentTypeFilters.map((f) => {
                             const active = paymentsTypeFilter === f.id
                             return (
@@ -1440,7 +1441,7 @@ export default function AdminFeesPage() {
                                 key={f.id || "all-types"}
                                 type="button"
                                 onClick={() => applyPaymentsTypeFilter(f.id)}
-                                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                className={`inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                   active
                                     ? "bg-violet-600 text-white shadow-sm"
                                     : theme === "dark"
@@ -1516,13 +1517,13 @@ export default function AdminFeesPage() {
                     ) : (
                       <div className="space-y-6">
                         {paiementsGrouped.map((group) => (
-                          <div key={group.sidebar.groupKey} className="flex gap-4 sm:gap-6">
-                            <div className="w-12 sm:w-14 shrink-0 text-center pt-1">
-                              <p className={`text-xl sm:text-2xl font-bold leading-none ${textColor}`}>
+                          <div key={group.sidebar.groupKey} className="flex gap-3 sm:gap-6">
+                            <div className="w-8 sm:w-14 shrink-0 text-left sm:text-center pt-1">
+                              <p className={`text-base sm:text-2xl font-bold leading-none ${textColor}`}>
                                 {group.sidebar.primary}
                               </p>
                               {group.sidebar.secondary && (
-                                <p className={`text-xs font-medium uppercase mt-1 ${textSecondary}`}>
+                                <p className={`text-[10px] sm:text-xs font-medium uppercase mt-0.5 sm:mt-1 ${textSecondary}`}>
                                   {group.sidebar.secondary}
                                 </p>
                               )}
@@ -1533,21 +1534,21 @@ export default function AdminFeesPage() {
                               </div>
                               <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                                 {group.items.map((p) => (
-                                  <div key={p.id} className={`flex items-start gap-3 p-4 ${hoverRow}`}>
-                                    <div className="w-10 h-10 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0">
+                                  <div key={p.id} className={`flex items-start gap-3 p-3 sm:p-4 ${hoverRow}`}>
+                                    <div className="hidden sm:flex w-10 h-10 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 items-center justify-center text-xs font-bold shrink-0">
                                       {getStudentInitials(p)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-semibold ${textColor}`}>
+                                      <p className={`text-sm font-semibold ${textColor} truncate`}>
                                         {p.student.lastName} {p.student.firstName}
-                                        <span className={`font-normal ${textSecondary}`}>
-                                          {" "}· {p.tarification.typeFrais.nom}
-                                        </span>
                                       </p>
-                                      <p className={`text-xs ${textSecondary} mt-0.5`}>
+                                      <p className={`text-xs ${textSecondary} mt-0.5 truncate`}>
+                                        {p.tarification.typeFrais.nom}
+                                      </p>
+                                      <p className={`hidden sm:block text-xs ${textSecondary} mt-0.5`}>
                                         {formatTimeLabel(p.datePaiement)} · {p.enrollment.class.name} · {p.tarification.year.name}
                                       </p>
-                                      <p className={`text-xs ${textSecondary} mt-0.5`}>
+                                      <p className={`hidden sm:block text-xs ${textSecondary} mt-0.5`}>
                                         {getModePaiementLabel(p.modePaiement)} ·{" "}
                                         <span className="font-mono">{p.numeroRecu}</span>
                                       </p>
@@ -1561,7 +1562,7 @@ export default function AdminFeesPage() {
                                           <X className="w-3 h-3" /> Annulé
                                         </span>
                                       ) : (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
+                                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
                                           <Check className="w-3 h-3" /> Valide
                                         </span>
                                       )}
