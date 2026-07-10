@@ -17,6 +17,7 @@ import {
 } from "@/lib/student-fields"
 import { validateStudentCreateInput } from "@/lib/student-create-validation"
 import { emailYearFromAcademicYear } from "@/lib/school-year-utils"
+import { compareClasses } from "@/lib/class-sort"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -169,8 +170,9 @@ export async function GET(req: NextRequest) {
         prisma.student.findMany({
           where,
           orderBy,
-          skip: (page - 1) * pageSize,
-          take: pageSize,
+          // Tri par classe : on récupère tout le jeu de données puis on trie/pagine
+          // côté application (Prisma ne peut pas trier par relation « many »).
+          ...(shouldSortByClass ? {} : { skip: (page - 1) * pageSize, take: pageSize }),
           select: {
             id: true,
             code: true,
@@ -189,7 +191,10 @@ export async function GET(req: NextRequest) {
                 class: {
                   select: {
                     id: true,
-                    name: true
+                    name: true,
+                    level: true,
+                    section: true,
+                    stream: true
                   }
                 },
                 year: {
@@ -207,12 +212,23 @@ export async function GET(req: NextRequest) {
       console.timeEnd(`${perfLabel} - findMany`)
       
       // Tri par classe si demandé (côté application car Prisma ne peut pas trier par relation many)
+      // Ordre par degré scolaire : Maternelle → Primaire → … (comme « Classes & Filières »).
       if (shouldSortByClass) {
         students.sort((a: any, b: any) => {
-          const classA = a.enrollments?.[0]?.class?.name || ''
-          const classB = b.enrollments?.[0]?.class?.name || ''
-          return classA.localeCompare(classB)
+          const ca = a.enrollments?.[0]?.class
+          const cb = b.enrollments?.[0]?.class
+          if (!ca && !cb) return (a.lastName || '').localeCompare(b.lastName || '')
+          if (!ca) return 1
+          if (!cb) return -1
+          const cmp = compareClasses(
+            { section: ca.section, level: ca.level, letter: ca.name },
+            { section: cb.section, level: cb.level, letter: cb.name }
+          )
+          if (cmp !== 0) return cmp
+          return (a.lastName || '').localeCompare(b.lastName || '')
         })
+        // Pagination appliquée après le tri global
+        students = students.slice((page - 1) * pageSize, page * pageSize)
       }
 
       const items = students.map((s: (typeof students)[number]) =>

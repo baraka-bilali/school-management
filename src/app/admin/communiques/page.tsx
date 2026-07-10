@@ -13,7 +13,7 @@ import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 import {
   Megaphone, Send, Clock, Eye, ChevronRight, Loader2, Trash2, Pencil,
   Bold, Italic, UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
-  List, ListOrdered, Undo, Redo, Type, Check, X
+  List, ListOrdered, Undo, Redo, Type, Check, X, MoreVertical
 } from "lucide-react"
 import Link from "next/link"
 import Portal from "@/components/portal"
@@ -38,38 +38,40 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   if (!editor) return null
 
   const btnClass = (active: boolean) =>
-    `p-2 rounded-lg transition-colors text-sm ${
+    `shrink-0 p-2 rounded-lg transition-colors text-sm ${
       active
         ? "bg-indigo-600 text-white"
         : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
     }`
 
+  const divider = <div className="shrink-0 w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+
   return (
-    <div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-t-xl">
+    <div className="flex items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-t-xl overflow-x-auto scrollbar-hide md:flex-wrap">
       <button type="button" onClick={() => editor.chain().focus().undo().run()} className={btnClass(false)} title="Annuler"><Undo className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().redo().run()} className={btnClass(false)} title="Rétablir"><Redo className="w-4 h-4" /></button>
 
-      <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+      {divider}
 
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive("bold"))} title="Gras"><Bold className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive("italic"))} title="Italique"><Italic className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive("underline"))} title="Souligné"><UnderlineIcon className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))} title="Barré"><span className="w-4 h-4 text-sm font-bold line-through">S</span></button>
 
-      <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+      {divider}
 
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive("heading", { level: 1 }))} title="Titre 1"><span className="text-xs font-bold">H1</span></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive("heading", { level: 2 }))} title="Titre 2"><span className="text-xs font-bold">H2</span></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btnClass(editor.isActive("heading", { level: 3 }))} title="Titre 3"><span className="text-xs font-bold">H3</span></button>
       <button type="button" onClick={() => editor.chain().focus().setParagraph().run()} className={btnClass(editor.isActive("paragraph"))} title="Paragraphe"><Type className="w-4 h-4" /></button>
 
-      <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+      {divider}
 
       <button type="button" onClick={() => editor.chain().focus().setTextAlign("left").run()} className={btnClass(editor.isActive({ textAlign: "left" }))} title="Gauche"><AlignLeft className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={btnClass(editor.isActive({ textAlign: "center" }))} title="Centre"><AlignCenter className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btnClass(editor.isActive({ textAlign: "right" }))} title="Droite"><AlignRight className="w-4 h-4" /></button>
 
-      <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+      {divider}
 
       <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive("bulletList"))} title="Liste à puces"><List className="w-4 h-4" /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(editor.isActive("orderedList"))} title="Liste numérotée"><ListOrdered className="w-4 h-4" /></button>
@@ -88,6 +90,7 @@ export default function AdminCommuniquesPage() {
   const [sending, setSending] = useState(false)
   const [sendStatus, setSendStatus] = useState<"idle" | "success" | "error">("idle")
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  const [menuId, setMenuId] = useState<number | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -319,11 +322,11 @@ export default function AdminCommuniquesPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* Composer */}
           <div className={`${bgCard} border ${borderColor} rounded-xl overflow-hidden shadow-sm`}>
-            <div className={`px-5 py-4 border-b ${borderColor} flex items-center gap-2`}>
+            <div className={`px-4 md:px-5 py-4 border-b ${borderColor} flex items-center gap-2`}>
               <Send className="w-4 h-4 text-indigo-500" />
               <h2 className={`font-semibold ${textColor}`}>Nouveau communiqué</h2>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 md:p-5 space-y-4">
               <div>
                 <label className={`text-sm font-medium ${textSecondary} block mb-1.5`}>Objet <span className="text-red-500">*</span></label>
                 <input
@@ -434,47 +437,56 @@ export default function AdminCommuniquesPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-start gap-4 p-4">
-                        <div className={`p-2.5 rounded-full flex-shrink-0 ${theme === "dark" ? "bg-indigo-500/15 text-indigo-400" : "bg-indigo-50 text-indigo-600"}`}>
-                          <Megaphone className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <Link href={`/admin/communiques/${c.id}`} className={`font-medium text-sm ${textColor} hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors`}>
-                            {c.title}
-                          </Link>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className={`flex items-center gap-1 text-xs ${textSecondary}`}>
-                              <Clock className="w-3 h-3" />
+                      <div className="flex items-center gap-3 p-4">
+                        <Link
+                          href={`/admin/communiques/${c.id}`}
+                          className="flex items-center gap-3 flex-1 min-w-0"
+                        >
+                          <div className={`p-2.5 rounded-full flex-shrink-0 ${theme === "dark" ? "bg-indigo-500/15 text-indigo-400" : "bg-indigo-50 text-indigo-600"}`}>
+                            <Megaphone className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium text-sm truncate ${textColor}`}>
+                              {c.title}
+                            </p>
+                            <span className={`flex items-center gap-1 text-xs mt-0.5 ${textSecondary}`}>
+                              <Clock className="w-3 h-3 shrink-0" />
                               {formatDate(c.createdAt)}
                             </span>
-                            <span className={`flex items-center gap-1 text-xs ${textSecondary}`}>
-                              <Eye className="w-3 h-3" />
-                              {c._count.reads} lecture{c._count.reads !== 1 ? "s" : ""}
-                            </span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        </Link>
+                        <div className="relative shrink-0">
                           <button
-                            onClick={() => setEditingCommunique(c)}
-                            className={`p-1.5 rounded-lg transition-colors ${textSecondary} ${hoverBg}`}
-                            title="Modifier"
+                            onClick={() => setMenuId(menuId === c.id ? null : c.id)}
+                            className={`p-2 rounded-lg transition-colors ${textSecondary} ${hoverBg}`}
+                            title="Actions"
+                            aria-label="Actions"
                           >
-                            <Pencil className="w-4 h-4" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                          <Link
-                            href={`/admin/communiques/${c.id}`}
-                            className={`p-1.5 rounded-lg transition-colors ${textSecondary} ${hoverBg}`}
-                            title="Voir"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => setDeleteConfirmId(c.id)}
-                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {menuId === c.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setMenuId(null)} />
+                              <div
+                                className={`absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border ${borderColor} ${bgCard} shadow-lg py-1`}
+                              >
+                                <button
+                                  onClick={() => { setMenuId(null); setEditingCommunique(c) }}
+                                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${textColor} ${hoverBg} transition-colors`}
+                                >
+                                  <Pencil className="w-4 h-4 text-indigo-500" />
+                                  Modifier
+                                </button>
+                                <button
+                                  onClick={() => { setMenuId(null); setDeleteConfirmId(c.id) }}
+                                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 ${hoverBg} transition-colors`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Supprimer
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}

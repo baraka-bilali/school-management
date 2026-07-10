@@ -41,6 +41,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [userRole, setUserRole] = useState<string>("ADMIN")
   const [canEnrollStudents, setCanEnrollStudents] = useState(false)
+  const [schoolName, setSchoolName] = useState<string>("")
   const router = useRouter()
   const pathname = usePathname()
 
@@ -50,6 +51,9 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     if (savedTheme) {
       setTheme(savedTheme)
     }
+
+    const savedSchoolName = localStorage.getItem("schoolName")
+    if (savedSchoolName) setSchoolName(savedSchoolName)
 
     // Récupérer le rôle de l'utilisateur depuis le token
     const token = localStorage.getItem("token")
@@ -79,6 +83,8 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
       if (currentTheme) {
         setTheme(currentTheme)
       }
+      const currentSchoolName = localStorage.getItem("schoolName")
+      if (currentSchoolName) setSchoolName(currentSchoolName)
     }
 
     window.addEventListener("storage", handleStorageChange)
@@ -193,28 +199,37 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   if (isMobile) {
     return (
       <>
-        {/* Mobile Overlay */}
+        {/* Mobile Overlay — flou façon modal */}
         {isOpen && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
             onClick={onToggle}
           />
         )}
         {/* Mobile Sidebar */}
         <aside className={`
-          fixed top-0 left-0 bottom-0 z-50 ${bgColor} border-r ${borderColor}
+          fixed top-0 left-0 bottom-0 z-50 ${bgColor} border-r ${borderColor} shadow-2xl
           transform transition-transform duration-300 ease-out md:hidden
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          w-80
+          w-[82%] max-w-xs
         `}
         style={{ willChange: 'transform' }}>
           {/* Shell */}
           <div className="flex h-full flex-col">
-          {/* Header */}
-          <div className={`flex items-center justify-between p-4 border-b ${borderColor} flex-shrink-0 overflow-hidden`}>
+          {/* Header — branding + fermeture */}
+          <div className={`flex items-center justify-between gap-2 p-4 border-b ${borderColor} flex-shrink-0 overflow-hidden`}>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm">
+                <School className="w-5 h-5" />
+              </div>
+              <span className={`truncate text-sm font-bold ${textColor}`}>
+                {schoolName || "Menu"}
+              </span>
+            </div>
             <button
               onClick={onToggle}
-              className={`p-2 rounded-lg ${hoverBg} ml-auto`}
+              className={`shrink-0 p-2 rounded-lg ${hoverBg}`}
+              aria-label="Fermer le menu"
             >
               <X className={`w-5 h-5 ${textSecondary}`} />
             </button>
@@ -258,9 +273,9 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                     <Link
                       href={item.href}
                       className={`
-                        flex items-center px-3 py-2.5 rounded-lg transition-all duration-300 ease-out
+                        flex items-center px-3 py-3 rounded-xl transition-all duration-200 ease-out
                         ${isActive(item.href)
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600`
+                          ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                           : `${textSecondary} ${hoverBg}`
                         }
                       `}
@@ -274,9 +289,9 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                     <Link
                       href={item.href}
                       className={`
-                        flex items-center px-3 py-2.5 rounded-lg transition-all duration-300 ease-out
+                        flex items-center px-3 py-3 rounded-xl transition-all duration-200 ease-out
                         ${isActive(item.href)
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 border-r-2 border-indigo-600`
+                          ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
                           : `${textSecondary} ${hoverBg}`
                         }
                       `}
@@ -307,7 +322,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                     <button
                       type="button"
                       onClick={() => setShowLogoutModal(true)}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-all duration-300 ease-out w-full text-left`}
+                      className={`flex items-center px-3 py-3 ${textSecondary} ${hoverBg} rounded-xl transition-all duration-200 ease-out w-full text-left`}
                     >
                       <item.icon className="w-5 h-5 mr-3" />
                       <span>{item.label}</span>
@@ -315,7 +330,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                   ) : (
                     <Link 
                       href={(item as { href: string }).href}
-                      className={`flex items-center px-3 py-2.5 ${textSecondary} ${hoverBg} rounded-lg transition-all duration-300 ease-out`}
+                      className={`flex items-center px-3 py-3 ${textSecondary} ${hoverBg} rounded-xl transition-all duration-200 ease-out`}
                       onClick={onToggle}
                     >
                       <item.icon className="w-5 h-5 mr-3" />

@@ -133,7 +133,7 @@ function StudentField({
         )
       ) : (
         <p className={`text-sm ${value ? `${txt} font-medium` : `${txtSec} italic`}`}>
-          {value || "Non renseigne"}
+          {value || "Non renseigné"}
         </p>
       )}
     </div>
@@ -202,7 +202,7 @@ export default function StudentDetailsPage() {
         setStudent(data.student)
       } else {
         const err = await res.json().catch(() => ({ error: "Erreur inconnue" }))
-        setError(err.error || "Impossible de charger les donnees")
+        setError(err.error || "Impossible de charger les données")
       }
     } catch {
       setError("Erreur de connexion au serveur")
@@ -395,9 +395,9 @@ export default function StudentDetailsPage() {
       <Layout>
         <div className="flex items-center justify-center" style={{ height: "calc(100vh - 140px)" }}>
           <div className="text-center p-8">
-            <p className={`${txt} text-xl font-semibold mb-2`}>{error || "Eleve introuvable"}</p>
+            <p className={`${txt} text-xl font-semibold mb-2`}>{error || "Élève introuvable"}</p>
             <button onClick={() => router.push("/admin/users")} className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
-              Retour a la liste
+              Retour à la liste
             </button>
           </div>
         </div>
@@ -442,7 +442,7 @@ export default function StudentDetailsPage() {
                   Matricule : <span className="font-mono font-semibold">{student.code}</span>
                 </p>
                 <button onClick={downloadQR} className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 text-sm">
-                  Telecharger (SVG)
+                  Télécharger (SVG)
                 </button>
               </div>
             </div>
@@ -451,7 +451,7 @@ export default function StudentDetailsPage() {
       )}
 
       {/* ──────────────────── Page content ──────────────────── */}
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 md:p-2">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -460,8 +460,8 @@ export default function StudentDetailsPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className={`text-xl font-bold ${txt}`}>Fiche eleve</h1>
-              <p className={`text-xs ${txtSec} mt-0.5`}>{student.lastName} {student.firstName} - {student.code}</p>
+              <h1 className={`text-xl font-bold ${txt}`}>Fiche élève</h1>
+              <p className={`text-xs ${txtSec} mt-0.5`}>{student.lastName} {student.firstName} · {student.code}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -490,7 +490,7 @@ export default function StudentDetailsPage() {
         )}
 
         {/* Profile card */}
-        <div className={`${cardBg} rounded-xl border ${border} p-5`}>
+        <div className={`${cardBg} rounded-xl border ${border} p-4 md:p-5`}>
           <div className="flex flex-col sm:flex-row items-start gap-5">
             {/* Avatar with photo/camera controls */}
             <div className="relative group flex-shrink-0">
@@ -536,7 +536,7 @@ export default function StudentDetailsPage() {
                   </span>
                 )}
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${dark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
-                  {student.gender === "M" ? "Garcon" : "Fille"}
+                  {student.gender === "M" ? "Garçon" : "Fille"}
                 </span>
               </div>
             </div>
@@ -552,7 +552,7 @@ export default function StudentDetailsPage() {
 
         {/* ── Section: Identification ── */}
         <div className={`${cardBg} rounded-xl border ${border} overflow-hidden`}>
-          <button onClick={() => toggleSection("identification")} className={`w-full px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
+          <button onClick={() => toggleSection("identification")} className={`w-full px-4 md:px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
             <div className="flex items-center gap-3">
               <User className="w-4 h-4 text-indigo-500" />
               <span className={`text-sm font-semibold ${txt}`}>Informations d'identification</span>
@@ -560,19 +560,19 @@ export default function StudentDetailsPage() {
             {openSections.identification ? <ChevronUp className={`w-4 h-4 ${txtSec}`} /> : <ChevronDown className={`w-4 h-4 ${txtSec}`} />}
           </button>
           {openSections.identification && (
-            <div className={`px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 border-t ${border}`}>
+            <div className={`px-4 md:px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 border-t ${border}`}>
               <StudentField {...fieldProps} label="Nom" editKey="lastName" value={student.lastName} />
               <StudentField {...fieldProps} label="Post-nom" editKey="middleName" value={student.middleName} />
-              <StudentField {...fieldProps} label="Prenom" editKey="firstName" value={student.firstName} />
+              <StudentField {...fieldProps} label="Prénom" editKey="firstName" value={student.firstName} />
               <div>
                 <label className={labelCls}>Sexe</label>
                 {editMode && editData ? (
                   <select value={editData.gender} onChange={(e) => setField("gender", e.target.value)} className={inputCls}>
                     <option value="M">Masculin</option>
-                    <option value="F">Feminin</option>
+                    <option value="F">Féminin</option>
                   </select>
                 ) : (
-                  <p className={`text-sm ${txt} font-medium`}>{student.gender === "M" ? "Masculin" : "Feminin"}</p>
+                  <p className={`text-sm ${txt} font-medium`}>{student.gender === "M" ? "Masculin" : "Féminin"}</p>
                 )}
               </div>
               <div>
@@ -584,7 +584,7 @@ export default function StudentDetailsPage() {
                 )}
               </div>
               <StudentField {...fieldProps} label="Lieu de naissance" editKey="birthPlace" value={student.birthPlace} />
-              <StudentField {...fieldProps} label="Nationalite" editKey="nationality" value={student.nationality} />
+              <StudentField {...fieldProps} label="Nationalité" editKey="nationality" value={student.nationality} />
               <StudentField {...fieldProps} label="N° Matricule" editKey="code" value={student.code} />
             </div>
           )}
@@ -592,7 +592,7 @@ export default function StudentDetailsPage() {
 
         {/* ── Section: Administratif scolaire ── */}
         <div className={`${cardBg} rounded-xl border ${border} overflow-hidden`}>
-          <button onClick={() => toggleSection("administratif")} className={`w-full px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
+          <button onClick={() => toggleSection("administratif")} className={`w-full px-4 md:px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
             <div className="flex items-center gap-3">
               <BookOpen className="w-4 h-4 text-blue-500" />
               <span className={`text-sm font-semibold ${txt}`}>Informations administratives scolaires</span>
@@ -600,19 +600,19 @@ export default function StudentDetailsPage() {
             {openSections.administratif ? <ChevronUp className={`w-4 h-4 ${txtSec}`} /> : <ChevronDown className={`w-4 h-4 ${txtSec}`} />}
           </button>
           {openSections.administratif && (
-            <div className={`px-5 pb-5 pt-4 border-t ${border}`}>
+            <div className={`px-4 md:px-5 pb-5 pt-4 border-t ${border}`}>
               {enrollment ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div><label className={labelCls}>Classe</label><p className={`text-sm ${txt} font-medium`}>{enrollment.class.name}</p></div>
                   <div><label className={labelCls}>Niveau</label><p className={`text-sm ${txt} font-medium`}>{enrollment.class.level}</p></div>
                   <div><label className={labelCls}>Section</label><p className={`text-sm ${txt} font-medium`}>{enrollment.class.section}</p></div>
-                  <div><label className={labelCls}>Option / Filiere</label><p className={`text-sm ${txt} font-medium`}>{enrollment.class.stream || "-"}</p></div>
-                  <div><label className={labelCls}>Annee scolaire</label><p className={`text-sm ${txt} font-medium`}>{enrollment.year.name}</p></div>
-                  <div><label className={labelCls}>Etablissement</label><p className={`text-sm ${txt} font-medium`}>{student.user.school?.nomEtablissement || "-"}</p></div>
-                  <div><label className={labelCls}>Statut d inscription</label><p className={`text-sm ${txt} font-medium`}>{enrollment.status}</p></div>
+                  <div><label className={labelCls}>Option / Filière</label><p className={`text-sm ${txt} font-medium`}>{enrollment.class.stream || "—"}</p></div>
+                  <div><label className={labelCls}>Année scolaire</label><p className={`text-sm ${txt} font-medium`}>{enrollment.year.name}</p></div>
+                  <div><label className={labelCls}>Établissement</label><p className={`text-sm ${txt} font-medium`}>{student.user.school?.nomEtablissement || "—"}</p></div>
+                  <div><label className={labelCls}>Statut d'inscription</label><p className={`text-sm ${txt} font-medium`}>{enrollment.status}</p></div>
                 </div>
               ) : (
-                <p className={`text-sm ${txtSec} italic`}>Aucune inscription enregistree.</p>
+                <p className={`text-sm ${txtSec} italic`}>Aucune inscription enregistrée.</p>
               )}
             </div>
           )}
@@ -620,26 +620,26 @@ export default function StudentDetailsPage() {
 
         {/* ── Section: Coordonnees ── */}
         <div className={`${cardBg} rounded-xl border ${border} overflow-hidden`}>
-          <button onClick={() => toggleSection("coordonnees")} className={`w-full px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
+          <button onClick={() => toggleSection("coordonnees")} className={`w-full px-4 md:px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
             <div className="flex items-center gap-3">
               <MapPin className="w-4 h-4 text-green-500" />
-              <span className={`text-sm font-semibold ${txt}`}>Coordonnees</span>
+              <span className={`text-sm font-semibold ${txt}`}>Coordonnées</span>
             </div>
             {openSections.coordonnees ? <ChevronUp className={`w-4 h-4 ${txtSec}`} /> : <ChevronDown className={`w-4 h-4 ${txtSec}`} />}
           </button>
           {openSections.coordonnees && (
-            <div className={`px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t ${border}`}>
+            <div className={`px-4 md:px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t ${border}`}>
               <div>
                 <label className={`${labelCls} flex items-center gap-1.5`}><Mail className="w-3.5 h-3.5" />Email</label>
                 <p className={`text-sm ${txt} font-medium`}>{student.user.email}</p>
               </div>
               <div>
-                <label className={`${labelCls} flex items-center gap-1.5`}><Phone className="w-3.5 h-3.5" />Telephone</label>
+                <label className={`${labelCls} flex items-center gap-1.5`}><Phone className="w-3.5 h-3.5" />Téléphone</label>
                 <p className={`text-sm ${student.user.telephone ? `${txt} font-medium` : `${txtSec} italic`}`}>
-                  {student.user.telephone || "Non renseigne"}
+                  {student.user.telephone || "Non renseigné"}
                 </p>
               </div>
-              <StudentField {...fieldProps} label="Adresse complete" editKey="address" value={student.address}
+              <StudentField {...fieldProps} label="Adresse complète" editKey="address" value={student.address}
                 rows={3} colSpan icon={<MapPin className="w-3.5 h-3.5" />} />
             </div>
           )}
@@ -647,7 +647,7 @@ export default function StudentDetailsPage() {
 
         {/* ── Section: Parents / Tuteurs ── */}
         <div className={`${cardBg} rounded-xl border ${border} overflow-hidden`}>
-          <button onClick={() => toggleSection("parents")} className={`w-full px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
+          <button onClick={() => toggleSection("parents")} className={`w-full px-4 md:px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
             <div className="flex items-center gap-3">
               <Users className="w-4 h-4 text-orange-500" />
               <span className={`text-sm font-semibold ${txt}`}>Parents / Tuteurs</span>
@@ -655,7 +655,7 @@ export default function StudentDetailsPage() {
             {openSections.parents ? <ChevronUp className={`w-4 h-4 ${txtSec}`} /> : <ChevronDown className={`w-4 h-4 ${txtSec}`} />}
           </button>
           {openSections.parents && (
-            <div className={`px-5 pb-5 pt-4 border-t ${border} space-y-5`}>
+            <div className={`px-4 md:px-5 pb-5 pt-4 border-t ${border} space-y-5`}>
               <div>
                 <p className={`text-xs font-semibold ${txtSec} uppercase tracking-wide mb-3 flex items-center gap-2`}>
                   <span className="w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 text-xs flex items-center justify-center font-bold">1</span>
@@ -664,7 +664,7 @@ export default function StudentDetailsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <StudentField {...fieldProps} label="Nom complet" editKey="parentName1" value={student.parentName1} />
                   <StudentField {...fieldProps} label="Profession" editKey="parentJob1" value={student.parentJob1} />
-                  <StudentField {...fieldProps} label="Telephone" editKey="parentPhone1" value={student.parentPhone1} type="tel" />
+                  <StudentField {...fieldProps} label="Téléphone" editKey="parentPhone1" value={student.parentPhone1} type="tel" />
                   <StudentField {...fieldProps} label="Email" editKey="parentEmail1" value={student.parentEmail1} type="email" />
                 </div>
               </div>
@@ -676,7 +676,7 @@ export default function StudentDetailsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <StudentField {...fieldProps} label="Nom complet" editKey="parentName2" value={student.parentName2} />
                   <StudentField {...fieldProps} label="Profession" editKey="parentJob2" value={student.parentJob2} />
-                  <StudentField {...fieldProps} label="Telephone" editKey="parentPhone2" value={student.parentPhone2} type="tel" />
+                  <StudentField {...fieldProps} label="Téléphone" editKey="parentPhone2" value={student.parentPhone2} type="tel" />
                   <StudentField {...fieldProps} label="Email" editKey="parentEmail2" value={student.parentEmail2} type="email" />
                 </div>
               </div>
@@ -686,33 +686,33 @@ export default function StudentDetailsPage() {
 
         {/* ── Section: Medical ── */}
         <div className={`${cardBg} rounded-xl border ${border} overflow-hidden`}>
-          <button onClick={() => toggleSection("medical")} className={`w-full px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
+          <button onClick={() => toggleSection("medical")} className={`w-full px-4 md:px-5 py-4 flex items-center justify-between ${hover} transition-colors`}>
             <div className="flex items-center gap-3">
               <Heart className="w-4 h-4 text-red-500" />
-              <span className={`text-sm font-semibold ${txt}`}>Informations medicales</span>
+              <span className={`text-sm font-semibold ${txt}`}>Informations médicales</span>
             </div>
             {openSections.medical ? <ChevronUp className={`w-4 h-4 ${txtSec}`} /> : <ChevronDown className={`w-4 h-4 ${txtSec}`} />}
           </button>
           {openSections.medical && (
-            <div className={`px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t ${border}`}>
+            <div className={`px-4 md:px-5 pb-5 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t ${border}`}>
               <div>
                 <label className={labelCls}>Groupe sanguin</label>
                 {editMode && editData ? (
                   <select value={editData.bloodGroup || ""} onChange={(e) => setField("bloodGroup", e.target.value)} className={inputCls}>
-                    <option value="">- Selectionner -</option>
+                    <option value="">— Sélectionner —</option>
                     {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
                 ) : (
                   <p className={`text-sm ${student.bloodGroup ? `${txt} font-medium` : `${txtSec} italic`}`}>
-                    {student.bloodGroup || "Non renseigne"}
+                    {student.bloodGroup || "Non renseigné"}
                   </p>
                 )}
               </div>
               <StudentField {...fieldProps} label="Allergies connues" editKey="allergies" value={student.allergies} />
-              <StudentField {...fieldProps} label="Notes medicales / Conditions a surveiller" editKey="medicalNotes"
+              <StudentField {...fieldProps} label="Notes médicales / Conditions à surveiller" editKey="medicalNotes"
                 value={student.medicalNotes} rows={3} colSpan />
-              <StudentField {...fieldProps} label="Contact en cas d urgence" editKey="emergencyContact" value={student.emergencyContact} />
-              <StudentField {...fieldProps} label="Telephone d urgence" editKey="emergencyPhone" value={student.emergencyPhone} type="tel" />
+              <StudentField {...fieldProps} label="Contact en cas d'urgence" editKey="emergencyContact" value={student.emergencyContact} />
+              <StudentField {...fieldProps} label="Téléphone d'urgence" editKey="emergencyPhone" value={student.emergencyPhone} type="tel" />
             </div>
           )}
         </div>
