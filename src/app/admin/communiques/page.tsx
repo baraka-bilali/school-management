@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Layout from "@/components/layout"
-import { useEditor, EditorContent } from "@tiptap/react"
+import { useEditor, EditorContent, useEditorState } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import TextAlign from "@tiptap/extension-text-align"
 import Underline from "@tiptap/extension-underline"
@@ -35,7 +35,32 @@ function formatDate(dateStr: string) {
 }
 
 function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
-  if (!editor) return null
+  // TipTap v3 : useEditor ne re-rend pas le composant à chaque changement de
+  // sélection/curseur. useEditorState s'abonne à l'état pour que les boutons
+  // reflètent en direct le formatage actif (comme Word).
+  const state = useEditorState({
+    editor,
+    selector: ({ editor }) => ({
+      isBold: editor?.isActive("bold") ?? false,
+      isItalic: editor?.isActive("italic") ?? false,
+      isUnderline: editor?.isActive("underline") ?? false,
+      isStrike: editor?.isActive("strike") ?? false,
+      isH1: editor?.isActive("heading", { level: 1 }) ?? false,
+      isH2: editor?.isActive("heading", { level: 2 }) ?? false,
+      isH3: editor?.isActive("heading", { level: 3 }) ?? false,
+      isParagraph: editor?.isActive("paragraph") ?? false,
+      isAlignLeft: editor?.isActive({ textAlign: "left" }) ?? false,
+      isAlignCenter: editor?.isActive({ textAlign: "center" }) ?? false,
+      isAlignRight: editor?.isActive({ textAlign: "right" }) ?? false,
+      isBulletList: editor?.isActive("bulletList") ?? false,
+      isOrderedList: editor?.isActive("orderedList") ?? false,
+      isBlockquote: editor?.isActive("blockquote") ?? false,
+      canUndo: editor?.can().undo() ?? false,
+      canRedo: editor?.can().redo() ?? false,
+    }),
+  })
+
+  if (!editor || !state) return null
 
   const btnClass = (active: boolean) =>
     `shrink-0 p-2 rounded-lg transition-colors text-sm ${
@@ -48,34 +73,34 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
 
   return (
     <div className="flex items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-t-xl overflow-x-auto scrollbar-hide md:flex-wrap">
-      <button type="button" onClick={() => editor.chain().focus().undo().run()} className={btnClass(false)} title="Annuler"><Undo className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().redo().run()} className={btnClass(false)} title="Rétablir"><Redo className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().undo().run()} disabled={!state.canUndo} className={`${btnClass(false)} disabled:opacity-40`} title="Annuler"><Undo className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().redo().run()} disabled={!state.canRedo} className={`${btnClass(false)} disabled:opacity-40`} title="Rétablir"><Redo className="w-4 h-4" /></button>
 
       {divider}
 
-      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive("bold"))} title="Gras"><Bold className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive("italic"))} title="Italique"><Italic className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive("underline"))} title="Souligné"><UnderlineIcon className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))} title="Barré"><span className="w-4 h-4 text-sm font-bold line-through">S</span></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(state.isBold)} title="Gras"><Bold className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(state.isItalic)} title="Italique"><Italic className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(state.isUnderline)} title="Souligné"><UnderlineIcon className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(state.isStrike)} title="Barré"><span className="w-4 h-4 text-sm font-bold line-through">S</span></button>
 
       {divider}
 
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive("heading", { level: 1 }))} title="Titre 1"><span className="text-xs font-bold">H1</span></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive("heading", { level: 2 }))} title="Titre 2"><span className="text-xs font-bold">H2</span></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btnClass(editor.isActive("heading", { level: 3 }))} title="Titre 3"><span className="text-xs font-bold">H3</span></button>
-      <button type="button" onClick={() => editor.chain().focus().setParagraph().run()} className={btnClass(editor.isActive("paragraph"))} title="Paragraphe"><Type className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className={btnClass(state.isH1)} title="Titre 1"><span className="text-xs font-bold">H1</span></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={btnClass(state.isH2)} title="Titre 2"><span className="text-xs font-bold">H2</span></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} className={btnClass(state.isH3)} title="Titre 3"><span className="text-xs font-bold">H3</span></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setParagraph().run()} className={btnClass(state.isParagraph)} title="Paragraphe"><Type className="w-4 h-4" /></button>
 
       {divider}
 
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("left").run()} className={btnClass(editor.isActive({ textAlign: "left" }))} title="Gauche"><AlignLeft className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("center").run()} className={btnClass(editor.isActive({ textAlign: "center" }))} title="Centre"><AlignCenter className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btnClass(editor.isActive({ textAlign: "right" }))} title="Droite"><AlignRight className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setTextAlign("left").run()} className={btnClass(state.isAlignLeft)} title="Gauche"><AlignLeft className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setTextAlign("center").run()} className={btnClass(state.isAlignCenter)} title="Centre"><AlignCenter className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setTextAlign("right").run()} className={btnClass(state.isAlignRight)} title="Droite"><AlignRight className="w-4 h-4" /></button>
 
       {divider}
 
-      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive("bulletList"))} title="Liste à puces"><List className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(editor.isActive("orderedList"))} title="Liste numérotée"><ListOrdered className="w-4 h-4" /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btnClass(editor.isActive("blockquote"))} title="Citation"><span className="text-sm font-bold">&ldquo;</span></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(state.isBulletList)} title="Liste à puces"><List className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(state.isOrderedList)} title="Liste numérotée"><ListOrdered className="w-4 h-4" /></button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleBlockquote().run()} className={btnClass(state.isBlockquote)} title="Citation"><span className="text-sm font-bold">&ldquo;</span></button>
     </div>
   )
 }
