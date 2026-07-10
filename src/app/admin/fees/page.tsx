@@ -285,7 +285,7 @@ function formatMontant(amount: number, devise: "USD" | "CDF"): string {
 
 export default function AdminFeesPage() {
   const router = useRouter()
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [isCashier, setIsCashier] = useState(false)
   const [activeTab, setActiveTab] = useState<"overview" | "types" | "tarifications" | "students" | "payments">("overview")
   const [loading, setLoading] = useState(true)

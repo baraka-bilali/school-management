@@ -7,7 +7,7 @@ import { StudentsSection } from "../users/students-section"
 
 export default function InscriptionsPage() {
   const router = useRouter()
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [allowed, setAllowed] = useState<boolean | null>(null)
 
   useEffect(() => {

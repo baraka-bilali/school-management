@@ -38,7 +38,7 @@ export default function UsersPage() {
   const tab = useMemo(() => parseTab(searchParams.get("tab")), [searchParams])
   const [tabVisible, setTabVisible] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
 
   const changeTab = (next: TabKey) => {
     const params = new URLSearchParams(searchParams.toString())

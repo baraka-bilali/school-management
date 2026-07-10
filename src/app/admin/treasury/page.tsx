@@ -147,7 +147,7 @@ type TreasuryMainTab = "overview" | "outflows"
 export default function AdminTreasuryPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [currency, setCurrency] = useState<"USD" | "CDF">(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("schoolCurrency") as "USD" | "CDF") || "USD"

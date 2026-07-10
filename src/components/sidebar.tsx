@@ -38,7 +38,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [userRole, setUserRole] = useState<string>("ADMIN")
   const [canEnrollStudents, setCanEnrollStudents] = useState(false)
   const [schoolName, setSchoolName] = useState<string>("")

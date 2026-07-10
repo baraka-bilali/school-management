@@ -345,7 +345,7 @@ export default function SubscriptionPage() {
   const [school, setSchool] = useState<School | null>(null)
   const [subscriptionSummary, setSubscriptionSummary] = useState<SubscriptionSummary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [activeTab, setActiveTab] = useState<"overview" | "history">("overview")
 
   // Payments journal
@@ -529,11 +529,11 @@ export default function SubscriptionPage() {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className={`text-3xl font-bold ${textColor} mb-2`}>Abonnement</h1>
+            <h1 className={`text-2xl md:text-3xl font-bold ${textColor} mb-2`}>Abonnement</h1>
             <p className={textSecondary}>Gérez votre abonnement et consultez les informations</p>
           </div>
           <span className={`px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 ${statusColors[statusInfo.color as keyof typeof statusColors]}`}>
@@ -546,27 +546,36 @@ export default function SubscriptionPage() {
         <div className={`flex gap-1 p-1 rounded-xl ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
           <button
             onClick={() => setActiveTab("overview")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === "overview"
                 ? `${bgCard} ${textColor} shadow`
                 : textSecondary
             }`}
           >
-            <CreditCard className="w-4 h-4" />
-            Vue d'ensemble
+            <CreditCard className="w-4 h-4 shrink-0" />
+            Vue d&apos;ensemble
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === "history"
                 ? `${bgCard} ${textColor} shadow`
                 : textSecondary
             }`}
           >
-            <Receipt className="w-4 h-4" />
-            Journal des paiements
+            <Receipt className="w-4 h-4 shrink-0" />
+            <span className="sm:hidden">Paiements</span>
+            <span className="hidden sm:inline">Journal des paiements</span>
             {totalPayments > 0 && (
-              <span className="bg-teal-500 text-white text-xs px-2 py-0.5 rounded-full">
+              <span
+                className={`ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                  activeTab === "history"
+                    ? "bg-teal-500 text-white"
+                    : theme === "dark"
+                      ? "bg-gray-700 text-gray-300"
+                      : "bg-gray-200 text-gray-600"
+                }`}
+              >
                 {totalPayments}
               </span>
             )}
@@ -578,7 +587,7 @@ export default function SubscriptionPage() {
           <>
             {/* Carte principale */}
             <Card theme={theme}>
-              <CardContent className="p-8">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
                   <div className="flex-shrink-0">
                     <CircularProgress
@@ -812,7 +821,39 @@ export default function SubscriptionPage() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* Mobile : cartes de paiement */}
+                  <div className={`md:hidden divide-y ${borderColor}`}>
+                    {payments.map((p) => (
+                      <button
+                        key={`m-${p.id}`}
+                        type="button"
+                        onClick={() => setSelectedPayment(p)}
+                        className={`w-full text-left p-4 flex items-start gap-3 transition-colors ${tableRowHover}`}
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/10 text-teal-500">
+                          <Receipt className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-sm font-semibold text-teal-500 truncate">{p.numeroFacture}</span>
+                            <span className={`shrink-0 text-sm font-bold ${textColor}`}>
+                              {new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2 }).format(p.montant)} {p.devise}
+                            </span>
+                          </div>
+                          <p className={`mt-0.5 truncate text-sm font-medium ${textColor}`}>
+                            {p.plan} · {periodeLabel[p.periode] || p.periode}
+                          </p>
+                          <p className={`mt-0.5 text-xs ${textSecondary}`}>
+                            {new Date(p.createdAt).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                        <Download className={`mt-0.5 h-4 w-4 shrink-0 ${textSecondary}`} />
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Desktop/tablette : tableau */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead>
                         <tr className={`border-b ${borderColor}`}>

@@ -25,7 +25,7 @@ function formatDate(dateStr: string) {
 export default function AdminCommuniqueViewPage() {
   const params = useParams()
   const router = useRouter()
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [communique, setCommunique] = useState<Communique | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)

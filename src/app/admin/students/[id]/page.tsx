@@ -148,7 +148,7 @@ export default function StudentDetailsPage() {
   const [student, setStudent] = useState<StudentDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
 
   // Edit
   const [editMode, setEditMode] = useState(false)

@@ -41,7 +41,7 @@ export default function NotificationsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)

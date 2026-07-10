@@ -27,7 +27,7 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [schoolName, setSchoolName] = useState("")

@@ -23,7 +23,7 @@ export default function Layout({ children }: LayoutProps) {
   })
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [subscriptionExpired, setSubscriptionExpired] = useState(false)
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)

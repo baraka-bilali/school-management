@@ -14,7 +14,7 @@ interface NotificationBellProps {
 export default function NotificationBell({ href = "/admin/notifications" }: NotificationBellProps) {
   const router = useRouter()
   const [unreadCount, setUnreadCount] = useState(0)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const prevUnreadRef = useRef(0)
   const countInitializedRef = useRef(false)
 

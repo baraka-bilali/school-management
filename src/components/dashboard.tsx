@@ -116,7 +116,9 @@ function StatCard({
 
 export default function Dashboard() {
   const queryClient = useQueryClient()
-  const [theme, setTheme] = useState<Theme>("light")
+  const [theme, setTheme] = useState<Theme>(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"
+  )
   const [usdToCdfRate, setUsdToCdfRate] = useState(2800)
   const [activeYearKey, setActiveYearKey] = useState<string | null>(() => {
     if (typeof window === "undefined") return null

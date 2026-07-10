@@ -86,7 +86,7 @@ export default function SettingsPage() {
   const [yearError, setYearError] = useState("")
 
   // ---- Theme ----
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) setTheme(savedTheme)

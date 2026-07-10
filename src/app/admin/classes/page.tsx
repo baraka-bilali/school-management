@@ -54,7 +54,7 @@ export default function ClassesPage() {
   const [visible, setVisible] = useState(false)
   const [mountedDelete, setMountedDelete] = useState(false)
   const [visibleDelete, setVisibleDelete] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
 
   // Gestion du thème
   useEffect(() => {

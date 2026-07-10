@@ -37,12 +37,18 @@ export default function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="google" content="notranslate" />
+        {/* Applique le thème avant le premier rendu pour éviter le flash (FOUC) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark';var e=document.documentElement;e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(e){}})();`,
+          }}
+        />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icons/favicon.png" type="image/png" sizes="512x512" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
       </head>
-      <body className="bg-gray-50 font-sans antialiased notranslate" suppressHydrationWarning>
+      <body className="bg-gray-50 dark:bg-gray-950 font-sans antialiased notranslate" suppressHydrationWarning>
         <ReactQueryProvider>
           <ClientOnly>
             {children}

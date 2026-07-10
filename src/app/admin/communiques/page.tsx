@@ -81,7 +81,7 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
 }
 
 export default function AdminCommuniquesPage() {
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [title, setTitle] = useState("")
   const [communiques, setCommuniques] = useState<Communique[]>([])
   const [loading, setLoading] = useState(true)

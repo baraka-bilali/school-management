@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react"
 
 export function useStudentTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"
+  )
 
   useEffect(() => {
     const apply = (t: "light" | "dark") => {

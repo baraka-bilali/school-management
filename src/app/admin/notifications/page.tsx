@@ -33,7 +33,7 @@ type CategoryFilter = "all" | "subscription" | "payment" | "reminder" | "info" |
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
