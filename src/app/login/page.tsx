@@ -25,6 +25,20 @@ export default function LoginPage() {
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState("")
 
+	// Thème calqué sur les préférences de l'appareil (clair/sombre)
+	const [isDark, setIsDark] = useState(false)
+	useEffect(() => {
+		const mq = window.matchMedia("(prefers-color-scheme: dark)")
+		const apply = (dark: boolean) => {
+			setIsDark(dark)
+			document.documentElement.classList.toggle("dark", dark)
+		}
+		apply(mq.matches)
+		const handler = (e: MediaQueryListEvent) => apply(e.matches)
+		mq.addEventListener("change", handler)
+		return () => mq.removeEventListener("change", handler)
+	}, [])
+
 	// Animation de démarrage (une fois par session)
 	const [showSplash, setShowSplash] = useState(false)
 	const [splashLeaving, setSplashLeaving] = useState(false)
@@ -298,42 +312,42 @@ export default function LoginPage() {
 	return (
 		<>
 		{showSplash && <SplashScreen leaving={splashLeaving} />}
-		<div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+		<div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6 transition-colors">
 			<div className="w-full max-w-md">
 				<div className="flex flex-col items-center mb-4">
 					<div className="mb-3">
 						<KelasiLogo variant="light" priority className="h-36 w-36 sm:h-44 sm:w-44 object-contain drop-shadow-md" />
 					</div>
-					<p className="text-sm text-gray-500">Connectez-vous à votre compte</p>
+					<p className="text-sm text-gray-500 dark:text-gray-400">Connectez-vous à votre compte</p>
 				</div>
-				<Card className="shadow-lg">
+				<Card theme={isDark ? "dark" : "light"} className="shadow-lg">
 					<CardHeader>
 						<CardTitle>Connexion</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<form className="space-y-4" onSubmit={handleSubmit}>
 							<div>
-								<label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+								<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
 								<div className="relative">
 									<span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
 										<Mail className="w-4 h-4" />
 									</span>
-									<Input type="email" name="email" placeholder="vous@exemple.com" className="pl-10" required value={form.email} onChange={handleChange} />
+									<Input type="email" name="email" placeholder="vous@exemple.com" className="pl-10 dark:bg-gray-800 dark:border-gray-600" required value={form.email} onChange={handleChange} />
 								</div>
 							</div>
 							<div>
-								<label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+								<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mot de passe</label>
 								<div className="relative">
 									<span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
 										<Lock className="w-4 h-4" />
 									</span>
-									<Input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" className="pl-10 pr-10" required value={form.password} onChange={handleChange} />
-									<button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700" onClick={() => setShowPassword((v) => !v)}>
+									<Input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" className="pl-10 pr-10 dark:bg-gray-800 dark:border-gray-600" required value={form.password} onChange={handleChange} />
+									<button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setShowPassword((v) => !v)}>
 										{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 									</button>
 								</div>
 							</div>
-							{error && <div className="text-red-600 text-sm">{error}</div>}
+							{error && <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>}
 							<Button type="submit" className="w-full mt-2" disabled={loading}>
 								<LogIn className="w-4 h-4 mr-2" />
 								{loading ? "Connexion..." : "Se connecter"}
@@ -344,7 +358,7 @@ export default function LoginPage() {
 
 				<footer className="mt-6 flex flex-col items-center gap-3 text-center">
 					<div className="flex flex-col items-center gap-1.5">
-						<span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+						<span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
 							<LifeBuoy className="w-3.5 h-3.5" />
 							Support technique
 						</span>
@@ -353,7 +367,7 @@ export default function LoginPage() {
 								href="https://wa.me/243980139630"
 								target="_blank"
 								rel="noopener noreferrer"
-								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
+								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-500/15 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400 transition-colors hover:bg-green-100 dark:hover:bg-green-500/25"
 							>
 								<MessageCircle className="w-3.5 h-3.5" />
 								+243 980 139 630
@@ -362,20 +376,20 @@ export default function LoginPage() {
 								href="https://wa.me/243826245169"
 								target="_blank"
 								rel="noopener noreferrer"
-								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 transition-colors hover:bg-green-100"
+								className="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-500/15 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400 transition-colors hover:bg-green-100 dark:hover:bg-green-500/25"
 							>
 								<MessageCircle className="w-3.5 h-3.5" />
 								+243 826 245 169
 							</a>
 						</div>
 					</div>
-					<p className="text-xs text-gray-400">
+					<p className="text-xs text-gray-400 dark:text-gray-500">
 						Créé par{" "}
 						<a
 							href="https://digicreateam.com"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="font-semibold text-gray-500 transition-colors hover:text-indigo-600"
+							className="font-semibold text-gray-500 dark:text-gray-400 transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
 						>
 							digicreateam
 						</a>

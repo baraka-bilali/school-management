@@ -287,39 +287,35 @@ export default function AdminCommuniquesPage() {
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const bgCard = theme === "dark" ? "bg-gray-800" : "bg-white"
-  const bgPage = theme === "dark" ? "bg-gray-900" : "bg-gray-50"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700/40" : "hover:bg-gray-50"
   const inputBg = theme === "dark" ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400" : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
   const editorBg = theme === "dark" ? "bg-gray-700/50" : "bg-white"
 
   const latest = communiques[0]
-  const rest = communiques.slice(1)
 
   return (
     <Layout>
-      <div className={`min-h-screen ${bgPage}`}>
+      <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className={`sticky top-0 z-10 ${bgCard} border-b ${borderColor}`}>
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/10 rounded-lg">
-              <Megaphone className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+            <Megaphone className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className={`text-xl font-bold ${textColor}`}>Communiqués</h1>
+              {currentYearName && (
+                <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  Année {formatAcademicYearOptionLabel(currentYearName, true)}
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className={`text-lg font-bold ${textColor}`}>Communiqués</h1>
-                {currentYearName && (
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                    Année {formatAcademicYearOptionLabel(currentYearName, true)}
-                  </span>
-                )}
-              </div>
-              <p className={`text-xs ${textSecondary}`}>Messages visibles par les élèves inscrits sur l&apos;année active</p>
-            </div>
+            <p className={`text-xs ${textSecondary} mt-0.5`}>Messages visibles par les élèves inscrits sur l&apos;année active</p>
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="space-y-6">
           {/* Composer */}
           <div className={`${bgCard} border ${borderColor} rounded-xl overflow-hidden shadow-sm`}>
             <div className={`px-4 md:px-5 py-4 border-b ${borderColor} flex items-center gap-2`}>
