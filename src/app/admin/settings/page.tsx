@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Star,
   Building2,
+  X,
 } from "lucide-react"
 import BrandingUploadCard from "@/components/branding-upload-card"
 import {
@@ -323,17 +324,24 @@ export default function SettingsPage() {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Paramètres</h1>
-          <p className="text-gray-600 dark:text-gray-400">Configuration générale de l&apos;application.</p>
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-indigo-500/10 shrink-0">
+            <Settings2 className="w-6 h-6 text-indigo-500" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Paramètres</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Configuration générale de l&apos;application.</p>
+          </div>
         </div>
 
         {/* ===== DEVISE ===== */}
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <BadgeDollarSign className="w-5 h-5 text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Devise et taux de change</h2>
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="p-2 rounded-lg bg-blue-500/10 shrink-0">
+              <BadgeDollarSign className="w-5 h-5 text-blue-500" />
+            </div>
+            <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">Devise et taux de change</h2>
           </div>
 
           {loadingSettings ? (
@@ -422,10 +430,12 @@ export default function SettingsPage() {
         </div>
 
         {/* ===== IDENTITÉ VISUELLE ===== */}
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <Building2 className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Identité visuelle de l&apos;établissement</h2>
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="p-2 rounded-lg bg-indigo-500/10 shrink-0">
+              <Building2 className="w-5 h-5 text-indigo-500" />
+            </div>
+            <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">Identité visuelle de l&apos;établissement</h2>
           </div>
           <p className={`text-sm ${textSecondary} mb-4`}>
             Logo, sceau et photo de profil utilisés dans l&apos;application et sur les reçus de paiement.
@@ -491,18 +501,25 @@ export default function SettingsPage() {
         </div>
 
         {/* ===== ANNÉE SCOLAIRE ===== */}
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-500" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Année scolaire en cours</h2>
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 md:p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-lg bg-purple-500/10 shrink-0">
+                <Calendar className="w-5 h-5 text-purple-500" />
+              </div>
+              <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">Année scolaire</h2>
             </div>
             <button
               onClick={() => { setShowNewYearForm((v) => !v); setYearError("") }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+              title={showNewYearForm ? "Annuler" : "Nouvelle année scolaire"}
+              aria-label={showNewYearForm ? "Annuler" : "Nouvelle année scolaire"}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-all ${
+                showNewYearForm
+                  ? "bg-gray-500 hover:bg-gray-600 rotate-0"
+                  : "bg-purple-600 hover:bg-purple-700"
+              }`}
             >
-              <Plus className="w-4 h-4" />
-              Nouvelle année
+              {showNewYearForm ? <X className="w-4 h-4" /> : <Plus className="w-5 h-5" />}
             </button>
           </div>
 
