@@ -107,13 +107,22 @@ export default function LoginPage() {
 	const redirectByRole = (role: string) => {
 		switch (role) {
 			case "ADMIN":
-			case "COMPTABLE":
-			case "DIRECTEUR_DISCIPLINE":
-			case "DIRECTEUR_ETUDES":
 				router.push("/admin")
 				break
 			case "CAISSIER":
 				router.push("/admin/fees")
+				break
+			case "COMPTABLE":
+			case "DIRECTEUR_DISCIPLINE":
+			case "DIRECTEUR_ETUDES":
+			case "DIRECTEUR_ADJOINT":
+			case "SECRETAIRE":
+			case "INTENDANT":
+			case "SURVEILLANT_GENERAL":
+			case "BIBLIOTHECAIRE":
+			case "INFIRMIER":
+			case "CONSEILLER_PEDAGOGIQUE":
+				router.push("/staff")
 				break
 			case "ELEVE":
 				router.push("/student")

@@ -18,6 +18,13 @@ const ROLE_LABEL: Record<string, string> = {
   CAISSIER: 'Caissier(ère)',
   DIRECTEUR_DISCIPLINE: 'Discipline',
   DIRECTEUR_ETUDES: 'Études',
+  DIRECTEUR_ADJOINT: 'Dir. adjoint',
+  SECRETAIRE: 'Secrétaire',
+  INTENDANT: 'Intendant(e)',
+  SURVEILLANT_GENERAL: 'Surveillant(e) gén.',
+  BIBLIOTHECAIRE: 'Bibliothécaire',
+  INFIRMIER: 'Infirmier(ère)',
+  CONSEILLER_PEDAGOGIQUE: 'Conseiller péd.',
   PROFESSEUR: 'Professeur',
   ELEVE: 'Élève'
 }

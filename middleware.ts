@@ -4,6 +4,8 @@ import { jwtVerify } from "jose"
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "secret_key")
 
+import { isStaffPortalRole } from "@/lib/staff-roles"
+
 async function verifyToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, SECRET)
@@ -24,15 +26,18 @@ export async function middleware(req: NextRequest) {
   const isAdminArea = pathname.startsWith("/admin")
   const isStudentArea = pathname.startsWith("/student")
   const isTeacherArea = pathname.startsWith("/teacher")
+  const isStaffArea = pathname.startsWith("/staff")
   const isGeneralLogin = pathname === "/login"
   const isRegister = pathname === "/register"
 
+  // Rôles avec accès admin (gestion). Les autres personnels n'accèdent qu'à /staff.
   const adminAllowed = new Set([
     "ADMIN",
     "COMPTABLE",
     "CAISSIER",
     "DIRECTEUR_DISCIPLINE",
     "DIRECTEUR_ETUDES",
+    "DIRECTEUR_ADJOINT",
   ])
 
   // Block public access to /register entirely
@@ -106,6 +111,8 @@ export async function middleware(req: NextRequest) {
         url.pathname = "/super-admin"
       } else if (role === "PROFESSEUR") {
         url.pathname = "/teacher"
+      } else if (isStaffPortalRole(role)) {
+        url.pathname = role === "CAISSIER" ? "/admin/fees" : "/staff"
       } else if (adminAllowed.has(role) || role === "ADMIN") {
         url.pathname = "/admin"
       } else {
@@ -128,7 +135,33 @@ export async function middleware(req: NextRequest) {
         url.pathname = "/super-admin"
       } else if (role === "ELEVE") {
         url.pathname = "/student"
+      } else if (isStaffPortalRole(role)) {
+        url.pathname = role === "CAISSIER" ? "/admin/fees" : "/staff"
       } else if (adminAllowed.has(role) || role === "ADMIN") {
+        url.pathname = "/admin"
+      } else {
+        url.pathname = "/login"
+      }
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Staff space protection
+  if (isStaffArea) {
+    if (!role) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/login"
+      return NextResponse.redirect(url)
+    }
+    if (!isStaffPortalRole(role)) {
+      const url = req.nextUrl.clone()
+      if (role === "SUPER_ADMIN") {
+        url.pathname = "/super-admin"
+      } else if (role === "ELEVE") {
+        url.pathname = "/student"
+      } else if (role === "PROFESSEUR") {
+        url.pathname = "/teacher"
+      } else if (role === "ADMIN") {
         url.pathname = "/admin"
       } else {
         url.pathname = "/login"
@@ -148,6 +181,8 @@ export async function middleware(req: NextRequest) {
       url.pathname = "/teacher"
     } else if (role === "CAISSIER") {
       url.pathname = "/admin/fees"
+    } else if (isStaffPortalRole(role)) {
+      url.pathname = "/staff"
     } else {
       url.pathname = "/admin"
     }
@@ -163,6 +198,7 @@ export const config = {
     "/super-admin/:path*",
     "/student/:path*",
     "/teacher/:path*",
+    "/staff/:path*",
     "/login",
     "/super-admin/login",
     "/register",

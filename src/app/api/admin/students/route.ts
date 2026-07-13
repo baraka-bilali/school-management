@@ -80,11 +80,9 @@ export async function GET(req: NextRequest) {
     }
     
     if (q) {
-      // IMPORTANT: MySQL ne supporte pas mode: 'insensitive'
-      // Solution: Rechercher avec contains (sensible à la casse par défaut)
-      // MySQL avec collation utf8mb4_general_ci est insensible à la casse par défaut
       const searchTerm = q.trim()
-      
+      const nameFilter = { contains: searchTerm, mode: "insensitive" as const }
+
       // Combiner le filtre de recherche avec le filtre schoolId
       if (adminSchoolId) {
         where.AND = [
@@ -95,20 +93,20 @@ export async function GET(req: NextRequest) {
           },
           {
             OR: [
-              { lastName: { contains: searchTerm } },
-              { middleName: { contains: searchTerm } },
-              { firstName: { contains: searchTerm } },
-              { code: { contains: searchTerm } }
+              { lastName: nameFilter },
+              { middleName: nameFilter },
+              { firstName: nameFilter },
+              { code: nameFilter }
             ]
           }
         ]
         delete where.user // Supprimer le filtre simple car on utilise AND
       } else {
         where.OR = [
-          { lastName: { contains: searchTerm } },
-          { middleName: { contains: searchTerm } },
-          { firstName: { contains: searchTerm } },
-          { code: { contains: searchTerm } }
+          { lastName: nameFilter },
+          { middleName: nameFilter },
+          { firstName: nameFilter },
+          { code: nameFilter }
         ]
       }
     }
