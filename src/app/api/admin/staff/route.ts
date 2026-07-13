@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { buildPersonnelEmailByCode, generatePassword } from "@/lib/generateCredentials"
-import { isStaffRole, STAFF_ROLES } from "@/lib/staff-roles"
+import { isStaffRole } from "@/lib/staff-roles"
+import { NON_STAFF_USER_ROLES, getStaffRolesInSchema } from "@/lib/staff-roles-server"
 import { User_role } from "@prisma/client"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     const where = {
       schoolId: auth.schoolId,
-      role: { in: STAFF_ROLES as unknown as User_role[] },
+      role: { notIn: NON_STAFF_USER_ROLES },
       ...(q
         ? {
             OR: [
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    return NextResponse.json({ items, total, page, pageSize })
+    return NextResponse.json({ items, total, page, pageSize, availableRoles: getStaffRolesInSchema() })
   } catch (error) {
     console.error("Erreur GET staff:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
@@ -122,6 +123,16 @@ export async function POST(req: NextRequest) {
     }
     if (!role || !isStaffRole(role)) {
       return NextResponse.json({ error: "Rôle invalide" }, { status: 400 })
+    }
+    const schemaRoles = getStaffRolesInSchema()
+    if (!schemaRoles.includes(role as User_role)) {
+      return NextResponse.json(
+        {
+          error:
+            "Ce rôle n'est pas encore disponible. Exécutez la migration SQL des rôles personnel, puis « npx prisma generate » et redémarrez le serveur.",
+        },
+        { status: 400 }
+      )
     }
 
     const email = await (async () => {

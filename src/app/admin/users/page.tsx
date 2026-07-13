@@ -16,7 +16,7 @@ import { StudentsSection, Toolbar, Pagination } from "./students-section"
 import { CoursesSection } from "./courses-section"
 import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
-import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
+import { STAFF_ROLES, STAFF_ROLES_CORE, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
 
 type TabKey = "students" | "teachers" | "staff" | "courses"
 
@@ -905,6 +905,8 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
   const [q, setQ] = useState("")
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [availableRoles, setAvailableRoles] = useState<StaffRole[]>(STAFF_ROLES_CORE)
   const [showResetModal, setShowResetModal] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<any>(null)
   const [newPassword, setNewPassword] = useState("")
@@ -922,14 +924,19 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
     params.set("pageSize", String(pagination.pageSize))
     ;(async () => {
       setLoading(true)
+      setLoadError(null)
       try {
         const r = await authFetch(`/api/admin/staff?${params.toString()}`)
         const res = await r.json()
         if (!r.ok) throw new Error(res.error || "Erreur")
         setItems(res.items || [])
         setTotal(res.total || 0)
+        if (Array.isArray(res.availableRoles) && res.availableRoles.length > 0) {
+          setAvailableRoles(res.availableRoles as StaffRole[])
+        }
       } catch (e) {
         console.error(e)
+        setLoadError((e as Error).message || "Impossible de charger le personnel")
         setItems([])
         setTotal(0)
       } finally {
@@ -1046,6 +1053,12 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
             <Plus className="h-4 w-4" />
           </button>
         </div>
+
+        {loadError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+            {loadError}
+          </div>
+        )}
 
         {/* Mobile: cartes avec tous les paramètres + accès visibles */}
         <div className="md:hidden space-y-2.5">
@@ -1239,6 +1252,7 @@ function StaffSection({ theme }: { theme: "light" | "dark" }) {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           theme={theme}
+          availableRoles={availableRoles}
           onCreated={(payload) => {
             setShowCreate(false)
             setSelectedStaff(payload.user)
@@ -1345,11 +1359,13 @@ function CreateStaffModal({
   onClose,
   onCreated,
   theme = "light",
+  availableRoles = STAFF_ROLES_CORE,
 }: {
   open: boolean
   onClose: () => void
   onCreated: (payload: { email: string; plaintextPassword: string; user: Record<string, unknown> }) => void
   theme?: "light" | "dark"
+  availableRoles?: StaffRole[]
 }) {
   const [form, setForm] = useState({
     lastName: "",
@@ -1380,13 +1396,13 @@ function CreateStaffModal({
         lastName: "",
         middleName: "",
         firstName: "",
-        role: "CAISSIER",
+        role: availableRoles[0] ?? "CAISSIER",
         phone: "",
         fonction: "",
       })
       setSubmitting(false)
     }
-  }, [open])
+  }, [open, availableRoles])
 
   if (!mounted) return null
 
@@ -1440,7 +1456,7 @@ function CreateStaffModal({
             <div>
               <label className={labelCls}>Rôle *</label>
               <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as StaffRole })}>
-                {STAFF_ROLES.map((role) => (
+                {availableRoles.map((role) => (
                   <option key={role} value={role}>{STAFF_ROLE_LABELS[role]}</option>
                 ))}
               </select>

@@ -14,6 +14,14 @@ export const STAFF_ROLES = [
 
 export type StaffRole = (typeof STAFF_ROLES)[number]
 
+/** Rôles toujours présents avant migration étendue (fallback UI). */
+export const STAFF_ROLES_CORE: StaffRole[] = [
+  "CAISSIER",
+  "COMPTABLE",
+  "DIRECTEUR_DISCIPLINE",
+  "DIRECTEUR_ETUDES",
+]
+
 /** Rôles avec accès à l'espace personnel /staff (tous les personnels non enseignants) */
 export const STAFF_PORTAL_ROLES = STAFF_ROLES
 
