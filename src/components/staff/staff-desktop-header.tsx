@@ -38,9 +38,12 @@ export default function StaffDesktopHeader({
             </span>
           )}
         </Link>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white ring-2 ring-indigo-500/30">
+        <Link
+          href="/staff/settings"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white ring-2 ring-indigo-500/30 transition-opacity hover:opacity-90"
+        >
           {initials}
-        </div>
+        </Link>
       </div>
     </header>
   )

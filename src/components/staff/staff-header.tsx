@@ -27,7 +27,7 @@ export default function StaffHeader({
       )}
     >
       <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
-        <div className="shrink-0">
+        <Link href="/staff/settings" className="shrink-0">
           <div
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ring-2 shadow-sm",
@@ -36,7 +36,7 @@ export default function StaffHeader({
           >
             {initials}
           </div>
-        </div>
+        </Link>
         <h1 className={cn("min-w-0 flex-1 truncate text-base font-bold tracking-tight", isDark ? "text-gray-100" : "text-gray-900")}>
           {schoolName}
         </h1>
