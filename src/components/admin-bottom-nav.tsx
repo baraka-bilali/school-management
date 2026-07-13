@@ -10,6 +10,7 @@ import {
   Megaphone,
   Menu,
   UserPlus,
+  Banknote,
 } from "lucide-react"
 
 type BottomNavItem = {
@@ -65,6 +66,12 @@ export default function AdminBottomNav({
             } as BottomNavItem,
           ]
         : []),
+      {
+        href: "/admin/salary",
+        label: "Portefeuille",
+        icon: Banknote,
+        match: (p) => p.startsWith("/admin/salary"),
+      },
       { label: "Plus", icon: Menu, action: "more" },
     ]
   } else if (ADMIN_ROLES.has(role)) {

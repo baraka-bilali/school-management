@@ -89,7 +89,8 @@ export async function middleware(req: NextRequest) {
     if (role === "CAISSIER") {
       const allowed =
         pathname.startsWith("/admin/fees") ||
-        pathname.startsWith("/admin/inscriptions")
+        pathname.startsWith("/admin/inscriptions") ||
+        pathname.startsWith("/admin/salary")
       if (!allowed) {
         const url = req.nextUrl.clone()
         url.pathname = "/admin/fees"

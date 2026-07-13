@@ -100,6 +100,12 @@ export default function LoginPage() {
 
 	const profileUpper = (value: string) => value.toUpperCase()
 
+	/** Champs dans modales à fond clair — texte toujours visible même en mode sombre système */
+	const lightFieldClass =
+		"text-gray-900 bg-white border-gray-300 placeholder:text-gray-400 dark:bg-white dark:text-gray-900 dark:border-gray-300 dark:placeholder:text-gray-400"
+	const profileFieldClass =
+		"text-gray-900 bg-white border-gray-300 placeholder:text-gray-400 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 dark:placeholder:text-gray-500"
+
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setForm({ ...form, [e.target.name]: e.target.value })
 	}
@@ -496,7 +502,7 @@ export default function LoginPage() {
 											type={showNewPassword ? "text" : "password"}
 											value={passwordForm.newPassword}
 											onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-											className="w-full pr-10"
+											className={`w-full pr-10 ${lightFieldClass}`}
 											placeholder="Au moins 6 caractères"
 											required
 											minLength={6}
@@ -513,7 +519,7 @@ export default function LoginPage() {
 											type={showConfirmPassword ? "text" : "password"}
 											value={passwordForm.confirmPassword}
 											onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-											className="w-full pr-10"
+											className={`w-full pr-10 ${lightFieldClass}`}
 											placeholder="Retapez votre mot de passe"
 											required
 											minLength={6}
@@ -610,7 +616,7 @@ export default function LoginPage() {
 											value={profileForm.birthPlace}
 											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: profileUpper(e.target.value) })}
 											placeholder="Ex : Kinshasa"
-											className="uppercase"
+											className={`uppercase ${profileFieldClass}`}
 										/>
 									</div>
 									<div>
@@ -619,7 +625,7 @@ export default function LoginPage() {
 											value={profileForm.nationality}
 											onChange={(e) => setProfileForm({ ...profileForm, nationality: profileUpper(e.target.value) })}
 											placeholder="Ex : Congolaise"
-											className="uppercase"
+											className={`uppercase ${profileFieldClass}`}
 										/>
 									</div>
 								</div>
@@ -632,7 +638,7 @@ export default function LoginPage() {
 										value={profileForm.address}
 										onChange={(e) => setProfileForm({ ...profileForm, address: profileUpper(e.target.value) })}
 										placeholder="Ex : Av. de l'Université, Commune de Lingwala"
-										className="uppercase"
+										className={`uppercase ${profileFieldClass}`}
 									/>
 								</div>
 
@@ -646,7 +652,7 @@ export default function LoginPage() {
 											value={profileForm.parentName1}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName1: profileUpper(e.target.value) })}
 											placeholder="Nom complet du parent/tuteur"
-											className="rounded-xl uppercase"
+											className={`rounded-xl uppercase ${profileFieldClass}`}
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
@@ -655,7 +661,7 @@ export default function LoginPage() {
 													value={profileForm.parentPhone1}
 													onChange={(e) => setProfileForm({ ...profileForm, parentPhone1: e.target.value })}
 													placeholder="Téléphone"
-													className="pl-8"
+													className={`pl-8 ${profileFieldClass}`}
 												/>
 											</div>
 											<Input
@@ -663,6 +669,7 @@ export default function LoginPage() {
 												value={profileForm.parentEmail1}
 												onChange={(e) => setProfileForm({ ...profileForm, parentEmail1: e.target.value })}
 												placeholder="Email (optionnel)"
+												className={profileFieldClass}
 											/>
 										</div>
 									</div>
@@ -678,7 +685,7 @@ export default function LoginPage() {
 											value={profileForm.parentName2}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName2: profileUpper(e.target.value) })}
 											placeholder="Nom complet"
-											className="rounded-xl uppercase"
+											className={`rounded-xl uppercase ${profileFieldClass}`}
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
@@ -687,7 +694,7 @@ export default function LoginPage() {
 													value={profileForm.parentPhone2}
 													onChange={(e) => setProfileForm({ ...profileForm, parentPhone2: e.target.value })}
 													placeholder="Téléphone"
-													className="pl-8"
+													className={`pl-8 ${profileFieldClass}`}
 												/>
 											</div>
 											<Input
@@ -695,6 +702,7 @@ export default function LoginPage() {
 												value={profileForm.parentEmail2}
 												onChange={(e) => setProfileForm({ ...profileForm, parentEmail2: e.target.value })}
 												placeholder="Email (optionnel)"
+												className={profileFieldClass}
 											/>
 										</div>
 									</div>
@@ -710,7 +718,7 @@ export default function LoginPage() {
 											value={profileForm.emergencyContact}
 											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: profileUpper(e.target.value) })}
 											placeholder="Nom du contact"
-											className="uppercase"
+											className={`uppercase ${profileFieldClass}`}
 										/>
 										<div className="relative">
 											<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -718,7 +726,7 @@ export default function LoginPage() {
 												value={profileForm.emergencyPhone}
 												onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
 												placeholder="Numéro d'urgence"
-												className="pl-8"
+												className={`pl-8 ${profileFieldClass}`}
 											/>
 										</div>
 									</div>
@@ -748,7 +756,7 @@ export default function LoginPage() {
 											value={profileForm.allergies}
 											onChange={(e) => setProfileForm({ ...profileForm, allergies: profileUpper(e.target.value) })}
 											placeholder="Ex : pénicilline, arachides..."
-											className="rounded-xl uppercase"
+											className={`rounded-xl uppercase ${profileFieldClass}`}
 										/>
 									</div>
 									<div>
@@ -757,7 +765,7 @@ export default function LoginPage() {
 											value={profileForm.medicalNotes}
 											onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: profileUpper(e.target.value) })}
 											placeholder="Informations importantes pour l'école"
-											className="rounded-xl uppercase"
+											className={`rounded-xl uppercase ${profileFieldClass}`}
 										/>
 									</div>
 								</div>

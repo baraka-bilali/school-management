@@ -18,6 +18,7 @@ import {
   Landmark,
   Lock,
   Megaphone,
+  Banknote,
   UserPlus,
 } from "lucide-react"
 import Link from "next/link"
@@ -127,6 +128,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     ...(canEnrollStudents
       ? [{ icon: UserPlus, label: "Inscription", href: "/admin/inscriptions" }]
       : []),
+    { icon: Banknote, label: "Paiements salaire", href: "/admin/salary" },
   ]
 
   // Menu pour les élèves
