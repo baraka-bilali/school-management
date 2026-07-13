@@ -40,11 +40,15 @@ import {
 // TYPES
 // ============================================================
 
-interface TeacherPaymentRow {
+interface SalaryPaymentRow {
   id: number
+  kind: "teacher" | "staff"
+  payeeKey: string
   teacherId: number
   teacherName: string
+  payeeName: string
   specialty: string | null
+  roleLabel: string
   montant: number
   type: string
   mois: string
@@ -52,6 +56,15 @@ interface TeacherPaymentRow {
   modePaiement: string
   reference: string | null
   datePaiement: string
+}
+
+interface PayeeOption {
+  id: number
+  key: string
+  kind: "teacher" | "staff"
+  name: string
+  specialty: string | null
+  roleLabel: string
 }
 
 interface ExpenseRow {
@@ -64,12 +77,6 @@ interface ExpenseRow {
   modePaiement: string
   reference: string | null
   dateDepense: string
-}
-
-interface TeacherOption {
-  id: number
-  name: string
-  specialty: string | null
 }
 
 interface TreasuryData {
@@ -93,9 +100,10 @@ interface TreasuryData {
   totalExpensesCdf: number
   balanceUsd: number
   balanceCdf: number
-  teacherPayments: TeacherPaymentRow[]
+  teacherPayments: SalaryPaymentRow[]
   expenses: ExpenseRow[]
-  teachers: TeacherOption[]
+  payees: PayeeOption[]
+  teachers: PayeeOption[]
 }
 
 // ============================================================
@@ -170,12 +178,12 @@ export default function AdminTreasuryPage() {
   const [trFilterYearId, setTrFilterYearId] = useState<number | null>(null)
   const [trFilterMonth, setTrFilterMonth] = useState("")
   const [periodShortcut, setPeriodShortcut] = useState<PeriodShortcut>("this_month")
-  const [trFilterTeacher, setTrFilterTeacher] = useState("")
+  const [trFilterPayee, setTrFilterPayee] = useState("")
   const [trFilterType, setTrFilterType] = useState("")
   const [trFilterCategorie, setTrFilterCategorie] = useState("")
-  const [showTeacherPaymentForm, setShowTeacherPaymentForm] = useState(false)
+  const [showSalaryPaymentForm, setShowSalaryPaymentForm] = useState(false)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
-  const [tpTeacherId, setTpTeacherId] = useState("")
+  const [tpPayeeKey, setTpPayeeKey] = useState("")
   const [tpMontant, setTpMontant] = useState("")
   const [tpType, setTpType] = useState("SALAIRE")
   const [tpMois, setTpMois] = useState(new Date().toISOString().slice(0, 7))
@@ -357,7 +365,7 @@ export default function AdminTreasuryPage() {
   const handleMainTabChange = (tab: TreasuryMainTab) => {
     setTreasuryMainTab(tab)
     if (tab === "overview") {
-      setShowTeacherPaymentForm(false)
+      setShowSalaryPaymentForm(false)
       setShowExpenseForm(false)
     }
     const params = new URLSearchParams()
@@ -423,32 +431,57 @@ export default function AdminTreasuryPage() {
     return () => window.removeEventListener("schoolSettingsChange", handleSettingsYearChange)
   }, [syncUrlParams])
 
-  const handleSubmitTeacherPayment = async () => {
-    if (!tpTeacherId || !tpMontant || !tpMois) return
+  const handleSubmitSalaryPayment = async () => {
+    if (!tpPayeeKey || !tpMontant || !tpMois) return
     setTpSubmitting(true)
     try {
-      const res = await fetch("/api/admin/fees/treasury/teacher-payments", {
+      const [kind, idStr] = tpPayeeKey.split(":")
+      const id = parseInt(idStr)
+      const isTeacher = kind === "teacher"
+      const url = isTeacher
+        ? "/api/admin/fees/treasury/teacher-payments"
+        : "/api/admin/fees/treasury/staff-payments"
+      const body = isTeacher
+        ? {
+            teacherId: id,
+            montant: parseFloat(tpMontant),
+            type: tpType,
+            mois: tpMois,
+            description: tpDescription || null,
+            modePaiement: tpModePaiement,
+            reference: tpReference || null,
+          }
+        : {
+            userId: id,
+            montant: parseFloat(tpMontant),
+            type: tpType,
+            mois: tpMois,
+            description: tpDescription || null,
+            modePaiement: tpModePaiement,
+            reference: tpReference || null,
+          }
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teacherId: parseInt(tpTeacherId),
-          montant: parseFloat(tpMontant),
-          type: tpType,
-          mois: tpMois,
-          description: tpDescription || null,
-          modePaiement: tpModePaiement,
-          reference: tpReference || null,
-        }),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
-        setShowTeacherPaymentForm(false)
-        setTpTeacherId(""); setTpMontant(""); setTpType("SALAIRE"); setTpDescription(""); setTpReference("")
+        setShowSalaryPaymentForm(false)
+        setTpPayeeKey("")
+        setTpMontant("")
+        setTpType("SALAIRE")
+        setTpDescription("")
+        setTpReference("")
         void fetchTreasury()
       } else {
         const err = await res.json()
         alert(err.error || "Erreur lors de l'enregistrement")
       }
-    } catch { alert("Erreur réseau") } finally { setTpSubmitting(false) }
+    } catch {
+      alert("Erreur réseau")
+    } finally {
+      setTpSubmitting(false)
+    }
   }
 
   const handleSubmitExpense = async () => {
@@ -486,10 +519,11 @@ export default function AdminTreasuryPage() {
     let csvRows: string[] = []
 
     if (sub === "salaires" || sub === "overview") {
-      csvRows.push(["Professeur", "Type", "Mois", "Montant ($)", "Mode", "Référence", "Description", "Date"].join(";"))
-      for (const tp of filteredTeacherPayments) {
+      csvRows.push(["Personnel", "Rôle", "Type", "Mois", "Montant ($)", "Mode", "Référence", "Description", "Date"].join(";"))
+      for (const tp of filteredSalaryPayments) {
         csvRows.push([
-          tp.teacherName,
+          tp.payeeName,
+          tp.roleLabel,
           PAYMENT_TYPES.find(p => p.value === tp.type)?.label || tp.type,
           tp.mois,
           tp.montant,
@@ -526,9 +560,13 @@ export default function AdminTreasuryPage() {
   }
 
   // Filtrer salaires / dépenses par période scolaire
-  const filteredTeacherPayments = treasury?.teacherPayments.filter((tp) => {
+  const payeeList = treasury?.payees ?? treasury?.teachers ?? []
+  const teacherPayees = payeeList.filter((p) => p.kind === "teacher")
+  const staffPayees = payeeList.filter((p) => p.kind === "staff")
+
+  const filteredSalaryPayments = treasury?.teacherPayments.filter((tp) => {
     if (periodBounds.monthValues.length > 0 && !periodBounds.monthValues.includes(tp.mois)) return false
-    if (trFilterTeacher && tp.teacherId !== parseInt(trFilterTeacher)) return false
+    if (trFilterPayee && tp.payeeKey !== trFilterPayee) return false
     if (trFilterType && tp.type !== trFilterType) return false
     return true
   }) ?? []
@@ -542,9 +580,9 @@ export default function AdminTreasuryPage() {
     return true
   }) ?? []
 
-  const outflowTeacherTotal = useMemo(
-    () => filteredTeacherPayments.reduce((s, p) => s + p.montant, 0),
-    [filteredTeacherPayments]
+  const outflowSalaryTotal = useMemo(
+    () => filteredSalaryPayments.reduce((s, p) => s + p.montant, 0),
+    [filteredSalaryPayments]
   )
   const outflowExpensesUsd = useMemo(
     () => filteredExpenses.filter((e) => e.devise === "USD").reduce((s, e) => s + e.montant, 0),
@@ -555,7 +593,7 @@ export default function AdminTreasuryPage() {
     [filteredExpenses]
   )
 
-  const hasOutflowClientFilters = !!(trFilterTeacher || trFilterType || trFilterCategorie)
+  const hasOutflowClientFilters = !!(trFilterPayee || trFilterType || trFilterCategorie)
 
   // Couleurs thème
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
@@ -669,14 +707,25 @@ export default function AdminTreasuryPage() {
                 <div className="flex flex-wrap gap-3 items-center pt-1 border-t border-dashed border-gray-200 dark:border-gray-700">
                   {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
                     <select
-                      value={trFilterTeacher}
-                      onChange={(e) => setTrFilterTeacher(e.target.value)}
-                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[160px]`}
+                      value={trFilterPayee}
+                      onChange={(e) => setTrFilterPayee(e.target.value)}
+                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[180px]`}
                     >
-                      <option value="">Tous les professeurs</option>
-                      {(treasury?.teachers ?? []).map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
+                      <option value="">Tout le personnel</option>
+                      {teacherPayees.length > 0 && (
+                        <optgroup label="Professeurs">
+                          {teacherPayees.map((t) => (
+                            <option key={t.key} value={t.key}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {staffPayees.length > 0 && (
+                        <optgroup label="Personnel administratif">
+                          {staffPayees.map((t) => (
+                            <option key={t.key} value={t.key}>{t.name} ({t.roleLabel})</option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   )}
 
@@ -706,11 +755,11 @@ export default function AdminTreasuryPage() {
                     </select>
                   )}
 
-                  {(periodShortcut !== "this_month" || trFilterMonth || trFilterTeacher || trFilterType || trFilterCategorie) && (
+                  {(periodShortcut !== "this_month" || trFilterMonth || trFilterPayee || trFilterType || trFilterCategorie) && (
                     <button
                       onClick={() => {
                         handleShortcutChange("this_month")
-                        setTrFilterTeacher("")
+                        setTrFilterPayee("")
                         setTrFilterType("")
                         setTrFilterCategorie("")
                       }}
@@ -771,7 +820,7 @@ export default function AdminTreasuryPage() {
                   scolaireCdf={treasury.scolaireIncomeCdf}
                   otherUsd={treasury.otherIncomeUsd}
                   otherCdf={treasury.otherIncomeCdf}
-                  teacherPayments={hasOutflowClientFilters ? outflowTeacherTotal : treasury.totalTeacherPayments}
+                  teacherPayments={hasOutflowClientFilters ? outflowSalaryTotal : treasury.totalTeacherPayments}
                   expensesUsd={hasOutflowClientFilters ? outflowExpensesUsd : treasury.totalExpensesUsd}
                   expensesCdf={hasOutflowClientFilters ? outflowExpensesCdf : treasury.totalExpensesCdf}
                   balanceUsd={treasury.balanceUsd}
@@ -807,8 +856,8 @@ export default function AdminTreasuryPage() {
                   <Download className="w-4 h-4" /> Excel
                 </button>
                 {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-                  <button onClick={() => setShowTeacherPaymentForm(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
-                    <Plus className="w-4 h-4" /> Payer un professeur
+                  <button onClick={() => setShowSalaryPaymentForm(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+                    <Plus className="w-4 h-4" /> Payer un salarié
                   </button>
                 )}
                 {(treasurySubTab === "overview" || treasurySubTab === "depenses") && (
@@ -820,18 +869,33 @@ export default function AdminTreasuryPage() {
             </div>
 
             {/* Formulaire paiement prof */}
-            {showTeacherPaymentForm && (
+            {showSalaryPaymentForm && (
               <Card theme={theme}>
                 <CardContent className="pt-5">
-                  <h3 className={`text-lg font-semibold ${textColor} mb-4`}>Payer un professeur</h3>
+                  <h3 className={`text-lg font-semibold ${textColor} mb-4`}>Payer un salarié</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Professeur *</label>
-                      <select value={tpTeacherId} onChange={(e) => setTpTeacherId(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
+                      <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Personnel *</label>
+                      <select value={tpPayeeKey} onChange={(e) => setTpPayeeKey(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
                         <option value="">Sélectionner...</option>
-                        {treasury.teachers.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}{t.specialty ? ` (${t.specialty})` : ""}</option>
-                        ))}
+                        {teacherPayees.length > 0 && (
+                          <optgroup label="Professeurs">
+                            {teacherPayees.map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {t.name}{t.specialty ? ` (${t.specialty})` : ""}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {staffPayees.length > 0 && (
+                          <optgroup label="Personnel administratif">
+                            {staffPayees.map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {t.name} ({t.roleLabel})
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -864,8 +928,8 @@ export default function AdminTreasuryPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 mt-4 justify-end">
-                    <button onClick={() => setShowTeacherPaymentForm(false)} className={`px-4 py-2 rounded-xl border ${borderColor} ${textColor} text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700`}>Annuler</button>
-                    <button onClick={handleSubmitTeacherPayment} disabled={!tpTeacherId || !tpMontant || !tpMois || tpSubmitting} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <button onClick={() => setShowSalaryPaymentForm(false)} className={`px-4 py-2 rounded-xl border ${borderColor} ${textColor} text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700`}>Annuler</button>
+                    <button onClick={handleSubmitSalaryPayment} disabled={!tpPayeeKey || !tpMontant || !tpMois || tpSubmitting} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium transition-colors inline-flex items-center gap-2">
                       {tpSubmitting && <Loader2 className="w-4 h-4 animate-spin" />} Enregistrer
                     </button>
                   </div>
@@ -931,26 +995,27 @@ export default function AdminTreasuryPage() {
               <Card theme={theme} className="rounded-2xl shadow-sm min-w-0 overflow-hidden">
                 <CardContent className="pt-5">
                   <h3 className={`text-base font-semibold ${textColor} mb-3 flex items-center gap-2`}>
-                    <Users className="w-5 h-5 text-blue-500 shrink-0" /> Paiements professeurs
+                    <Users className="w-5 h-5 text-blue-500 shrink-0" /> Paiements salaires
                   </h3>
-                  {filteredTeacherPayments.length === 0 ? (
+                  {filteredSalaryPayments.length === 0 ? (
                     <p className={`text-center py-8 ${textSecondary}`}>{treasury.teacherPayments.length === 0 ? "Aucun paiement enregistré" : "Aucun résultat pour ces filtres"}</p>
                   ) : isCompactTables ? (
                     <div className={`rounded-xl border ${borderColor} overflow-hidden`}>
                       <table className="w-full table-fixed text-xs">
                         <thead>
                           <tr className={headerBg}>
-                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase`}>Professeur</th>
+                            <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase`}>Personnel</th>
                             <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[18%]`}>Mois</th>
                             <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[22%]`}>Montant</th>
                             <th className={`px-2 py-2 text-left font-semibold ${textSecondary} uppercase w-[20%]`}>Date</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${borderColor}`}>
-                          {filteredTeacherPayments.map((tp) => (
-                            <tr key={tp.id} className={`${hoverRow} transition-colors`}>
+                          {filteredSalaryPayments.map((tp) => (
+                            <tr key={`${tp.kind}-${tp.id}`} className={`${hoverRow} transition-colors`}>
                               <td className={`px-2 py-2 ${textColor} min-w-0`}>
-                                <div className="font-medium truncate">{tp.teacherName}</div>
+                                <div className="font-medium truncate">{tp.payeeName}</div>
+                                <div className={`text-[10px] ${textSecondary} truncate`}>{tp.roleLabel}</div>
                                 <span className={`inline-flex mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                   tp.type === "SALAIRE" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                                   : tp.type === "PRIME" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
@@ -975,7 +1040,7 @@ export default function AdminTreasuryPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className={headerBg}>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Professeur</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Personnel</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Type</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Mois</th>
                             <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
@@ -985,10 +1050,11 @@ export default function AdminTreasuryPage() {
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${borderColor}`}>
-                          {filteredTeacherPayments.map((tp) => (
-                            <tr key={tp.id} className={`${hoverRow} transition-colors`}>
+                          {filteredSalaryPayments.map((tp) => (
+                            <tr key={`${tp.kind}-${tp.id}`} className={`${hoverRow} transition-colors`}>
                               <td className={`px-4 py-3 ${textColor}`}>
-                                <div className="font-medium">{tp.teacherName}</div>
+                                <div className="font-medium">{tp.payeeName}</div>
+                                <div className={`text-xs ${textSecondary}`}>{tp.roleLabel}</div>
                                 {tp.specialty && <div className={`text-xs ${textSecondary}`}>{tp.specialty}</div>}
                               </td>
                               <td className="px-4 py-3">
