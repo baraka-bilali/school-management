@@ -840,7 +840,10 @@ function CreateTeacherModal({
 
   if (!mounted) return null
 
+  const canSubmit = form.lastName.trim().length > 0 && form.firstName.trim().length > 0
+
   const submit = async () => {
+    if (!canSubmit) return
     setSubmitting(true)
     try {
       const res = await authFetch("/api/admin/teachers", {
@@ -870,16 +873,20 @@ function CreateTeacherModal({
           </div>
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>
+              Nom <span className="text-red-500">*</span>
+            </label>
+            <input required className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Post-nom</label>
             <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: e.target.value })} />
           </div>
           <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom</label>
-            <input className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>
+              Prénom <span className="text-red-500">*</span>
+            </label>
+            <input required className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`} value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
           </div>
           <div>
             <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Sexe</label>
@@ -903,7 +910,7 @@ function CreateTeacherModal({
         </div>
         <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
           <button className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`} onClick={onClose}>Annuler</button>
-          <button disabled={submitting} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
+          <button disabled={submitting || !canSubmit} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
             {submitting ? "Création..." : "Créer"}
           </button>
         </div>
