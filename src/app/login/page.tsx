@@ -100,12 +100,6 @@ export default function LoginPage() {
 
 	const profileUpper = (value: string) => value.toUpperCase()
 
-	/** Champs dans modales à fond clair — texte toujours visible même en mode sombre système */
-	const lightFieldClass =
-		"text-gray-900 bg-white border-gray-300 placeholder:text-gray-400 dark:bg-white dark:text-gray-900 dark:border-gray-300 dark:placeholder:text-gray-400"
-	const profileFieldClass =
-		"text-gray-900 bg-white border-gray-300 placeholder:text-gray-400 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 dark:placeholder:text-gray-500"
-
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setForm({ ...form, [e.target.name]: e.target.value })
 	}
@@ -347,7 +341,7 @@ export default function LoginPage() {
 									<span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
 										<Mail className="w-4 h-4" />
 									</span>
-									<Input type="email" name="email" placeholder="vous@exemple.com" className="pl-10 dark:bg-gray-800 dark:border-gray-600" required value={form.email} onChange={handleChange} />
+									<Input type="email" name="email" placeholder="vous@exemple.com" className="pl-10" required value={form.email} onChange={handleChange} />
 								</div>
 							</div>
 							<div>
@@ -356,7 +350,7 @@ export default function LoginPage() {
 									<span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
 										<Lock className="w-4 h-4" />
 									</span>
-									<Input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" className="pl-10 pr-10 dark:bg-gray-800 dark:border-gray-600" required value={form.password} onChange={handleChange} />
+									<Input type={showPassword ? "text" : "password"} name="password" placeholder="••••••••" className="pl-10 pr-10" required value={form.password} onChange={handleChange} />
 									<button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setShowPassword((v) => !v)}>
 										{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 									</button>
@@ -499,10 +493,11 @@ export default function LoginPage() {
 									<label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe <span className="text-red-500">*</span></label>
 									<div className="relative">
 										<Input
+											lightSurface
 											type={showNewPassword ? "text" : "password"}
 											value={passwordForm.newPassword}
 											onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-											className={`w-full pr-10 ${lightFieldClass}`}
+											className="w-full pr-10"
 											placeholder="Au moins 6 caractères"
 											required
 											minLength={6}
@@ -516,10 +511,11 @@ export default function LoginPage() {
 									<label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe <span className="text-red-500">*</span></label>
 									<div className="relative">
 										<Input
+											lightSurface
 											type={showConfirmPassword ? "text" : "password"}
 											value={passwordForm.confirmPassword}
 											onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-											className={`w-full pr-10 ${lightFieldClass}`}
+											className="w-full pr-10"
 											placeholder="Retapez votre mot de passe"
 											required
 											minLength={6}
@@ -613,19 +609,21 @@ export default function LoginPage() {
 											Lieu de naissance
 										</label>
 										<Input
+											lightSurface
 											value={profileForm.birthPlace}
 											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: profileUpper(e.target.value) })}
 											placeholder="Ex : Kinshasa"
-											className={`uppercase ${profileFieldClass}`}
+											className="uppercase"
 										/>
 									</div>
 									<div>
 										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nationalité</label>
 										<Input
+											lightSurface
 											value={profileForm.nationality}
 											onChange={(e) => setProfileForm({ ...profileForm, nationality: profileUpper(e.target.value) })}
 											placeholder="Ex : Congolaise"
-											className={`uppercase ${profileFieldClass}`}
+											className="uppercase"
 										/>
 									</div>
 								</div>
@@ -635,10 +633,11 @@ export default function LoginPage() {
 										Adresse résidentielle
 									</label>
 									<Input
+										lightSurface
 										value={profileForm.address}
 										onChange={(e) => setProfileForm({ ...profileForm, address: profileUpper(e.target.value) })}
 										placeholder="Ex : Av. de l'Université, Commune de Lingwala"
-										className={`uppercase ${profileFieldClass}`}
+										className="uppercase"
 									/>
 								</div>
 
@@ -649,27 +648,29 @@ export default function LoginPage() {
 									</p>
 									<div className="space-y-3">
 										<Input
+											lightSurface
 											value={profileForm.parentName1}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName1: profileUpper(e.target.value) })}
 											placeholder="Nom complet du parent/tuteur"
-											className={`rounded-xl uppercase ${profileFieldClass}`}
+											className="rounded-xl uppercase"
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
 												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
 												<Input
+													lightSurface
 													value={profileForm.parentPhone1}
 													onChange={(e) => setProfileForm({ ...profileForm, parentPhone1: e.target.value })}
 													placeholder="Téléphone"
-													className={`pl-8 ${profileFieldClass}`}
+													className="pl-8"
 												/>
 											</div>
 											<Input
+												lightSurface
 												type="email"
 												value={profileForm.parentEmail1}
 												onChange={(e) => setProfileForm({ ...profileForm, parentEmail1: e.target.value })}
 												placeholder="Email (optionnel)"
-												className={profileFieldClass}
 											/>
 										</div>
 									</div>
@@ -682,27 +683,29 @@ export default function LoginPage() {
 									</p>
 									<div className="space-y-3">
 										<Input
+											lightSurface
 											value={profileForm.parentName2}
 											onChange={(e) => setProfileForm({ ...profileForm, parentName2: profileUpper(e.target.value) })}
 											placeholder="Nom complet"
-											className={`rounded-xl uppercase ${profileFieldClass}`}
+											className="rounded-xl uppercase"
 										/>
 										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 											<div className="relative">
 												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
 												<Input
+													lightSurface
 													value={profileForm.parentPhone2}
 													onChange={(e) => setProfileForm({ ...profileForm, parentPhone2: e.target.value })}
 													placeholder="Téléphone"
-													className={`pl-8 ${profileFieldClass}`}
+													className="pl-8"
 												/>
 											</div>
 											<Input
+												lightSurface
 												type="email"
 												value={profileForm.parentEmail2}
 												onChange={(e) => setProfileForm({ ...profileForm, parentEmail2: e.target.value })}
 												placeholder="Email (optionnel)"
-												className={profileFieldClass}
 											/>
 										</div>
 									</div>
@@ -715,18 +718,20 @@ export default function LoginPage() {
 									</p>
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 										<Input
+											lightSurface
 											value={profileForm.emergencyContact}
 											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: profileUpper(e.target.value) })}
 											placeholder="Nom du contact"
-											className={`uppercase ${profileFieldClass}`}
+											className="uppercase"
 										/>
 										<div className="relative">
 											<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
 											<Input
+												lightSurface
 												value={profileForm.emergencyPhone}
 												onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
 												placeholder="Numéro d'urgence"
-												className={`pl-8 ${profileFieldClass}`}
+												className="pl-8"
 											/>
 										</div>
 									</div>
@@ -742,7 +747,7 @@ export default function LoginPage() {
 										<select
 											value={profileForm.bloodGroup}
 											onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
-											className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+											className="field-on-light w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
 										>
 											<option value="">Je ne sais pas / Non renseigné</option>
 											{BLOOD_GROUPS.map((g) => (
@@ -753,19 +758,21 @@ export default function LoginPage() {
 									<div>
 										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Allergies connues</label>
 										<Input
+											lightSurface
 											value={profileForm.allergies}
 											onChange={(e) => setProfileForm({ ...profileForm, allergies: profileUpper(e.target.value) })}
 											placeholder="Ex : pénicilline, arachides..."
-											className={`rounded-xl uppercase ${profileFieldClass}`}
+											className="rounded-xl uppercase"
 										/>
 									</div>
 									<div>
 										<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Notes médicales</label>
 										<Input
+											lightSurface
 											value={profileForm.medicalNotes}
 											onChange={(e) => setProfileForm({ ...profileForm, medicalNotes: profileUpper(e.target.value) })}
 											placeholder="Informations importantes pour l'école"
-											className={`rounded-xl uppercase ${profileFieldClass}`}
+											className="rounded-xl uppercase"
 										/>
 									</div>
 								</div>

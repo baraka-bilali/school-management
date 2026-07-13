@@ -291,6 +291,20 @@ input:not(:-webkit-autofill) {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Champs à fond clair dans une UI sombre — texte toujours lisible (mobile + desktop) */
+.field-on-light {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+}
+
+.field-on-light::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
+}
+
 /* Disable autocomplete background */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -345,6 +359,31 @@ select:-webkit-autofill:focus {
   -webkit-text-fill-color: white !important;
   color: white !important;
   background-color: rgb(31 41 55) !important;
+}
+
+/* Champs fond clair : priorité sur les règles dark/autofill ci-dessus */
+.dark .field-on-light:-webkit-autofill,
+.dark .field-on-light:-webkit-autofill:hover,
+.dark .field-on-light:-webkit-autofill:focus,
+.dark .field-on-light:-webkit-autofill:active,
+.dark .field-on-light:-internal-autofill-selected {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  caret-color: #111827 !important;
+}
+
+.dark select.field-on-light {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+.dark select.field-on-light option {
+  background-color: #ffffff;
+  color: #111827;
 }
 
 /* Select styling for dark mode */
