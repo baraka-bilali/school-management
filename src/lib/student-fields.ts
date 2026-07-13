@@ -46,6 +46,23 @@ export function normalizeStudentProfile(input: {
   return out
 }
 
+/** Champs obligatoires pour la complétion du profil élève (première connexion). */
+export function isStudentProfileComplete(input: Record<string, unknown>): boolean {
+  const required = [
+    "birthPlace",
+    "nationality",
+    "address",
+    "parentName1",
+    "parentPhone1",
+    "emergencyContact",
+    "emergencyPhone",
+  ] as const
+  return required.every((key) => {
+    const value = input[key]
+    return typeof value === "string" && value.trim().length > 0
+  })
+}
+
 const CLASS_CODE_SEP = ":"
 
 export type ParsedStoredCode = {

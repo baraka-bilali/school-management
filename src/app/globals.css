@@ -296,13 +296,18 @@ input:not(:-webkit-autofill) {
   color-scheme: light !important;
   background-color: #ffffff !important;
   color: #111827 !important;
-  -webkit-text-fill-color: #111827 !important;
   caret-color: #111827 !important;
 }
 
 .field-on-light::placeholder {
   color: #9ca3af !important;
-  opacity: 1;
+  -webkit-text-fill-color: #9ca3af !important;
+  opacity: 1 !important;
+}
+
+.field-on-light:not(:placeholder-shown) {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 
 /* Disable autocomplete background */

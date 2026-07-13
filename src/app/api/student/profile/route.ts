@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
-import { normalizeStudentProfile } from "@/lib/student-fields"
+import { normalizeStudentProfile, isStudentProfileComplete } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -36,6 +36,16 @@ export async function PATCH(req: NextRequest) {
 
     if (!student) {
       return NextResponse.json({ error: "Élève introuvable" }, { status: 404 })
+    }
+
+    if (profileCompleted === true) {
+      const merged = { ...body, ...profile }
+      if (!isStudentProfileComplete(merged)) {
+        return NextResponse.json(
+          { error: "Veuillez remplir tous les champs obligatoires du profil" },
+          { status: 400 }
+        )
+      }
     }
 
     const updated = await prisma.student.update({

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
 import Portal from "@/components/portal"
 import { BLOOD_GROUPS } from "@/lib/blood-groups"
+import { isStudentProfileComplete } from "@/lib/student-fields"
 
 type ModalStep =
   | "none"
@@ -37,6 +38,54 @@ export default function LoginPage() {
 		const handler = (e: MediaQueryListEvent) => apply(e.matches)
 		mq.addEventListener("change", handler)
 		return () => mq.removeEventListener("change", handler)
+	}, [])
+
+	// Élève déjà connecté mais profil incomplet → forcer la complétion
+	useEffect(() => {
+		const resumeIncompleteProfile = async () => {
+			const token = localStorage.getItem("token")
+			if (!token) return
+			try {
+				const payload = JSON.parse(atob(token.split(".")[1]))
+				if (payload.role !== "ELEVE") return
+				const meRes = await fetch("/api/student/me", { credentials: "include" })
+				if (!meRes.ok) return
+				const meData = await meRes.json()
+				if (meData.student?.profileCompleted) return
+				setPendingRole("ELEVE")
+				setUserName(meData.student?.firstName || "")
+				setPendingStudentProfileCompleted(false)
+				setStudentReadOnly({
+					code: meData.student?.code || "",
+					lastName: meData.student?.lastName || "",
+					middleName: meData.student?.middleName || "",
+					firstName: meData.student?.firstName || "",
+					gender: meData.student?.gender || "",
+					birthDate: meData.student?.birthDate || "",
+					className: meData.student?.class || "",
+				})
+				setProfileForm({
+					birthPlace: meData.student?.birthPlace || "",
+					nationality: meData.student?.nationality || "",
+					address: meData.student?.address || "",
+					parentName1: meData.student?.parentName1 || "",
+					parentPhone1: meData.student?.parentPhone1 || "",
+					parentEmail1: meData.student?.parentEmail1 || "",
+					parentName2: meData.student?.parentName2 || "",
+					parentPhone2: meData.student?.parentPhone2 || "",
+					parentEmail2: meData.student?.parentEmail2 || "",
+					bloodGroup: meData.student?.bloodGroup || "",
+					allergies: meData.student?.allergies || "",
+					medicalNotes: meData.student?.medicalNotes || "",
+					emergencyContact: meData.student?.emergencyContact || "",
+					emergencyPhone: meData.student?.emergencyPhone || "",
+				})
+				setStep("profile_completion")
+			} catch {
+				/* ignore */
+			}
+		}
+		void resumeIncompleteProfile()
 	}, [])
 
 	// Animation de démarrage (une fois par session)
@@ -87,6 +136,7 @@ export default function LoginPage() {
 		emergencyPhone: "",
 	})
 	const [savingProfile, setSavingProfile] = useState(false)
+	const [profileError, setProfileError] = useState("")
 
 	// Read-only student info (admin-set fields) for profile completion display
 	const [studentReadOnly, setStudentReadOnly] = useState<{
@@ -289,6 +339,11 @@ export default function LoginPage() {
 
 	// Sauvegarder le profil étudiant
 	const handleSaveProfile = async () => {
+		setProfileError("")
+		if (!isStudentProfileComplete(profileForm)) {
+			setProfileError("Veuillez remplir tous les champs obligatoires marqués d'un astérisque (*).")
+			return
+		}
 		setSavingProfile(true)
 		try {
 			const res = await fetch("/api/student/profile", {
@@ -300,23 +355,17 @@ export default function LoginPage() {
 			if (res.ok) {
 				setStep("welcome")
 				setTimeout(() => router.push("/student"), 3500)
+			} else {
+				const data = await res.json().catch(() => ({}))
+				setProfileError(data.error || "Erreur lors de l'enregistrement du profil")
 			}
-		} catch {}
+		} catch {
+			setProfileError("Erreur réseau")
+		}
 		setSavingProfile(false)
 	}
 
-	const handleSkipProfile = async () => {
-		try {
-			await fetch("/api/student/profile", {
-				method: "PATCH",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-				body: JSON.stringify({ profileCompleted: true }),
-			})
-		} catch {}
-		setStep("welcome")
-		setTimeout(() => router.push("/student"), 3500)
-	}
+	const profileFormComplete = isStudentProfileComplete(profileForm)
 
 	return (
 		<>
@@ -606,7 +655,7 @@ export default function LoginPage() {
 									<div>
 										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
 											<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
-											Lieu de naissance
+											Lieu de naissance <span className="text-red-500">*</span>
 										</label>
 										<Input
 											lightSurface
@@ -617,7 +666,9 @@ export default function LoginPage() {
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nationalité</label>
+										<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+											Nationalité <span className="text-red-500">*</span>
+										</label>
 										<Input
 											lightSurface
 											value={profileForm.nationality}
@@ -630,7 +681,7 @@ export default function LoginPage() {
 								<div>
 									<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
 										<MapPin className="w-3.5 h-3.5 inline mr-1 text-gray-400" />
-										Adresse résidentielle
+										Adresse résidentielle <span className="text-red-500">*</span>
 									</label>
 									<Input
 										lightSurface
@@ -644,7 +695,7 @@ export default function LoginPage() {
 								<div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
 									<p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-1.5">
 										<User className="w-4 h-4 text-blue-500" />
-										Parent / Tuteur principal
+										Parent / Tuteur principal <span className="text-red-500">*</span>
 									</p>
 									<div className="space-y-3">
 										<Input
@@ -714,7 +765,7 @@ export default function LoginPage() {
 								<div className="pt-2 border-t border-gray-100 dark:border-gray-700/50">
 									<p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-1.5">
 										<Phone className="w-4 h-4 text-red-500" />
-										Contact d&apos;urgence
+										Contact d&apos;urgence <span className="text-red-500">*</span>
 									</p>
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 										<Input
@@ -777,17 +828,18 @@ export default function LoginPage() {
 									</div>
 								</div>
 							</div>
-							<div className="p-4 sm:p-6 border-t border-gray-100 dark:border-gray-700 flex flex-col-reverse sm:flex-row gap-3 shrink-0 bg-white dark:bg-gray-900">
-								<button
-									onClick={handleSkipProfile}
-									className="flex-none px-4 py-2.5 text-sm font-medium rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-								>
-									Plus tard
-								</button>
+							{profileError && (
+								<div className="px-4 sm:px-6 pb-0">
+									<p className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+										{profileError}
+									</p>
+								</div>
+							)}
+							<div className="p-4 sm:p-6 border-t border-gray-100 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-900">
 								<button
 									onClick={handleSaveProfile}
-									disabled={savingProfile}
-									className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/25"
+									disabled={savingProfile || !profileFormComplete}
+									className="flex w-full items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-indigo-500/25"
 								>
 									{savingProfile ? (
 										<span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -796,6 +848,9 @@ export default function LoginPage() {
 									)}
 									Enregistrer et continuer
 								</button>
+								<p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+									Complétez tous les champs obligatoires (*) pour accéder à votre espace.
+								</p>
 							</div>
 						</div>
 					</div>

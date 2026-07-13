@@ -19,7 +19,7 @@ interface StudentLayoutProps {
 export default function StudentLayout({ children }: StudentLayoutProps) {
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useStudentTheme()
-  const { student: me } = useStudentMe()
+  const { student: me, loading } = useStudentMe()
   const student = me
     ? {
         firstName: me.firstName,
@@ -45,6 +45,12 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     const saved = localStorage.getItem("student-sidebar-open")
     if (saved !== null) setSidebarExpanded(saved === "true")
   }, [])
+
+  useEffect(() => {
+    if (!loading && me && !me.profileCompleted) {
+      window.location.href = "/login"
+    }
+  }, [loading, me])
 
   const toggleSidebar = () => {
     setSidebarExpanded((prev) => {
