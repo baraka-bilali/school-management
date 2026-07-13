@@ -234,8 +234,13 @@ export default function LoginPage() {
 					return
 				}
 
-				// Admin avec mot de passe temporaire → forcer changement
+				// Mot de passe temporaire → changement obligatoire (personnel, prof, admin…)
 				if (data.temporaryPassword) {
+					const displayName =
+						data.user?.prenom ||
+						data.user?.nom ||
+						(data.user?.email ? data.user.email.split("@")[0] : "")
+					setUserName(displayName)
 					setStep("change_password")
 					return
 				}

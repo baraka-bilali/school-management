@@ -46,7 +46,7 @@ export async function POST(
 
     await prisma.user.update({
       where: { id: teacher.user!.id },
-      data: { password: hashed },
+      data: { password: hashed, temporaryPassword: true },
     })
 
     return NextResponse.json({

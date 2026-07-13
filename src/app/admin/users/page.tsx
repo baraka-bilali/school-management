@@ -194,8 +194,10 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
   const [selectedTeacherForReset, setSelectedTeacherForReset] = useState<any>(null)
   const [newTeacherPasswordGenerated, setNewTeacherPasswordGenerated] = useState("")
   const [resettingTeacherPassword, setResettingTeacherPassword] = useState(false)
+  const [teacherCredentialsMode, setTeacherCredentialsMode] = useState<"create" | "reset">("reset")
   const [teacherPasswordCopied, setTeacherPasswordCopied] = useState(false)
   const [teacherEmailCopied, setTeacherEmailCopied] = useState(false)
+  const [detailsTeacherId, setDetailsTeacherId] = useState<number | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -343,6 +345,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
 
   const handleResetTeacherPassword = (teacher: any) => {
     setSelectedTeacherForReset(teacher)
+    setTeacherCredentialsMode("reset")
     setShowTeacherResetModal(true)
     setNewTeacherPasswordGenerated("")
     setTeacherPasswordCopied(false)
@@ -378,6 +381,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
     setShowTeacherResetModal(false)
     setSelectedTeacherForReset(null)
     setNewTeacherPasswordGenerated("")
+    setTeacherCredentialsMode("reset")
     setTeacherPasswordCopied(false)
     setTeacherEmailCopied(false)
   }
@@ -579,9 +583,6 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                               })}}>
                                 <Pencil className="h-4 w-4" />
                               </button>
-                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); }}>
-                                <Eye className="h-4 w-4" />
-                              </button>
                               <button
                                 className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer relative group`}
                                 onClick={(e) => { e.stopPropagation(); handleResetTeacherPassword(t) }}
@@ -591,6 +592,9 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                                 <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
                                   Réinit. mot de passe
                                 </span>
+                              </button>
+                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); setDetailsTeacherId(detailsTeacherId === t.id ? null : t.id) }}>
+                                <Eye className="h-4 w-4" />
                               </button>
                             </>
                           )}
@@ -602,7 +606,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                       <td colSpan={9} className="px-3 py-0">
                         <div className={cn(
                           "overflow-hidden transition-all duration-300",
-                          editingId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+                          detailsTeacherId === t.id || editingId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                         )}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
                             <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{t.lastName}</div></div>
@@ -636,12 +640,17 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
           theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
-            setBanner({
+            setSelectedTeacherForReset({
+              lastName: payload.teacher.lastName,
+              middleName: payload.teacher.middleName,
+              firstName: payload.teacher.firstName,
+              specialty: payload.teacher.specialty,
               email: payload.email,
-              password: payload.plaintextPassword,
-              type: "success",
-              notificationType: "create",
             })
+            setNewTeacherPasswordGenerated(payload.plaintextPassword)
+            setTeacherCredentialsMode("create")
+            setTeacherPasswordCopied(false)
+            setTeacherEmailCopied(false)
             setLoading(true)
             setPagination((p) => ({ ...p }))
           }}
@@ -715,7 +724,9 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                     </div>
                     <div>
                       <h2 className={`text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Identifiants de Connexion</h2>
-                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>Mot de passe réinitialisé avec succès</p>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        {teacherCredentialsMode === "create" ? "Compte créé avec succès" : "Mot de passe réinitialisé avec succès"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -745,7 +756,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                     </div>
                   </div>
                   <div>
-                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}><KeyRound className="w-3.5 h-3.5" />Nouveau mot de passe</label>
+                    <label className={`block text-xs font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-700"} mb-2 flex items-center gap-1.5`}><KeyRound className="w-3.5 h-3.5" />{teacherCredentialsMode === "create" ? "Mot de passe temporaire" : "Nouveau mot de passe"}</label>
                     <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"} border-2 ${teacherPasswordCopied ? "border-green-500" : theme === "dark" ? "border-gray-600" : "border-gray-200"} rounded-lg p-3 flex items-center justify-between hover:border-orange-500 transition-all`}>
                       <span className={`font-mono text-lg font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"} select-all`}>{newTeacherPasswordGenerated}</span>
                       <button onClick={() => { navigator.clipboard?.writeText(newTeacherPasswordGenerated); setTeacherPasswordCopied(true); setTimeout(() => setTeacherPasswordCopied(false), 2000) }} className={`transition-colors p-1.5 rounded ${teacherPasswordCopied ? "text-green-500 bg-green-500/20" : "text-orange-500 hover:text-orange-400 hover:bg-orange-500/10"}`}>
@@ -778,7 +789,11 @@ function CreateTeacherModal({
 }: {
   open: boolean
   onClose: () => void
-  onCreated: (payload: { email: string; plaintextPassword: string }) => void
+  onCreated: (payload: {
+    email: string
+    plaintextPassword: string
+    teacher: { lastName: string; middleName: string; firstName: string; specialty: string | null }
+  }) => void
   theme?: "light" | "dark"
 }) {
   const [form, setForm] = useState({
@@ -835,7 +850,7 @@ function CreateTeacherModal({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
-      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword })
+      onCreated({ email: data.user.email, plaintextPassword: data.plaintextPassword, teacher: data.teacher })
     } catch (e) {
       alert((e as Error).message)
     } finally {

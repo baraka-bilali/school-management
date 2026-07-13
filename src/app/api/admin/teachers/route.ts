@@ -170,10 +170,13 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: {
         name: `${lastName} ${firstName}`,
+        nom: lastName,
+        prenom: firstName,
         email,
         password: hashedPassword,
         role: "PROFESSEUR",
         schoolId: adminSchoolId,
+        temporaryPassword: true,
       },
     })
 
