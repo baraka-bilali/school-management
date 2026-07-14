@@ -232,10 +232,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (monthlyStudents.length > 0 && studentsCount > monthlyStudents[monthlyStudents.length - 1]) {
-      monthlyStudents[monthlyStudents.length - 1] = studentsCount
-    }
-
     const calendarEvents: Array<{ date: string; label: string; type: "year" | "communique" }> = []
     if (anneeBounds.dateDebut) {
       calendarEvents.push({

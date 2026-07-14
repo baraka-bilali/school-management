@@ -15,12 +15,10 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import {
-  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  ComposedChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -284,13 +282,13 @@ export default function Dashboard() {
   )
 
   const enrollmentYMax = useMemo(() => {
-    const max = Math.max(...monthlySeries.map((d) => d.students), safeStats.students, 1)
+    const max = Math.max(...monthlySeries.map((d) => d.studentsNew), 1)
     if (max <= 10) return Math.max(max, 5)
     if (max <= 50) return Math.ceil(max / 5) * 5
     if (max <= 200) return Math.ceil(max / 20) * 20
     if (max <= 1000) return Math.ceil(max / 100) * 100
     return Math.ceil(max / 200) * 200
-  }, [monthlySeries, safeStats.students])
+  }, [monthlySeries])
 
   const sectionXMax = useMemo(() => {
     const max = Math.max(...sectionData.map((d) => d.value), 1)
@@ -367,7 +365,7 @@ export default function Dashboard() {
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des inscriptions</p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Barres = inscriptions du mois · Courbe = total cumulé
+                  Inscriptions par mois
                   {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
                 </p>
               </div>
@@ -375,7 +373,7 @@ export default function Dashboard() {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={monthlySeries}>
+                <BarChart data={monthlySeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
                   <YAxis
@@ -386,10 +384,7 @@ export default function Dashboard() {
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null
-                      const row = payload[0]?.payload as {
-                        students?: number
-                        studentsNew?: number
-                      }
+                      const row = payload[0]?.payload as { studentsNew?: number }
                       return (
                         <div
                           className={`rounded-xl border px-3 py-2 text-xs shadow-md ${
@@ -397,8 +392,7 @@ export default function Dashboard() {
                           }`}
                         >
                           <p className="font-semibold mb-1">Mois : {String(label ?? "")}</p>
-                          <p>Nouvelles inscriptions : <strong>{row.studentsNew ?? 0}</strong></p>
-                          <p>Total cumulé : <strong>{row.students ?? 0}</strong></p>
+                          <p>Inscriptions : <strong>{row.studentsNew ?? 0}</strong></p>
                         </div>
                       )
                     }}
@@ -406,22 +400,10 @@ export default function Dashboard() {
                   <Bar
                     dataKey="studentsNew"
                     fill={palette.students}
-                    fillOpacity={0.35}
                     radius={[4, 4, 0, 0]}
-                    name="Nouvelles inscriptions"
+                    name="Inscriptions"
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="students"
-                    stroke={palette.students}
-                    fill={palette.students}
-                    fillOpacity={0.12}
-                    strokeWidth={3}
-                    dot={false}
-                    activeDot={{ r: 5, fill: palette.students }}
-                    name="Total cumulé"
-                  />
-                </ComposedChart>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

@@ -255,8 +255,10 @@ export function formatAcademicYearOptionLabel(name: string, isCurrent: boolean):
 }
 
 /**
- * Mois scolaire (index 0 = sept.) où placer un événement hors bornes exactes.
- * Les pré-inscriptions sont comptées dès septembre via buildSchoolYearChartCumulative.
+ * Mois scolaire (index 0 = sept.) où placer une inscription sur le graphique.
+ * - Pendant l'année → mois calendaire réel (montée progressive)
+ * - Avant le début (pré-inscription) → septembre
+ * - Après la fin (été) → dernier mois affiché (juin)
  */
 export function schoolMonthChartIndex(
   date: Date,
@@ -265,6 +267,9 @@ export function schoolMonthChartIndex(
   schoolYearEnd: Date
 ): number {
   if (!schoolYearMonths.length) return 0
+
+  if (date < schoolYearStart) return 0
+  if (date > schoolYearEnd) return schoolYearMonths.length - 1
 
   const calYear = date.getFullYear()
   const calMonth = date.getMonth() + 1
@@ -281,42 +286,12 @@ export function schoolMonthChartIndex(
   })
   if (monthSlotIdx >= 0) return monthSlotIdx
 
-  if (date < schoolYearStart) return 0
-  if (date > schoolYearEnd) return schoolYearMonths.length - 1
   return 0
 }
 
-/** Cumul d'inscriptions / créations par mois scolaire. */
-export function buildSchoolYearChartCumulative(
-  dates: Date[],
-  schoolYearMonths: MoisScolaire[],
-  schoolYearStart: Date,
-  schoolYearEnd: Date
-): number[] {
-  const lastIdx = schoolYearMonths.length - 1
-  return schoolYearMonths.map((month, monthIdx) =>
-    dates.filter((d) => {
-      // Inscription pendant l'année scolaire → date réelle (montée progressive)
-      if (d >= schoolYearStart && d <= schoolYearEnd) {
-        return d <= month.dateFin
-      }
-      // Pré-inscription avant septembre → comptée dès le 1er mois scolaire (septembre)
-      if (d < schoolYearStart) {
-        return true
-      }
-      // Inscription après la fin officielle (ex. été) → incluse au dernier mois affiché (juin)
-      if (d > schoolYearEnd) {
-        return monthIdx >= lastIdx
-      }
-      return d <= month.dateFin
-    }).length
-  )
-}
-
 /**
- * Nouvelles inscriptions / créations par mois (date réelle).
- * Les pré-inscriptions avant septembre sont comptées sur le mois calendaire
- * d'inscription (ex. juin 2026 → colonne « Juin »), pas en septembre.
+ * Nouvelles inscriptions par mois (barres).
+ * Une seule règle pour toutes les années : placement via schoolMonthChartIndex.
  */
 export function buildSchoolYearChartMonthlyNew(
   dates: Date[],
@@ -324,23 +299,34 @@ export function buildSchoolYearChartMonthlyNew(
   schoolYearStart: Date,
   schoolYearEnd: Date
 ): number[] {
-  const lastIdx = schoolYearMonths.length - 1
-  return schoolYearMonths.map((month, monthIdx) => {
-    const [targetYear, targetMonth] = month.value.split("-").map(Number)
-    return dates.filter((d) => {
-      const calYear = d.getFullYear()
-      const calMonth = d.getMonth() + 1
-      if (d > schoolYearEnd) {
-        return monthIdx === lastIdx
-      }
-      if (d >= schoolYearStart && d <= schoolYearEnd) {
-        return calYear === targetYear && calMonth === targetMonth
-      }
-      if (d < schoolYearStart) {
-        return calMonth === targetMonth
-      }
-      return calYear === targetYear && calMonth === targetMonth
-    }).length
+  const counts = schoolYearMonths.map(() => 0)
+  for (const d of dates) {
+    const idx = schoolMonthChartIndex(d, schoolYearMonths, schoolYearStart, schoolYearEnd)
+    if (idx >= 0 && idx < counts.length) counts[idx]++
+  }
+  return counts
+}
+
+/**
+ * Cumul d'inscriptions par mois = somme progressive des barres.
+ * Garantit que la courbe reste cohérente avec les nouvelles inscriptions (pas de plateau artificiel).
+ */
+export function buildSchoolYearChartCumulative(
+  dates: Date[],
+  schoolYearMonths: MoisScolaire[],
+  schoolYearStart: Date,
+  schoolYearEnd: Date
+): number[] {
+  const monthly = buildSchoolYearChartMonthlyNew(
+    dates,
+    schoolYearMonths,
+    schoolYearStart,
+    schoolYearEnd
+  )
+  let sum = 0
+  return monthly.map((n) => {
+    sum += n
+    return sum
   })
 }
 
