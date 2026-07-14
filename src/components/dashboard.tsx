@@ -8,7 +8,6 @@ import {
   Activity,
   BarChart3,
   BookOpen,
-  CalendarDays,
   GraduationCap,
   PieChart as PieIcon,
   School,
@@ -485,27 +484,16 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-          <div className={`lg:col-span-2 ${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5`}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className={`text-sm font-semibold ${textColor}`}>Calendrier scolaire</p>
-                <p className={`text-xs ${textSecondary}`}>
-                  Dates clés et communiqués
-                  {safeStats.currentYearName ? ` · ${safeStats.currentYearName}` : ""}
-                </p>
-              </div>
-              <CalendarDays className={`w-4 h-4 ${textSecondary}`} />
-            </div>
-            <div className="h-64">
-              <DashboardEventCalendar
-                events={safeStats.calendarEvents ?? []}
-                theme={theme}
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6 items-start">
+          <div className={`lg:col-span-2 ${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5 overflow-hidden`}>
+            <DashboardEventCalendar
+              events={safeStats.calendarEvents ?? []}
+              theme={theme}
+              yearLabel={safeStats.currentYearName}
+            />
           </div>
 
-          <div className={`${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5`}>
+          <div className={`${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5 overflow-hidden`}>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Repartition genre</p>
@@ -536,8 +524,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className={`${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+          <div className={`${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5 overflow-hidden`}>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Niveau scolaire</p>
