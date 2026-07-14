@@ -131,6 +131,57 @@ export function getSchoolYearMonths(annee: AnneeScolaire): MoisScolaire[] {
   })
 }
 
+/**
+ * Période réelle d'inscription : mai → septembre (année de début).
+ * Ex. année 2026-2027 → Mai 2026 … Septembre 2026.
+ */
+export const ENROLLMENT_CAMPAIGN_MONTHS = [5, 6, 7, 8, 9] as const
+
+export function getEnrollmentCampaignMonths(annee: AnneeScolaire): MoisScolaire[] {
+  const parsed = parseSchoolYearLabel(annee.label)
+  const startYear = parsed?.startYear ?? annee.dateDebut.getFullYear()
+
+  return ENROLLMENT_CAMPAIGN_MONTHS.map((month) => {
+    const value = `${startYear}-${String(month).padStart(2, "0")}`
+    const dateDebut = new Date(startYear, month - 1, 1)
+    const dateFin = new Date(startYear, month, 0, 23, 59, 59, 999)
+    return {
+      value,
+      label: `${MONTH_NAMES_FR[month - 1]} ${startYear}`,
+      dateDebut,
+      dateFin,
+    }
+  })
+}
+
+/**
+ * Place une inscription sur un des 5 mois de campagne (mai→sept).
+ * - mois 5–9 → colonne correspondante (même si l'année calendaire diffère)
+ * - avant mai → Mai ; après septembre → Septembre
+ */
+export function enrollmentCampaignMonthIndex(date: Date, campaignMonths: MoisScolaire[]): number {
+  if (!campaignMonths.length) return 0
+  const last = campaignMonths.length - 1
+  const calMonth = date.getMonth() + 1
+  const slot = ENROLLMENT_CAMPAIGN_MONTHS.findIndex((m) => m === calMonth)
+  if (slot >= 0) return slot
+  if (date < campaignMonths[0].dateDebut) return 0
+  return last
+}
+
+/** Inscriptions par mois sur la campagne mai→septembre. */
+export function buildEnrollmentCampaignMonthlyNew(
+  dates: Date[],
+  campaignMonths: MoisScolaire[]
+): number[] {
+  const counts = campaignMonths.map(() => 0)
+  for (const d of dates) {
+    const idx = enrollmentCampaignMonthIndex(d, campaignMonths)
+    if (idx >= 0 && idx < counts.length) counts[idx]++
+  }
+  return counts
+}
+
 export function isMonthInSchoolYear(yyyyMM: string, annee: AnneeScolaire): boolean {
   return getSchoolYearMonths(annee).some((m) => m.value === yyyyMM)
 }

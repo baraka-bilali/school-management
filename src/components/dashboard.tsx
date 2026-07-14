@@ -15,10 +15,12 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -47,6 +49,7 @@ interface DashboardStatsResponse {
   classes: number
   attendance: string
   monthLabels?: string[]
+  enrollmentMonthLabels?: string[]
   monthlyStudents?: number[]
   monthlyStudentsNew?: number[]
   monthlyTeachers?: number[]
@@ -192,6 +195,7 @@ export default function Dashboard() {
     classes: 0,
     attendance: "--",
     monthLabels: [],
+    enrollmentMonthLabels: [],
     monthlyStudents: [],
     monthlyStudentsNew: [],
     monthlyTeachers: [],
@@ -229,32 +233,38 @@ export default function Dashboard() {
   // ✅ OPTIMISÉ - Calculs memoïzés (évite recalcul à chaque render)
   const monthlySeries = useMemo(() => {
     const labels = safeStats.monthLabels ?? []
-    const students = safeStats.monthlyStudents ?? []
-    const studentsNew = safeStats.monthlyStudentsNew ?? []
-    const teachers = safeStats.monthlyTeachers ?? []
-    const teachersNew = safeStats.monthlyTeachersNew ?? []
     const paymentsUsd = safeStats.monthlyPaymentsUsd ?? []
     const paymentsCdf = safeStats.monthlyPaymentsCdf ?? []
 
-    const max = Math.max(labels.length, students.length, teachers.length, paymentsUsd.length)
+    const max = Math.max(labels.length, paymentsUsd.length)
     return Array.from({ length: max }, (_, i) => ({
       month: labels[i] ?? `M${i + 1}`,
-      students: students[i] ?? 0,
-      studentsNew: studentsNew[i] ?? 0,
-      teachers: teachers[i] ?? 0,
-      teachersNew: teachersNew[i] ?? 0,
       paymentsUsd: paymentsUsd[i] ?? 0,
       paymentsCdf: paymentsCdf[i] ?? 0,
     }))
   }, [
     safeStats.monthLabels,
-    safeStats.monthlyStudents,
-    safeStats.monthlyStudentsNew,
-    safeStats.monthlyTeachers,
-    safeStats.monthlyTeachersNew,
     safeStats.monthlyPaymentsUsd,
     safeStats.monthlyPaymentsCdf,
   ])
+
+  const enrollmentSeries = useMemo(() => {
+    const labels = safeStats.enrollmentMonthLabels?.length
+      ? safeStats.enrollmentMonthLabels
+      : ["Mai", "Juin", "Juil.", "Août", "Sept."]
+    const studentsNew = safeStats.monthlyStudentsNew ?? []
+    const studentsCumul = safeStats.monthlyStudents ?? []
+    let running = 0
+    return labels.map((month, i) => {
+      const neu = studentsNew[i] ?? 0
+      running = studentsCumul[i] ?? running + neu
+      return {
+        month,
+        studentsNew: neu,
+        students: running,
+      }
+    })
+  }, [safeStats.enrollmentMonthLabels, safeStats.monthlyStudentsNew, safeStats.monthlyStudents])
 
   const genderData = useMemo(() => [
     { name: "Garcons", value: safeStats.genderStats?.male ?? 0, color: palette.male },
@@ -282,13 +292,16 @@ export default function Dashboard() {
   )
 
   const enrollmentYMax = useMemo(() => {
-    const max = Math.max(...monthlySeries.map((d) => d.studentsNew), 1)
+    const max = Math.max(
+      ...enrollmentSeries.map((d) => Math.max(d.studentsNew, d.students)),
+      1
+    )
     if (max <= 10) return Math.max(max, 5)
     if (max <= 50) return Math.ceil(max / 5) * 5
     if (max <= 200) return Math.ceil(max / 20) * 20
     if (max <= 1000) return Math.ceil(max / 100) * 100
     return Math.ceil(max / 200) * 200
-  }, [monthlySeries])
+  }, [enrollmentSeries])
 
   const sectionXMax = useMemo(() => {
     const max = Math.max(...sectionData.map((d) => d.value), 1)
@@ -365,7 +378,7 @@ export default function Dashboard() {
               <div>
                 <p className={`text-sm font-semibold ${textColor}`}>Evolution des inscriptions</p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Inscriptions par mois
+                  Barres = mois · Courbe = cumul · Mai → Septembre
                   {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
                 </p>
               </div>
@@ -373,7 +386,7 @@ export default function Dashboard() {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlySeries}>
+                <ComposedChart data={enrollmentSeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
                   <YAxis
@@ -384,7 +397,10 @@ export default function Dashboard() {
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null
-                      const row = payload[0]?.payload as { studentsNew?: number }
+                      const row = payload[0]?.payload as {
+                        studentsNew?: number
+                        students?: number
+                      }
                       return (
                         <div
                           className={`rounded-xl border px-3 py-2 text-xs shadow-md ${
@@ -392,7 +408,8 @@ export default function Dashboard() {
                           }`}
                         >
                           <p className="font-semibold mb-1">Mois : {String(label ?? "")}</p>
-                          <p>Inscriptions : <strong>{row.studentsNew ?? 0}</strong></p>
+                          <p>Inscriptions du mois : <strong>{row.studentsNew ?? 0}</strong></p>
+                          <p>Total cumulé : <strong>{row.students ?? 0}</strong></p>
                         </div>
                       )
                     }}
@@ -400,10 +417,22 @@ export default function Dashboard() {
                   <Bar
                     dataKey="studentsNew"
                     fill={palette.students}
+                    fillOpacity={0.35}
                     radius={[4, 4, 0, 0]}
-                    name="Inscriptions"
+                    name="Inscriptions du mois"
                   />
-                </BarChart>
+                  <Area
+                    type="monotone"
+                    dataKey="students"
+                    stroke={palette.students}
+                    fill={palette.students}
+                    fillOpacity={0.12}
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, fill: palette.students }}
+                    name="Total cumulé"
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>

@@ -6,9 +6,11 @@ import { ensureDefaultFeeType, getDefaultFeeTypeId } from "@/lib/fees/default-fe
 import { SECTION_ORDER } from "@/lib/class-sort"
 import {
   getSchoolYearMonths,
+  getEnrollmentCampaignMonths,
   schoolYearFromRecord,
   buildSchoolYearChartCumulative,
   buildSchoolYearChartMonthlyNew,
+  buildEnrollmentCampaignMonthlyNew,
 } from "@/lib/school-year-utils"
 
 function emptySectionStats(): Record<string, number> {
@@ -161,6 +163,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const monthLabels: string[] = []
+    const enrollmentMonthLabels: string[] = []
     const monthlyStudents: number[] = []
     const monthlyStudentsNew: number[] = []
     const monthlyTeachers: number[] = []
@@ -173,22 +176,24 @@ export async function GET(request: NextRequest) {
       .filter((t) => t.user)
       .map((t) => new Date(t.user!.createdAt))
 
-    monthlyStudents.push(
-      ...buildSchoolYearChartCumulative(
-        enrollmentDates,
-        schoolYearMonths,
-        anneeBounds.dateDebut,
-        anneeBounds.dateFin
-      )
-    )
+    const enrollmentCampaignMonths = getEnrollmentCampaignMonths(anneeBounds)
+
     monthlyStudentsNew.push(
-      ...buildSchoolYearChartMonthlyNew(
-        enrollmentDates,
-        schoolYearMonths,
-        anneeBounds.dateDebut,
-        anneeBounds.dateFin
-      )
+      ...buildEnrollmentCampaignMonthlyNew(enrollmentDates, enrollmentCampaignMonths)
     )
+    // Cumul aligné sur la campagne (utile côté API / rétrocompat)
+    let enrollmentCumul = 0
+    monthlyStudents.push(
+      ...monthlyStudentsNew.map((n) => {
+        enrollmentCumul += n
+        return enrollmentCumul
+      })
+    )
+
+    for (const month of enrollmentCampaignMonths) {
+      const shortName = month.dateDebut.toLocaleDateString("fr-FR", { month: "short" })
+      enrollmentMonthLabels.push(shortName.charAt(0).toUpperCase() + shortName.slice(1))
+    }
 
     monthlyTeachers.push(
       ...buildSchoolYearChartCumulative(
@@ -261,6 +266,7 @@ export async function GET(request: NextRequest) {
       classes: classesCount,
       attendance: "--",
       monthLabels,
+      enrollmentMonthLabels,
       monthlyStudents,
       monthlyStudentsNew,
       monthlyTeachers,
