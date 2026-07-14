@@ -293,6 +293,7 @@ export function buildSchoolYearChartCumulative(
   schoolYearStart: Date,
   schoolYearEnd: Date
 ): number[] {
+  const lastIdx = schoolYearMonths.length - 1
   return schoolYearMonths.map((month, monthIdx) =>
     dates.filter((d) => {
       // Inscription pendant l'année scolaire → date réelle (montée progressive)
@@ -302,6 +303,10 @@ export function buildSchoolYearChartCumulative(
       // Pré-inscription avant septembre → comptée dès le 1er mois scolaire (septembre)
       if (d < schoolYearStart) {
         return true
+      }
+      // Inscription après la fin officielle (ex. été) → incluse au dernier mois affiché (juin)
+      if (d > schoolYearEnd) {
+        return monthIdx >= lastIdx
       }
       return d <= month.dateFin
     }).length
@@ -319,11 +324,15 @@ export function buildSchoolYearChartMonthlyNew(
   schoolYearStart: Date,
   schoolYearEnd: Date
 ): number[] {
-  return schoolYearMonths.map((month) => {
+  const lastIdx = schoolYearMonths.length - 1
+  return schoolYearMonths.map((month, monthIdx) => {
     const [targetYear, targetMonth] = month.value.split("-").map(Number)
     return dates.filter((d) => {
       const calYear = d.getFullYear()
       const calMonth = d.getMonth() + 1
+      if (d > schoolYearEnd) {
+        return monthIdx === lastIdx
+      }
       if (d >= schoolYearStart && d <= schoolYearEnd) {
         return calYear === targetYear && calMonth === targetMonth
       }

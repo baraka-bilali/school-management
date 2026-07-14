@@ -8,6 +8,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  CalendarDays,
   GraduationCap,
   PieChart as PieIcon,
   School,
@@ -29,6 +30,7 @@ import {
   YAxis,
 } from "recharts"
 import DashboardSkeleton from "@/components/dashboard-skeleton"
+import DashboardEventCalendar from "@/components/dashboard-event-calendar"
 import { SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 
@@ -61,6 +63,7 @@ interface DashboardStatsResponse {
   sectionStats?: Record<string, number>
   currentYearId?: number | null
   currentYearName?: string | null
+  calendarEvents?: Array<{ date: string; label: string; type: "year" | "communique" }>
 }
 
 function formatUsd(value: number): string {
@@ -202,6 +205,7 @@ export default function Dashboard() {
     sectionStats: Object.fromEntries(SECTION_ORDER.map((s) => [s, 0])),
     currentYearId: null,
     currentYearName: null,
+    calendarEvents: [],
   }
 
   const palette = {
@@ -288,14 +292,6 @@ export default function Dashboard() {
     if (max <= 1000) return Math.ceil(max / 100) * 100
     return Math.ceil(max / 200) * 200
   }, [monthlySeries, safeStats.students])
-
-  const teachersYMax = useMemo(() => {
-    const max = Math.max(...monthlySeries.map((d) => d.teachers), safeStats.teachers, 1)
-    if (max <= 5) return 5
-    if (max <= 20) return Math.ceil(max / 5) * 5
-    if (max <= 50) return Math.ceil(max / 10) * 10
-    return Math.ceil(max / 20) * 20
-  }, [monthlySeries, safeStats.teachers])
 
   const sectionXMax = useMemo(() => {
     const max = Math.max(...sectionData.map((d) => d.value), 1)
@@ -493,64 +489,19 @@ export default function Dashboard() {
           <div className={`lg:col-span-2 ${bgCard} rounded-2xl shadow-sm border ${borderColor} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className={`text-sm font-semibold ${textColor}`}>Evolution des enseignants</p>
+                <p className={`text-sm font-semibold ${textColor}`}>Calendrier scolaire</p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Barres = nouveaux comptes du mois · Courbe = total cumulé
-                  {safeStats.currentYearName ? ` (${safeStats.currentYearName})` : ""}
+                  Dates clés et communiqués
+                  {safeStats.currentYearName ? ` · ${safeStats.currentYearName}` : ""}
                 </p>
               </div>
-              <Users className={`w-4 h-4 ${textSecondary}`} />
+              <CalendarDays className={`w-4 h-4 ${textSecondary}`} />
             </div>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={monthlySeries}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} />
-                  <YAxis
-                    stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
-                    allowDecimals={false}
-                    domain={[0, teachersYMax]}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null
-                      const row = payload[0]?.payload as {
-                        teachers?: number
-                        teachersNew?: number
-                      }
-                      return (
-                        <div
-                          className={`rounded-xl border px-3 py-2 text-xs shadow-md ${
-                            theme === "dark" ? "bg-gray-800 border-gray-600 text-gray-100" : "bg-white border-gray-200 text-gray-800"
-                          }`}
-                        >
-                          <p className="font-semibold mb-1">Mois : {String(label ?? "")}</p>
-                          <p>Nouveaux enseignants : <strong>{row.teachersNew ?? 0}</strong></p>
-                          <p>Total cumulé : <strong>{row.teachers ?? 0}</strong></p>
-                        </div>
-                      )
-                    }}
-                  />
-                  <Bar
-                    dataKey="teachersNew"
-                    fill={palette.teachers}
-                    fillOpacity={0.35}
-                    radius={[4, 4, 0, 0]}
-                    name="Nouveaux enseignants"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="teachers"
-                    stroke={palette.teachers}
-                    fill={palette.teachers}
-                    fillOpacity={0.12}
-                    strokeWidth={3}
-                    dot={false}
-                    activeDot={{ r: 5, fill: palette.teachers }}
-                    name="Total cumulé"
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <DashboardEventCalendar
+                events={safeStats.calendarEvents ?? []}
+                theme={theme}
+              />
             </div>
           </div>
 

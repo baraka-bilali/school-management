@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       paymentWhere.tarification = { typeFraisId: defaultFeeTypeId }
     }
 
-    const [allTeachers, allPayments] = await Promise.all([
+    const [allTeachers, allPayments, communiques] = await Promise.all([
       prisma.teacher.findMany({
         where: { user: { schoolId } },
         select: { user: { select: { createdAt: true } } },
@@ -148,6 +148,15 @@ export async function GET(request: NextRequest) {
           montant: true,
           tarification: { select: { devise: true } },
         },
+      }),
+      prisma.communique.findMany({
+        where: {
+          schoolId,
+          ...(currentYearIdResolved ? { yearId: currentYearIdResolved } : {}),
+        },
+        select: { id: true, title: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
       }),
     ])
 
@@ -223,6 +232,33 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    if (monthlyStudents.length > 0 && studentsCount > monthlyStudents[monthlyStudents.length - 1]) {
+      monthlyStudents[monthlyStudents.length - 1] = studentsCount
+    }
+
+    const calendarEvents: Array<{ date: string; label: string; type: "year" | "communique" }> = []
+    if (anneeBounds.dateDebut) {
+      calendarEvents.push({
+        date: anneeBounds.dateDebut.toISOString(),
+        label: "Début de l'année scolaire",
+        type: "year",
+      })
+    }
+    if (anneeBounds.dateFin) {
+      calendarEvents.push({
+        date: anneeBounds.dateFin.toISOString(),
+        label: "Fin de l'année scolaire",
+        type: "year",
+      })
+    }
+    for (const c of communiques) {
+      calendarEvents.push({
+        date: new Date(c.createdAt).toISOString(),
+        label: c.title,
+        type: "communique",
+      })
+    }
+
     return NextResponse.json({
       students: studentsCount,
       teachers: teachersCount,
@@ -239,6 +275,7 @@ export async function GET(request: NextRequest) {
       sectionStats,
       currentYearId: currentYearIdResolved,
       currentYearName,
+      calendarEvents,
     })
   } catch (error) {
     console.error("[ERROR] Dashboard stats:", error)
