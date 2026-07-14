@@ -167,10 +167,17 @@ export default function StaffWalletContent() {
       </section>
 
       {invoiceOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setInvoiceOpen(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
-            className={cn("max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border p-5 shadow-xl", card, border)}
-            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setInvoiceOpen(false)}
+          />
+          <div
+            className={cn(
+              "relative z-10 max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border p-5 shadow-2xl animate-scale-up",
+              card,
+              border
+            )}
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className={cn("text-lg font-bold", text)}>Facture de paiement</h3>
