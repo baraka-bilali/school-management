@@ -530,7 +530,8 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                             <>
                               <button 
                                 disabled={submitting}
-                                className={`transition-colors cursor-pointer relative group ${
+                                title={submitting ? "Enregistrement..." : "Valider"}
+                                className={`transition-colors cursor-pointer ${
                                   submitting 
                                     ? 'text-gray-400 cursor-not-allowed' 
                                     : 'text-green-600 hover:text-green-700'
@@ -545,13 +546,11 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                                 ) : (
                                   <Check className="h-4 w-4" />
                                 )}
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  {submitting ? 'Enregistrement...' : 'Valider'}
-                                </span>
                               </button>
                               <button 
                                 disabled={submitting}
-                                className={`transition-colors cursor-pointer relative group ${
+                                title="Annuler"
+                                className={`transition-colors cursor-pointer ${
                                   submitting
                                     ? 'text-gray-400 cursor-not-allowed'
                                     : 'text-red-600 hover:text-red-700'
@@ -565,35 +564,49 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                                 }}
                               >
                                 <X className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Annuler
-                                </span>
                               </button>
                             </>
                           ) : (
                             <>
-                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); setEditingId(t.id); setEditForm({
-                                lastName: t.lastName || "",
-                                middleName: t.middleName || "",
-                                firstName: t.firstName || "",
-                                gender: t.gender || "M",
-                                birthDate: t.birthDate ? t.birthDate.split('T')[0] : "",
-                                specialty: t.specialty || "",
-                                phone: t.phone || "",
-                              })}}>
+                              <button
+                                title="Modifier"
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDetailsTeacherId(null);
+                                  setEditingId(t.id);
+                                  setEditForm({
+                                    lastName: t.lastName || "",
+                                    middleName: t.middleName || "",
+                                    firstName: t.firstName || "",
+                                    gender: t.gender || "M",
+                                    birthDate: t.birthDate ? t.birthDate.split('T')[0] : "",
+                                    specialty: t.specialty || "",
+                                    phone: t.phone || "",
+                                  });
+                                }}
+                              >
                                 <Pencil className="h-4 w-4" />
                               </button>
                               <button
-                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer relative group`}
-                                onClick={(e) => { e.stopPropagation(); handleResetTeacherPassword(t) }}
-                                title="Réinitialiser le mot de passe"
+                                title="Réinitialiser mot de passe"
+                                className={`${textSecondary} hover:text-orange-500 transition-colors cursor-pointer`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResetTeacherPassword(t);
+                                }}
                               >
                                 <KeyRound className="h-4 w-4" />
-                                <span className={`absolute -top-7 left-1/2 transform -translate-x-1/2 ${theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-gray-800 text-white"} text-[11px] px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50`}>
-                                  Réinit. mot de passe
-                                </span>
                               </button>
-                              <button className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer relative group`} onClick={(e) => { e.stopPropagation(); setDetailsTeacherId(detailsTeacherId === t.id ? null : t.id) }}>
+                              <button
+                                title="Voir les détails"
+                                className={`${textSecondary} hover:text-indigo-600 transition-colors cursor-pointer`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingId(null);
+                                  setDetailsTeacherId(detailsTeacherId === t.id ? null : t.id);
+                                }}
+                              >
                                 <Eye className="h-4 w-4" />
                               </button>
                             </>
@@ -606,7 +619,7 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                       <td colSpan={9} className="px-3 py-0">
                         <div className={cn(
                           "overflow-hidden transition-all duration-300",
-                          detailsTeacherId === t.id || editingId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+                          detailsTeacherId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                         )}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
                             <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{t.lastName}</div></div>
