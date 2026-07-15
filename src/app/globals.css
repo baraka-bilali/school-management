@@ -582,4 +582,15 @@ select:-webkit-autofill:focus {
   animation-delay: 0.3s;
 }
 
+/* PWA — mode standalone (écran d'accueil) */
+@media (display-mode: standalone) {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top);
+    overscroll-behavior-y: none;
+  }
+}
 

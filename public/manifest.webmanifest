@@ -1,25 +1,59 @@
 {
+  "id": "/",
   "name": "Kelasi 360",
   "short_name": "Kelasi 360",
   "description": "Plateforme de gestion scolaire 360° pour les établissements en RDC",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#111827",
   "theme_color": "#4f46e5",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "lang": "fr",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "business"],
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "/icons/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icons/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icons/apple-touch-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Connexion",
+      "short_name": "Connexion",
+      "description": "Se connecter à Kelasi 360",
+      "url": "/login",
+      "icons": [{ "src": "/icons/favicon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Administration",
+      "short_name": "Admin",
+      "description": "Tableau de bord administrateur",
+      "url": "/admin",
+      "icons": [{ "src": "/icons/favicon.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

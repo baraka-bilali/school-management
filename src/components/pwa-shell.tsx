@@ -1,8 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Download, X, Bell, Smartphone } from "lucide-react"
-import { registerServiceWorker } from "@/lib/register-service-worker"
+import { Download, X, Bell, Smartphone, RefreshCw } from "lucide-react"
+import {
+  registerServiceWorker,
+  onServiceWorkerUpdate,
+  applyServiceWorkerUpdate,
+} from "@/lib/register-service-worker"
 import {
   getNotificationPermission,
   requestNotificationPermission,
@@ -33,11 +37,16 @@ export default function PwaShell() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showInstall, setShowInstall] = useState(false)
   const [showNotif, setShowNotif] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const [showUpdate, setShowUpdate] = useState(false)
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"
+  )
   const [iosHint, setIosHint] = useState(false)
+  const [installed, setInstalled] = useState(false)
 
   useEffect(() => {
-    registerServiceWorker()
+    setInstalled(isStandalone())
+    void registerServiceWorker()
 
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
     if (savedTheme) setTheme(savedTheme)
@@ -57,23 +66,27 @@ export default function PwaShell() {
     }
     window.addEventListener("beforeinstallprompt", onBeforeInstall)
 
+    const onDisplayMode = () => setInstalled(isStandalone())
+    window.matchMedia("(display-mode: standalone)").addEventListener("change", onDisplayMode)
+
     if (isIos() && !isStandalone() && !localStorage.getItem(INSTALL_DISMISSED_KEY)) {
       setIosHint(true)
       setShowInstall(true)
     }
 
+    const unsubUpdate = onServiceWorkerUpdate(() => setShowUpdate(true))
+
+    let notifTimer: ReturnType<typeof setTimeout> | undefined
     if (getNotificationPermission() === "default" && !localStorage.getItem(NOTIF_DISMISSED_KEY)) {
-      const t = setTimeout(() => setShowNotif(true), 2500)
-      return () => {
-        clearTimeout(t)
-        window.removeEventListener("themeChange", onTheme)
-        window.removeEventListener("beforeinstallprompt", onBeforeInstall)
-      }
+      notifTimer = setTimeout(() => setShowNotif(true), 2500)
     }
 
     return () => {
+      if (notifTimer) clearTimeout(notifTimer)
       window.removeEventListener("themeChange", onTheme)
       window.removeEventListener("beforeinstallprompt", onBeforeInstall)
+      window.matchMedia("(display-mode: standalone)").removeEventListener("change", onDisplayMode)
+      unsubUpdate()
     }
   }, [])
 
@@ -101,11 +114,50 @@ export default function PwaShell() {
   const card = isDark ? "bg-gray-800 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"
   const muted = isDark ? "text-gray-400" : "text-gray-600"
 
-  if (!showInstall && !showNotif) return null
+  if (!showInstall && !showNotif && !showUpdate) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[60] flex flex-col gap-3 sm:left-auto sm:right-4 sm:max-w-sm pointer-events-none">
-      {showInstall && (
+    <div
+      className={`fixed left-4 right-4 z-[60] flex flex-col gap-3 sm:left-auto sm:right-4 sm:max-w-sm pointer-events-none ${
+        installed ? "bottom-[max(1rem,env(safe-area-inset-bottom))]" : "bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4"
+      }`}
+    >
+      {showUpdate && (
+        <div className={`pointer-events-auto rounded-2xl border shadow-2xl p-4 ${card}`}>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center shrink-0">
+              <RefreshCw className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">Mise à jour disponible</p>
+              <p className={`text-xs mt-1 ${muted}`}>
+                Une nouvelle version de Kelasi 360 est prête. Actualisez pour en profiter.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => void applyServiceWorkerUpdate()}
+                  className="flex-1 rounded-lg bg-indigo-600 text-white text-xs font-medium py-2 px-3 hover:bg-indigo-700"
+                >
+                  Actualiser
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowUpdate(false)}
+                  className={`rounded-lg border px-3 py-2 text-xs ${isDark ? "border-gray-600" : "border-gray-300"}`}
+                >
+                  Plus tard
+                </button>
+              </div>
+            </div>
+            <button type="button" onClick={() => setShowUpdate(false)} className={muted}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showInstall && !installed && (
         <div className={`pointer-events-auto rounded-2xl border shadow-2xl p-4 ${card}`}>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center shrink-0">

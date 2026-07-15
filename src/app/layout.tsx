@@ -11,8 +11,12 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Kelasi 360",
+  },
+  applicationName: "Kelasi 360",
+  formatDetection: {
+    telephone: false,
   },
   icons: {
     icon: [
@@ -24,7 +28,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#4f46e5" },
+    { media: "(prefers-color-scheme: dark)", color: "#111827" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -47,6 +58,9 @@ export default function RootLayout({
         <link rel="icon" href="/icons/favicon.png" type="image/png" sizes="512x512" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="shortcut icon" href="/favicon.ico" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="bg-gray-50 dark:bg-gray-950 font-sans antialiased notranslate" suppressHydrationWarning>
         <ReactQueryProvider>
