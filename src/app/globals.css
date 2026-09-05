@@ -147,6 +147,16 @@
   }
 }
 
+/*
+ * Densité UI par défaut ≈ zoom navigateur 80 %.
+ * Desktop uniquement : sur mobile, on garde 100 % pour les zones tactiles.
+ */
+@media (min-width: 768px) {
+  html {
+    zoom: 0.8;
+  }
+}
+
 /* Custom animations */
 @keyframes fall {
   to {
