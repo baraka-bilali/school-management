@@ -253,14 +253,20 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
             {(role || userRole) !== "SUPER_ADMIN" && (
               <button
                 type="button"
-                onClick={openFeatureSearch}
-                className={`inline-flex items-center gap-2 rounded-lg p-2 transition-colors ${
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowFeatureSearch(true)
+                }}
+                className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-2 transition-colors ${
                   theme === "dark"
                     ? "hover:bg-gray-800 text-gray-300"
                     : "hover:bg-gray-100 text-gray-600"
                 }`}
                 title="Rechercher (Ctrl+K)"
                 aria-label="Rechercher une fonctionnalité"
+                aria-haspopup="dialog"
+                aria-expanded={showFeatureSearch}
               >
                 <Search className="w-5 h-5" />
                 <span
