@@ -51,6 +51,9 @@ export default function ClassesPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingClass, setDeletingClass] = useState<Class | null>(null)
+  const [deleteConfirmName, setDeleteConfirmName] = useState("")
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
   const [mountedDelete, setMountedDelete] = useState(false)
@@ -160,8 +163,25 @@ export default function ClassesPage() {
 
   const handleDelete = (cls: Class) => {
     setDeletingClass(cls)
+    setDeleteConfirmName("")
+    setDeleteAcknowledged(false)
+    setDeleteError(null)
     setShowDeleteModal(true)
   }
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false)
+    setDeletingClass(null)
+    setDeleteConfirmName("")
+    setDeleteAcknowledged(false)
+    setDeleteError(null)
+  }
+
+  const canConfirmDelete =
+    !!deletingClass &&
+    deleteConfirmName.trim() === deletingClass.name &&
+    deleteAcknowledged &&
+    !submitting
 
   const handleSubmit = async () => {
     const letterRequired = form.section !== "Maternelle" && !(form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))
@@ -203,7 +223,17 @@ export default function ClassesPage() {
   const confirmDelete = async () => {
     if (!deletingClass) return
 
+    if (deleteConfirmName.trim() !== deletingClass.name) {
+      setDeleteError("Le nom saisi ne correspond pas exactement à la classe.")
+      return
+    }
+    if (!deleteAcknowledged) {
+      setDeleteError("Vous devez cocher la case de confirmation.")
+      return
+    }
+
     setSubmitting(true)
+    setDeleteError(null)
     try {
       const response = await fetch(`/api/admin/classes/${deletingClass.id}`, {
         method: "DELETE"
@@ -214,11 +244,10 @@ export default function ClassesPage() {
         throw new Error(error.error || "Erreur")
       }
 
-      setShowDeleteModal(false)
-      setDeletingClass(null)
+      closeDeleteModal()
       fetchClasses()
     } catch (error) {
-      alert((error as Error).message)
+      setDeleteError((error as Error).message)
     } finally {
       setSubmitting(false)
     }
@@ -559,37 +588,102 @@ export default function ClassesPage() {
         {mountedDelete && (
           <Portal>
             <div className={cn(
-              "fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200",
+              "fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200",
               visibleDelete ? "opacity-100" : "opacity-0 pointer-events-none"
             )} aria-hidden={!visibleDelete}>
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDeleteModal(false)} />
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeDeleteModal} />
 
               <div className={cn(
                 "relative w-full max-w-md rounded-2xl shadow-2xl transform transition-all duration-200",
                 theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200",
                 visibleDelete ? "opacity-100 scale-100" : "opacity-0 scale-95"
               )} role="dialog" aria-modal="true">
-                <div className="p-4">
-                  <div className={`text-lg font-semibold mb-2 ${textColor}`}>Confirmer la suppression</div>
-                  <div className={`${textSecondary} mb-4`}>
-                    Êtes-vous sûr de vouloir supprimer la classe "{deletingClass?.name}" ?
-                    Cette action est irréversible.
+                <div className={`border-b px-4 py-3 ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <div className={`text-lg font-semibold ${textColor}`}>Confirmer la suppression</div>
+                </div>
+
+                <div className="space-y-4 p-4">
+                  <div className={`rounded-lg border px-3 py-2.5 text-sm ${
+                    theme === "dark"
+                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      : "border-red-200 bg-red-50 text-red-700"
+                  }`}>
+                    Action irréversible. La classe{" "}
+                    <span className="font-semibold">« {deletingClass?.name} »</span>{" "}
+                    sera définitivement supprimée.
                   </div>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
-                      onClick={() => setShowDeleteModal(false)}
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      disabled={submitting}
-                      className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-60"
-                      onClick={confirmDelete}
-                    >
-                      {submitting ? "Suppression..." : "Supprimer"}
-                    </button>
+
+                  <div>
+                    <label className={`mb-1.5 block text-sm font-medium ${textColor}`}>
+                      Tapez le nom exact de la classe pour confirmer
+                    </label>
+                    <p className={`mb-2 text-xs ${textSecondary}`}>
+                      Saisissez : <span className={`font-mono font-semibold ${textColor}`}>{deletingClass?.name}</span>
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteConfirmName}
+                      onChange={(e) => {
+                        setDeleteConfirmName(e.target.value)
+                        setDeleteError(null)
+                      }}
+                      placeholder={deletingClass?.name || "Nom de la classe"}
+                      autoComplete="off"
+                      className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-red-500/40 ${
+                        theme === "dark"
+                          ? "border-gray-600 bg-gray-900 text-gray-100 placeholder:text-gray-500"
+                          : "border-gray-300 bg-white text-gray-900 placeholder:text-gray-400"
+                      }`}
+                    />
                   </div>
+
+                  <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${
+                    theme === "dark" ? "border-gray-700 bg-gray-900/40" : "border-gray-200 bg-gray-50"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={deleteAcknowledged}
+                      onChange={(e) => {
+                        setDeleteAcknowledged(e.target.checked)
+                        setDeleteError(null)
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-500 text-red-600 focus:ring-red-500"
+                    />
+                    <span className={textSecondary}>
+                      Je comprends que cette suppression est <strong className={textColor}>risquée</strong> et
+                      définitive, et j&apos;approuve la suppression de cette classe.
+                    </span>
+                  </label>
+
+                  {deleteError && (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                      {deleteError}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`flex items-center justify-end gap-2 border-t px-4 py-3 ${
+                  theme === "dark" ? "border-gray-700" : "border-gray-200"
+                }`}>
+                  <button
+                    type="button"
+                    className={`rounded-md border px-4 py-2 ${
+                      theme === "dark"
+                        ? "border-gray-600 text-gray-200 hover:bg-gray-700"
+                        : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={closeDeleteModal}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canConfirmDelete}
+                    className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={confirmDelete}
+                  >
+                    {submitting ? "Suppression..." : "Supprimer définitivement"}
+                  </button>
                 </div>
               </div>
             </div>
