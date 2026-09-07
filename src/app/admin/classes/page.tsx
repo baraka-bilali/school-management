@@ -1,9 +1,10 @@
 "use client"
 
 import { Fragment, useEffect, useState } from "react"
+import Link from "next/link"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Eye } from "lucide-react"
 import Portal from "@/components/portal"
 import { cn } from "@/lib/utils"
 import { TableLoadingRow } from "@/components/ui/table-loading"
@@ -351,7 +352,14 @@ export default function ClassesPage() {
                               </tr>
                               {sectionClasses.map((cls) => (
                                 <tr key={cls.id} className={hoverBg}>
-                                  <td className={`px-3 py-2 font-medium ${textColor}`}>{cls.name}</td>
+                                  <td className={`px-3 py-2 font-medium ${textColor}`}>
+                                    <Link
+                                      href={`/admin/classes/${cls.id}`}
+                                      className="text-indigo-500 hover:text-indigo-400 hover:underline underline-offset-2"
+                                    >
+                                      {cls.name}
+                                    </Link>
+                                  </td>
                                   <td className={`px-3 py-2 ${textColor}`}>{cls.level}</td>
                                   <td className={`px-3 py-2 ${textColor}`}>{cls.section}</td>
                                   <td className={`px-3 py-2 ${textColor}`}>{cls.letter || "—"}</td>
@@ -359,6 +367,14 @@ export default function ClassesPage() {
                                   <td className={`px-3 py-2 ${textColor}`}>{new Date(cls.createdAt).toLocaleDateString()}</td>
                                   <td className="px-3 py-2">
                                     <div className="flex items-center gap-3">
+                                      <Link
+                                        href={`/admin/classes/${cls.id}`}
+                                        className={`rounded-full p-2 ${textSecondary} hover:text-teal-500 ${theme === "dark" ? "hover:bg-teal-900/30" : "hover:bg-teal-50"} transition-colors`}
+                                        aria-label="Voir les élèves"
+                                        title="Voir les élèves"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Link>
                                       <button
                                         onClick={() => handleEdit(cls)}
                                         className={`rounded-full p-2 ${textSecondary} hover:text-indigo-600 ${theme === "dark" ? "hover:bg-indigo-900/30" : "hover:bg-indigo-50"} transition-colors`}
