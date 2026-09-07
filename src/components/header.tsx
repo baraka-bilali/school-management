@@ -451,6 +451,14 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
           </div>
         </Portal>
       )}
+
+      <FeatureSearch
+        role={role || userRole}
+        canEnrollStudents={enrollPermission}
+        theme={theme}
+        open={showFeatureSearch}
+        onOpenChange={setShowFeatureSearch}
+      />
     </>
   )
 }
