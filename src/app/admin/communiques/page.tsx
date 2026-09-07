@@ -13,10 +13,12 @@ import { formatAcademicYearOptionLabel } from "@/lib/school-year-utils"
 import {
   Megaphone, Send, Clock, Eye, ChevronRight, Loader2, Trash2, Pencil,
   Bold, Italic, UnderlineIcon, AlignLeft, AlignCenter, AlignRight,
-  List, ListOrdered, Undo, Redo, Type, Check, X, MoreVertical
+  List, ListOrdered, Undo, Redo, Type, Check, X, MoreVertical,
+  Paperclip, Upload, Users, GraduationCap, UserRound, Briefcase,
 } from "lucide-react"
 import Link from "next/link"
 import Portal from "@/components/portal"
+import { COMMUNIQUE_ATTACHMENT_MAX_BYTES } from "@/lib/communique-user-read"
 
 interface Communique {
   id: number
@@ -25,6 +27,51 @@ interface Communique {
   createdAt: string
   createdBy: { name: string; nom?: string; prenom?: string }
   _count: { reads: number }
+  targetStudents?: boolean
+  targetParents?: boolean
+  targetTeachers?: boolean
+  targetStaff?: boolean
+  attachmentName?: string | null
+  attachmentUrl?: string | null
+}
+
+type AudienceTargets = {
+  targetStudents: boolean
+  targetParents: boolean
+  targetTeachers: boolean
+  targetStaff: boolean
+}
+
+const AUDIENCE_OPTIONS: {
+  key: keyof AudienceTargets
+  label: string
+  icon: typeof Users
+}[] = [
+  { key: "targetStudents", label: "Tous les élèves", icon: GraduationCap },
+  { key: "targetParents", label: "Tous les parents", icon: Users },
+  { key: "targetTeachers", label: "Tous les enseignants", icon: UserRound },
+  { key: "targetStaff", label: "Tout le personnel", icon: Briefcase },
+]
+
+function audienceLabels(c: Communique): string[] {
+  const labels: string[] = []
+  if (c.targetStudents) labels.push("Élèves")
+  if (c.targetParents) labels.push("Parents")
+  if (c.targetTeachers) labels.push("Enseignants")
+  if (c.targetStaff) labels.push("Personnel")
+  return labels.length > 0 ? labels : ["Élèves"]
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error("Lecture impossible"))
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result)
+      else reject(new Error("Fichier vide"))
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 function formatDate(dateStr: string) {
@@ -123,8 +170,21 @@ export default function AdminCommuniquesPage() {
   const [editTitle, setEditTitle] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
   const [editStatus, setEditStatus] = useState<"idle" | "success" | "error">("idle")
+  const [targets, setTargets] = useState<AudienceTargets>({
+    targetStudents: true,
+    targetParents: false,
+    targetTeachers: false,
+    targetStaff: false,
+  })
+  const [attachment, setAttachment] = useState<{
+    name: string
+    mime: string
+    dataUrl: string
+  } | null>(null)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
 
   const [editorEmpty, setEditorEmpty] = useState(true)
+  const hasAudience = Object.values(targets).some(Boolean)
 
   const editor = useEditor({
     extensions: [
@@ -243,8 +303,28 @@ export default function AdminCommuniquesPage() {
 
   useEffect(() => { fetchCommuniques(1, false) }, [fetchCommuniques])
 
+  const handleAttachmentChange = async (file: File | null) => {
+    setAttachmentError(null)
+    if (!file) {
+      setAttachment(null)
+      return
+    }
+    if (file.size > COMMUNIQUE_ATTACHMENT_MAX_BYTES) {
+      setAttachment(null)
+      setAttachmentError("Le fichier ne doit pas dépasser 5 Mo.")
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      setAttachment({ name: file.name, mime: file.type || "application/octet-stream", dataUrl })
+    } catch {
+      setAttachment(null)
+      setAttachmentError("Impossible de lire ce fichier.")
+    }
+  }
+
   const handleSend = async () => {
-    if (!title.trim() || !editor || editorEmpty) return
+    if (!title.trim() || !editor || editorEmpty || !hasAudience) return
     setSending(true)
     setSendStatus("idle")
     try {
@@ -252,12 +332,27 @@ export default function AdminCommuniquesPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), content: editor.getHTML() }),
+        body: JSON.stringify({
+          title: title.trim(),
+          content: editor.getHTML(),
+          ...targets,
+          attachmentUrl: attachment?.dataUrl ?? null,
+          attachmentName: attachment?.name ?? null,
+          attachmentMime: attachment?.mime ?? null,
+        }),
       })
       if (res.ok) {
         setSendStatus("success")
         setTitle("")
         editor.commands.clearContent()
+        setAttachment(null)
+        setAttachmentError(null)
+        setTargets({
+          targetStudents: true,
+          targetParents: false,
+          targetTeachers: false,
+          targetStaff: false,
+        })
         await fetchCommuniques(1, false)
         setTimeout(() => setSendStatus("idle"), 3000)
       } else {
@@ -336,7 +431,9 @@ export default function AdminCommuniquesPage() {
                 </span>
               )}
             </div>
-            <p className={`text-xs ${textSecondary} mt-0.5`}>Messages visibles par les élèves inscrits sur l&apos;année active</p>
+            <p className={`text-xs ${textSecondary} mt-0.5`}>
+              Choisissez les destinataires — élèves, parents, enseignants ou personnel
+            </p>
           </div>
         </div>
 
@@ -359,6 +456,44 @@ export default function AdminCommuniquesPage() {
                   maxLength={200}
                 />
               </div>
+
+              <div>
+                <label className={`text-sm font-medium ${textSecondary} block mb-2`}>
+                  Destinataires <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {AUDIENCE_OPTIONS.map(({ key, label, icon: Icon }) => {
+                    const checked = targets[key]
+                    return (
+                      <label
+                        key={key}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                          checked
+                            ? theme === "dark"
+                              ? "border-indigo-500/50 bg-indigo-500/10"
+                              : "border-indigo-300 bg-indigo-50"
+                            : borderColor
+                        } ${theme === "dark" ? "hover:bg-gray-700/40" : "hover:bg-gray-50"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) =>
+                            setTargets((prev) => ({ ...prev, [key]: e.target.checked }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <Icon className={`w-4 h-4 shrink-0 ${checked ? "text-indigo-500" : textSecondary}`} />
+                        <span className={`text-sm ${textColor}`}>{label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {!hasAudience && (
+                  <p className="text-xs text-amber-500 mt-1.5">Sélectionnez au moins un destinataire.</p>
+                )}
+              </div>
+
               <div>
                 <label className={`text-sm font-medium ${textSecondary} block mb-1.5`}>Contenu <span className="text-red-500">*</span></label>
                 <div className={`border ${borderColor} rounded-xl overflow-hidden ${editorBg}`}>
@@ -366,6 +501,55 @@ export default function AdminCommuniquesPage() {
                   <EditorContent editor={editor} />
                 </div>
               </div>
+
+              <div>
+                <label className={`text-sm font-medium ${textSecondary} block mb-1.5`}>
+                  Pièce jointe <span className="font-normal opacity-70">(optionnelle)</span>
+                </label>
+                {attachment ? (
+                  <div
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${borderColor} ${
+                      theme === "dark" ? "bg-gray-700/40" : "bg-gray-50"
+                    }`}
+                  >
+                    <Paperclip className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span className={`text-sm truncate flex-1 ${textColor}`}>{attachment.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachment(null)
+                        setAttachmentError(null)
+                      }}
+                      className={`text-xs font-medium px-2 py-1 rounded-md ${
+                        theme === "dark" ? "hover:bg-gray-600 text-gray-300" : "hover:bg-gray-200 text-gray-600"
+                      }`}
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className={`flex flex-col items-center justify-center gap-2 px-4 py-6 rounded-xl border border-dashed cursor-pointer transition-colors ${
+                      theme === "dark"
+                        ? "border-gray-600 hover:border-indigo-500/50 hover:bg-indigo-500/5"
+                        : "border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/50"
+                    }`}
+                  >
+                    <Upload className={`w-6 h-6 ${textSecondary}`} />
+                    <span className={`text-sm font-medium ${textColor}`}>Joindre un fichier</span>
+                    <span className={`text-xs ${textSecondary}`}>PDF, Word, image… max 5 Mo</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => void handleAttachmentChange(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                )}
+                {attachmentError && (
+                  <p className="text-xs text-red-500 mt-1.5">{attachmentError}</p>
+                )}
+              </div>
+
               <div className="flex items-center justify-between pt-1">
                 <div>
                   {sendStatus === "success" && (
@@ -375,13 +559,13 @@ export default function AdminCommuniquesPage() {
                   )}
                   {sendStatus === "error" && (
                     <span className="flex items-center gap-1.5 text-sm text-red-500">
-                      <X className="w-4 h-4" /> Erreur lors de l'envoi
+                      <X className="w-4 h-4" /> Erreur lors de l&apos;envoi
                     </span>
                   )}
                 </div>
                 <button
                   onClick={handleSend}
-                  disabled={sending || !title.trim() || !editor || editorEmpty}
+                  disabled={sending || !title.trim() || !editor || editorEmpty || !hasAudience}
                   className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
                 >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -412,7 +596,7 @@ export default function AdminCommuniquesPage() {
                   className={`text-sm ${textSecondary} line-clamp-3 prose prose-sm dark:prose-invert max-w-none`}
                   dangerouslySetInnerHTML={{ __html: latest.content }}
                 />
-                <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
                   <span className={`flex items-center gap-1 text-xs ${textSecondary}`}>
                     <Clock className="w-3.5 h-3.5" />
                     {formatDate(latest.createdAt)}
@@ -421,6 +605,24 @@ export default function AdminCommuniquesPage() {
                     <Eye className="w-3.5 h-3.5" />
                     {latest._count.reads} lecture{latest._count.reads !== 1 ? "s" : ""}
                   </span>
+                  {audienceLabels(latest).map((label) => (
+                    <span
+                      key={label}
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+                        theme === "dark"
+                          ? "bg-indigo-500/15 text-indigo-300"
+                          : "bg-indigo-50 text-indigo-700"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                  {latest.attachmentName && (
+                    <span className={`inline-flex items-center gap-1 text-xs ${textSecondary}`}>
+                      <Paperclip className="w-3.5 h-3.5" />
+                      {latest.attachmentName}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -470,6 +672,26 @@ export default function AdminCommuniquesPage() {
                             <p className={`font-medium text-sm truncate ${textColor}`}>
                               {c.title}
                             </p>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              {audienceLabels(c).map((label) => (
+                                <span
+                                  key={label}
+                                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+                                    theme === "dark"
+                                      ? "bg-indigo-500/15 text-indigo-300"
+                                      : "bg-indigo-50 text-indigo-700"
+                                  }`}
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                              {c.attachmentName && (
+                                <span className={`inline-flex items-center gap-0.5 text-[10px] ${textSecondary}`}>
+                                  <Paperclip className="w-3 h-3" />
+                                  Fichier
+                                </span>
+                              )}
+                            </div>
                             <span className={`flex items-center gap-1 text-xs mt-0.5 ${textSecondary}`}>
                               <Clock className="w-3 h-3 shrink-0" />
                               {formatDate(c.createdAt)}

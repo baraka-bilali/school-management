@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "20")
   const skip = (page - 1) * limit
 
-  const where = { schoolId, yearId }
+  const where = { schoolId, yearId, targetStudents: true }
 
   const [communiques, total] = await Promise.all([
     prisma.communique.findMany({

@@ -3,8 +3,10 @@ import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import {
+  communiqueAudienceFilter,
   communiqueYearFilter,
   getUserReadCommuniqueIds,
+  mergeCommuniqueWhere,
 } from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
@@ -20,7 +22,10 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "20")
   const skip = (page - 1) * limit
 
-  const where = communiqueYearFilter(ctx.schoolId, yearId)
+  const where = mergeCommuniqueWhere(
+    communiqueYearFilter(ctx.schoolId, yearId),
+    communiqueAudienceFilter("teachers")
+  )
   const readIds = await getUserReadCommuniqueIds(ctx.userId)
 
   const [communiques, total] = await Promise.all([

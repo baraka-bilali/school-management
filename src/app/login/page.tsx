@@ -180,6 +180,9 @@ export default function LoginPage() {
 			case "PROFESSEUR":
 				router.push("/teacher")
 				break
+			case "PARENT":
+				router.push("/parent")
+				break
 			default:
 				router.push("/")
 		}

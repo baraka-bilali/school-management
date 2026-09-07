@@ -21,6 +21,7 @@ export async function GET(
     where: {
       id: communiqueId,
       schoolId: ctx.schoolId,
+      targetStaff: true,
       ...(yearId ? { OR: [{ yearId }, { yearId: null }] } : {}),
     },
     include: {

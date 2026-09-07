@@ -49,6 +49,30 @@ export function communiqueYearFilter(schoolId: number, yearId: number | null): P
   }
 }
 
+export type CommuniqueAudience = "students" | "parents" | "teachers" | "staff"
+
+/** Filtre par destinataires sélectionnés à l'envoi */
+export function communiqueAudienceFilter(audience: CommuniqueAudience): Prisma.CommuniqueWhereInput {
+  switch (audience) {
+    case "students":
+      return { targetStudents: true }
+    case "parents":
+      return { targetParents: true }
+    case "teachers":
+      return { targetTeachers: true }
+    case "staff":
+      return { targetStaff: true }
+  }
+}
+
+export function mergeCommuniqueWhere(
+  ...parts: Prisma.CommuniqueWhereInput[]
+): Prisma.CommuniqueWhereInput {
+  return { AND: parts }
+}
+
+export const COMMUNIQUE_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024
+
 export const COMMUNIQUE_NOTIF_PREFIX = "COMMUNIQUE:"
 export function communiqueNotificationMessage(title: string, communiqueId: number) {
   return `${COMMUNIQUE_NOTIF_PREFIX}${communiqueId}|Nouveau communiqué : ${title}`

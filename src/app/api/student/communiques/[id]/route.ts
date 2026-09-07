@@ -39,7 +39,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const communique = await prisma.communique.findFirst({
-    where: { id: communiqueId, schoolId: schoolId ?? undefined, yearId },
+    where: {
+      id: communiqueId,
+      schoolId: schoolId ?? undefined,
+      yearId,
+      targetStudents: true,
+    },
     include: {
       createdBy: { select: { name: true, nom: true, prenom: true } },
     },

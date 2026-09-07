@@ -15,6 +15,28 @@ async function verifyToken(token: string) {
   }
 }
 
+function redirectForRole(req: NextRequest, role: string) {
+  const url = req.nextUrl.clone()
+  if (role === "SUPER_ADMIN") {
+    url.pathname = "/super-admin"
+  } else if (role === "ELEVE") {
+    url.pathname = "/student"
+  } else if (role === "PROFESSEUR") {
+    url.pathname = "/teacher"
+  } else if (role === "PARENT") {
+    url.pathname = "/parent"
+  } else if (role === "CAISSIER") {
+    url.pathname = "/admin/fees"
+  } else if (isStaffPortalRole(role)) {
+    url.pathname = "/staff"
+  } else if (role === "ADMIN") {
+    url.pathname = "/admin"
+  } else {
+    url.pathname = "/login"
+  }
+  return NextResponse.redirect(url)
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const token = req.cookies.get("token")?.value
@@ -27,6 +49,7 @@ export async function middleware(req: NextRequest) {
   const isStudentArea = pathname.startsWith("/student")
   const isTeacherArea = pathname.startsWith("/teacher")
   const isStaffArea = pathname.startsWith("/staff")
+  const isParentArea = pathname.startsWith("/parent")
   const isGeneralLogin = pathname === "/login"
   const isRegister = pathname === "/register"
 
@@ -107,19 +130,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url)
     }
     if (role !== "ELEVE") {
-      const url = req.nextUrl.clone()
-      if (role === "SUPER_ADMIN") {
-        url.pathname = "/super-admin"
-      } else if (role === "PROFESSEUR") {
-        url.pathname = "/teacher"
-      } else if (isStaffPortalRole(role)) {
-        url.pathname = role === "CAISSIER" ? "/admin/fees" : "/staff"
-      } else if (adminAllowed.has(role) || role === "ADMIN") {
-        url.pathname = "/admin"
-      } else {
-        url.pathname = "/login"
-      }
-      return NextResponse.redirect(url)
+      return redirectForRole(req, role)
     }
   }
 
@@ -131,19 +142,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url)
     }
     if (role !== "PROFESSEUR") {
-      const url = req.nextUrl.clone()
-      if (role === "SUPER_ADMIN") {
-        url.pathname = "/super-admin"
-      } else if (role === "ELEVE") {
-        url.pathname = "/student"
-      } else if (isStaffPortalRole(role)) {
-        url.pathname = role === "CAISSIER" ? "/admin/fees" : "/staff"
-      } else if (adminAllowed.has(role) || role === "ADMIN") {
-        url.pathname = "/admin"
-      } else {
-        url.pathname = "/login"
-      }
-      return NextResponse.redirect(url)
+      return redirectForRole(req, role)
     }
   }
 
@@ -155,38 +154,56 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(url)
     }
     if (!isStaffPortalRole(role)) {
+      return redirectForRole(req, role)
+    }
+  }
+
+  // Parent space protection
+  if (isParentArea) {
+    if (!role) {
       const url = req.nextUrl.clone()
-      if (role === "SUPER_ADMIN") {
-        url.pathname = "/super-admin"
-      } else if (role === "ELEVE") {
-        url.pathname = "/student"
-      } else if (role === "PROFESSEUR") {
-        url.pathname = "/teacher"
-      } else if (role === "ADMIN") {
-        url.pathname = "/admin"
-      } else {
-        url.pathname = "/login"
-      }
+      url.pathname = "/login"
       return NextResponse.redirect(url)
+    }
+    if (role !== "PARENT") {
+      return redirectForRole(req, role)
     }
   }
 
   // General login: if already logged in, push to respective area
   if (isGeneralLogin && role) {
-    const url = req.nextUrl.clone()
     if (role === "SUPER_ADMIN") {
+      const url = req.nextUrl.clone()
       url.pathname = "/super-admin"
-    } else if (role === "ELEVE") {
-      url.pathname = "/student"
-    } else if (role === "PROFESSEUR") {
-      url.pathname = "/teacher"
-    } else if (role === "CAISSIER") {
-      url.pathname = "/admin/fees"
-    } else if (isStaffPortalRole(role)) {
-      url.pathname = "/staff"
-    } else {
-      url.pathname = "/admin"
+      return NextResponse.redirect(url)
     }
+    if (role === "ELEVE") {
+      const url = req.nextUrl.clone()
+      url.pathname = "/student"
+      return NextResponse.redirect(url)
+    }
+    if (role === "PROFESSEUR") {
+      const url = req.nextUrl.clone()
+      url.pathname = "/teacher"
+      return NextResponse.redirect(url)
+    }
+    if (role === "PARENT") {
+      const url = req.nextUrl.clone()
+      url.pathname = "/parent"
+      return NextResponse.redirect(url)
+    }
+    if (role === "CAISSIER") {
+      const url = req.nextUrl.clone()
+      url.pathname = "/admin/fees"
+      return NextResponse.redirect(url)
+    }
+    if (isStaffPortalRole(role)) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/staff"
+      return NextResponse.redirect(url)
+    }
+    const url = req.nextUrl.clone()
+    url.pathname = "/admin"
     return NextResponse.redirect(url)
   }
 
@@ -200,6 +217,7 @@ export const config = {
     "/student/:path*",
     "/teacher/:path*",
     "/staff/:path*",
+    "/parent/:path*",
     "/login",
     "/super-admin/login",
     "/register",

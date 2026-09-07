@@ -28,6 +28,7 @@ model User {
   createdSchools    School[]  @relation("SchoolsCreated")
   student           Student?
   teacher           Teacher?
+  parent            Parent?
   school            School?   @relation("SchoolAdmins", fields: [schoolId], references: [id])
   subscriptionPayments SubscriptionPayment[] @relation("SubscriptionPayments")
   communiques          Communique[]           @relation("CommuniquesCreated")
@@ -111,6 +112,7 @@ model Student {
   enrollments    Enrollment[]
   paiements      Paiement[]
   communiqueReads CommuniqueRead[]
+  parentLinks    ParentStudent[]
   user           User         @relation(fields: [userId], references: [id])
 
   @@index([lastName])
@@ -137,6 +139,33 @@ model Teacher {
   @@index([lastName])
   @@index([specialty])
   @@index([lastName, firstName])
+}
+
+model Parent {
+  id         Int             @id @default(autoincrement())
+  userId     Int             @unique
+  lastName   String
+  firstName  String
+  middleName String?
+  phone      String?
+  user       User            @relation(fields: [userId], references: [id])
+  students   ParentStudent[]
+
+  @@index([lastName])
+  @@index([lastName, firstName])
+}
+
+model ParentStudent {
+  id           Int     @id @default(autoincrement())
+  parentId     Int
+  studentId    Int
+  relationship String?
+  parent       Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([parentId])
+  @@index([studentId])
 }
 
 model Enrollment {
@@ -462,6 +491,7 @@ enum User_role {
   COMPTABLE
   CAISSIER
   PROFESSEUR
+  PARENT
   DIRECTEUR_DISCIPLINE
   DIRECTEUR_ETUDES
   DIRECTEUR_ADJOINT
@@ -684,17 +714,24 @@ enum BreakType {
 // ============================================================
 
 model Communique {
-  id          Int           @id @default(autoincrement())
-  title       String
-  content     String        @db.Text
-  schoolId    Int
-  yearId      Int?
-  createdById Int
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  school      School        @relation(fields: [schoolId], references: [id])
-  year        AcademicYear? @relation(fields: [yearId], references: [id])
-  createdBy   User          @relation("CommuniquesCreated", fields: [createdById], references: [id])
+  id              Int           @id @default(autoincrement())
+  title           String
+  content         String        @db.Text
+  schoolId        Int
+  yearId          Int?
+  createdById     Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  targetStudents  Boolean       @default(true)
+  targetParents   Boolean       @default(false)
+  targetTeachers  Boolean       @default(false)
+  targetStaff     Boolean       @default(false)
+  attachmentUrl   String?       @db.Text
+  attachmentName  String?
+  attachmentMime  String?
+  school          School        @relation(fields: [schoolId], references: [id])
+  year            AcademicYear? @relation(fields: [yearId], references: [id])
+  createdBy       User          @relation("CommuniquesCreated", fields: [createdById], references: [id])
   reads           CommuniqueRead[]
   userReads       CommuniqueUserRead[]
 

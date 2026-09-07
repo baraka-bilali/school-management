@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { getStaffFromRequest } from "@/lib/staff-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
-import { communiqueYearFilter } from "@/lib/communique-user-read"
+import {
+  communiqueAudienceFilter,
+  communiqueYearFilter,
+  mergeCommuniqueWhere,
+} from "@/lib/communique-user-read"
 
 export async function GET(req: NextRequest) {
   const ctx = await getStaffFromRequest(req)
@@ -11,7 +15,10 @@ export async function GET(req: NextRequest) {
   }
 
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
-  const where = communiqueYearFilter(ctx.schoolId, yearId)
+  const where = mergeCommuniqueWhere(
+    communiqueYearFilter(ctx.schoolId, yearId),
+    communiqueAudienceFilter("staff")
+  )
 
   const unread = await prisma.communique.count({
     where: {

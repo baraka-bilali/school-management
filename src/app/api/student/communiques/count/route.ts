@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       where: {
         schoolId: decoded.schoolId,
         yearId,
+        targetStudents: true,
         reads: { none: { studentId: student.id } },
       },
     })
