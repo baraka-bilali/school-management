@@ -81,6 +81,8 @@ export default function Layout({ children }: LayoutProps) {
     }
   }, [])
 
+  const pathname = usePathname()
+
   // Fetch role + subscription status
   useEffect(() => {
     const fetchRole = async () => {
@@ -131,7 +133,20 @@ export default function Layout({ children }: LayoutProps) {
       } catch {}
     }
     fetchRole()
-  }, [])
+  }, [router])
+
+  // Abonnement expiré : seul Abonnement (+ paramètres) reste accessible
+  useEffect(() => {
+    if (!subscriptionExpired || !pathname) return
+    const allowed =
+      pathname === "/admin/subscription" ||
+      pathname.startsWith("/admin/subscription/") ||
+      pathname === "/admin/settings" ||
+      pathname.startsWith("/admin/settings/")
+    if (!allowed && pathname.startsWith("/admin")) {
+      router.replace("/admin/subscription")
+    }
+  }, [subscriptionExpired, pathname, router])
 
   // Supabase Realtime: listen for new communiqués for this school
   useEffect(() => {
@@ -187,6 +202,7 @@ export default function Layout({ children }: LayoutProps) {
         role={role}
         theme={theme}
         canEnrollStudents={canEnrollStudents}
+        subscriptionExpired={subscriptionExpired}
         onMore={toggleSidebar}
       />
     </div>

@@ -7,26 +7,16 @@ import { authFetch } from "@/lib/auth-fetch"
 import {
   CreditCard, Calendar, AlertCircle, CheckCircle, Clock,
   Mail, Phone, Receipt, FileText, ChevronLeft,
-  ChevronRight, Eye, MessageCircle, X, Building2, User, Timer, Layers
+  ChevronRight, Eye, X, Info
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
 import Portal from "@/components/portal"
 import SubscriptionSkeleton from "@/components/admin/subscription-skeleton"
 import {
   getSubscriptionPeriodMetrics,
+  isSubscriptionAccessBlocked,
   parseSubscriptionDate,
-  type SubscriptionPeriodMetrics,
-  type SubscriptionSegment,
 } from "@/lib/subscription-period"
-
-interface SubscriptionSummary {
-  cumulativeStart: string | null
-  cumulativeEnd: string | null
-  totalDays: number
-  subscriptionCount: number
-  segments: SubscriptionSegment[]
-  metrics: SubscriptionPeriodMetrics
-}
 
 interface School {
   id: number
@@ -54,113 +44,54 @@ interface SubscriptionPayment {
   createdAt: string
 }
 
-const CircularProgress = ({
+function OverviewRing({
   remainingPercent,
-  daysRemaining,
-  daysElapsed,
-  totalDays,
-  daysUntilStart,
-  phase,
+  blocked,
   theme,
 }: {
   remainingPercent: number
-  daysRemaining: number | null
-  daysElapsed: number
-  totalDays: number
-  daysUntilStart: number
-  phase: string
+  blocked: boolean
   theme: "light" | "dark"
-}) => {
-  const radius = 80
+}) {
+  const radius = 34
   const circumference = 2 * Math.PI * radius
-  const clamped = Math.min(100, Math.max(0, remainingPercent))
+  const clamped = blocked ? 0 : Math.min(100, Math.max(0, remainingPercent))
   const strokeDashoffset = circumference - (clamped / 100) * circumference
-
-  const getGradientColors = () => {
-    if (phase === "expired" || phase === "suspended" || (daysRemaining !== null && daysRemaining <= 0)) {
-      return { from: "#ef4444", to: "#dc2626" }
-    }
-    if (daysRemaining !== null && daysRemaining <= 7) {
-      return { from: "#ef4444", to: "#f97316" }
-    }
-    if (daysRemaining !== null && daysRemaining <= 15) {
-      return { from: "#f97316", to: "#ea580c" }
-    }
-    return { from: "#14b8a6", to: "#0d9488" }
-  }
-
-  const colors = getGradientColors()
-  const gradientId = `subscriptionRemaining-${theme}`
+  const stroke = blocked
+    ? "#ef4444"
+    : clamped <= 20
+      ? "#f97316"
+      : "#14b8a6"
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative inline-flex items-center justify-center">
-        <div
-          className={`absolute -top-1 -right-1 z-10 flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-md ${
-            theme === "dark" ? "border-gray-700 bg-gray-800" : "border-white bg-white"
-          } ${
-            daysRemaining !== null && daysRemaining <= 7
-              ? "text-red-500 animate-pulse"
-              : daysRemaining !== null && daysRemaining <= 15
-                ? "text-orange-500"
-                : "text-teal-500"
-          }`}
-        >
-          <Timer className="h-4 w-4" />
-        </div>
-        <svg width="200" height="200" className="transform -rotate-90" aria-hidden>
-          <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style={{ stopColor: colors.from, stopOpacity: 1 }} />
-              <stop offset="100%" style={{ stopColor: colors.to, stopOpacity: 1 }} />
-            </linearGradient>
-          </defs>
-          <circle cx="100" cy="100" r={radius} stroke={theme === "dark" ? "#374151" : "#e5e7eb"} strokeWidth="12" fill="none" />
-          <circle
-            cx="100" cy="100" r={radius}
-            stroke={`url(#${gradientId})`} strokeWidth="12" fill="none"
-            strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round" className="transition-all duration-1000 ease-out"
-            style={{ filter: "drop-shadow(0 0 8px rgba(20, 184, 166, 0.35))" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-          <div className="text-center">
-            {phase === "upcoming" && daysUntilStart > 0 ? (
-              <>
-                <div className="text-4xl font-bold text-teal-500">{totalDays}</div>
-                <div className={`text-sm font-medium mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                  jours au total
-                </div>
-                <div className={`text-xs mt-2 ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-                  début dans {daysUntilStart} j.
-                </div>
-              </>
-            ) : daysRemaining !== null && daysRemaining > 0 ? (
-              <>
-                <div className={`text-5xl font-bold tabular-nums ${daysRemaining <= 7 ? "text-red-500" : daysRemaining <= 15 ? "text-orange-500" : "text-teal-500"}`}>
-                  {daysRemaining}
-                </div>
-                <div className={`text-sm font-medium mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                  jours restants
-                </div>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
-                <div className="text-sm font-medium text-red-500">
-                  {phase === "suspended" ? "Résilié" : "Expiré"}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      {phase === "active" && totalDays > 0 && (
-        <p className={`text-xs ${theme === "dark" ? "text-gray-500" : "text-gray-500"}`}>
-          {daysElapsed} consommé{daysElapsed > 1 ? "s" : ""} · {daysRemaining ?? 0} restant{(daysRemaining ?? 0) > 1 ? "s" : ""} · {totalDays} j. total
-        </p>
-      )}
+    <div className="relative inline-flex h-[88px] w-[88px] items-center justify-center">
+      <svg width="88" height="88" className="absolute inset-0 -rotate-90" aria-hidden>
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          stroke={theme === "dark" ? "#374151" : "#e5e7eb"}
+          strokeWidth="7"
+          fill="none"
+        />
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          stroke={stroke}
+          strokeWidth="7"
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <Calendar
+        className={`relative h-7 w-7 ${
+          blocked ? "text-red-500" : theme === "dark" ? "text-gray-300" : "text-gray-600"
+        }`}
+      />
     </div>
   )
 }
@@ -182,7 +113,7 @@ function InvoicePrintModal({
   }
   const typePaiementLabel: Record<string, string> = {
     MOBILE_MONEY: "Mobile Money", VIREMENT: "Virement bancaire",
-    ESPECES: "Espèces", CARTE: "Carte bancaire",
+    ESPECES: "Espèces", CARTE: "Carte bancaire", OFFERT: "Offert",
   }
 
   const bg     = theme === "dark" ? "bg-[#1a1f2e]"    : "bg-white"
@@ -210,17 +141,14 @@ function InvoicePrintModal({
   return (
     <Portal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay flou — même pattern que le modal de déconnexion */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Carte du modal */}
       <div className={`relative ${bg} rounded-2xl border ${border} shadow-2xl w-full max-w-md flex flex-col animate-scale-up`}
         style={{ maxHeight: "88vh" }}>
 
-        {/* Header */}
         <div className={`p-5 border-b ${border} flex items-center justify-between flex-shrink-0`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-teal-500/20 rounded-lg">
@@ -246,16 +174,12 @@ function InvoicePrintModal({
           </div>
         </div>
 
-        {/* Contenu scrollable */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-          {/* Date */}
           <div className={`flex items-center justify-between text-sm border-b ${border} pb-3`}>
-            <span className={sub}>Date d'émission</span>
+            <span className={sub}>Date d&apos;émission</span>
             <span className={`font-semibold ${text}`}>{fmt(payment.createdAt)}</span>
           </div>
 
-          {/* Émetteur / Destinataire */}
           <div className="grid grid-cols-2 gap-3">
             <div className={`${rowBg} rounded-xl p-3`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1.5`}>Émetteur</p>
@@ -268,7 +192,6 @@ function InvoicePrintModal({
             </div>
           </div>
 
-          {/* Tableau */}
           <div className={`border ${border} rounded-xl overflow-hidden`}>
             <div className={`${rowBg} px-4 py-2 flex justify-between border-b ${border}`}>
               <span className={`text-[10px] font-bold uppercase tracking-wider ${sub}`}>Description</span>
@@ -296,7 +219,6 @@ function InvoicePrintModal({
             </div>
           </div>
 
-          {/* Mode paiement + Référence */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className={`text-[10px] font-bold uppercase tracking-wider ${sub} mb-1`}>Mode de paiement</p>
@@ -310,7 +232,6 @@ function InvoicePrintModal({
             )}
           </div>
 
-          {/* Notes */}
           {payment.notes && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1">Notes</p>
@@ -323,7 +244,6 @@ function InvoicePrintModal({
           </p>
         </div>
 
-        {/* Boutons */}
         <div className={`flex-shrink-0 flex gap-3 p-4 border-t ${border}`}>
           <InvoiceDownloadButton data={invoiceData} />
           <button
@@ -345,12 +265,10 @@ function InvoicePrintModal({
 
 export default function SubscriptionPage() {
   const [school, setSchool] = useState<School | null>(null)
-  const [subscriptionSummary, setSubscriptionSummary] = useState<SubscriptionSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [activeTab, setActiveTab] = useState<"overview" | "history">("overview")
 
-  // Payments journal
   const [payments, setPayments] = useState<SubscriptionPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -379,7 +297,7 @@ export default function SubscriptionPage() {
     }
   }, [])
 
-  useEffect(() => { fetchSchoolData() }, [])
+  useEffect(() => { void fetchSchoolData() }, [])
 
   useEffect(() => {
     const onFocus = () => { void fetchSchoolData() }
@@ -388,23 +306,15 @@ export default function SubscriptionPage() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === "history") fetchPayments(page)
+    if (activeTab === "history") void fetchPayments(page)
   }, [activeTab, page])
 
   const fetchSchoolData = async () => {
     try {
       setLoading(true)
-      const [schoolRes, summaryRes] = await Promise.all([
-        authFetch("/api/admin/school"),
-        authFetch("/api/admin/subscription/summary"),
-      ])
+      const schoolRes = await authFetch("/api/admin/school")
       const schoolData = await schoolRes.json()
       setSchool(schoolData.school)
-      if (summaryRes.ok) {
-        const summaryData = await summaryRes.json()
-        setSubscriptionSummary(summaryData)
-        setTotalPayments(summaryData.subscriptionCount ?? 0)
-      }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error)
     } finally {
@@ -427,39 +337,14 @@ export default function SubscriptionPage() {
     }
   }
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Non défini"
+  const formatDateShort = (dateString: string | null) => {
+    if (!dateString) return "—"
     const d = parseSubscriptionDate(dateString)
-    if (!d) return "Non défini"
-    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-  }
-
-  const formatMontant = (montant: number | null) => {
-    if (!montant) return "0"
-    return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(montant)
-  }
-
-  const getStatusInfo = (metrics: SubscriptionPeriodMetrics) => {
-    if (!school) return { label: "Inconnu", color: "gray", icon: AlertCircle, status: "INCONNU" }
-    const daysRemaining = metrics.daysRemaining
-
-    if (school.etatCompte === "ACTIF") {
-      if (metrics.phase === "upcoming") {
-        return { label: "À venir", color: "teal", icon: Clock, status: "A_VENIR" }
-      }
-      if (daysRemaining === null) return { label: "Actif", color: "teal", icon: CheckCircle, status: "ACTIF" }
-      if (daysRemaining <= 0) return { label: "Expiré", color: "red", icon: AlertCircle, status: "EXPIRÉ" }
-      if (daysRemaining <= 15) return { label: "Expire bientôt", color: "orange", icon: Clock, status: "EXPIRE_BIENTOT" }
-      return { label: "Actif", color: "teal", icon: CheckCircle, status: "ACTIF" }
-    }
-    if (school.etatCompte === "SUSPENDU") return { label: "Suspendu", color: "red", icon: AlertCircle, status: "SUSPENDU" }
-    if (school.etatCompte === "INACTIF") return { label: "Inactif", color: "gray", icon: AlertCircle, status: "INACTIF" }
-    return { label: school.etatCompte, color: "gray", icon: AlertCircle, status: school.etatCompte }
-  }
-
-  const periodeLabel: Record<string, string> = {
-    MENSUEL: "Mensuel", TRIMESTRIEL: "Trimestriel",
-    SEMESTRIEL: "Semestriel", ANNUEL: "Annuel",
+    if (!d) return "—"
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${y}-${m}-${day}`
   }
 
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -483,63 +368,57 @@ export default function SubscriptionPage() {
       <Layout>
         <div className="p-6">
           <div className="flex items-center justify-center py-32">
-            <p className={textColor}>Aucune donnée d'abonnement disponible</p>
+            <p className={textColor}>Aucune donnée d&apos;abonnement disponible</p>
           </div>
         </div>
       </Layout>
     )
   }
 
-  const fallbackMetrics = getSubscriptionPeriodMetrics(
+  const now = new Date(todayTick)
+  const metrics = getSubscriptionPeriodMetrics(
     school.dateDebutAbonnement,
     school.dateFinAbonnement,
     school.etatCompte,
-    new Date(todayTick)
+    now
   )
-  const periodMetrics = subscriptionSummary
-    ? getSubscriptionPeriodMetrics(
-        subscriptionSummary.cumulativeStart,
-        subscriptionSummary.cumulativeEnd,
-        school.etatCompte,
-        new Date(todayTick),
-        subscriptionSummary.totalDays
-      )
-    : fallbackMetrics
-  const cumulativeStart = subscriptionSummary?.cumulativeStart ?? school.dateDebutAbonnement
-  const cumulativeEnd = subscriptionSummary?.cumulativeEnd ?? school.dateFinAbonnement
-  const totalDaysCumulative = subscriptionSummary?.totalDays ?? periodMetrics.totalDays
-  const subscriptionCount = subscriptionSummary?.subscriptionCount ?? 1
-  const segments = subscriptionSummary?.segments ?? []
+  const blocked = isSubscriptionAccessBlocked(
+    school.dateFinAbonnement,
+    school.etatCompte,
+    now
+  )
 
-  const statusInfo = getStatusInfo(periodMetrics)
-  const StatusIcon = statusInfo.icon
-  const daysRemaining = periodMetrics.daysRemaining
-  const progressRemaining = periodMetrics.progressRemaining
-  const progressElapsed = periodMetrics.progressElapsed
+  const status = (() => {
+    if (school.etatCompte === "SUSPENDU" || blocked) {
+      return { label: school.etatCompte === "SUSPENDU" ? "Suspendu" : "Expiré", tone: "red" as const, icon: AlertCircle }
+    }
+    if (metrics.phase === "upcoming") {
+      return { label: "À venir", tone: "teal" as const, icon: Clock }
+    }
+    if (metrics.daysRemaining !== null && metrics.daysRemaining <= 7) {
+      return { label: "Expire bientôt", tone: "orange" as const, icon: Clock }
+    }
+    return { label: "Actif", tone: "green" as const, icon: CheckCircle }
+  })()
 
-  const statusColors = {
-    teal: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
-    orange: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-    red: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    gray: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400",
-  }
+  const StatusIcon = status.icon
+  const badgeClass =
+    status.tone === "green"
+      ? "bg-emerald-500/15 text-emerald-500"
+      : status.tone === "orange"
+        ? "bg-orange-500/15 text-orange-500"
+        : status.tone === "teal"
+          ? "bg-teal-500/15 text-teal-500"
+          : "bg-red-500/15 text-red-500"
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className={`text-2xl md:text-3xl font-bold ${textColor} mb-2`}>Abonnement</h1>
-            <p className={textSecondary}>Gérez votre abonnement et consultez les informations</p>
-          </div>
-          <span className={`px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 ${statusColors[statusInfo.color as keyof typeof statusColors]}`}>
-            <StatusIcon className="w-4 h-4" />
-            {statusInfo.label}
-          </span>
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <div>
+          <h1 className={`text-2xl md:text-3xl font-bold ${textColor} mb-1`}>Abonnement</h1>
+          <p className={textSecondary}>Consultez l&apos;état de votre accès Kelasi 360</p>
         </div>
 
-        {/* Tabs */}
         <div className={`flex gap-1 p-1 rounded-xl ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
           <button
             onClick={() => setActiveTab("overview")}
@@ -563,215 +442,106 @@ export default function SubscriptionPage() {
             <Receipt className="w-4 h-4 shrink-0" />
             <span className="sm:hidden">Paiements</span>
             <span className="hidden sm:inline">Journal des paiements</span>
-            {totalPayments > 0 && (
-              <span
-                className={`ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
-                  activeTab === "history"
-                    ? "bg-teal-500 text-white"
-                    : theme === "dark"
-                      ? "bg-gray-700 text-gray-300"
-                      : "bg-gray-200 text-gray-600"
-                }`}
-              >
+            {activeTab === "history" && totalPayments > 0 && (
+              <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-teal-500 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
                 {totalPayments}
               </span>
             )}
           </button>
         </div>
 
-        {/* TAB: Overview */}
         {activeTab === "overview" && (
           <>
-            {/* Carte principale */}
-            <Card theme={theme}>
-              <CardContent className="p-4 sm:p-6 lg:p-8">
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-                  <div className="flex-shrink-0">
-                    <CircularProgress
-                      remainingPercent={progressRemaining}
-                      daysRemaining={daysRemaining}
-                      daysElapsed={periodMetrics.daysElapsed}
-                      totalDays={totalDaysCumulative}
-                      daysUntilStart={periodMetrics.daysUntilStart}
-                      phase={periodMetrics.phase}
-                      theme={theme}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-6 w-full">
-                    <div>
-                      <p className={`${textSecondary} text-sm font-medium mb-1`}>Établissement</p>
-                      <h2 className={`${textColor} text-2xl font-bold`}>{school.nomEtablissement}</h2>
-                    </div>
-                    <div className="space-y-4">
-                      {/* Couverture totale cumulée */}
-                      <div className={`rounded-xl border p-4 ${theme === "dark" ? "bg-teal-900/10 border-teal-800/40" : "bg-teal-50/80 border-teal-200"}`}>
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Layers className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                            <p className={`text-xs font-semibold uppercase tracking-wide ${theme === "dark" ? "text-teal-300" : "text-teal-800"}`}>
-                              Couverture totale
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center rounded-full bg-teal-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
-                            {subscriptionCount} abonnement{subscriptionCount > 1 ? "s" : ""} · {totalDaysCumulative} jours
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-center">
-                          <div>
-                            <p className={`text-[10px] font-bold uppercase tracking-wider ${textSecondary} mb-1`}>Début global</p>
-                            <p className={`${textColor} text-base font-semibold`}>{formatDate(cumulativeStart)}</p>
-                          </div>
-                          <div className={`hidden sm:flex items-center justify-center ${textSecondary}`}>
-                            <span className="text-lg">→</span>
-                          </div>
-                          <div>
-                            <p className={`text-[10px] font-bold uppercase tracking-wider ${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-500" : textSecondary} mb-1`}>
-                              Expiration globale
-                            </p>
-                            <p className={`${daysRemaining !== null && daysRemaining <= 15 ? "text-orange-600 dark:text-orange-400" : textColor} text-base font-semibold`}>
-                              {formatDate(cumulativeEnd)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+            <div className={`rounded-2xl border ${borderColor} ${bgCard} overflow-hidden`}>
+              <div className={`flex items-center justify-between gap-3 px-5 py-4 border-b ${borderColor}`}>
+                <h2 className={`text-base sm:text-lg font-semibold truncate ${textColor}`}>
+                  {school.nomEtablissement}
+                </h2>
+                <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
+                  <StatusIcon className="h-3.5 w-3.5" />
+                  {status.label}
+                </span>
+              </div>
 
-                      {/* Détail par abonnement */}
-                      {segments.length > 0 && (
-                        <div className={`rounded-xl border p-4 ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-                          <p className={`text-xs font-semibold uppercase tracking-wide ${textSecondary} mb-3`}>
-                            Détail des périodes souscrites
-                          </p>
-                          <div className="space-y-2">
-                            {segments.map((seg) => (
-                              <div
-                                key={`${seg.index}-${seg.dateDebut}`}
-                                className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm ${
-                                  theme === "dark" ? "bg-gray-900/60" : "bg-white"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[11px] font-bold text-white">
-                                    {seg.index}
-                                  </span>
-                                  <span className={`font-medium ${textColor}`}>
-                                    Abonnement {seg.index}
-                                    {seg.plan ? ` · ${seg.plan}` : ""}
-                                  </span>
-                                </div>
-                                <span className={`tabular-nums ${textSecondary}`}>
-                                  {formatDate(seg.dateDebut)} → {formatDate(seg.dateFin)}
-                                </span>
-                                <span className="rounded-md bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-600 dark:text-teal-400">
-                                  {seg.days} j.
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {daysRemaining !== null && daysRemaining <= 30 && (
-                      <div className={`flex items-start gap-3 p-4 rounded-lg border ${
-                        theme === "dark" ? "bg-blue-900/20 border-blue-700" : "bg-blue-50 border-blue-200"
-                      }`}>
-                        <MessageCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className={`text-sm font-semibold ${theme === "dark" ? "text-blue-300" : "text-blue-800"}`}>
-                            Pour renouveler votre abonnement
-                          </p>
-                          <p className={`text-sm mt-1 ${theme === "dark" ? "text-blue-400" : "text-blue-700"}`}>
-                            Contactez l'équipe Kelasi 360 via email ou téléphone ci-dessous.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Clock className={`w-4 h-4 ${textSecondary}`} />
-                      <p className={`${textSecondary} text-sm font-medium`}>Progression vers l&apos;expiration</p>
-                    </div>
-                    <p className={`${textColor} text-sm font-semibold tabular-nums`}>{Math.round(progressElapsed)}%</p>
-                  </div>
-                  <div className={`h-2.5 w-full rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
-                    <div
-                      className={`h-full rounded-full transition-all duration-1000 ${
-                        school.etatCompte === "SUSPENDU" || periodMetrics.phase === "expired" || (daysRemaining !== null && daysRemaining <= 0)
-                          ? "bg-gradient-to-r from-red-500 to-red-600"
-                          : daysRemaining !== null && daysRemaining <= 7
-                            ? "bg-gradient-to-r from-red-500 to-orange-500"
-                            : daysRemaining !== null && daysRemaining <= 15
-                              ? "bg-gradient-to-r from-orange-500 to-orange-600"
-                              : "bg-gradient-to-r from-teal-500 to-teal-600"
-                      }`}
-                      style={{ width: `${progressElapsed}%` }}
-                    />
-                  </div>
-                  <div className={`flex items-center justify-between mt-2 text-xs ${textSecondary}`}>
-                    <span>
-                      {periodMetrics.phase === "upcoming"
-                        ? `Début le ${formatDate(cumulativeStart)} · ${totalDaysCumulative} jours au total`
-                        : `${periodMetrics.daysElapsed} jour${periodMetrics.daysElapsed > 1 ? "s" : ""} consommé${periodMetrics.daysElapsed > 1 ? "s" : ""}`}
-                    </span>
-                    <span className="tabular-nums">
-                      {daysRemaining ?? 0} restant{(daysRemaining ?? 0) > 1 ? "s" : ""} / {totalDaysCumulative} j.
+              <div className="flex items-center gap-5 px-5 py-6">
+                <OverviewRing
+                  remainingPercent={metrics.progressRemaining}
+                  blocked={blocked}
+                  theme={theme}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className={`flex items-center gap-1.5 text-sm ${textSecondary}`}>
+                    <span>Date d&apos;expiration</span>
+                    <span title="L'accès reste ouvert jusqu'à la fin de cette journée inclusive.">
+                      <Info className="h-3.5 w-3.5 opacity-70" />
                     </span>
                   </div>
+                  <p className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${textColor}`}>
+                    {formatDateShort(school.dateFinAbonnement)}
+                  </p>
+                  {!blocked && metrics.daysRemaining !== null && (
+                    <p className={`mt-1 text-sm ${textSecondary}`}>
+                      {metrics.daysRemaining === 0
+                        ? "Expire aujourd'hui"
+                        : `${metrics.daysRemaining} jour${metrics.daysRemaining > 1 ? "s" : ""} restant${metrics.daysRemaining > 1 ? "s" : ""}`}
+                    </p>
+                  )}
+                  <a
+                    href="mailto:support@kelasi360.com?subject=Renouvellement%20abonnement%20Kelasi%20360"
+                    className="mt-2 inline-block text-sm font-medium text-indigo-500 hover:text-indigo-400 transition-colors"
+                  >
+                    Demander un renouvellement
+                  </a>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Informations de paiement */}
-            <Card theme={theme}>
-              <CardHeader>
-                <CardTitle>
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5" />
-                    Informations de paiement
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <p className={`${textSecondary} text-sm font-medium mb-2`}>Type de paiement</p>
-                    <div className={`p-3 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}>
-                      <p className={`${textColor} font-semibold`}>{school.typePaiement || "Non défini"}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className={`${textSecondary} text-sm font-medium mb-2`}>Montant du dernier paiement</p>
-                    <div className={`p-3 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}>
-                      <p className={`${textColor} text-2xl font-bold`}>
-                        {formatMontant(school.montantPaye)} <span className="text-lg font-normal">USD</span>
-                      </p>
-                    </div>
-                  </div>
+              <div className={`flex items-start justify-between gap-4 px-5 py-4 border-t ${borderColor} ${
+                theme === "dark" ? "bg-gray-900/40" : "bg-gray-50/80"
+              }`}>
+                <div>
+                  <p className={`text-sm font-medium ${textColor}`}>Renouvellement</p>
+                  <p className={`text-xs mt-0.5 ${textSecondary}`}>
+                    Activé uniquement par l&apos;équipe Kelasi 360 (super administrateurs).
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* Besoin d'aide */}
+            {blocked && (
+              <div className={`flex items-start gap-3 rounded-xl border p-4 ${
+                theme === "dark" ? "bg-red-950/30 border-red-800/50" : "bg-red-50 border-red-200"
+              }`}>
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className={`text-sm font-semibold ${theme === "dark" ? "text-red-300" : "text-red-800"}`}>
+                    Accès aux fonctionnalités suspendu
+                  </p>
+                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-red-400" : "text-red-700"}`}>
+                    Contactez Kelasi 360 pour réactiver votre abonnement. Les paramètres restent accessibles.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <Card theme={theme}>
               <CardHeader><CardTitle>Contacter Kelasi 360</CardTitle></CardHeader>
               <CardContent>
                 <p className={`${textSecondary} mb-6`}>
-                  Pour renouveler votre abonnement, signaler un problème ou toute autre question,
-                  contactez directement notre équipe.
+                  Pour renouveler ou toute question, contactez directement notre équipe.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <a
                     href="mailto:support@kelasi360.com"
-                    className="flex items-center justify-center gap-3 px-6 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    className="flex items-center justify-center gap-3 px-6 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-all font-semibold"
                   >
                     <Mail className="w-5 h-5" />
                     <span>Envoyer un email</span>
                   </a>
                   <a
                     href="tel:+243859628644"
-                    className="flex items-center justify-center gap-3 px-6 py-4 border-2 border-teal-600 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-all font-semibold"
+                    className={`flex items-center justify-center gap-3 px-6 py-4 border-2 border-teal-600 text-teal-600 dark:text-teal-400 rounded-lg transition-all font-semibold ${
+                      theme === "dark" ? "hover:bg-teal-900/20" : "hover:bg-teal-50"
+                    }`}
                   >
                     <Phone className="w-5 h-5" />
                     <span>Appeler le support</span>
@@ -789,7 +559,6 @@ export default function SubscriptionPage() {
           </>
         )}
 
-        {/* TAB: Journal des paiements */}
         {activeTab === "history" && (
           <Card theme={theme}>
             <CardHeader>
@@ -813,12 +582,11 @@ export default function SubscriptionPage() {
                   <FileText className={`w-12 h-12 ${textSecondary}`} />
                   <p className={textSecondary}>Aucun paiement enregistré.</p>
                   <p className={`text-sm ${textSecondary}`}>
-                    Les paiements enregistrés par l'administration apparaîtront ici.
+                    Les paiements enregistrés par l&apos;administration apparaîtront ici.
                   </p>
                 </div>
               ) : (
                 <>
-                  {/* Liste épurée : n° de facture + bouton Voir (détails dans le modal) */}
                   <ul className={`divide-y ${borderColor}`}>
                     {payments.map((p) => (
                       <li
@@ -842,7 +610,6 @@ export default function SubscriptionPage() {
                     ))}
                   </ul>
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className={`flex items-center justify-between px-6 py-4 border-t ${borderColor}`}>
                       <span className={`text-sm ${textSecondary}`}>Page {page} / {totalPages}</span>
@@ -871,7 +638,6 @@ export default function SubscriptionPage() {
         )}
       </div>
 
-      {/* Modal facture */}
       {selectedPayment && school && (
         <InvoicePrintModal
           payment={selectedPayment}

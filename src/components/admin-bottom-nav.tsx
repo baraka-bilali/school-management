@@ -25,6 +25,7 @@ interface AdminBottomNavProps {
   role: string | null
   theme: "light" | "dark"
   canEnrollStudents?: boolean
+  subscriptionExpired?: boolean
   onMore: () => void
 }
 
@@ -35,10 +36,13 @@ const ADMIN_ROLES = new Set([
   "DIRECTEUR_ETUDES",
 ])
 
+const LOCKED_ALLOWED_HREFS = new Set(["/admin/subscription", "/admin/settings"])
+
 export default function AdminBottomNav({
   role,
   theme,
   canEnrollStudents = false,
+  subscriptionExpired = false,
   onMore,
 }: AdminBottomNavProps) {
   const pathname = usePathname()
@@ -116,32 +120,43 @@ export default function AdminBottomNav({
         {items.map((item) => {
           const active = item.match ? item.match(pathname || "") : false
           const Icon = item.icon
+          const locked =
+            subscriptionExpired &&
+            item.action !== "more" &&
+            !!item.href &&
+            !LOCKED_ALLOWED_HREFS.has(item.href)
 
           const content = (
             <>
               <span
                 className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${
-                  active
-                    ? `text-white shadow-md shadow-indigo-600/30 ${isDark ? "bg-indigo-500" : "bg-indigo-600"}`
-                    : ""
+                  locked
+                    ? "opacity-40"
+                    : active
+                      ? `text-white shadow-md shadow-indigo-600/30 ${isDark ? "bg-indigo-500" : "bg-indigo-600"}`
+                      : ""
                 }`}
               >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.25 : 2} />
+                <Icon className="h-[18px] w-[18px]" strokeWidth={active && !locked ? 2.25 : 2} />
               </span>
-              <span className={`text-[10px] font-medium leading-none ${active ? "font-semibold" : ""}`}>
+              <span className={`text-[10px] font-medium leading-none ${active && !locked ? "font-semibold" : ""}`}>
                 {item.label}
               </span>
             </>
           )
 
           const baseClasses = `relative flex min-w-[3.75rem] flex-col items-center gap-1 rounded-2xl px-2 py-1 transition-colors ${
-            active
+            locked
               ? isDark
-                ? "text-indigo-400"
-                : "text-indigo-600"
-              : isDark
-                ? "text-gray-500 hover:text-gray-300"
-                : "text-gray-400 hover:text-gray-600"
+                ? "text-gray-600 cursor-not-allowed opacity-50"
+                : "text-gray-300 cursor-not-allowed opacity-50"
+              : active
+                ? isDark
+                  ? "text-indigo-400"
+                  : "text-indigo-600"
+                : isDark
+                  ? "text-gray-500 hover:text-gray-300"
+                  : "text-gray-400 hover:text-gray-600"
           }`
 
           if (item.action === "more") {
@@ -149,6 +164,14 @@ export default function AdminBottomNav({
               <button key={item.label} type="button" onClick={onMore} className={baseClasses}>
                 {content}
               </button>
+            )
+          }
+
+          if (locked) {
+            return (
+              <span key={item.href} className={baseClasses} aria-disabled="true">
+                {content}
+              </span>
             )
           }
 
