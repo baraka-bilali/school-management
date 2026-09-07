@@ -593,11 +593,22 @@ export default function SubscriptionPage() {
                         key={p.id}
                         className={`flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 transition-colors ${tableRowHover}`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/10 text-teal-500">
                             <Receipt className="w-4 h-4" />
                           </div>
-                          <span className="font-mono text-sm font-semibold text-teal-500 truncate">{p.numeroFacture}</span>
+                          <div className="min-w-0">
+                            <span className="font-mono text-sm font-semibold text-teal-500 truncate block">
+                              {p.numeroFacture}
+                            </span>
+                            <span className={`text-xs tabular-nums ${textSecondary}`}>
+                              {new Date(p.createdAt).toLocaleDateString("fr-FR", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
                         </div>
                         <button
                           onClick={() => setSelectedPayment(p)}
