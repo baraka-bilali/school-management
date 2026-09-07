@@ -69,6 +69,31 @@ export function diffCalendarDays(from: Date, to: Date): number {
   return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / (1000 * 60 * 60 * 24))
 }
 
+/** Accès bloqué : après le jour d'expiration (calendaire) ou compte suspendu. */
+export function isSubscriptionAccessBlocked(
+  dateFin: string | Date | null | undefined,
+  etatCompte: string | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (etatCompte === "SUSPENDU") return true
+  if (etatCompte && etatCompte !== "ACTIF" && !dateFin) return true
+  const end = parseSubscriptionDate(dateFin)
+  if (!end) return etatCompte !== "ACTIF"
+  return startOfDay(now) > end
+}
+
+/** Jours calendaires restants jusqu'à la date de fin (0 = expire aujourd'hui, encore actif). */
+export function getSubscriptionDaysLeft(
+  dateFin: string | Date | null | undefined,
+  now: Date = new Date()
+): number | null {
+  const end = parseSubscriptionDate(dateFin)
+  if (!end) return null
+  const today = startOfDay(now)
+  if (today > end) return 0
+  return Math.max(0, diffCalendarDays(today, end))
+}
+
 export function getSubscriptionPeriodMetrics(
   dateDebut: string | Date | null | undefined,
   dateFin: string | Date | null | undefined,
@@ -102,9 +127,10 @@ export function getSubscriptionPeriodMetrics(
   const today = startOfDay(now)
   const start = parseSubscriptionDate(dateDebut)
 
+  // Expire uniquement le lendemain de la date de fin (accès valable toute la journée d'expiration)
   if (today > end) {
     const totalDays =
-      totalDaysOverride ?? (start ? Math.max(1, diffCalendarDays(start, end)) : 1)
+      totalDaysOverride ?? (start ? Math.max(1, diffCalendarDays(start, end) + 1) : 1)
     return {
       phase: "expired",
       daysRemaining: 0,
@@ -116,9 +142,8 @@ export function getSubscriptionPeriodMetrics(
     }
   }
 
-  const totalDays =
-    totalDaysOverride ??
-    (start ? Math.max(1, diffCalendarDays(start, end)) : Math.max(1, diffCalendarDays(today, end)))
+  const spanDays = start ? Math.max(1, diffCalendarDays(start, end) + 1) : null
+  const totalDays = totalDaysOverride && totalDaysOverride > 0 ? totalDaysOverride : (spanDays ?? Math.max(1, diffCalendarDays(today, end) + 1))
 
   if (!start) {
     const daysRemaining = Math.max(0, diffCalendarDays(today, end))
@@ -128,7 +153,7 @@ export function getSubscriptionPeriodMetrics(
       totalDays,
       daysElapsed: Math.max(0, totalDays - daysRemaining),
       progressElapsed: Math.min(100, ((totalDays - daysRemaining) / totalDays) * 100),
-      progressRemaining: Math.min(100, (daysRemaining / totalDays) * 100),
+      progressRemaining: Math.min(100, (daysRemaining / Math.max(1, totalDays)) * 100),
       daysUntilStart: 0,
     }
   }
@@ -145,12 +170,12 @@ export function getSubscriptionPeriodMetrics(
     }
   }
 
-  const rawElapsed = diffCalendarDays(start, today) + 1
-  const daysElapsed = Math.min(totalDays, Math.max(0, rawElapsed))
-  const daysRemaining = Math.max(0, totalDays - daysElapsed)
+  // Jours restants = calendrier jusqu'à la date de fin (source de vérité pour l'accès)
+  const daysRemaining = Math.max(0, diffCalendarDays(today, end))
+  const daysElapsed = Math.min(totalDays, Math.max(0, totalDays - daysRemaining))
 
   const progressElapsed = Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100))
-  const progressRemaining = Math.min(100, Math.max(0, (daysRemaining / totalDays) * 100))
+  const progressRemaining = Math.min(100, Math.max(0, (daysRemaining / Math.max(1, totalDays)) * 100))
 
   return {
     phase: "active",
@@ -192,7 +217,7 @@ export function buildCumulativeSubscriptionView(
       index: i + 1,
       dateDebut: toIsoDate(d0) ?? String(p.dateDebut),
       dateFin: toIsoDate(d1) ?? String(p.dateFin),
-      days: Math.max(1, diffCalendarDays(d0, d1)),
+      days: Math.max(1, diffCalendarDays(d0, d1) + 1),
       numeroFacture: p.numeroFacture ?? null,
       plan: p.plan ?? null,
     }
@@ -212,7 +237,7 @@ export function buildCumulativeSubscriptionView(
   } else if (schoolStart && schoolEnd) {
     cumulativeStart = schoolStart
     cumulativeEnd = schoolEnd
-    totalDays = Math.max(1, diffCalendarDays(schoolStart, schoolEnd))
+    totalDays = Math.max(1, diffCalendarDays(schoolStart, schoolEnd) + 1)
     subscriptionCount = 1
   }
 

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { grantWelcomeMonthIfEligible } from "@/lib/school-subscription";
+import {
+  getSubscriptionDaysLeft,
+  isSubscriptionAccessBlocked,
+} from "@/lib/subscription-period";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
@@ -59,19 +63,21 @@ export async function GET(req: Request) {
       }
     }
 
-    // Calculate subscription status for admin users
-    let subscriptionExpired = false;
-    let daysLeft: number | null = null;
+    const now = new Date()
+    let subscriptionExpired = false
+    let daysLeft: number | null = null
 
-    if (user.school?.dateFinAbonnement) {
-      const now = new Date();
-      const endDate = new Date(user.school.dateFinAbonnement);
-      const diff = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      daysLeft = diff;
-      subscriptionExpired = diff < 0 || user.school.etatCompte === "SUSPENDU";
-    } else if (user.role !== "SUPER_ADMIN") {
-      // No subscription set at all = expired/pending
-      subscriptionExpired = user.school?.etatCompte !== "ACTIF";
+    if (user.role === "SUPER_ADMIN") {
+      subscriptionExpired = false
+    } else if (user.school) {
+      daysLeft = getSubscriptionDaysLeft(user.school.dateFinAbonnement, now)
+      subscriptionExpired = isSubscriptionAccessBlocked(
+        user.school.dateFinAbonnement,
+        user.school.etatCompte,
+        now
+      )
+    } else {
+      subscriptionExpired = true
     }
     
     return NextResponse.json({

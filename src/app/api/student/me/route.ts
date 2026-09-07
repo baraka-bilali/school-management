@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { toDisplayCode } from "@/lib/student-fields"
+import { isSubscriptionAccessBlocked } from "@/lib/subscription-period"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -84,12 +85,10 @@ export async function GET(request: NextRequest) {
     const currentEnrollment = student.enrollments[0]
 
     const school = student.user.school
-    const now = new Date()
-    // Un seul abonnement : accès complet tant que le compte est actif
-    const isPremium = !!(
-      school?.etatCompte === "ACTIF" &&
-      school?.dateFinAbonnement &&
-      new Date(school.dateFinAbonnement) > now
+    // Accès complet tant que l'abonnement n'est pas bloqué (jour d'expiration inclus)
+    const isPremium = !isSubscriptionAccessBlocked(
+      school?.dateFinAbonnement,
+      school?.etatCompte
     )
 
     return NextResponse.json({
