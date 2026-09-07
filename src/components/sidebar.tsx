@@ -35,7 +35,7 @@ interface SidebarProps {
 // Routes always accessible regardless of subscription
 const ALWAYS_ALLOWED = ["/admin/subscription", "/admin/settings"]
 
-export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false, studentIsPremium = false, badgeCounts = {} }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false, studentIsPremium: _studentIsPremium = false, badgeCounts = {} }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -107,7 +107,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  type NavItem = { icon: LucideIcon; label: string; href: string; proOnly?: boolean; premiumOnly?: boolean }
+  type NavItem = { icon: LucideIcon; label: string; href: string; comingSoon?: boolean }
 
   // Menu pour les administrateurs
   const adminNavItems: NavItem[] = [
@@ -118,8 +118,8 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
     { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
-    { icon: Calendar, label: "Horaire", href: "/admin/schedule", proOnly: true },
-    { icon: FileText, label: "Notes & Bulletins", href: "/admin/grades", proOnly: true },
+    { icon: Calendar, label: "Horaire", href: "/admin/schedule", comingSoon: true },
+    { icon: FileText, label: "Notes & Bulletins", href: "/admin/grades", comingSoon: true },
   ]
 
   // Menu caissier (POS — encaissement uniquement)
@@ -134,8 +134,8 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   // Menu pour les élèves
   const studentNavItems: NavItem[] = [
     { icon: BarChart3, label: "Tableau de bord", href: "/student" },
-    { icon: Calendar, label: "Horaire des cours", href: "/student/schedule", premiumOnly: true },
-    { icon: FileText, label: "Notes & Bulletins", href: "/student/grades", premiumOnly: true },
+    { icon: Calendar, label: "Horaire des cours", href: "/student/schedule", comingSoon: true },
+    { icon: FileText, label: "Notes & Bulletins", href: "/student/grades", comingSoon: true },
     { icon: Wallet, label: "Frais scolaires", href: "/student/fees" },
     { icon: Megaphone, label: "Communiqués", href: "/student/communiques" },
   ]
@@ -149,10 +149,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
         : adminNavItems
   const basePath = userRole === "ELEVE" ? "/student" : "/admin"
 
-  // For non-premium students, completely hide premium-only items
-  const visibleNavItems = navItems.filter(item =>
-    !(item as NavItem).premiumOnly || studentIsPremium
-  )
+  const visibleNavItems = navItems
 
   const isActive = (href: string) => {
     if (href === basePath) return pathname === basePath
@@ -252,7 +249,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
               <ul className="space-y-1">
                 {visibleNavItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
-                  const proLocked = !!(item as NavItem).proOnly
+                  const comingSoon = !!(item as NavItem).comingSoon
                   const badge = badgeCounts[item.href]
                   return (
                   <li key={index}>
@@ -262,31 +259,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                         <span className="flex-1">{item.label}</span>
                         <Lock className="w-3 h-3 opacity-60" />
                       </span>
-                    ) : proLocked ? (
-                      <span
-                        className={`flex items-center px-3 py-2.5 rounded-lg cursor-not-allowed select-none opacity-60 ${textSecondary}`}
-                        title="Disponible avec le plan Pro"
-                      >
-                        <item.icon className="w-5 h-5 mr-3" />
-                        <span className="flex-1">{item.label}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
-                      </span>
-                    ) : (item as NavItem).premiumOnly ? (
-                    <Link
-                      href={item.href}
-                      className={`
-                        flex items-center px-3 py-3 rounded-xl transition-all duration-200 ease-out
-                        ${isActive(item.href)
-                          ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
-                          : `${textSecondary} ${hoverBg}`
-                        }
-                      `}
-                      onClick={onToggle}
-                    >
-                      <item.icon className="w-5 h-5 mr-3" />
-                      <span className="flex-1">{item.label}</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-500 border border-green-500/30">New</span>
-                    </Link>
                     ) : (
                     <Link
                       href={item.href}
@@ -301,7 +273,12 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                     >
                       <item.icon className="w-5 h-5 mr-3" />
                       <span className="flex-1">{item.label}</span>
-                      {badge > 0 && (
+                      {comingSoon && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                          Bientôt
+                        </span>
+                      )}
+                      {!comingSoon && badge > 0 && (
                         <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                           {badge > 9 ? "9+" : badge}
                         </span>
@@ -440,7 +417,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
               <ul className="space-y-1">
                 {visibleNavItems.map((item, index) => {
                   const locked = subscriptionExpired && !ALWAYS_ALLOWED.includes(item.href)
-                  const proLocked = !!(item as NavItem).proOnly
+                  const comingSoon = !!(item as NavItem).comingSoon
                   const badge = badgeCounts[item.href]
                   return (
                   <li key={index}>
@@ -459,49 +436,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                           </>
                         )}
                       </span>
-                    ) : proLocked ? (
-                      <span
-                        className={`
-                          flex items-center rounded-lg opacity-60 cursor-not-allowed select-none
-                          ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
-                          ${textSecondary}
-                        `}
-                        title={!isOpen ? `${item.label} (Plan Pro)` : undefined}
-                      >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                        {isOpen && (
-                          <>
-                            <span className="ml-3 flex-1">{item.label}</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">PRO</span>
-                          </>
-                        )}
-                      </span>
-                    ) : (item as NavItem).premiumOnly ? (
-                    <Link
-                      href={item.href}
-                      className={`
-                        flex items-center rounded-lg transition-all duration-300 ease-out group relative
-                        ${isOpen ? 'px-3 py-2.5' : 'p-2.5 justify-center'}
-                        ${isActive(item.href)
-                          ? `${activeBg} text-indigo-700 dark:text-indigo-400 ${isOpen ? 'border-r-2 border-indigo-600' : ''}`
-                          : `${textSecondary} ${hoverBg}`
-                        }
-                      `}
-                      title={!isOpen ? item.label : undefined}
-                    >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      {isOpen && (
-                        <>
-                          <span className="ml-3 flex-1">{item.label}</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-500 border border-green-500/30">New</span>
-                        </>
-                      )}
-                      {!isOpen && (
-                        <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
-                          {item.label}
-                        </div>
-                      )}
-                    </Link>
                     ) : (
                     <Link
                       href={item.href}
@@ -519,17 +453,21 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
                       {isOpen && (
                         <>
                           <span className="ml-3 flex-1">{item.label}</span>
-                          {badge > 0 && (
+                          {comingSoon ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                              Bientôt
+                            </span>
+                          ) : badge > 0 ? (
                             <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                               {badge > 9 ? "9+" : badge}
                             </span>
-                          )}
+                          ) : null}
                         </>
                       )}
                       {!isOpen && (
                         <div className={`absolute left-full ml-2 px-2 py-1 ${theme === "dark" ? "bg-gray-700" : "bg-gray-900"} text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
                           {item.label}
-                          {badge > 0 && ` (${badge})`}
+                          {comingSoon ? " (Bientôt)" : badge > 0 ? ` (${badge})` : ""}
                         </div>
                       )}
                     </Link>

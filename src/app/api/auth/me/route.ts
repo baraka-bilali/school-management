@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
+import { grantWelcomeMonthIfEligible } from "@/lib/school-subscription";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
@@ -36,6 +37,28 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
     }
 
+    let welcomeMonthGranted = false
+
+    // Première ouverture de l'espace école → 1 mois offert
+    if (user.schoolId && user.role !== "SUPER_ADMIN") {
+      const welcome = await grantWelcomeMonthIfEligible(user.schoolId)
+      if (welcome.granted) {
+        welcomeMonthGranted = true
+        const refreshed = await prisma.school.findUnique({
+          where: { id: user.schoolId },
+          select: {
+            id: true,
+            nomEtablissement: true,
+            etatCompte: true,
+            dateFinAbonnement: true,
+          },
+        })
+        if (refreshed) {
+          ;(user as { school: typeof refreshed | null }).school = refreshed
+        }
+      }
+    }
+
     // Calculate subscription status for admin users
     let subscriptionExpired = false;
     let daysLeft: number | null = null;
@@ -65,6 +88,7 @@ export async function GET(req: Request) {
         daysLeft,
         etatCompte: user.school?.etatCompte ?? null,
         dateFinAbonnement: user.school?.dateFinAbonnement ?? null,
+        welcomeMonthGranted,
       }
     });
   } catch (e) {

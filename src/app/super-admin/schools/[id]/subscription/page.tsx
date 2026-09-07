@@ -65,7 +65,7 @@ export default function SubscriptionManagement() {
   const [totalPayments, setTotalPayments] = useState(0)
 
   const [form, setForm] = useState({
-    planAbonnement: "STARTER",
+    planAbonnement: "STANDARD",
     typePaiement: "MOBILE_MONEY",
     montantPaye: "70",
     reference: "",
@@ -91,7 +91,7 @@ export default function SubscriptionManagement() {
       setSchool(data.school)
       setForm(prev => ({
         ...prev,
-        planAbonnement: data.school.planAbonnement || "STARTER",
+        planAbonnement: data.school.planAbonnement || "STANDARD",
         typePaiement: data.school.typePaiement || "MOBILE_MONEY",
         montantPaye: data.school.montantPaye?.toString() || "70",
       }))
@@ -159,7 +159,7 @@ export default function SubscriptionManagement() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          planAbonnement: form.planAbonnement,
+          planAbonnement: "STANDARD",
           typePaiement: form.typePaiement,
           montantPaye: form.montantPaye ? parseFloat(form.montantPaye) : null,
           reference: form.reference || null,
@@ -335,8 +335,12 @@ export default function SubscriptionManagement() {
                 </p>
               </div>
               <div>
-                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Plan</p>
-                <p className={`text-sm font-medium ${textColor}`}>{school.planAbonnement || "—"}</p>
+                <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Abonnement</p>
+                <p className={`text-sm font-medium ${textColor}`}>
+                  {school.montantPaye === 0 || school.typePaiement === "OFFERT"
+                    ? "Kelasi 360 · mois offert"
+                    : "Kelasi 360"}
+                </p>
               </div>
               <div>
                 <p className={`text-xs ${textSecondary} uppercase tracking-wide mb-1`}>Dernier paiement</p>
@@ -451,18 +455,15 @@ export default function SubscriptionManagement() {
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                {/* Plan + Montant */}
+                {/* Plan unique + Montant */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className={`block text-sm font-medium ${textColor} mb-2`}>Plan d'abonnement</label>
-                    <select
-                      value={form.planAbonnement}
-                      onChange={(e) => setForm(prev => ({ ...prev, planAbonnement: e.target.value }))}
-                      className={`w-full h-10 px-3 rounded-lg ${inputBg} border ${borderColor} ${textColor} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    >
-                      <option value="STARTER">Starter — Fonctionnalités de base</option>
-                      <option value="PRO">Pro — Toutes les fonctionnalités</option>
-                    </select>
+                    <label className={`block text-sm font-medium ${textColor} mb-2`}>Abonnement</label>
+                    <div className={`flex h-10 items-center rounded-lg border px-3 ${inputBg} ${borderColor}`}>
+                      <span className={`text-sm font-semibold ${textColor}`}>Kelasi 360</span>
+                      <span className={`ml-2 text-xs ${textSecondary}`}>— offre unique</span>
+                    </div>
+                    <input type="hidden" value="STANDARD" readOnly />
                   </div>
                   <div>
                     <label className={`block text-sm font-medium ${textColor} mb-2`}>
@@ -631,12 +632,8 @@ export default function SubscriptionManagement() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                              p.plan === "PRO"
-                                ? "bg-purple-500/10 text-purple-400"
-                                : "bg-blue-500/10 text-blue-400"
-                            }`}>
-                              {p.plan}
+                            <span className="text-xs px-2 py-1 rounded-full font-medium bg-teal-500/10 text-teal-400">
+                              {p.montant === 0 || p.typePaiement === "OFFERT" ? "Mois offert" : "Kelasi 360"}
                             </span>
                           </td>
                           <td className={`px-6 py-4 text-right font-semibold ${textColor}`}>

@@ -277,7 +277,8 @@ function InvoicePrintModal({
             <div className={`px-4 py-3 flex justify-between items-start border-b ${border}`}>
               <div>
                 <p className={`font-semibold ${text} text-sm`}>
-                  Abonnement {payment.plan} — {periodeLabel[payment.periode] || payment.periode}
+                  Abonnement Kelasi 360 — {periodeLabel[payment.periode] || payment.periode}
+                  {payment.montant === 0 || payment.typePaiement === "OFFERT" ? " (mois offert)" : ""}
                 </p>
                 <p className={`text-xs ${sub} mt-0.5`}>
                   {fmt(payment.dateDebut)} → {fmt(payment.dateFin)}

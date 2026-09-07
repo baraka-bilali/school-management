@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSupabaseAdmin } from "@/lib/supabase-server"
 import { extendSubscriptionEnd, newSubscriptionPeriod } from "@/lib/subscription-period"
+import { SCHOOL_PLAN } from "@/lib/school-subscription"
 import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -118,7 +119,7 @@ export async function PUT(
     const { schoolStart, schoolEnd, paymentStart, paymentEnd, isExtension } =
       calculateSubscriptionDates(existingSchool)
 
-    const plan = planAbonnement || "STARTER"
+    const plan = planAbonnement || SCHOOL_PLAN
     const montant = montantPaye != null ? parseFloat(String(montantPaye)) : 70
     const devise = "USD"
 

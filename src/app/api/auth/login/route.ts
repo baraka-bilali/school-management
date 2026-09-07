@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
+import { grantWelcomeMonthIfEligible } from "@/lib/school-subscription";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"; // mets une vraie clé secrète en prod
 
@@ -34,6 +35,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // Première ouverture de l'espace → mois offert (si éligible)
+    let welcomeMonthGranted = false
+    if (user.schoolId && user.role !== "SUPER_ADMIN") {
+      try {
+        const welcome = await grantWelcomeMonthIfEligible(user.schoolId)
+        welcomeMonthGranted = welcome.granted
+      } catch (e) {
+        console.error("Welcome month grant failed:", e)
+      }
+    }
+
     // Générer un token JWT avec schoolId
     const token = jwt.sign(
       { 
@@ -52,7 +64,8 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ 
       message: "Connexion réussie", 
       token,
-      temporaryPassword: user.temporaryPassword || false, // Indiquer si le mot de passe est temporaire
+      temporaryPassword: user.temporaryPassword || false,
+      welcomeMonthGranted,
       user: {
         id: user.id,
         email: user.email,

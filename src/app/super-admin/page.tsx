@@ -119,7 +119,7 @@ export default function SuperAdminHome() {
     schoolsByType: [] as { type: string, count: number }[],
     schoolsByProvince: [] as { province: string, count: number }[],
     unreadNotifications: 0,
-    subscriptionsByPlan: { Starter: 0, Pro: 0 },
+    subscriptionsByPlan: { Starter: 0, Pro: 0, "Kelasi 360": 0 },
     unassignedSubscriptions: 0,
     subscriptionTimeline: [] as { label: string, count: number }[],
     maxTimelineCount: 0,
@@ -142,7 +142,7 @@ export default function SuperAdminHome() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [subscriptionForm, setSubscriptionForm] = useState({
     dateDebutAbonnement: "", dateFinAbonnement: "",
-    periodeAbonnement: "MENSUEL", planAbonnement: "STARTER",
+    periodeAbonnement: "MENSUEL", planAbonnement: "STANDARD",
     typePaiement: "MOBILE_MONEY", montantPaye: ""
   })
   const [savingSubscription, setSavingSubscription] = useState(false)
@@ -817,7 +817,7 @@ export default function SuperAdminHome() {
         body: JSON.stringify({
           dateDebutAbonnement: subscriptionForm.dateDebutAbonnement || null,
           typePaiement: subscriptionForm.typePaiement,
-          planAbonnement: subscriptionForm.planAbonnement,
+          planAbonnement: "STANDARD",
           montantPaye: 70,
         }),
       })
@@ -1297,10 +1297,7 @@ export default function SuperAdminHome() {
 
   const formatPlanLabel = (plan?: string | null) => {
     if (!plan) return "Non défini"
-    const value = plan.toUpperCase()
-    if (value === "BASIC" || value === "STARTER") return "Starter"
-    if (value === "PREMIUM" || value === "PRO" || value === "ENTERPRISE") return "Pro"
-    return plan
+    return "Kelasi 360"
   }
 
   const formatDisplayAmount = (amount: number) => {
@@ -1597,37 +1594,25 @@ export default function SuperAdminHome() {
 
         {/* Distribution Chart */}
         <div className={`${cardBg} rounded-xl p-6 border ${borderColor} shadow-sm`}>
-          <h3 className={`text-lg font-semibold mb-6 ${textColor}`}>Répartition par formule</h3>
+          <h3 className={`text-lg font-semibold mb-6 ${textColor}`}>Abonnements actifs</h3>
           <div className="flex items-center justify-center mb-6">
             <div className="relative w-40 h-40">
               {(() => {
-                const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
-                const starterPercent = total > 0 ? (stats.subscriptionsByPlan.Starter / total) * 100 : 0
-                const proPercent = total > 0 ? (stats.subscriptionsByPlan.Pro / total) * 100 : 0
-
+                const total = (stats.subscriptionsByPlan["Kelasi 360"] ?? 0) + stats.unassignedSubscriptions
+                const activeCount = stats.subscriptionsByPlan["Kelasi 360"] ?? 0
+                const percent = total > 0 ? (activeCount / total) * 100 : (stats.activeSchools > 0 ? 100 : 0)
                 const circumference = 440
-                const starterDash = (starterPercent / 100) * circumference
-                const proDash = (proPercent / 100) * circumference
+                const dash = (percent / 100) * circumference
 
                 return (
                   <svg className="w-full h-full -rotate-90">
                     <circle cx="80" cy="80" r="70" fill="none" stroke={theme === "dark" ? "#1a2332" : "#f3f4f6"} strokeWidth="20" />
                     <circle
                       cx="80" cy="80" r="70" fill="none"
-                      stroke="#3b82f6"
+                      stroke="#14b8a6"
                       strokeWidth="20"
-                      strokeDasharray={`${starterDash} ${circumference}`}
+                      strokeDasharray={`${dash} ${circumference}`}
                       className="transition-all duration-1000 ease-out"
-                      style={{ animation: 'drawCircle 1.5s ease-out forwards' }}
-                    />
-                    <circle
-                      cx="80" cy="80" r="70" fill="none"
-                      stroke="#a855f7"
-                      strokeWidth="20"
-                      strokeDasharray={`${proDash} ${circumference}`}
-                      strokeDashoffset={`-${starterDash}`}
-                      className="transition-all duration-1000 ease-out"
-                      style={{ animation: 'drawCircle 1.5s ease-out 0.2s forwards', opacity: 0, animationFillMode: 'forwards' }}
                     />
                   </svg>
                 )
@@ -1639,28 +1624,15 @@ export default function SuperAdminHome() {
             </div>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-blue-500/5 p-2 rounded-lg transition-colors">
+            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-teal-500/5 p-2 rounded-lg transition-colors">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500 group-hover:scale-110 transition-transform"></div>
-                <span className={textSecondary}>Starter ({(() => {
-                  const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Starter / total) * 100) : 0
-                })()}%)</span>
+                <div className="w-3 h-3 rounded-full bg-teal-500 group-hover:scale-110 transition-transform"></div>
+                <span className={textSecondary}>Kelasi 360</span>
               </div>
-              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Starter}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm group cursor-pointer hover:bg-purple-500/5 p-2 rounded-lg transition-colors">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-purple-500 group-hover:scale-110 transition-transform"></div>
-                <span className={textSecondary}>Pro ({(() => {
-                  const total = stats.subscriptionsByPlan.Starter + stats.subscriptionsByPlan.Pro
-                  return total > 0 ? Math.round((stats.subscriptionsByPlan.Pro / total) * 100) : 0
-                })()}%)</span>
-              </div>
-              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan.Pro}</span>
+              <span className={`font-semibold ${textColor}`}>{stats.subscriptionsByPlan["Kelasi 360"] ?? stats.activeSchools}</span>
             </div>
             <div className="flex items-center justify-between text-sm p-2">
-              <span className={textSecondary}>Sans formule</span>
+              <span className={textSecondary}>Sans abonnement</span>
               <span className={`font-semibold ${textColor}`}>{stats.unassignedSubscriptions}</span>
             </div>
           </div>
@@ -3110,7 +3082,9 @@ export default function SuperAdminHome() {
           ? new Date(schoolDetails.school.dateFinAbonnement)
           : selectedSchool.dateFinAbonnement ? new Date(selectedSchool.dateFinAbonnement) : null
         const daysLeft = endDate ? Math.ceil((endDate.getTime() - new Date().getTime()) / 86400000) : null
-        const planName = schoolDetails?.school?.planAbonnement || selectedSchool.planAbonnement || "—"
+        const planName = formatPlanLabel(
+          schoolDetails?.school?.planAbonnement || selectedSchool.planAbonnement
+        )
         const maxStudents = Math.max(...(schoolDetails?.studentsByYear.map(y => y.count) || []), 1)
         const filteredYears = selectedDetailsYear === "all"
           ? (schoolDetails?.studentsByYear || [])
@@ -3220,13 +3194,10 @@ export default function SuperAdminHome() {
                       <div className={`p-5 rounded-xl border ${theme === "dark" ? "bg-gray-800/40 border-gray-700/50" : "bg-gray-50 border-gray-200"}`}>
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <p className={`text-xs ${textSecondary} mb-1`}>Plan actuel</p>
-                            <span className={`text-lg font-bold px-3 py-1 rounded-lg border inline-block ${
-                              planName === "Enterprise" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                              planName === "Premium"    ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                              planName === "Basic"      ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                              theme === "dark" ? "bg-gray-700 text-gray-400 border-gray-600" : "bg-gray-200 text-gray-500 border-gray-300"
-                            }`}>{planName}</span>
+                            <p className={`text-xs ${textSecondary} mb-1`}>Abonnement</p>
+                            <span className={`text-lg font-bold px-3 py-1 rounded-lg border inline-block bg-teal-500/10 text-teal-400 border-teal-500/20`}>
+                              {planName}
+                            </span>
                           </div>
                           {daysLeft !== null && (
                             <div className="text-right">
@@ -3421,21 +3392,20 @@ export default function SuperAdminHome() {
                   </div>
                 )}
 
-                {/* Plan */}
+                {/* Abonnement unique */}
                 <div>
-                  <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Plan d'abonnement</label>
-                  <select value={subscriptionForm.planAbonnement} onChange={e => setSubscriptionForm(p => ({ ...p, planAbonnement: e.target.value }))}
-                    className={`w-full h-9 px-3 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}>
-                    <option value="STARTER">Starter</option>
-                    <option value="PRO">Pro</option>
-                  </select>
+                  <label className={`block text-xs font-medium ${textColor} mb-1.5`}>Abonnement</label>
+                  <div className={`flex h-9 items-center rounded-lg border px-3 text-sm ${inputBg} ${theme === "dark" ? "border-gray-700 text-white" : "border-gray-300 text-gray-900"}`}>
+                    <span className="font-semibold">Kelasi 360</span>
+                    <span className={`ml-2 text-xs ${textSecondary}`}>offre unique</span>
+                  </div>
                 </div>
 
                 {/* Plan info */}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${theme === "dark" ? "bg-emerald-500/5 border-emerald-500/20" : "bg-emerald-50 border-emerald-200"}`}>
                   <div>
-                    <p className={`text-xs font-semibold uppercase tracking-wider ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>Plan sélectionné</p>
-                    <p className={`text-lg font-bold mt-0.5 ${textColor}`}>{subscriptionForm.planAbonnement === "PRO" ? "Pro" : "Starter"}</p>
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${theme === "dark" ? "text-emerald-400" : "text-emerald-600"}`}>Offre</p>
+                    <p className={`text-lg font-bold mt-0.5 ${textColor}`}>Kelasi 360</p>
                     <p className={`text-xs mt-0.5 ${textSecondary}`}>Accès complet à toutes les fonctionnalités</p>
                   </div>
                   <div className="text-right">

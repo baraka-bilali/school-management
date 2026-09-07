@@ -85,11 +85,11 @@ export async function GET(request: NextRequest) {
 
     const school = student.user.school
     const now = new Date()
+    // Un seul abonnement : accès complet tant que le compte est actif
     const isPremium = !!(
       school?.etatCompte === "ACTIF" &&
       school?.dateFinAbonnement &&
-      new Date(school.dateFinAbonnement) > now &&
-      (school?.planAbonnement === "PRO" || school?.planAbonnement === "PREMIUM")
+      new Date(school.dateFinAbonnement) > now
     )
 
     return NextResponse.json({

@@ -16,12 +16,9 @@ type JwtPayload = {
 
 function normalizePlan(plan: string | null | undefined) {
   const value = plan?.trim().toUpperCase()
-
   if (!value) return null
-  if (value === "BASIC" || value === "STARTER") return "Starter"
-  if (value === "PREMIUM" || value === "PRO" || value === "ENTERPRISE") return "Pro"
-
-  return null
+  // Un seul abonnement — toutes les valeurs historiques comptent comme Kelasi 360
+  return "Kelasi 360"
 }
 
 function getPeriodRange(periodParam: string | null) {
@@ -222,10 +219,10 @@ export async function GET(request: NextRequest) {
           return accumulator
         }
 
-        accumulator[normalized] += 1
+        accumulator["Kelasi 360"] += 1
         return accumulator
       },
-      { Starter: 0, Pro: 0, unassigned: 0 } as Record<string, number>
+      { "Kelasi 360": 0, Starter: 0, Pro: 0, unassigned: 0 } as Record<string, number>
     )
 
     const currentRevenue = currentPeriodSchools.reduce(
@@ -272,8 +269,9 @@ export async function GET(request: NextRequest) {
       })),
       unreadNotifications,
       subscriptionsByPlan: {
-        Starter: activePlanCounts.Starter,
-        Pro: activePlanCounts.Pro,
+        Starter: 0,
+        Pro: 0,
+        "Kelasi 360": activePlanCounts["Kelasi 360"],
       },
       unassignedSubscriptions: activePlanCounts.unassigned,
       subscriptionTimeline,
