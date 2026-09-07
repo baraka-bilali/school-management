@@ -890,24 +890,28 @@ export default function AdminFeesPage() {
               )}
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {!isCashier && (
+              <button
+                onClick={() => setShowCreateTypeModal(true)}
+                className={`hidden md:inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-colors border ${
+                  theme === "dark"
+                    ? "border-gray-600/80 bg-transparent text-gray-200 hover:bg-gray-800 hover:border-gray-500"
+                    : "border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                }`}
+              >
+                <Plus className="w-4 h-4 text-indigo-500" />
+                Nouveau type de frais
+              </button>
+            )}
             <button
               onClick={() => openPaymentModal()}
-              className="inline-flex items-center gap-2 px-3.5 py-2 md:px-5 md:py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all shadow-lg shadow-green-500/25 text-sm md:text-base font-medium"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-colors bg-emerald-600 hover:bg-emerald-500 text-white"
             >
               <DollarSign className="w-4 h-4" />
               <span className="md:hidden">Paiement</span>
               <span className="hidden md:inline">Enregistrer un paiement</span>
             </button>
-            {!isCashier && (
-            <button
-              onClick={() => setShowCreateTypeModal(true)}
-              className="hidden md:inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg shadow-indigo-500/25 font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Nouveau type de frais
-            </button>
-            )}
           </div>
         </div>
 
