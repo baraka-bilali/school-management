@@ -20,6 +20,10 @@ import {
   ArrowDownCircle,
   Receipt,
   Layers,
+  ClipboardList,
+  Link2,
+  LayoutDashboard,
+  ListOrdered,
 } from "lucide-react"
 
 export type FeatureSearchCategory =
@@ -142,13 +146,35 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
   },
   {
     id: "admin-courses",
-    title: "Cours & attributions",
+    title: "Cours & Affectations",
     subtitle: "Utilisateurs",
     href: "/admin/users?tab=courses",
     category: "users",
-    keywords: ["cours", "matieres", "attributions", "courses"],
+    keywords: ["cours", "matieres", "attributions", "courses", "affectations"],
     icon: BookOpen,
     roles: ADMIN_LIKE,
+    popular: true,
+  },
+  {
+    id: "admin-subjects",
+    title: "Matières / Cours",
+    subtitle: "Cours & Affectations",
+    href: "/admin/users?tab=courses",
+    category: "users",
+    keywords: ["matieres", "cours", "coefficient", "horaires", "subjects"],
+    icon: BookOpen,
+    roles: ADMIN_LIKE,
+  },
+  {
+    id: "admin-assignments",
+    title: "Affectations professeurs",
+    subtitle: "Cours & Affectations",
+    href: "/admin/users?tab=courses&view=assignments",
+    category: "users",
+    keywords: ["affectations", "assignations", "professeur", "classe", "heures"],
+    icon: Link2,
+    roles: ADMIN_LIKE,
+    popular: true,
   },
   {
     id: "admin-inscriptions",
@@ -188,14 +214,55 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
     popular: true,
   },
   {
+    id: "admin-fees-overview",
+    title: "Vue d'ensemble des frais",
+    subtitle: "Frais scolaires",
+    href: "/admin/fees?tab=overview",
+    category: "finance",
+    keywords: ["apercu frais", "stats frais", "progression"],
+    icon: LayoutDashboard,
+    roles: ADMIN_AND_CASHIER,
+  },
+  {
     id: "admin-fees-types",
     title: "Types de frais",
     subtitle: "Frais scolaires",
-    href: "/admin/fees",
+    href: "/admin/fees?tab=types",
     category: "finance",
     keywords: ["type frais", "nouveau frais", "tarifs"],
     icon: Layers,
     roles: ADMIN_LIKE,
+  },
+  {
+    id: "admin-fees-tarifs",
+    title: "Tarifications",
+    subtitle: "Frais scolaires",
+    href: "/admin/fees?tab=tarifications",
+    category: "finance",
+    keywords: ["tarification", "montant", "classe", "prix"],
+    icon: ListOrdered,
+    roles: ADMIN_LIKE,
+  },
+  {
+    id: "admin-fees-students",
+    title: "Frais par élève",
+    subtitle: "Frais scolaires",
+    href: "/admin/fees?tab=students",
+    category: "finance",
+    keywords: ["par eleve", "soldes", "impayes", "encaisser"],
+    icon: ClipboardList,
+    roles: ADMIN_AND_CASHIER,
+    popular: true,
+  },
+  {
+    id: "admin-fees-payments",
+    title: "Historique des paiements",
+    subtitle: "Frais scolaires",
+    href: "/admin/fees?tab=payments",
+    category: "finance",
+    keywords: ["paiements", "historique", "recu", "transactions"],
+    icon: Receipt,
+    roles: ADMIN_AND_CASHIER,
   },
   {
     id: "admin-treasury",
@@ -390,7 +457,10 @@ export function filterFeatureSearchItems(
 
   if (!q) {
     const popular = byCategory.filter((i) => i.popular)
-    return popular.length > 0 ? popular : byCategory.slice(0, 8)
+    // Show popular first, then fill with other items for richer browsing
+    if (popular.length === 0) return byCategory.slice(0, 12)
+    const rest = byCategory.filter((i) => !i.popular)
+    return [...popular, ...rest].slice(0, 14)
   }
 
   return byCategory
