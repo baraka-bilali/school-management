@@ -19,6 +19,57 @@ interface JwtPayload {
   schoolId?: number
 }
 
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const token = req.headers.get("cookie")?.split("token=")[1]?.split(";")[0]
+    if (!token) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
+    const schoolId = decoded.schoolId
+    if (!schoolId) {
+      return NextResponse.json(
+        { error: "Aucune école associée à cet utilisateur" },
+        { status: 403 }
+      )
+    }
+
+    const id = parseInt(params.id, 10)
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 })
+    }
+
+    const classItem = await prisma.class.findFirst({
+      where: { id, schoolId },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        section: true,
+        letter: true,
+        stream: true,
+        createdAt: true,
+      },
+    })
+
+    if (!classItem) {
+      return NextResponse.json(
+        { error: "Classe non trouvée ou accès refusé" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ class: classItem })
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la classe:", error)
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
+  }
+}
+
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }

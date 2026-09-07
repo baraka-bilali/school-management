@@ -89,34 +89,48 @@ interface GenderChartProps {
 
 export function GenderChart({ data, theme }: GenderChartProps) {
   const isDark = theme === "dark"
-  
+  const total = data.reduce((sum, d) => sum + (d.value || 0), 0)
+
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          labelLine={false}
-          label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
-          outerRadius={100}
-          fill="#8884d8"
-          dataKey="value"
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip
-          contentStyle={{
-            backgroundColor: isDark ? "#1f2937" : "#ffffff",
-            border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
-            borderRadius: "8px",
-            color: isDark ? "#f3f4f6" : "#111827",
-          }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="w-full">
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={48}
+            outerRadius={78}
+            paddingAngle={total > 0 ? 2 : 0}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${entry.name}-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value: number | undefined) => [`${value ?? 0}`, "Élèves"]}
+            contentStyle={{
+              backgroundColor: isDark ? "#1f2937" : "#ffffff",
+              border: `1px solid ${isDark ? "#6366f1" : "#e5e7eb"}`,
+              borderRadius: "8px",
+              color: isDark ? "#f3f4f6" : "#111827",
+            }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
+        {data.map((entry) => (
+          <div key={entry.name} className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+              {entry.name}: {entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
