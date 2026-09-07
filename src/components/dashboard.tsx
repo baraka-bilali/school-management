@@ -311,13 +311,15 @@ export default function Dashboard() {
     return Math.ceil(max / 100) * 100
   }, [sectionData])
 
-  const currentMonthUsd = useMemo(() =>
-    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsUsd : 0
-  , [monthlySeries])
+  const yearFeesUsd = useMemo(
+    () => monthlySeries.reduce((sum, row) => sum + (row.paymentsUsd || 0), 0),
+    [monthlySeries]
+  )
 
-  const currentMonthCdf = useMemo(() =>
-    monthlySeries.length > 0 ? monthlySeries[monthlySeries.length - 1].paymentsCdf : 0
-  , [monthlySeries])
+  const yearFeesCdf = useMemo(
+    () => monthlySeries.reduce((sum, row) => sum + (row.paymentsCdf || 0), 0),
+    [monthlySeries]
+  )
 
   // Y-axis ticks for the payments chart (steps of 5000 USD / equivalent CDF)
   const chartYAxis = useMemo(() => {
@@ -360,12 +362,12 @@ export default function Dashboard() {
           <StatCard title="Eleves" value={safeStats.students} icon={GraduationCap} color={palette.students} theme={theme} />
           <StatCard title="Enseignants" value={safeStats.teachers} icon={Users} color={palette.teachers} theme={theme} />
           <StatCard title="Classes" value={safeStats.classes} icon={School} color={palette.classes} theme={theme} />
-          <StatCard title="Frais scolaires (mois)"
-            value={currentMonthUsd > 0 || currentMonthCdf === 0 ? formatUsd(currentMonthUsd) : `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`}
+          <StatCard title="Frais scolaires"
+            value={yearFeesUsd > 0 || yearFeesCdf === 0 ? formatUsd(yearFeesUsd) : `${new Intl.NumberFormat("fr-FR").format(yearFeesCdf)} FC`}
             subValue={
-              currentMonthUsd > 0 && currentMonthCdf > 0
-                ? `${new Intl.NumberFormat("fr-FR").format(currentMonthCdf)} FC`
-                : currentMonthUsd === 0 && currentMonthCdf > 0
+              yearFeesUsd > 0 && yearFeesCdf > 0
+                ? `${new Intl.NumberFormat("fr-FR").format(yearFeesCdf)} FC`
+                : yearFeesUsd === 0 && yearFeesCdf > 0
                   ? "0 $"
                   : undefined
             }
