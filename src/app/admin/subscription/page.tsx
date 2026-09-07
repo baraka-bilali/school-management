@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
 import Portal from "@/components/portal"
+import SubscriptionSkeleton from "@/components/admin/subscription-skeleton"
 import {
   getSubscriptionPeriodMetrics,
   parseSubscriptionDate,
@@ -469,13 +470,8 @@ export default function SubscriptionPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="p-6">
-          <div className="flex items-center justify-center py-32">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className={textSecondary}>Chargement...</p>
-            </div>
-          </div>
+        <div className="p-4 md:p-6">
+          <SubscriptionSkeleton theme={theme} />
         </div>
       </Layout>
     )
