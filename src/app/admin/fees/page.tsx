@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import {
@@ -285,9 +285,39 @@ function formatMontant(amount: number, devise: "USD" | "CDF"): string {
 
 export default function AdminFeesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [isCashier, setIsCashier] = useState(false)
-  const [activeTab, setActiveTab] = useState<"overview" | "types" | "tarifications" | "students" | "payments">("overview")
+  const FEE_TABS = ["overview", "types", "tarifications", "students", "payments"] as const
+  type FeeTab = (typeof FEE_TABS)[number]
+  const tabFromUrl = searchParams.get("tab")
+  const initialTab: FeeTab =
+    tabFromUrl && (FEE_TABS as readonly string[]).includes(tabFromUrl)
+      ? (tabFromUrl as FeeTab)
+      : "overview"
+  const [activeTab, setActiveTabState] = useState<FeeTab>(initialTab)
+
+  const setActiveTab = useCallback(
+    (tab: FeeTab) => {
+      setActiveTabState(tab)
+      const params = new URLSearchParams(searchParams.toString())
+      if (tab === "overview") params.delete("tab")
+      else params.set("tab", tab)
+      const qs = params.toString()
+      router.replace(qs ? `/admin/fees?${qs}` : "/admin/fees", { scroll: false })
+    },
+    [router, searchParams]
+  )
+
+  useEffect(() => {
+    const t = searchParams.get("tab")
+    if (t && (FEE_TABS as readonly string[]).includes(t) && t !== activeTab) {
+      setActiveTabState(t as FeeTab)
+    }
+    if (!t && activeTab !== "overview") {
+      // keep local tab unless URL explicitly cleared elsewhere
+    }
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
 
