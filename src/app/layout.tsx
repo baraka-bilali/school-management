@@ -62,7 +62,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="bg-gray-50 dark:bg-gray-950 font-sans antialiased notranslate" suppressHydrationWarning>
+      <body className="min-h-dvh bg-gray-50 dark:bg-gray-900 font-sans antialiased notranslate" suppressHydrationWarning>
         <ReactQueryProvider>
           <ClientOnly>
             {children}

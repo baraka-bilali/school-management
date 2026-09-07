@@ -105,7 +105,7 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #111827;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
@@ -142,14 +142,21 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
   body {
-    @apply bg-background text-foreground;
+    @apply min-h-dvh bg-background text-foreground;
+  }
+  html.dark,
+  html.dark body {
+    background-color: #111827;
   }
 }
 
 /*
  * Densité UI par défaut ≈ zoom navigateur 80 %.
  * Desktop uniquement : sur mobile, on garde 100 % pour les zones tactiles.
+ * Le fond html/body reste gray-900 en dark pour éviter une bande plus sombre
+ * sous le layout (effet visible avec zoom < 1).
  */
 @media (min-width: 768px) {
   html {

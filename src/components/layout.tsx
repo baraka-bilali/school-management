@@ -172,7 +172,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className={`min-h-screen transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div className={`min-h-dvh transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
       <Header
         onSidebarToggle={toggleSidebar}
         role={role}
