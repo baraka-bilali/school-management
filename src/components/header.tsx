@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Menu, School, User, Moon, Sun, LogOut, X } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Menu, School, User, Moon, Sun, LogOut, X, Search } from "lucide-react"
 import { useRouter } from "next/navigation"
 import NotificationBell from "./notification-bell"
 import Portal from "./portal"
+import FeatureSearch, { useFeatureSearchHotkey } from "./feature-search"
 
 interface HeaderProps {
   onSidebarToggle: () => void
   role?: string | null
+  canEnrollStudents?: boolean
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -29,10 +31,11 @@ const ROLE_LABEL: Record<string, string> = {
   ELEVE: 'Élève'
 }
 
-export default function Header({ onSidebarToggle, role }: HeaderProps) {
+export default function Header({ onSidebarToggle, role, canEnrollStudents = false }: HeaderProps) {
   const router = useRouter()
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [showFeatureSearch, setShowFeatureSearch] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [userName, setUserName] = useState("")
@@ -40,6 +43,14 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
   const [schoolName, setSchoolName] = useState("")
   const [schoolPhoto, setSchoolPhoto] = useState<string | null>(null)
   const [userRole, setUserRole] = useState("")
+  const [enrollPermission, setEnrollPermission] = useState(canEnrollStudents)
+
+  const openFeatureSearch = useCallback(() => setShowFeatureSearch(true), [])
+  useFeatureSearchHotkey(openFeatureSearch, (role || userRole) !== "SUPER_ADMIN")
+
+  useEffect(() => {
+    setEnrollPermission(canEnrollStudents)
+  }, [canEnrollStudents])
 
   useEffect(() => {
     // Récupérer les infos utilisateur depuis le token et l'API
@@ -60,10 +71,16 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
           }
         })
           .then(res => res.json())
-          .then(data => {
+          .then((data) => {
             if (data.user?.name) {
               setUserName(data.user.name)
               console.log("✅ Nom d'utilisateur récupéré de l'API:", data.user.name)
+            }
+            if (typeof data.user?.canEnrollStudents === "boolean") {
+              setEnrollPermission(data.user.canEnrollStudents)
+            }
+            if (data.user?.role) {
+              setUserRole(data.user.role)
             }
           })
           .catch(error => {
@@ -232,6 +249,30 @@ export default function Header({ onSidebarToggle, role }: HeaderProps) {
           </div>
           
           <div className="flex items-center space-x-1 md:space-x-2 shrink-0">
+            {/* Feature search */}
+            {(role || userRole) !== "SUPER_ADMIN" && (
+              <button
+                type="button"
+                onClick={openFeatureSearch}
+                className={`inline-flex items-center gap-2 rounded-lg p-2 transition-colors ${
+                  theme === "dark"
+                    ? "hover:bg-gray-800 text-gray-300"
+                    : "hover:bg-gray-100 text-gray-600"
+                }`}
+                title="Rechercher (Ctrl+K)"
+                aria-label="Rechercher une fonctionnalité"
+              >
+                <Search className="w-5 h-5" />
+                <span
+                  className={`hidden lg:inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${
+                    theme === "dark" ? "border-gray-600 text-gray-500" : "border-gray-300 text-gray-400"
+                  }`}
+                >
+                  Ctrl K
+                </span>
+              </button>
+            )}
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
