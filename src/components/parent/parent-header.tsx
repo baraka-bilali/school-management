@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Megaphone } from "lucide-react"
+import { Megaphone, Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ParentHeaderProps {
@@ -9,6 +9,7 @@ interface ParentHeaderProps {
   firstName?: string
   unreadCount?: number
   isDark?: boolean
+  onToggleTheme?: () => void
 }
 
 export default function ParentHeader({
@@ -16,6 +17,7 @@ export default function ParentHeader({
   firstName,
   unreadCount = 0,
   isDark = false,
+  onToggleTheme,
 }: ParentHeaderProps) {
   const initials = firstName?.charAt(0)?.toUpperCase() || "P"
 
@@ -23,10 +25,10 @@ export default function ParentHeader({
     <header
       className={cn(
         "sticky top-0 z-40 border-b backdrop-blur-md lg:hidden",
-        isDark ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-[#eef2f9]/90"
+        isDark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-[#eef2f9]/90"
       )}
     >
-      <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-lg items-center gap-2 px-4 py-3">
         <Link href="/parent/settings" className="shrink-0">
           <div
             className={cn(
@@ -47,6 +49,19 @@ export default function ParentHeader({
         >
           {schoolName}
         </h1>
+        {onToggleTheme && (
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            title={isDark ? "Mode clair" : "Mode sombre"}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+              isDark ? "text-gray-300 hover:bg-gray-800" : "text-indigo-600 hover:bg-white"
+            )}
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        )}
         <Link
           href="/parent/messages"
           className={cn(

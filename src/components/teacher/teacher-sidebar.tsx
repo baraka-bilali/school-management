@@ -40,7 +40,7 @@ export default function TeacherSidebar({
       className={cn(
         "fixed inset-y-0 left-0 z-40 hidden flex-col border-r transition-[width] duration-300 ease-in-out lg:flex",
         expanded ? "w-64 xl:w-72" : "w-[4.25rem]",
-        isDark ? "border-white/5 bg-[#0a0a12]" : "border-gray-200 bg-white"
+        isDark ? "border-white/5 bg-gray-900" : "border-gray-200 bg-white"
       )}
     >
       <div

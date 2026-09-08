@@ -19,7 +19,7 @@ export default function StaffDesktopHeader({
     <header
       className={cn(
         "sticky top-0 z-30 hidden border-b backdrop-blur-md lg:block",
-        isDark ? "border-white/5 bg-[#0a0a12]/90" : "border-gray-100 bg-[#eef2f9]/90"
+        isDark ? "border-white/5 bg-gray-900/90" : "border-gray-100 bg-[#eef2f9]/90"
       )}
     >
       <div className="flex h-14 items-center justify-end gap-3 px-6 xl:px-8">

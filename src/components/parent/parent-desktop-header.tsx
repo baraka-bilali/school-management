@@ -1,19 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { Megaphone } from "lucide-react"
+import { Megaphone, Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ParentDesktopHeaderProps {
   firstName?: string
   unreadCount?: number
   isDark?: boolean
+  onToggleTheme?: () => void
 }
 
 export default function ParentDesktopHeader({
   firstName,
   unreadCount = 0,
   isDark = false,
+  onToggleTheme,
 }: ParentDesktopHeaderProps) {
   const initials = firstName?.charAt(0)?.toUpperCase() || "P"
 
@@ -21,10 +23,23 @@ export default function ParentDesktopHeader({
     <header
       className={cn(
         "sticky top-0 z-30 hidden border-b backdrop-blur-md lg:block",
-        isDark ? "border-white/5 bg-[#0a0a12]/90" : "border-gray-100 bg-[#eef2f9]/90"
+        isDark ? "border-white/5 bg-gray-900/90" : "border-gray-100 bg-[#eef2f9]/90"
       )}
     >
-      <div className="flex h-14 items-center justify-end gap-3 px-6 xl:px-8">
+      <div className="flex h-14 items-center justify-end gap-2 px-6 xl:px-8">
+        {onToggleTheme && (
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            title={isDark ? "Mode clair" : "Mode sombre"}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+              isDark ? "text-gray-300 hover:bg-white/10" : "text-indigo-600 hover:bg-white"
+            )}
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        )}
         <Link
           href="/parent/messages"
           className={cn(

@@ -148,6 +148,8 @@
   }
   html.dark,
   html.dark body {
+    /* Aligné sur gray-900 : même teinte que les shells admin / parent / élève
+       (évite une bande plus claire sous le contenu avec zoom < 1). */
     background-color: #111827;
   }
 }

@@ -31,7 +31,7 @@ export default function StudentHeader({
     <header
       className={cn(
         "sticky top-0 z-40 border-b backdrop-blur-md lg:hidden",
-        isDark ? "border-gray-800 bg-gray-950/90" : "border-gray-100 bg-[#eef2f9]/90"
+        isDark ? "border-gray-800 bg-gray-900/90" : "border-gray-100 bg-[#eef2f9]/90"
       )}
     >
       <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
