@@ -4,39 +4,36 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LogOut, PanelLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { studentNavItems } from "./student-nav"
+import { parentNavItems } from "./parent-nav"
 
-export interface StudentSidebarProfile {
+export interface ParentSidebarProfile {
   school: string
   fullName: string
   firstName: string
-  className?: string
-  photoUrl?: string | null
+  childrenLabel?: string
 }
 
-interface StudentSidebarProps {
-  profile: StudentSidebarProfile | null
+interface ParentSidebarProps {
+  profile: ParentSidebarProfile | null
   expanded?: boolean
   onToggle?: () => void
-  unreadMessages?: number
-  feePulse?: boolean
+  unreadCommuniques?: number
   onLogout?: () => void
   loggingOut?: boolean
   isDark?: boolean
 }
 
-export default function StudentSidebar({
+export default function ParentSidebar({
   profile,
   expanded = true,
   onToggle,
-  unreadMessages = 0,
-  feePulse = false,
+  unreadCommuniques = 0,
   onLogout,
   loggingOut = false,
   isDark = false,
-}: StudentSidebarProps) {
+}: ParentSidebarProps) {
   const pathname = usePathname()
-  const initials = profile?.firstName?.charAt(0)?.toUpperCase() || "É"
+  const initials = profile?.firstName?.charAt(0)?.toUpperCase() || "P"
 
   return (
     <aside
@@ -46,7 +43,6 @@ export default function StudentSidebar({
         isDark ? "border-white/5 bg-[#0a0a12]" : "border-gray-200 bg-white"
       )}
     >
-      {/* En-tête + toggle (style Claude) */}
       <div
         className={cn(
           "flex shrink-0 items-center border-b",
@@ -55,7 +51,12 @@ export default function StudentSidebar({
         )}
       >
         {expanded && (
-          <p className={cn("min-w-0 truncate pr-2 text-sm font-bold tracking-tight", isDark ? "text-white" : "text-gray-900")}>
+          <p
+            className={cn(
+              "min-w-0 truncate pr-2 text-sm font-bold tracking-tight",
+              isDark ? "text-white" : "text-gray-900"
+            )}
+          >
             {profile?.school || "Mon école"}
           </p>
         )}
@@ -65,7 +66,9 @@ export default function StudentSidebar({
             onClick={onToggle}
             className={cn(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-              isDark ? "text-gray-400 hover:bg-white/10 hover:text-gray-200" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              isDark
+                ? "text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
             )}
             aria-label={expanded ? "Réduire le menu" : "Étendre le menu"}
             title={expanded ? "Réduire le menu" : "Étendre le menu"}
@@ -94,9 +97,9 @@ export default function StudentSidebar({
               <p className={cn("truncate text-sm font-semibold", isDark ? "text-white" : "text-gray-900")}>
                 {profile.fullName}
               </p>
-              {profile.className && (
+              {profile.childrenLabel && (
                 <p className={cn("truncate text-xs", isDark ? "text-gray-400" : "text-gray-500")}>
-                  {profile.className}
+                  {profile.childrenLabel}
                 </p>
               )}
             </div>
@@ -105,10 +108,9 @@ export default function StudentSidebar({
       )}
 
       <nav className={cn("flex-1 space-y-1 overflow-y-auto py-3", expanded ? "px-3" : "px-2")}>
-        {studentNavItems.map(({ href, label, icon: Icon, match, badgeKey }) => {
+        {parentNavItems.map(({ href, label, icon: Icon, match, badgeKey }) => {
           const active = match(pathname)
-          const showMsgBadge = badgeKey === "messages" && unreadMessages > 0 && !active
-          const showFeePulse = badgeKey === "fees" && feePulse && !active
+          const showMsgBadge = badgeKey === "messages" && unreadCommuniques > 0 && !active
 
           return (
             <Link
@@ -135,25 +137,14 @@ export default function StudentSidebar({
                     )}
                   />
                 )}
-                {!expanded && showFeePulse && (
-                  <span
-                    className={cn(
-                      "absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-green-500 ring-2",
-                      isDark ? "ring-[#0a0a12]" : "ring-white"
-                    )}
-                  />
-                )}
               </span>
               {expanded && (
                 <>
                   <span className="truncate">{label}</span>
                   {showMsgBadge && (
                     <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                      {unreadCommuniques > 9 ? "9+" : unreadCommuniques}
                     </span>
-                  )}
-                  {showFeePulse && (
-                    <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-green-500" />
                   )}
                 </>
               )}

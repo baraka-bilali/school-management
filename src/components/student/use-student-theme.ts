@@ -49,7 +49,7 @@ export function useStudentTheme() {
     textMuted: isDark ? "text-gray-400" : "text-gray-500",
     border: isDark ? "border-gray-800 lg:border-white/5" : "border-gray-100",
     shadow: isDark ? "shadow-none" : "shadow-sm shadow-gray-200/60",
-    navBar: isDark ? "border-gray-800 bg-gray-950/95" : "border-gray-100 bg-white/95",
+    navBar: isDark ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white",
     unreadHighlight: isDark ? "border-indigo-500/30 bg-indigo-500/10" : "border-indigo-200 bg-indigo-50",
     unreadHighlightSoft: isDark ? "border-indigo-500/20 bg-indigo-500/5" : "border-indigo-200 bg-indigo-50/50",
     actionBtn: isDark
