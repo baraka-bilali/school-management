@@ -16,14 +16,14 @@ export default function ParentChildrenPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className={cn("text-xl font-bold tracking-tight", text)}>Mes enfants</h1>
-        <p className={cn("mt-1 text-sm", textMuted)}>
+        <h1 className={cn("text-xl font-bold tracking-tight lg:text-3xl", text)}>Mes enfants</h1>
+        <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>
           Consultez les paiements et le suivi scolaire
         </p>
       </div>
 
       {me?.children && me.children.length > 0 ? (
-        <div className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:gap-3">
           {me.children.map((child) => {
             const fullName = `${child.lastName} ${child.middleName || ""} ${child.firstName}`
               .replace(/\s+/g, " ")
@@ -33,7 +33,7 @@ export default function ParentChildrenPage() {
                 key={child.id}
                 href={`/parent/children/${child.id}`}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-indigo-500/40",
+                  "flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-indigo-500/40 lg:p-5",
                   card,
                   border,
                   shadow

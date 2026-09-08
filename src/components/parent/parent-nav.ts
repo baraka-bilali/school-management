@@ -11,6 +11,7 @@ export interface ParentNavItem {
   label: string
   icon: LucideIcon
   match: (pathname: string) => boolean
+  badgeKey?: "messages"
 }
 
 export const parentNavItems: ParentNavItem[] = [
@@ -31,6 +32,7 @@ export const parentNavItems: ParentNavItem[] = [
     label: "Communiqués",
     icon: Megaphone,
     match: (p) => p.startsWith("/parent/messages"),
+    badgeKey: "messages",
   },
   {
     href: "/parent/settings",
@@ -40,4 +42,5 @@ export const parentNavItems: ParentNavItem[] = [
   },
 ]
 
+/** Bottom bar mobile : les 4 entrées principales */
 export const parentMobileNavItems = parentNavItems
