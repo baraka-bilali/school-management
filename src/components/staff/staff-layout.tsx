@@ -98,7 +98,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     if (!profile?.schoolId) return
     const channel = getSupabaseBrowser()
       .channel(`communiques:school:${profile.schoolId}`)
-      .on("broadcast", { event: "new_communique" }, () => {
+      .on("broadcast", { event: "new_communique" }, ({ payload }) => {
+        if (payload?.targetStaff !== true) return
         setUnreadCommuniques((p) => p + 1)
         void showSystemNotification("Kelasi 360", "Nouveau communiqué", {
           url: "/staff/messages",

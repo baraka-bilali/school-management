@@ -14,13 +14,14 @@ import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
 import { StudentsSection, Toolbar, Pagination } from "./students-section"
 import { CoursesSection } from "./courses-section"
+import { ParentsSection } from "./parents-section"
 import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
 import { STAFF_ROLES, STAFF_ROLES_CORE, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
 
-type TabKey = "students" | "teachers" | "staff" | "courses"
+type TabKey = "students" | "teachers" | "staff" | "parents" | "courses"
 
-const TAB_KEYS: TabKey[] = ["students", "teachers", "staff", "courses"]
+const TAB_KEYS: TabKey[] = ["students", "teachers", "staff", "parents", "courses"]
 
 function parseTab(value: string | null): TabKey {
   if (value && TAB_KEYS.includes(value as TabKey)) return value as TabKey
@@ -99,7 +100,7 @@ export default function UsersPage() {
       <div className="space-y-4 md:p-6">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Utilisateurs</h1>
-          <p className={textSecondary}>Gestion des élèves, enseignants et personnel administratif.</p>
+          <p className={textSecondary}>Gestion des élèves, parents, enseignants et personnel administratif.</p>
         </div>
 
         {/* Tabs */}
@@ -114,6 +115,17 @@ export default function UsersPage() {
             onClick={() => changeTab("students")}
           >
             Élèves
+          </button>
+          <button
+            className={cn(
+              "shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium -mb-px border-b-2",
+              tab === "parents"
+                ? "border-indigo-600 text-indigo-700"
+                : `border-transparent ${textSecondary} hover:${textColor}`
+            )}
+            onClick={() => changeTab("parents")}
+          >
+            Parents
           </button>
           <button
             className={cn(
@@ -153,6 +165,7 @@ export default function UsersPage() {
 
         <div className={`transition-all duration-250 ease-out transform ${tabVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
           {tab === "students" && <StudentsSection theme={theme} />}
+          {tab === "parents" && <ParentsSection theme={theme} />}
           {tab === "teachers" && <TeachersSection theme={theme} />}
           {tab === "staff" && <StaffSection theme={theme} />}
           {tab === "courses" && <CoursesSection theme={theme} />}

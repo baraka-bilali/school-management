@@ -125,6 +125,16 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
     popular: true,
   },
   {
+    id: "admin-parents",
+    title: "Parents",
+    subtitle: "Utilisateurs",
+    href: "/admin/users?tab=parents",
+    category: "users",
+    keywords: ["parents", "tuteurs", "famille", "enfants"],
+    icon: Users,
+    roles: ADMIN_LIKE,
+  },
+  {
     id: "admin-teachers",
     title: "Enseignants",
     subtitle: "Utilisateurs",

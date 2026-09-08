@@ -171,7 +171,7 @@ export default function AdminCommuniquesPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editStatus, setEditStatus] = useState<"idle" | "success" | "error">("idle")
   const [targets, setTargets] = useState<AudienceTargets>({
-    targetStudents: true,
+    targetStudents: false,
     targetParents: false,
     targetTeachers: false,
     targetStaff: false,
@@ -348,7 +348,7 @@ export default function AdminCommuniquesPage() {
         setAttachment(null)
         setAttachmentError(null)
         setTargets({
-          targetStudents: true,
+          targetStudents: false,
           targetParents: false,
           targetTeachers: false,
           targetStaff: false,
