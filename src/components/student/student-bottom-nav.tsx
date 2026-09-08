@@ -55,7 +55,7 @@ export default function StudentBottomNav({ feePulse = false, isDark = false }: S
                   <span
                     className={cn(
                       "absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-green-500 ring-2",
-                      isDark ? "ring-gray-950" : "ring-white"
+                      isDark ? "ring-gray-900" : "ring-white"
                     )}
                   />
                 )}
