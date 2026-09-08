@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import Portal from "@/components/portal"
-import { Banner } from "@/components/ui/banner"
 import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 import { Toolbar, Pagination } from "./students-section"
 import { authFetch } from "@/lib/auth-fetch"
@@ -54,6 +53,16 @@ type StudentOption = {
   firstName: string
 }
 
+type CredentialsPayload = {
+  email: string
+  plaintextPassword: string
+  lastName: string
+  middleName?: string | null
+  firstName: string
+  phone?: string | null
+  childrenCount?: number
+}
+
 interface PaginationState {
   page: number
   pageSize: number
@@ -63,32 +72,40 @@ function fullName(p: { lastName?: string | null; middleName?: string | null; fir
   return [p.lastName, p.middleName, p.firstName].filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
 }
 
+function copyText(value: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    void navigator.clipboard.writeText(value)
+    return
+  }
+  const textArea = document.createElement("textarea")
+  textArea.value = value
+  textArea.style.position = "fixed"
+  textArea.style.left = "-9999px"
+  document.body.appendChild(textArea)
+  textArea.select()
+  document.execCommand("copy")
+  document.body.removeChild(textArea)
+}
+
 export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
   const [items, setItems] = useState<ParentItem[]>([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, pageSize: 20 })
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(true)
-  const [banner, setBanner] = useState<{
-    message?: string
-    email?: string
-    password?: string
-    type?: "success" | "error"
-    notificationType?: "create" | "update"
-  } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<ParentItem | null>(null)
   const [mobileExpandedId, setMobileExpandedId] = useState<number | null>(null)
-  const [showResetModal, setShowResetModal] = useState(false)
-  const [selectedForReset, setSelectedForReset] = useState<ParentItem | null>(null)
-  const [newPassword, setNewPassword] = useState("")
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [selectedForCredentials, setSelectedForCredentials] = useState<ParentItem | null>(null)
+  const [newPasswordGenerated, setNewPasswordGenerated] = useState("")
   const [resetting, setResetting] = useState(false)
   const [credentialsMode, setCredentialsMode] = useState<"create" | "reset">("reset")
   const [passwordCopied, setPasswordCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
 
   const bgCard = theme === "dark" ? "bg-gray-800" : "bg-white"
-  const bgInput = theme === "dark" ? "bg-gray-700" : "bg-white"
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
@@ -117,28 +134,47 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
     void load()
   }, [load])
 
+  const closeCredentials = () => {
+    setShowResetConfirm(false)
+    setSelectedForCredentials(null)
+    setNewPasswordGenerated("")
+    setCredentialsMode("reset")
+    setPasswordCopied(false)
+    setEmailCopied(false)
+  }
+
+  const openResetConfirm = (parent: ParentItem) => {
+    setSelectedForCredentials(parent)
+    setCredentialsMode("reset")
+    setNewPasswordGenerated("")
+    setShowResetConfirm(true)
+    setPasswordCopied(false)
+    setEmailCopied(false)
+  }
+
   const handleConfirmReset = async () => {
-    if (!selectedForReset) return
+    if (!selectedForCredentials) return
     try {
       setResetting(true)
-      const res = await authFetch(`/api/admin/parents/${selectedForReset.id}/reset-password`, {
+      const res = await authFetch(`/api/admin/parents/${selectedForCredentials.id}/reset-password`, {
         method: "POST",
       })
       if (res.ok) {
         const data = await res.json()
-        setNewPassword(data.newPassword)
-        setSelectedForReset({
-          ...selectedForReset,
-          user: { ...selectedForReset.user, email: data.parent.email },
+        setNewPasswordGenerated(data.newPassword)
+        setSelectedForCredentials({
+          ...selectedForCredentials,
+          user: { ...selectedForCredentials.user, email: data.parent.email },
         })
+        setShowResetConfirm(false)
       } else {
         const data = await res.json().catch(() => ({}))
         toast.error(data.error || "Erreur lors de la réinitialisation")
-        setShowResetModal(false)
+        closeCredentials()
       }
     } catch {
       toast.error("Une erreur est survenue")
-      setShowResetModal(false)
+      closeCredentials()
     } finally {
       setResetting(false)
     }
@@ -153,17 +189,6 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {banner && (
-          <Banner
-            type={banner.type}
-            message={banner.message}
-            email={banner.email}
-            password={banner.password}
-            notificationType={banner.notificationType}
-            onClose={() => setBanner(null)}
-          />
-        )}
-
         <Toolbar
           placeholder="Rechercher par nom, téléphone ou email"
           onCreate={() => setShowCreate(true)}
@@ -193,8 +218,8 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
                     <div
                       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                         theme === "dark"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-emerald-100 text-emerald-700"
+                          ? "bg-indigo-500/20 text-indigo-300"
+                          : "bg-indigo-100 text-indigo-700"
                       }`}
                     >
                       {initials}
@@ -245,17 +270,11 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedForReset(p)
-                            setCredentialsMode("reset")
-                            setNewPassword("")
-                            setShowResetModal(true)
-                            setPasswordCopied(false)
-                            setEmailCopied(false)
-                          }}
+                          onClick={() => openResetConfirm(p)}
                           className={`inline-flex items-center justify-center rounded-xl border px-3 py-2 ${borderColor} ${textColor}`}
+                          title="Réinitialiser le mot de passe"
                         >
-                          <KeyRound className="h-4 w-4" />
+                          <KeyRound className="h-4 w-4 text-orange-500" />
                         </button>
                       </div>
                     </div>
@@ -323,17 +342,10 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
                         <button
                           type="button"
                           title="Réinitialiser le mot de passe"
-                          onClick={() => {
-                            setSelectedForReset(p)
-                            setCredentialsMode("reset")
-                            setNewPassword("")
-                            setShowResetModal(true)
-                            setPasswordCopied(false)
-                            setEmailCopied(false)
-                          }}
-                          className={`rounded-lg p-1.5 ${hoverBg} ${textSecondary}`}
+                          onClick={() => openResetConfirm(p)}
+                          className={`rounded-lg p-1.5 ${hoverBg}`}
                         >
-                          <KeyRound className="h-4 w-4" />
+                          <KeyRound className="h-4 w-4 text-orange-500" />
                         </button>
                       </div>
                     </td>
@@ -365,123 +377,330 @@ export function ParentsSection({ theme }: { theme: "light" | "dark" }) {
             setShowCreate(false)
             setEditing(null)
             if (payload?.email && payload?.plaintextPassword) {
-              setBanner({
-                message: "Compte parent créé avec succès",
-                email: payload.email,
-                password: payload.plaintextPassword,
-                type: "success",
-                notificationType: "create",
-              })
-              setSelectedForReset({
+              setSelectedForCredentials({
                 id: 0,
-                lastName: "",
-                middleName: null,
-                firstName: "",
-                phone: null,
+                lastName: payload.lastName,
+                middleName: payload.middleName || null,
+                firstName: payload.firstName,
+                phone: payload.phone || null,
                 userId: 0,
                 user: { id: 0, email: payload.email },
                 students: [],
+                childrenCount: payload.childrenCount || 0,
               })
-              setNewPassword(payload.plaintextPassword)
+              setNewPasswordGenerated(payload.plaintextPassword)
               setCredentialsMode("create")
-              setShowResetModal(true)
+              setShowResetConfirm(false)
               setPasswordCopied(false)
               setEmailCopied(false)
             } else {
-              setBanner({
-                message: "Parent mis à jour",
-                type: "success",
-                notificationType: "update",
-              })
-              setTimeout(() => setBanner(null), 3000)
+              toast.success("Parent mis à jour")
             }
             void load()
           }}
         />
 
-        {showResetModal && selectedForReset && (
+        {/* Modal confirmation reset MDP — style élèves / enseignants */}
+        {showResetConfirm && !newPasswordGenerated && selectedForCredentials && (
           <Portal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowResetModal(false)} />
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeCredentials} />
               <div
-                className={`relative w-full max-w-md rounded-2xl border p-5 shadow-2xl ${
+                className={`relative w-full max-w-md transform rounded-2xl border shadow-2xl transition-all duration-200 ${
                   theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"
                 }`}
               >
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h3 className={`text-lg font-semibold ${textColor}`}>
-                      {credentialsMode === "create" ? "Identifiants parent" : "Réinitialiser le mot de passe"}
-                    </h3>
-                    <p className={`mt-1 text-sm ${textSecondary}`}>
-                      {credentialsMode === "create"
-                        ? "Communiquez ces identifiants au parent de façon sécurisée."
-                        : `Nouveau mot de passe pour ${fullName(selectedForReset) || selectedForReset.user.email}`}
-                    </p>
-                  </div>
-                  <button type="button" className={textSecondary} onClick={() => setShowResetModal(false)}>
-                    <X className="h-5 w-5" />
-                  </button>
+                <div className={`border-b p-6 ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <h3
+                    className={`flex items-center gap-2 text-xl font-bold ${
+                      theme === "dark" ? "text-gray-100" : "text-gray-900"
+                    }`}
+                  >
+                    <KeyRound className="h-5 w-5 text-orange-500" />
+                    Réinitialiser le mot de passe
+                  </h3>
                 </div>
-
-                {!newPassword && credentialsMode === "reset" ? (
+                <div className="p-6">
+                  <div className="mb-4 flex items-center gap-4">
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold ${
+                        theme === "dark"
+                          ? "bg-indigo-500/20 text-indigo-400"
+                          : "bg-indigo-100 text-indigo-600"
+                      }`}
+                    >
+                      {selectedForCredentials.firstName?.charAt(0)}
+                      {selectedForCredentials.lastName?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                        {fullName(selectedForCredentials)}
+                      </p>
+                      <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        {selectedForCredentials.phone || "Parent"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className={`mb-2 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                    Êtes-vous sûr de vouloir réinitialiser le mot de passe de ce parent ?
+                  </p>
+                  <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Un nouveau mot de passe temporaire sera généré. Le parent pourra le changer lors de sa
+                    prochaine connexion.
+                  </p>
+                </div>
+                <div
+                  className={`flex gap-3 border-t p-6 ${
+                    theme === "dark" ? "border-gray-700" : "border-gray-200"
+                  }`}
+                >
                   <button
                     type="button"
+                    onClick={closeCredentials}
                     disabled={resetting}
-                    onClick={handleConfirmReset}
-                    className="w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-all disabled:opacity-50 ${
+                      theme === "dark"
+                        ? "border border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600"
+                        : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
                   >
-                    {resetting ? "Génération..." : "Générer un nouveau mot de passe"}
+                    <X className="h-4 w-4" />
+                    Annuler
                   </button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className={`rounded-xl border ${borderColor} p-3`}>
-                      <div className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-500">
-                        <Mail className="h-3.5 w-3.5" /> Email
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <code className={`truncate text-sm ${textColor}`}>{selectedForReset.user.email}</code>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(selectedForReset.user.email)
-                            setEmailCopied(true)
-                            setTimeout(() => setEmailCopied(false), 1500)
-                          }}
-                          className={textSecondary}
-                        >
-                          {emailCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                      </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmReset}
+                    disabled={resetting}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    {resetting ? "Réinitialisation..." : "Réinitialiser"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
+
+        {/* Modal identifiants — même design que élèves / enseignants */}
+        {newPasswordGenerated && selectedForCredentials && (
+          <Portal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeCredentials} />
+              <div
+                className={`relative w-full max-w-lg transform rounded-2xl border shadow-2xl transition-all duration-200 ${
+                  theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"
+                }`}
+              >
+                <div
+                  className={`border-b p-6 ${
+                    theme === "dark"
+                      ? "border-green-500/20 bg-green-500/5"
+                      : "border-green-200 bg-green-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-green-500/20">
+                      <KeyRound className="h-7 w-7 text-green-500" />
                     </div>
-                    <div className={`rounded-xl border ${borderColor} p-3`}>
-                      <div className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-500">
-                        <KeyRound className="h-3.5 w-3.5" /> Mot de passe
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <code className={`text-sm ${textColor}`}>{newPassword}</code>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(newPassword)
-                            setPasswordCopied(true)
-                            setTimeout(() => setPasswordCopied(false), 1500)
-                          }}
-                          className={textSecondary}
-                        >
-                          {passwordCopied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                      </div>
+                    <div>
+                      <h2
+                        className={`text-lg font-bold ${
+                          theme === "dark" ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        Identifiants de Connexion
+                      </h2>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        {credentialsMode === "create"
+                          ? "Compte créé avec succès"
+                          : "Mot de passe réinitialisé avec succès"}
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowResetModal(false)}
-                      className="w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white"
-                    >
-                      Fermer
-                    </button>
                   </div>
-                )}
+                </div>
+
+                <div className="space-y-4 p-6">
+                  <div
+                    className={`rounded-lg border p-4 ${
+                      theme === "dark"
+                        ? "border-yellow-500/30 bg-yellow-500/10"
+                        : "border-yellow-200 bg-yellow-50"
+                    }`}
+                  >
+                    <p
+                      className={`flex items-start gap-2 text-sm font-medium ${
+                        theme === "dark" ? "text-yellow-400" : "text-yellow-700"
+                      }`}
+                    >
+                      <svg
+                        className="mt-0.5 h-5 w-5 flex-shrink-0"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>
+                        <strong>Important :</strong> Copiez ces identifiants maintenant ! Ils ne seront plus
+                        affichés après la fermeture.
+                      </span>
+                    </p>
+                  </div>
+
+                  <div
+                    className={`flex items-center gap-3 rounded-lg p-3 ${
+                      theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"
+                    }`}
+                  >
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                        theme === "dark"
+                          ? "bg-indigo-500/20 text-indigo-400"
+                          : "bg-indigo-100 text-indigo-600"
+                      }`}
+                    >
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                        {fullName(selectedForCredentials)}
+                      </p>
+                      <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                        Parent
+                        {typeof selectedForCredentials.childrenCount === "number"
+                          ? ` · ${selectedForCredentials.childrenCount} enfant${
+                              selectedForCredentials.childrenCount !== 1 ? "s" : ""
+                            }`
+                          : selectedForCredentials.students.length > 0
+                            ? ` · ${selectedForCredentials.students.length} enfant${
+                                selectedForCredentials.students.length !== 1 ? "s" : ""
+                              }`
+                            : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`mb-2 flex items-center gap-1.5 text-xs font-semibold ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Adresse email
+                    </label>
+                    <div
+                      className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:border-indigo-500 ${
+                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      } ${
+                        emailCopied
+                          ? "border-green-500"
+                          : theme === "dark"
+                            ? "border-gray-600"
+                            : "border-gray-200"
+                      }`}
+                    >
+                      <span
+                        className={`select-all font-mono text-sm ${
+                          theme === "dark" ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        {selectedForCredentials.user.email}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          copyText(selectedForCredentials.user.email)
+                          setEmailCopied(true)
+                          setTimeout(() => setEmailCopied(false), 2000)
+                        }}
+                        className={`rounded p-1.5 transition-colors ${
+                          emailCopied
+                            ? "bg-green-500/20 text-green-500"
+                            : "text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400"
+                        }`}
+                        title={emailCopied ? "Copié !" : "Copier l'email"}
+                      >
+                        {emailCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`mb-2 flex items-center gap-1.5 text-xs font-semibold ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      {credentialsMode === "create" ? "Mot de passe temporaire" : "Nouveau mot de passe"}
+                    </label>
+                    <div
+                      className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:border-orange-500 ${
+                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      } ${
+                        passwordCopied
+                          ? "border-green-500"
+                          : theme === "dark"
+                            ? "border-gray-600"
+                            : "border-gray-200"
+                      }`}
+                    >
+                      <span
+                        className={`select-all font-mono text-lg font-bold ${
+                          theme === "dark" ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        {newPasswordGenerated}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          copyText(newPasswordGenerated)
+                          setPasswordCopied(true)
+                          setTimeout(() => setPasswordCopied(false), 2000)
+                        }}
+                        className={`rounded p-1.5 transition-colors ${
+                          passwordCopied
+                            ? "bg-green-500/20 text-green-500"
+                            : "text-orange-500 hover:bg-orange-500/10 hover:text-orange-400"
+                        }`}
+                        title={passwordCopied ? "Copié !" : "Copier le mot de passe"}
+                      >
+                        {passwordCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+                    Le parent devra changer ce mot de passe lors de sa prochaine connexion.
+                  </p>
+                </div>
+
+                <div className={`border-t p-6 ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                  <button
+                    type="button"
+                    onClick={closeCredentials}
+                    className={`flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                      passwordCopied && emailCopied
+                        ? theme === "dark"
+                          ? "border border-green-500/70 bg-green-500/30 text-green-300 hover:bg-green-500/40"
+                          : "border border-green-300 bg-green-100 text-green-700 hover:bg-green-200"
+                        : theme === "dark"
+                          ? "border border-green-500/50 bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                          : "border border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                    }`}
+                  >
+                    <Check className="h-4 w-4" />
+                    {passwordCopied && emailCopied
+                      ? "✓ Identifiants copiés !"
+                      : "J'ai copié les identifiants"}
+                  </button>
+                </div>
               </div>
             </div>
           </Portal>
@@ -504,7 +723,7 @@ function ParentFormModal({
   initial: ParentItem | null
   theme: "light" | "dark"
   onClose: () => void
-  onSaved: (payload?: { email: string; plaintextPassword: string }) => void
+  onSaved: (payload?: CredentialsPayload) => void
 }) {
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
@@ -612,9 +831,7 @@ function ParentFormModal({
         })
       }
     }
-    return selectedIds
-      .map((id) => map.get(id))
-      .filter(Boolean) as StudentOption[]
+    return selectedIds.map((id) => map.get(id)).filter(Boolean) as StudentOption[]
   }, [selectedIds, studentOptions, initial])
 
   if (!mounted) return null
@@ -640,7 +857,15 @@ function ParentFormModal({
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Erreur")
-        onSaved({ email: data.user.email, plaintextPassword: data.plaintextPassword })
+        onSaved({
+          email: data.user.email,
+          plaintextPassword: data.plaintextPassword,
+          lastName: form.lastName,
+          middleName: form.middleName,
+          firstName: form.firstName,
+          phone: form.phone,
+          childrenCount: selectedIds.length,
+        })
       } else if (initial) {
         const res = await authFetch(`/api/admin/parents/${initial.id}`, {
           method: "PUT",
@@ -668,7 +893,7 @@ function ParentFormModal({
           visible ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div
           className={`relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl transition-all duration-200 ${
             theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"
@@ -677,24 +902,35 @@ function ParentFormModal({
           aria-modal="true"
         >
           <div
-            className={`flex items-center justify-between border-b px-4 py-3 ${
-              theme === "dark" ? "border-gray-700" : "border-gray-200"
+            className={`flex items-center justify-between border-b px-5 py-4 ${
+              theme === "dark"
+                ? "border-indigo-500/20 bg-indigo-500/5"
+                : "border-indigo-100 bg-indigo-50/70"
             }`}
           >
-            <div>
-              <h3 className={`text-lg font-semibold ${textColor}`}>
-                {mode === "create" ? "Nouveau compte parent" : "Modifier le parent"}
-              </h3>
-              <p className={`text-xs ${textSecondary}`}>
-                Assignez un ou plusieurs élèves pour le suivi scolaire
-              </p>
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-full ${
+                  theme === "dark" ? "bg-indigo-500/20 text-indigo-300" : "bg-indigo-100 text-indigo-600"
+                }`}
+              >
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className={`text-lg font-bold ${textColor}`}>
+                  {mode === "create" ? "Nouveau compte parent" : "Modifier le parent"}
+                </h3>
+                <p className={`text-xs ${textSecondary}`}>
+                  Assignez un ou plusieurs élèves pour le suivi scolaire
+                </p>
+              </div>
             </div>
             <button type="button" className={textSecondary} onClick={onClose}>
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="space-y-4 overflow-y-auto p-4">
+          <div className="space-y-4 overflow-y-auto p-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className={`mb-1 block text-sm ${textSecondary}`}>
@@ -750,13 +986,11 @@ function ParentFormModal({
             </div>
 
             <div className={`rounded-2xl border p-3 ${borderColor}`}>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <User className={`h-4 w-4 ${textSecondary}`} />
-                  <p className={`text-sm font-semibold ${textColor}`}>
-                    Élèves assignés ({selectedIds.length})
-                  </p>
-                </div>
+              <div className="mb-2 flex items-center gap-2">
+                <User className={`h-4 w-4 ${textSecondary}`} />
+                <p className={`text-sm font-semibold ${textColor}`}>
+                  Élèves assignés ({selectedIds.length})
+                </p>
               </div>
 
               {selectedLabels.length > 0 && (
@@ -766,7 +1000,7 @@ function ParentFormModal({
                       key={`sel-${s.id}`}
                       type="button"
                       onClick={() => toggleStudent(s.id)}
-                      className="inline-flex items-center gap-1 rounded-full bg-emerald-600/15 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                      className="inline-flex items-center gap-1 rounded-full bg-indigo-600/15 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300"
                     >
                       {fullName(s)}
                       <X className="h-3 w-3" />
@@ -803,8 +1037,8 @@ function ParentFormModal({
                         className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
                           checked
                             ? theme === "dark"
-                              ? "bg-emerald-500/15"
-                              : "bg-emerald-50"
+                              ? "bg-indigo-500/15"
+                              : "bg-indigo-50"
                             : theme === "dark"
                               ? "hover:bg-gray-700/80"
                               : "hover:bg-gray-50"
@@ -812,9 +1046,7 @@ function ParentFormModal({
                       >
                         <span
                           className={`flex h-5 w-5 items-center justify-center rounded border ${
-                            checked
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : borderColor
+                            checked ? "border-indigo-500 bg-indigo-500 text-white" : borderColor
                           }`}
                         >
                           {checked && <Check className="h-3.5 w-3.5" />}
@@ -831,14 +1063,14 @@ function ParentFormModal({
           </div>
 
           <div
-            className={`flex items-center justify-end gap-2 border-t px-4 py-3 ${
+            className={`flex items-center justify-end gap-2 border-t px-5 py-3 ${
               theme === "dark" ? "border-gray-700" : "border-gray-200"
             }`}
           >
             <button
               type="button"
               onClick={onClose}
-              className={`rounded-xl border px-4 py-2 text-sm font-medium ${borderColor} ${textColor}`}
+              className={`rounded-lg border px-4 py-2.5 text-sm font-medium ${borderColor} ${textColor}`}
             >
               Annuler
             </button>
@@ -846,7 +1078,7 @@ function ParentFormModal({
               type="button"
               disabled={!canSubmit || submitting}
               onClick={submit}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {submitting ? "Enregistrement…" : mode === "create" ? "Créer le compte" : "Enregistrer"}
             </button>
