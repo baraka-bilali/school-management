@@ -7,11 +7,12 @@ export function getStaffRolesInSchema(): User_role[] {
   return STAFF_ROLES.filter((r) => known.has(r as User_role)) as User_role[]
 }
 
-/** Filtre Prisma : tous les utilisateurs hors admin, élève, prof, super-admin. */
+/** Filtre Prisma : tous les utilisateurs hors admin, élève, prof, parent, super-admin. */
 export const NON_STAFF_USER_ROLES: User_role[] = [
   User_role.ADMIN,
   User_role.ELEVE,
   User_role.PROFESSEUR,
+  User_role.PARENT,
   User_role.SUPER_ADMIN,
 ]
 

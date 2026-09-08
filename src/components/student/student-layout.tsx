@@ -115,7 +115,8 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     if (!schoolId) return
     const channel = getSupabaseBrowser()
       .channel(`communiques:school:${schoolId}`)
-      .on("broadcast", { event: "new_communique" }, () => {
+      .on("broadcast", { event: "new_communique" }, ({ payload }) => {
+        if (payload?.targetStudents !== true) return
         setUnreadCommuniques((prev) => prev + 1)
         void showSystemNotification("Kelasi 360", "Nouveau communiqué", { url: "/student/communiques" })
       })

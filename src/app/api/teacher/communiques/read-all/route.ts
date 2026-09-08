@@ -3,9 +3,11 @@ import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import {
+  communiqueAudienceFilter,
   communiqueYearFilter,
   getUserReadCommuniqueIds,
   markAllCommuniquesReadForUser,
+  mergeCommuniqueWhere,
 } from "@/lib/communique-user-read"
 
 export async function POST(req: NextRequest) {
@@ -15,7 +17,10 @@ export async function POST(req: NextRequest) {
   }
 
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
-  const where = communiqueYearFilter(ctx.schoolId, yearId)
+  const where = mergeCommuniqueWhere(
+    communiqueYearFilter(ctx.schoolId, yearId),
+    communiqueAudienceFilter("teachers")
+  )
   const readIds = await getUserReadCommuniqueIds(ctx.userId)
 
   const unread = await prisma.communique.findMany({

@@ -35,16 +35,22 @@ export default function ParentHomePage() {
           </Link>
         </div>
 
-        {me?.children && me.children.length > 0 ? (
+            {me?.children && me.children.length > 0 ? (
           <div className="space-y-2">
             {me.children.map((child) => {
               const fullName = `${child.lastName} ${child.middleName || ""} ${child.firstName}`
                 .replace(/\s+/g, " ")
                 .trim()
               return (
-                <div
+                <Link
                   key={child.id}
-                  className={cn("flex items-center gap-3 rounded-2xl border p-4", card, border, shadow)}
+                  href={`/parent/children/${child.id}`}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-indigo-500/40",
+                    card,
+                    border,
+                    shadow
+                  )}
                 >
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
                     {child.firstName?.charAt(0)?.toUpperCase() || "E"}
@@ -56,7 +62,8 @@ export default function ParentHomePage() {
                       {child.relationship ? ` · ${child.relationship}` : ""}
                     </p>
                   </div>
-                </div>
+                  <ChevronRight className={cn("h-5 w-5 shrink-0", textMuted)} />
+                </Link>
               )
             })}
           </div>

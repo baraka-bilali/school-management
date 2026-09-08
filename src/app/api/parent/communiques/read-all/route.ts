@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getStaffFromRequest } from "@/lib/staff-auth"
+import { getParentFromRequest } from "@/lib/parent-auth"
 import { prisma } from "@/lib/prisma"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/lib/communique-user-read"
 
 export async function POST(req: NextRequest) {
-  const ctx = await getStaffFromRequest(req)
+  const ctx = await getParentFromRequest(req)
   if (!ctx) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const yearId = ctx.yearId ?? (await getSchoolCurrentYearId(ctx.schoolId))
   const where = mergeCommuniqueWhere(
     communiqueYearFilter(ctx.schoolId, yearId),
-    communiqueAudienceFilter("staff")
+    communiqueAudienceFilter("parents")
   )
   const readIds = await getUserReadCommuniqueIds(ctx.userId)
 

@@ -126,7 +126,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     if (!teacher?.schoolId) return
     const channel = getSupabaseBrowser()
       .channel(`communiques:school:${teacher.schoolId}`)
-      .on("broadcast", { event: "new_communique" }, () => {
+      .on("broadcast", { event: "new_communique" }, ({ payload }) => {
+        if (payload?.targetTeachers !== true) return
         setUnreadCommuniques((p) => p + 1)
         void showSystemNotification("Kelasi 360", "Nouveau communiqué", {
           url: "/teacher/messages?tab=communiques",
