@@ -148,6 +148,8 @@
   }
   html.dark,
   html.dark body {
+    /* Aligné sur gray-900 : même teinte que les shells admin / parent / élève
+       (évite une bande plus claire sous le contenu avec zoom < 1). */
     background-color: #111827;
   }
 }
@@ -155,8 +157,8 @@
 /*
  * Densité UI par défaut ≈ zoom navigateur 80 %.
  * Desktop uniquement : sur mobile, on garde 100 % pour les zones tactiles.
- * Le fond html/body reste gray-900 en dark pour éviter une bande plus sombre
- * sous le layout (effet visible avec zoom < 1).
+ * html/body + shells portails partagent gray-900 (#111827) en dark pour
+ * qu’aucune bande de couleur différente n’apparaisse sous le contenu (zoom).
  */
 @media (min-width: 768px) {
   html {

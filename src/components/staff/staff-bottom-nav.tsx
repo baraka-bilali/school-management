@@ -22,7 +22,7 @@ export default function StaffBottomNav({
     <nav
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 border-t px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden",
-        isDark ? "border-gray-800 bg-gray-950" : "border-gray-100 bg-white"
+        isDark ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"
       )}
     >
       <div className="mx-auto flex max-w-lg items-center justify-around py-2">

@@ -14,7 +14,7 @@ import { showSystemNotification } from "@/lib/system-notifications"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { isDark, bg, desktopBg } = useTeacherTheme()
+  const { isDark, bg, desktopBg, toggleTheme, theme } = useTeacherTheme()
   const { parent: me } = useParentMe()
   const [unread, setUnread] = useState(0)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -113,12 +113,14 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           firstName={me?.firstName}
           unreadCount={unread}
           isDark={isDark}
+          onToggleTheme={() => toggleTheme(theme === "dark" ? "light" : "dark")}
         />
 
         <ParentDesktopHeader
           firstName={me?.firstName}
           unreadCount={unread}
           isDark={isDark}
+          onToggleTheme={() => toggleTheme(theme === "dark" ? "light" : "dark")}
         />
 
         <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-2 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6 xl:max-w-6xl xl:px-8">
