@@ -234,9 +234,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const lastName = String(body.lastName || "").trim()
-    const firstName = String(body.firstName || "").trim()
-    const middleName = body.middleName ? String(body.middleName).trim() : null
+    const lastName = String(body.lastName || "").trim().toUpperCase()
+    const firstName = String(body.firstName || "").trim().toUpperCase()
+    const middleName = body.middleName ? String(body.middleName).trim().toUpperCase() : null
     const phone = body.phone ? String(body.phone).trim() : null
     const links = parseStudentLinks(body) || []
 
