@@ -23,6 +23,31 @@ interface PaginationState {
   pageSize: number
 }
 
+type CreateStep = "search" | "reenroll" | "create"
+type ReenrollOrigine = "PASSAGE" | "REDOUBLEMENT" | "TRANSFERT"
+
+type StudentSearchHit = {
+  id: number
+  permanentCode?: string | null
+  code?: string | null
+  lastName?: string | null
+  middleName?: string | null
+  firstName?: string | null
+  birthDate?: string | null
+  enrollments?: Array<{
+    code?: string | null
+    yearId?: number
+    class?: { name?: string } | null
+    year?: { id?: number; name?: string } | null
+  }>
+}
+
+function latestEnrollment(student: StudentSearchHit) {
+  const list = student.enrollments || []
+  if (!list.length) return undefined
+  return [...list].sort((a, b) => (b.yearId || 0) - (a.yearId || 0))[0]
+}
+
 function CreateStudentModal({
   open,
   onClose,
@@ -39,7 +64,7 @@ function CreateStudentModal({
   years: AcademicYearOption[]
   defaultYearId?: number
   currentYearId?: number | null
-  onCreated: (payload: { 
+  onCreated: (payload: {
     email: string
     plaintextPassword: string
     lastName?: string
@@ -47,10 +72,11 @@ function CreateStudentModal({
     code?: string
     classId?: number
     academicYearId?: number
+    existingAccount?: boolean
   }) => void
   theme?: "light" | "dark"
 }) {
-  const [form, setForm] = useState({
+  const emptyCreateForm = () => ({
     lastName: "",
     middleName: "",
     firstName: "",
@@ -60,15 +86,29 @@ function CreateStudentModal({
     classId: "",
     academicYearId: defaultYearId ? String(defaultYearId) : "",
   })
+
+  const [step, setStep] = useState<CreateStep>("search")
+  const [searchForm, setSearchForm] = useState({ lastName: "", firstName: "", birthDate: "" })
+  const [searching, setSearching] = useState(false)
+  const [searchDone, setSearchDone] = useState(false)
+  const [matches, setMatches] = useState<StudentSearchHit[]>([])
+  const [selectedStudent, setSelectedStudent] = useState<StudentSearchHit | null>(null)
+  const [reenrollForm, setReenrollForm] = useState({
+    classId: "",
+    academicYearId: defaultYearId ? String(defaultYearId) : "",
+    origine: "PASSAGE" as ReenrollOrigine,
+    code: "",
+  })
+  const [form, setForm] = useState(emptyCreateForm)
   const [autoCode, setAutoCode] = useState(false)
   const [autoCodeLoading, setAutoCodeLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<StudentCreateField, string>>>({})
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<StudentCreateField | "yearId" | "origine", string>>>({})
   const [formError, setFormError] = useState("")
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
 
-  const clearFieldError = (field: StudentCreateField) => {
+  const clearFieldError = (field: StudentCreateField | "yearId" | "origine") => {
     setFieldErrors((prev) => {
       if (!prev[field]) return prev
       const next = { ...prev }
@@ -78,7 +118,7 @@ function CreateStudentModal({
     setFormError("")
   }
 
-  const inputClass = (field?: StudentCreateField) => {
+  const inputClass = (field?: StudentCreateField | "yearId" | "origine") => {
     const hasError = field && fieldErrors[field]
     const base =
       theme === "dark"
@@ -88,24 +128,27 @@ function CreateStudentModal({
     return `w-full rounded-md border px-3 py-2 ${hasError ? err : base}`
   }
 
-  const FieldError = ({ field }: { field: StudentCreateField }) =>
+  const FieldError = ({ field }: { field: StudentCreateField | "yearId" | "origine" }) =>
     fieldErrors[field] ? (
       <p className="mt-1 text-xs text-red-500">{fieldErrors[field]}</p>
     ) : null
 
-  // reset form when opening the modal so previous inputs are cleared
+  // reset flow when opening the modal
   useEffect(() => {
     if (open) {
-      setForm({
-        lastName: "",
-        middleName: "",
-        firstName: "",
-        gender: "M",
-        birthDate: "",
-        code: "",
+      setStep("search")
+      setSearchForm({ lastName: "", firstName: "", birthDate: "" })
+      setSearching(false)
+      setSearchDone(false)
+      setMatches([])
+      setSelectedStudent(null)
+      setReenrollForm({
         classId: "",
         academicYearId: defaultYearId ? String(defaultYearId) : "",
+        origine: "PASSAGE",
+        code: "",
       })
+      setForm(emptyCreateForm())
       setAutoCode(false)
       setSubmitting(false)
       setFieldErrors({})
@@ -113,33 +156,34 @@ function CreateStudentModal({
     }
   }, [open, defaultYearId])
 
-  // Auto-fetch next code when autoCode is on and classId changes
+  // Auto-fetch next code when autoCode is on and classId changes (create step)
   useEffect(() => {
-    if (!autoCode || !form.classId) return
+    if (step !== "create" || !autoCode || !form.classId) return
     let cancelled = false
     setAutoCodeLoading(true)
     const params = new URLSearchParams({ classId: form.classId })
     if (form.academicYearId) params.set("yearId", form.academicYearId)
     authFetch(`/api/admin/students/next-code?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        if (!cancelled) setForm(f => ({ ...f, code: String(data.nextCode ?? 1) }))
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setForm((f) => ({ ...f, code: String(data.nextCode ?? 1) }))
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setAutoCodeLoading(false) })
-    return () => { cancelled = true }
-  }, [autoCode, form.classId, form.academicYearId])
+      .finally(() => {
+        if (!cancelled) setAutoCodeLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [step, autoCode, form.classId, form.academicYearId])
 
   // manage mount/visibility so opening animates smoothly
   useEffect(() => {
     if (open) {
       setMounted(true)
-      // allow the element to mount first, then set visible to trigger CSS transition
       const id = setTimeout(() => setVisible(true), 10)
       return () => clearTimeout(id)
     }
-
-    // closing: animate out first then unmount
     setVisible(false)
     const t = setTimeout(() => setMounted(false), 220)
     return () => clearTimeout(t)
@@ -148,8 +192,155 @@ function CreateStudentModal({
   if (!mounted) return null
 
   const toUpper = (v: string) => v.toUpperCase()
+  const labelClass = theme === "dark" ? "text-gray-200" : "text-gray-700"
+  const mutedClass = theme === "dark" ? "text-gray-400" : "text-gray-500"
+  const cardClass =
+    theme === "dark"
+      ? "border-gray-600 bg-gray-700/50"
+      : "border-gray-200 bg-gray-50"
 
-  const submit = async () => {
+  const title =
+    step === "search"
+      ? "Créer / réinscrire un élève"
+      : step === "reenroll"
+        ? "Réinscrire un élève"
+        : "Créer un nouvel élève"
+
+  const goBackToSearch = () => {
+    setStep("search")
+    setSelectedStudent(null)
+    setFieldErrors({})
+    setFormError("")
+    setSubmitting(false)
+  }
+
+  const runSearch = async () => {
+    const lastName = searchForm.lastName.trim()
+    const firstName = searchForm.firstName.trim()
+    if (!lastName && !firstName) {
+      setFormError("Saisissez au moins un nom ou un prénom pour rechercher.")
+      return
+    }
+    setFormError("")
+    setSearching(true)
+    setSearchDone(false)
+    try {
+      const q = [lastName, firstName].filter(Boolean).join(" ").trim()
+      const params = new URLSearchParams({
+        q: lastName || firstName || q,
+        yearId: "all",
+        pageSize: "20",
+        page: "1",
+      })
+      const res = await authFetch(`/api/admin/students?${params.toString()}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setFormError(data.error || "Erreur lors de la recherche")
+        setMatches([])
+        return
+      }
+      const items: StudentSearchHit[] = data.items || []
+      const birth = searchForm.birthDate
+      const filtered = items.filter((s) => {
+        if (lastName && !(s.lastName || "").toUpperCase().includes(lastName.toUpperCase())) return false
+        if (firstName && !(s.firstName || "").toUpperCase().includes(firstName.toUpperCase())) return false
+        if (birth) {
+          const bd = s.birthDate ? new Date(s.birthDate).toISOString().slice(0, 10) : ""
+          if (bd !== birth) return false
+        }
+        return true
+      })
+      setMatches(filtered)
+    } catch {
+      setFormError("Impossible de contacter le serveur. Réessayez.")
+      setMatches([])
+    } finally {
+      setSearching(false)
+      setSearchDone(true)
+    }
+  }
+
+  const startReenroll = (student: StudentSearchHit) => {
+    setSelectedStudent(student)
+    setReenrollForm({
+      classId: "",
+      academicYearId: defaultYearId ? String(defaultYearId) : "",
+      origine: "PASSAGE",
+      code: "",
+    })
+    setFieldErrors({})
+    setFormError("")
+    setStep("reenroll")
+  }
+
+  const startCreate = () => {
+    setForm({
+      ...emptyCreateForm(),
+      lastName: searchForm.lastName,
+      firstName: searchForm.firstName,
+      birthDate: searchForm.birthDate,
+    })
+    setAutoCode(false)
+    setFieldErrors({})
+    setFormError("")
+    setStep("create")
+  }
+
+  const submitReenroll = async () => {
+    if (!selectedStudent) return
+    const errors: Partial<Record<StudentCreateField | "yearId" | "origine", string>> = {}
+    if (!reenrollForm.classId) errors.classId = "La classe est obligatoire"
+    if (!reenrollForm.academicYearId) errors.academicYearId = "L'année académique est obligatoire"
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors)
+      return
+    }
+    setFieldErrors({})
+    setFormError("")
+    setSubmitting(true)
+    try {
+      const body: Record<string, unknown> = {
+        classId: Number(reenrollForm.classId),
+        yearId: Number(reenrollForm.academicYearId),
+        origine: reenrollForm.origine,
+      }
+      if (reenrollForm.code.trim()) body.code = reenrollForm.code.trim()
+
+      const res = await authFetch(`/api/admin/students/${selectedStudent.id}/enrollments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const field = data.field as StudentCreateField | "yearId" | undefined
+        if (field === "yearId") {
+          setFieldErrors({ academicYearId: data.error || "Année déjà inscrite" })
+        } else if (field) {
+          setFieldErrors({ [field]: data.error || "Erreur de validation" })
+        } else {
+          setFormError(data.error || "Erreur lors de la réinscription")
+        }
+        return
+      }
+      onCreated({
+        email: "(compte existant)",
+        plaintextPassword: "",
+        lastName: selectedStudent.lastName || undefined,
+        firstName: selectedStudent.firstName || undefined,
+        code: data.enrollment?.code || selectedStudent.permanentCode || undefined,
+        classId: Number(reenrollForm.classId),
+        academicYearId: Number(reenrollForm.academicYearId),
+        existingAccount: true,
+      })
+    } catch {
+      setFormError("Impossible de contacter le serveur. Réessayez.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const submitCreate = async () => {
     const validation = validateStudentCreateInput({
       lastName: form.lastName,
       firstName: form.firstName,
@@ -203,153 +394,459 @@ function CreateStudentModal({
     }
   }
 
+  const selectedPast = selectedStudent ? latestEnrollment(selectedStudent) : undefined
+
   return (
     <Portal>
-      {/* overlay */}
-      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} aria-hidden={!visible}>
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        aria-hidden={!visible}
+      >
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
-        {/* dialog */}
-        <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} role="dialog" aria-modal="true">
-          <div className={`sticky top-0 z-10 flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} px-4 py-3`}>
-            <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>Créer un élève</div>
-            <button className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`} onClick={onClose} aria-label="Fermer">×</button>
-          </div>
-        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          {formError && (
-            <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-              {formError}
+        <div
+          className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl transform transition-all duration-200 ${theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} ${visible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className={`sticky top-0 z-10 flex items-center justify-between border-b ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"} px-4 py-3`}
+          >
+            <div className={`text-lg font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+              {title}
             </div>
-          )}
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Nom <span className="text-red-500">*</span></label>
-            <input
-              className={`${inputClass("lastName")} uppercase`}
-              value={form.lastName}
-              onChange={(e) => {
-                clearFieldError("lastName")
-                setForm({ ...form, lastName: toUpper(e.target.value) })
-              }}
-            />
-            <FieldError field="lastName" />
-          </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Post-nom</label>
-            <input className={`${inputClass()} uppercase`} value={form.middleName} onChange={(e) => setForm({ ...form, middleName: toUpper(e.target.value) })} />
-          </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Prénom <span className="text-red-500">*</span></label>
-            <input
-              className={`${inputClass("firstName")} uppercase`}
-              value={form.firstName}
-              onChange={(e) => {
-                clearFieldError("firstName")
-                setForm({ ...form, firstName: toUpper(e.target.value) })
-              }}
-            />
-            <FieldError field="firstName" />
-          </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Sexe</label>
-            <select className={inputClass()} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-              <option value="M">M</option>
-              <option value="F">F</option>
-            </select>
-          </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Date de naissance <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              required
-              className={inputClass("birthDate")}
-              value={form.birthDate}
-              onChange={(e) => {
-                clearFieldError("birthDate")
-                setForm({ ...form, birthDate: e.target.value })
-              }}
-            />
-            <FieldError field="birthDate" />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"}`}>Code</label>
-              <label className={`flex items-center gap-1.5 text-xs cursor-pointer ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                <input
-                  type="checkbox"
-                  checked={autoCode}
-                  onChange={(e) => {
-                    setAutoCode(e.target.checked)
-                    if (!e.target.checked) setForm(f => ({ ...f, code: "" }))
-                  }}
-                  className="rounded"
-                />
-                Auto-incrémenter
-              </label>
-            </div>
-            {autoCode ? (
-              <div className={`relative w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-400" : "border-gray-300 bg-gray-50 text-gray-500"} px-3 py-2 flex items-center`}>
-                <span className="flex-1 font-mono">
-                  {autoCodeLoading ? "..." : (form.code || (form.classId ? "Sélectionnez une classe" : "—"))}
-                </span>
-                {autoCodeLoading && <div className="w-3 h-3 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin ml-2" />}
-              </div>
-            ) : (
-              <input
-                className={inputClass("code")}
-                value={form.code}
-                onChange={(e) => {
-                  clearFieldError("code")
-                  setForm({ ...form, code: e.target.value })
-                }}
-                placeholder="Optionnel — auto si vide"
-              />
-            )}
-            <FieldError field="code" />
-          </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Classe <span className="text-red-500">*</span></label>
-            <select
-              className={inputClass("classId")}
-              value={form.classId}
-              onChange={(e) => {
-                clearFieldError("classId")
-                setForm({ ...form, classId: e.target.value })
-              }}
+            <button
+              className={`${theme === "dark" ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+              onClick={onClose}
+              aria-label="Fermer"
             >
-              <option value="">Sélectionner</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <FieldError field="classId" />
+              ×
+            </button>
           </div>
-          <div>
-            <label className={`block ${theme === "dark" ? "text-gray-200" : "text-gray-700"} mb-1`}>Année académique <span className="text-red-500">*</span></label>
-            <AcademicYearSelect
-              years={years}
-              currentYearId={currentYearId}
-              value={form.academicYearId}
-              onChange={(value) => {
-                clearFieldError("academicYearId")
-                setForm({ ...form, academicYearId: value })
-              }}
-              placeholder="Sélectionner"
-              className={inputClass("academicYearId")}
-            />
-            <FieldError field="academicYearId" />
-            <p className={`mt-1 text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
-              Toute année scolaire disponible — indépendamment du filtre de la liste.
-            </p>
-          </div>
-        </div>
-        <div className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}>
-          <button className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`} onClick={onClose}>Annuler</button>
-          <button disabled={submitting} className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60" onClick={submit}>
-            {submitting ? "Création..." : "Créer"}
-          </button>
+
+          {step === "search" && (
+            <>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {formError && (
+                  <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                    {formError}
+                  </div>
+                )}
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>Nom</label>
+                  <input
+                    className={`${inputClass()} uppercase`}
+                    value={searchForm.lastName}
+                    onChange={(e) => setSearchForm({ ...searchForm, lastName: toUpper(e.target.value) })}
+                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                  />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>Prénom</label>
+                  <input
+                    className={`${inputClass()} uppercase`}
+                    value={searchForm.firstName}
+                    onChange={(e) => setSearchForm({ ...searchForm, firstName: toUpper(e.target.value) })}
+                    onKeyDown={(e) => e.key === "Enter" && runSearch()}
+                  />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Date de naissance <span className={`font-normal ${mutedClass}`}>(optionnel)</span>
+                  </label>
+                  <input
+                    type="date"
+                    className={inputClass()}
+                    value={searchForm.birthDate}
+                    onChange={(e) => setSearchForm({ ...searchForm, birthDate: e.target.value })}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    disabled={searching}
+                    onClick={runSearch}
+                    className="w-full rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    {searching ? "Recherche..." : "Rechercher"}
+                  </button>
+                </div>
+
+                {searchDone && (
+                  <div className="sm:col-span-2 space-y-2">
+                    {matches.length === 0 ? (
+                      <p className={`text-sm ${mutedClass}`}>Aucun élève trouvé pour ces critères.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {matches.map((s) => {
+                          const enr = latestEnrollment(s)
+                          const name = [s.lastName, s.middleName, s.firstName].filter(Boolean).join(" ")
+                          const codeLabel = toDisplayCode(s.permanentCode) || toDisplayCode(s.code)
+                          return (
+                            <li
+                              key={s.id}
+                              className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border px-3 py-2.5 ${cardClass}`}
+                            >
+                              <div className="min-w-0">
+                                <div className={`font-medium ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                                  {name || "—"}
+                                </div>
+                                <div className={`text-xs ${mutedClass}`}>
+                                  {codeLabel ? `Code permanent : ${codeLabel}` : "Sans code permanent"}
+                                  {enr
+                                    ? ` · ${enr.class?.name || "—"} · ${enr.year?.name || "—"}`
+                                    : " · Aucune inscription"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => startReenroll(s)}
+                                className="shrink-0 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                              >
+                                Réinscrire cet élève
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                    <button
+                      type="button"
+                      onClick={startCreate}
+                      className={`w-full rounded-md border px-4 py-2 text-sm font-medium ${
+                        theme === "dark"
+                          ? "border-gray-600 text-gray-200 hover:bg-gray-700"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      Aucun résultat — créer un nouvel élève
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div
+                className={`flex items-center justify-end gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}
+              >
+                <button
+                  className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
+                  onClick={onClose}
+                >
+                  Annuler
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "reenroll" && selectedStudent && (
+            <>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {formError && (
+                  <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                    {formError}
+                  </div>
+                )}
+                <div className={`sm:col-span-2 rounded-lg border px-3 py-3 ${cardClass}`}>
+                  <div className={`text-xs uppercase tracking-wide ${mutedClass}`}>Élève sélectionné</div>
+                  <div className={`mt-1 font-semibold ${theme === "dark" ? "text-gray-100" : "text-gray-900"}`}>
+                    {[selectedStudent.lastName, selectedStudent.middleName, selectedStudent.firstName]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </div>
+                  <div className={`mt-0.5 text-xs ${mutedClass}`}>
+                    Code permanent :{" "}
+                    {toDisplayCode(selectedStudent.permanentCode) || toDisplayCode(selectedStudent.code) || "—"}
+                    {selectedPast
+                      ? ` · Dernière inscription : ${selectedPast.class?.name || "—"} (${selectedPast.year?.name || "—"})`
+                      : " · Aucune inscription passée"}
+                  </div>
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Année académique <span className="text-red-500">*</span>
+                  </label>
+                  <AcademicYearSelect
+                    years={years}
+                    currentYearId={currentYearId}
+                    value={reenrollForm.academicYearId}
+                    onChange={(value) => {
+                      clearFieldError("academicYearId")
+                      clearFieldError("yearId")
+                      setReenrollForm({ ...reenrollForm, academicYearId: value })
+                    }}
+                    placeholder="Sélectionner"
+                    className={inputClass("academicYearId")}
+                  />
+                  <FieldError field="academicYearId" />
+                  {fieldErrors.yearId && <p className="mt-1 text-xs text-red-500">{fieldErrors.yearId}</p>}
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Classe <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className={inputClass("classId")}
+                    value={reenrollForm.classId}
+                    onChange={(e) => {
+                      clearFieldError("classId")
+                      setReenrollForm({ ...reenrollForm, classId: e.target.value })
+                    }}
+                  >
+                    <option value="">Sélectionner</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError field="classId" />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>Origine</label>
+                  <select
+                    className={inputClass("origine")}
+                    value={reenrollForm.origine}
+                    onChange={(e) =>
+                      setReenrollForm({
+                        ...reenrollForm,
+                        origine: e.target.value as ReenrollOrigine,
+                      })
+                    }
+                  >
+                    <option value="PASSAGE">Passage</option>
+                    <option value="REDOUBLEMENT">Redoublement</option>
+                    <option value="TRANSFERT">Transfert</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Code de classe <span className={`font-normal ${mutedClass}`}>(optionnel)</span>
+                  </label>
+                  <input
+                    className={inputClass("code")}
+                    value={reenrollForm.code}
+                    onChange={(e) => {
+                      clearFieldError("code")
+                      setReenrollForm({ ...reenrollForm, code: e.target.value })
+                    }}
+                    placeholder="Auto si vide"
+                  />
+                  <FieldError field="code" />
+                </div>
+              </div>
+              <div
+                className={`flex items-center justify-between gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}
+              >
+                <button
+                  className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
+                  onClick={goBackToSearch}
+                >
+                  Retour
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
+                    onClick={onClose}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    disabled={submitting}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
+                    onClick={submitReenroll}
+                  >
+                    {submitting ? "Inscription..." : "Réinscrire"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === "create" && (
+            <>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {formError && (
+                  <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                    {formError}
+                  </div>
+                )}
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Nom <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className={`${inputClass("lastName")} uppercase`}
+                    value={form.lastName}
+                    onChange={(e) => {
+                      clearFieldError("lastName")
+                      setForm({ ...form, lastName: toUpper(e.target.value) })
+                    }}
+                  />
+                  <FieldError field="lastName" />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>Post-nom</label>
+                  <input
+                    className={`${inputClass()} uppercase`}
+                    value={form.middleName}
+                    onChange={(e) => setForm({ ...form, middleName: toUpper(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Prénom <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className={`${inputClass("firstName")} uppercase`}
+                    value={form.firstName}
+                    onChange={(e) => {
+                      clearFieldError("firstName")
+                      setForm({ ...form, firstName: toUpper(e.target.value) })
+                    }}
+                  />
+                  <FieldError field="firstName" />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>Sexe</label>
+                  <select
+                    className={inputClass()}
+                    value={form.gender}
+                    onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                  >
+                    <option value="M">M</option>
+                    <option value="F">F</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Date de naissance <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className={inputClass("birthDate")}
+                    value={form.birthDate}
+                    onChange={(e) => {
+                      clearFieldError("birthDate")
+                      setForm({ ...form, birthDate: e.target.value })
+                    }}
+                  />
+                  <FieldError field="birthDate" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`block ${labelClass}`}>Code de classe</label>
+                    <label
+                      className={`flex items-center gap-1.5 text-xs cursor-pointer ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={autoCode}
+                        onChange={(e) => {
+                          setAutoCode(e.target.checked)
+                          if (!e.target.checked) setForm((f) => ({ ...f, code: "" }))
+                        }}
+                        className="rounded"
+                      />
+                      Auto-incrémenter
+                    </label>
+                  </div>
+                  {autoCode ? (
+                    <div
+                      className={`relative w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-400" : "border-gray-300 bg-gray-50 text-gray-500"} px-3 py-2 flex items-center`}
+                    >
+                      <span className="flex-1 font-mono">
+                        {autoCodeLoading
+                          ? "..."
+                          : form.code || (form.classId ? "Sélectionnez une classe" : "—")}
+                      </span>
+                      {autoCodeLoading && (
+                        <div className="w-3 h-3 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin ml-2" />
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      className={inputClass("code")}
+                      value={form.code}
+                      onChange={(e) => {
+                        clearFieldError("code")
+                        setForm({ ...form, code: e.target.value })
+                      }}
+                      placeholder="Optionnel — auto si vide"
+                    />
+                  )}
+                  <FieldError field="code" />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Classe <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className={inputClass("classId")}
+                    value={form.classId}
+                    onChange={(e) => {
+                      clearFieldError("classId")
+                      setForm({ ...form, classId: e.target.value })
+                    }}
+                  >
+                    <option value="">Sélectionner</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError field="classId" />
+                </div>
+                <div>
+                  <label className={`block ${labelClass} mb-1`}>
+                    Année académique <span className="text-red-500">*</span>
+                  </label>
+                  <AcademicYearSelect
+                    years={years}
+                    currentYearId={currentYearId}
+                    value={form.academicYearId}
+                    onChange={(value) => {
+                      clearFieldError("academicYearId")
+                      setForm({ ...form, academicYearId: value })
+                    }}
+                    placeholder="Sélectionner"
+                    className={inputClass("academicYearId")}
+                  />
+                  <FieldError field="academicYearId" />
+                  <p className={`mt-1 text-[11px] ${theme === "dark" ? "text-gray-500" : "text-gray-400"}`}>
+                    Origine : nouvel entrant (définie automatiquement).
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`flex items-center justify-between gap-2 border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"} px-4 py-3`}
+              >
+                <button
+                  className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
+                  onClick={goBackToSearch}
+                >
+                  Retour
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    className={`rounded-md border ${theme === "dark" ? "border-gray-600 text-gray-200 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"} px-4 py-2`}
+                    onClick={onClose}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    disabled={submitting}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
+                    onClick={submitCreate}
+                  >
+                    {submitting ? "Création..." : "Créer"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
-    </div>
     </Portal>
   )
 }
@@ -755,12 +1252,8 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
   const borderColor = theme === "dark" ? "border-gray-600" : "border-gray-300"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
   const cellHover = theme === "dark" ? "group-hover:bg-gray-700" : "group-hover:bg-gray-50"
-  const studentDisplayCode = (student: { code?: string; enrollments?: Array<{ classId?: number; yearId?: number }> }) =>
-    toDisplayCode(
-      student.code,
-      student.enrollments?.[0]?.classId,
-      student.enrollments?.[0]?.yearId
-    )
+  const studentDisplayCode = (student: { code?: string; permanentCode?: string; enrollments?: Array<{ code?: string | null }> }) =>
+    toDisplayCode(student.enrollments?.[0]?.code || student.code || student.permanentCode)
 
   const exportStudents = () => {
     if (!items.length) return
@@ -1027,7 +1520,14 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                             value={editForm.code}
                             onChange={(e) => setEditForm(prev => ({ ...prev, code: e.target.value }))}
                           />
-                        ) : studentDisplayCode(s)}
+                        ) : (
+                          <div>
+                            <div>{studentDisplayCode(s) || "—"}</div>
+                            {s.permanentCode && (
+                              <div className={`text-[11px] ${textSecondary}`}>{s.permanentCode}</div>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className={cn(`px-3 py-2 ${textColor}`, cellHover)}>
                         {editingId === s.id ? (
@@ -1174,6 +1674,8 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                     <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
                       <td colSpan={9} className="px-3 py-3">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                            <div><span className={textSecondary}>Code permanent</span><div className={`font-medium ${textColor}`}>{s.permanentCode || "—"}</div></div>
+                            <div><span className={textSecondary}>Code classe</span><div className={`font-medium ${textColor}`}>{studentDisplayCode(s) || "—"}</div></div>
                             <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{s.lastName}</div></div>
                             <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{s.middleName}</div></div>
                             <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{s.firstName}</div></div>
@@ -1209,16 +1711,6 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           theme={theme}
           onCreated={(payload) => {
             setShowCreate(false)
-            setIsCreateCredentials(true)
-            setSelectedStudentForReset({
-              email: payload.email,
-              lastName: payload.lastName,
-              firstName: payload.firstName,
-              code: toDisplayCode(payload.code, payload.classId),
-            })
-            setNewPasswordGenerated(payload.plaintextPassword)
-            setPasswordCopied(false)
-            setEmailCopied(false)
             setLoading(true)
             setPagination((p) => ({ ...p }))
             if (
@@ -1234,6 +1726,21 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                   : "Élève créé dans une autre année. Ajustez le filtre pour l'afficher."
               )
             }
+            if (payload.existingAccount) {
+              const name = [payload.lastName, payload.firstName].filter(Boolean).join(" ")
+              toast.success(name ? `Réinscription réussie pour ${name}` : "Réinscription réussie")
+              return
+            }
+            setIsCreateCredentials(true)
+            setSelectedStudentForReset({
+              email: payload.email,
+              lastName: payload.lastName,
+              firstName: payload.firstName,
+              code: toDisplayCode(payload.code),
+            })
+            setNewPasswordGenerated(payload.plaintextPassword)
+            setPasswordCopied(false)
+            setEmailCopied(false)
           }}
         />
 
@@ -1261,7 +1768,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                         {selectedStudentForReset?.lastName} {selectedStudentForReset?.middleName} {selectedStudentForReset?.firstName}
                       </p>
                       <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        Code: {toDisplayCode(selectedStudentForReset?.code, selectedStudentForReset?.enrollments?.[0]?.classId)}
+                        Code: {toDisplayCode(selectedStudentForReset?.enrollments?.[0]?.code || selectedStudentForReset?.code || selectedStudentForReset?.permanentCode)}
                       </p>
                     </div>
                   </div>
@@ -1345,7 +1852,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                         {selectedStudentForReset?.lastName} {selectedStudentForReset?.firstName}
                       </p>
                       <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        Code: {toDisplayCode(selectedStudentForReset?.code, selectedStudentForReset?.enrollments?.[0]?.classId)}
+                        Code: {toDisplayCode(selectedStudentForReset?.enrollments?.[0]?.code || selectedStudentForReset?.code || selectedStudentForReset?.permanentCode)}
                       </p>
                     </div>
                   </div>

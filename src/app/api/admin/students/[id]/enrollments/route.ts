@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { invalidateCachePattern } from "@/lib/cache"
-import { isCodeUsedInClass, toStoredCode } from "@/lib/student-fields"
+import { getNextClassCode, isCodeUsedInClass } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -12,7 +12,9 @@ interface JwtPayload {
   schoolId?: number
 }
 
-/** POST /api/admin/students/[id]/enrollments — inscrire un élève dans une autre année */
+const ORIGINES = ["PASSAGE", "REDOUBLEMENT", "TRANSFERT", "NOUVEL_ENTRANT"] as const
+
+/** POST /api/admin/students/[id]/enrollments — inscrire un élève existant dans une autre année */
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -36,6 +38,8 @@ export async function POST(
     const body = await req.json()
     const classId = Number(body.classId)
     const yearId = Number(body.yearId)
+    const origine = ORIGINES.includes(body.origine) ? body.origine : "PASSAGE"
+    const status = body.status === "PROPOSEE" || body.status === "CONFIRMEE" ? body.status : "ACTIVE"
 
     if (!classId || Number.isNaN(classId)) {
       return NextResponse.json(
@@ -54,7 +58,7 @@ export async function POST(
       where: { id: studentId },
       select: {
         id: true,
-        code: true,
+        permanentCode: true,
         user: { select: { schoolId: true } },
       },
     })
@@ -72,6 +76,20 @@ export async function POST(
     const schoolId = decoded.schoolId ?? student.user?.schoolId
     if (!schoolId) {
       return NextResponse.json({ error: "Aucune école associée" }, { status: 403 })
+    }
+
+    const existingYear = await prisma.enrollment.findUnique({
+      where: { studentId_yearId: { studentId, yearId } },
+      select: { id: true },
+    })
+    if (existingYear) {
+      return NextResponse.json(
+        {
+          error: "Cet élève a déjà une inscription pour cette année scolaire",
+          field: "yearId",
+        },
+        { status: 400 }
+      )
     }
 
     const [year, schoolClass] = await Promise.all([
@@ -94,41 +112,29 @@ export async function POST(
       )
     }
 
-    const existing = await prisma.enrollment.findFirst({
-      where: { studentId, classId, yearId },
-    })
-    if (existing) {
+    let displayCode = body.code?.trim() ? String(body.code).trim() : ""
+    if (!displayCode) {
+      displayCode = String(await getNextClassCode(classId, yearId))
+    }
+    if (await isCodeUsedInClass(classId, yearId, displayCode, studentId)) {
       return NextResponse.json(
         {
-          error: "Cet élève est déjà inscrit dans cette classe pour cette année",
-          field: "yearId",
+          error: `Le code « ${displayCode} » est déjà utilisé dans cette classe pour cette année`,
+          field: "code",
         },
         { status: 400 }
       )
     }
 
-    const displayCode = body.code?.trim()
-      ? String(body.code).trim()
-      : undefined
-    if (displayCode) {
-      const taken = await isCodeUsedInClass(classId, yearId, displayCode, studentId)
-      if (taken) {
-        return NextResponse.json(
-          {
-            error: `Le code « ${displayCode} » est déjà utilisé dans cette classe pour cette année`,
-            field: "code",
-          },
-          { status: 400 }
-        )
-      }
-      await prisma.student.update({
-        where: { id: studentId },
-        data: { code: toStoredCode(classId, displayCode, yearId) },
-      })
-    }
-
     const enrollment = await prisma.enrollment.create({
-      data: { studentId, classId, yearId, status: "ACTIVE" },
+      data: {
+        studentId,
+        classId,
+        yearId,
+        code: displayCode,
+        status,
+        origine,
+      },
       include: { class: true, year: true },
     })
 
@@ -141,7 +147,7 @@ export async function POST(
     if (err.code === "P2002") {
       return NextResponse.json(
         {
-          error: "Cet élève est déjà inscrit dans cette classe pour cette année",
+          error: "Cet élève a déjà une inscription pour cette année scolaire",
           field: "yearId",
         },
         { status: 400 }
