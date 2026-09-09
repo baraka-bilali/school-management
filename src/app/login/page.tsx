@@ -378,7 +378,7 @@ export default function LoginPage() {
 	return (
 		<>
 		{showSplash && <SplashScreen leaving={splashLeaving} />}
-		<div className="min-h-dvh bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6 transition-colors">
+		<div className="min-h-dvh bg-[#eef2f9] dark:bg-gray-900 flex items-center justify-center p-6 transition-colors">
 			<div className="w-full max-w-md">
 				<div className="flex flex-col items-center mb-4">
 					<div className="mb-3">
