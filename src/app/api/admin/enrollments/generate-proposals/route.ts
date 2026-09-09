@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { getNextClassCode } from "@/lib/student-fields"
 import { invalidateCachePattern } from "@/lib/cache"
+import { isStrictlyHigherClass } from "@/lib/class-sort"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -76,7 +77,15 @@ export async function POST(req: NextRequest) {
         status: { in: ["ACTIVE", "CONFIRMEE"] },
       },
       include: {
-        class: { select: { id: true, name: true, nextClassId: true } },
+        class: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            section: true,
+            nextClassId: true,
+          },
+        },
         student: { select: { id: true, permanentCode: true, lastName: true, firstName: true } },
       },
     })
@@ -93,7 +102,7 @@ export async function POST(req: NextRequest) {
       if (existing) {
         skipped.push({
           studentId: src.studentId,
-          reason: "Inscription déjà existante pour l'année cible",
+          reason: `Déjà inscrit pour l'année cible (${existing.status})`,
         })
         continue
       }
@@ -121,11 +130,42 @@ export async function POST(req: NextRequest) {
 
       const schoolClass = await prisma.class.findFirst({
         where: { id: targetClassId, schoolId: auth.schoolId },
-        select: { id: true },
+        select: { id: true, level: true, section: true, name: true },
       })
       if (!schoolClass) {
         skipped.push({ studentId: src.studentId, reason: "Classe cible invalide pour cette école" })
         continue
+      }
+
+      // Passage: refuse toute régression de niveau (saut autorisé)
+      if (
+        src.decisionPassage === "PASSAGE" &&
+        src.class.section &&
+        src.class.level &&
+        schoolClass.section &&
+        schoolClass.level &&
+        !isStrictlyHigherClass(
+          { section: src.class.section, level: src.class.level },
+          { section: schoolClass.section, level: schoolClass.level }
+        )
+      ) {
+        skipped.push({
+          studentId: src.studentId,
+          reason: `Classe cible « ${schoolClass.name} » n'est pas supérieure à « ${src.class.name} »`,
+        })
+        continue
+      }
+
+      // Mémoriser le choix comme nextClassId si encore vide (évite de redemander)
+      if (
+        src.decisionPassage === "PASSAGE" &&
+        !src.class.nextClassId &&
+        override
+      ) {
+        await prisma.class.update({
+          where: { id: src.classId },
+          data: { nextClassId: targetClassId },
+        })
       }
 
       const code = String(await getNextClassCode(targetClassId, targetYearId))
