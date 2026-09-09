@@ -30,6 +30,27 @@ export function compareClasses(a: ClassSortable, b: ClassSortable): number {
   return (a.letter || "").localeCompare(b.letter || "")
 }
 
+/** Indice de progression scolaire (section + niveau), ignore la lettre/filière. */
+export function classProgressIndex(c: Pick<ClassSortable, "section" | "level">): number {
+  const sectionA = SECTION_ORDER.indexOf(c.section as (typeof SECTION_ORDER)[number])
+  const sectionIdx = sectionA === -1 ? 999 : sectionA
+  const levels = LEVELS_BY_SECTION[c.section] ?? []
+  const li = levels.indexOf(c.level)
+  const levelIdx = li === -1 ? 999 : li
+  return sectionIdx * 100 + levelIdx
+}
+
+/**
+ * Classe cible strictement supérieure (passage / saut de niveau).
+ * Ex: Grande Section → 1ère Primaire OK ; 2ème → 1ère NON.
+ */
+export function isStrictlyHigherClass(
+  from: Pick<ClassSortable, "section" | "level">,
+  to: Pick<ClassSortable, "section" | "level">
+): boolean {
+  return classProgressIndex(to) > classProgressIndex(from)
+}
+
 export const SECTION_LABELS: Record<string, string> = {
   Maternelle: "Maternelle",
   Primaire: "Primaire",

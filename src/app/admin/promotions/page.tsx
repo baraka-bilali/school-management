@@ -8,7 +8,7 @@ import {
   type AcademicYearOption,
 } from "@/components/academic-year-select"
 import { authFetch } from "@/lib/auth-fetch"
-import { compareClasses } from "@/lib/class-sort"
+import { compareClasses, isStrictlyHigherClass } from "@/lib/class-sort"
 import { toDisplayCode } from "@/lib/student-fields"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -66,6 +66,8 @@ interface ClassOption {
   level?: string
   section?: string
   letter?: string | null
+  stream?: string | null
+  nextClassId?: number | null
 }
 
 interface RowDraft {
@@ -167,6 +169,8 @@ export default function PromotionsPage() {
   const [targetItems, setTargetItems] = useState<DecisionItem[]>([])
   const [drafts, setDrafts] = useState<Record<number, RowDraft>>({})
   const [overrides, setOverrides] = useState<Record<number, string>>({})
+  /** Inscriptions année cible (tous statuts) pour détecter les élèves déjà couverts */
+  const [targetYearEnrollments, setTargetYearEnrollments] = useState<DecisionItem[]>([])
   const [selectedDecisionClassId, setSelectedDecisionClassId] = useState<string>("")
   const [selectedPropositionClassId, setSelectedPropositionClassId] =
     useState<string>("")
@@ -280,17 +284,33 @@ export default function PromotionsPage() {
       )
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur de chargement")
-      const list: DecisionItem[] = (data.items || []).filter(
-        (e: DecisionItem) => e.status === "PROPOSEE"
+      const list: DecisionItem[] = data.items || []
+      setTargetYearEnrollments(list)
+      // Afficher les propositions en attente ET celles déjà confirmées/activées
+      // (sinon l'onglet se vide après confirmation et l'admin croit que rien n'a été généré)
+      const visible = list.filter(
+        (e) =>
+          e.status === "PROPOSEE" ||
+          e.status === "CONFIRMEE" ||
+          (e.status === "ACTIVE" &&
+            (e.origine === "PASSAGE" || e.origine === "REDOUBLEMENT"))
       )
-      setTargetItems(list)
+      setTargetItems(visible)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur de chargement")
       setTargetItems([])
+      setTargetYearEnrollments([])
     } finally {
       setLoadingTarget(false)
     }
   }, [])
+
+  // Load target-year enrollments whenever target year is known (needed on Décisions too)
+  useEffect(() => {
+    if (targetYearId) {
+      loadPropositions(targetYearId)
+    }
+  }, [targetYearId, loadPropositions])
 
   useEffect(() => {
     if (sourceYearId) {
@@ -298,12 +318,6 @@ export default function PromotionsPage() {
       loadDecisions(sourceYearId)
     }
   }, [sourceYearId, loadDecisions])
-
-  useEffect(() => {
-    if (tab === "propositions" && targetYearId) {
-      loadPropositions(targetYearId)
-    }
-  }, [tab, targetYearId, loadPropositions])
 
   useEffect(() => {
     if (tab === "propositions") {
@@ -383,13 +397,69 @@ export default function PromotionsPage() {
     )
   }, [targetItems, selectedPropositionClassId])
 
-  // Override needs: only for the currently selected decision class (consistency with table filter)
+  const studentIdsWithTargetEnrollment = useMemo(() => {
+    return new Set(targetYearEnrollments.map((e) => e.studentId))
+  }, [targetYearEnrollments])
+
+  const targetEnrollmentByStudentId = useMemo(() => {
+    const map = new Map<number, DecisionItem>()
+    for (const e of targetYearEnrollments) {
+      map.set(e.studentId, e)
+    }
+    return map
+  }, [targetYearEnrollments])
+
+  // Override needs: PASSAGE without nextClassId, AND not already enrolled for N+1
   const passageNeedsOverride = useMemo(() => {
     return filteredDecisionRows.filter((e) => {
       const draft = drafts[e.id]
-      return draft?.decisionPassage === "PASSAGE" && !e.class?.nextClassId
+      if (draft?.decisionPassage !== "PASSAGE") return false
+      if (e.class?.nextClassId) return false
+      if (studentIdsWithTargetEnrollment.has(e.studentId)) return false
+      return true
     })
-  }, [filteredDecisionRows, drafts])
+  }, [filteredDecisionRows, drafts, studentIdsWithTargetEnrollment])
+
+  const alreadyCoveredInClass = useMemo(() => {
+    return filteredDecisionRows.filter((e) => {
+      const draft = drafts[e.id]
+      if (
+        draft?.decisionPassage !== "PASSAGE" &&
+        draft?.decisionPassage !== "REDOUBLEMENT"
+      ) {
+        return false
+      }
+      return studentIdsWithTargetEnrollment.has(e.studentId)
+    })
+  }, [filteredDecisionRows, drafts, studentIdsWithTargetEnrollment])
+
+  function higherClassesFor(source: EnrollmentClass | undefined | null): ClassOption[] {
+    const withLevels = classes.filter(
+      (c): c is ClassOption & { section: string; level: string } =>
+        Boolean(c.section && c.level)
+    )
+    if (!source?.section || !source?.level) {
+      return [...withLevels].sort((a, b) =>
+        compareClasses(
+          { section: a.section, level: a.level, letter: a.letter || undefined },
+          { section: b.section, level: b.level, letter: b.letter || undefined }
+        )
+      )
+    }
+    return withLevels
+      .filter((c) =>
+        isStrictlyHigherClass(
+          { section: source.section!, level: source.level! },
+          { section: c.section, level: c.level }
+        )
+      )
+      .sort((a, b) =>
+        compareClasses(
+          { section: a.section, level: a.level, letter: a.letter || undefined },
+          { section: b.section, level: b.level, letter: b.letter || undefined }
+        )
+      )
+  }
 
   const dirtyCount = useMemo(() => {
     let n = 0
@@ -994,7 +1064,18 @@ export default function PromotionsPage() {
                   </div>
                   <button
                     type="button"
-                    disabled={generating || !targetYearId}
+                    disabled={
+                      generating ||
+                      !targetYearId ||
+                      (passageNeedsOverride.length === 0 &&
+                        filteredDecisionRows.filter((e) => {
+                          const d = drafts[e.id]?.decisionPassage
+                          return (
+                            (d === "PASSAGE" || d === "REDOUBLEMENT") &&
+                            !studentIdsWithTargetEnrollment.has(e.studentId)
+                          )
+                        }).length === 0)
+                    }
                     onClick={handleGenerate}
                     className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
                   >
@@ -1007,6 +1088,52 @@ export default function PromotionsPage() {
                   </button>
                 </div>
 
+                {alreadyCoveredInClass.length > 0 && (
+                  <div
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 text-sm space-y-1.5",
+                      theme === "dark"
+                        ? "border-teal-800/60 bg-teal-950/30 text-teal-200"
+                        : "border-teal-200 bg-teal-50 text-teal-900"
+                    )}
+                  >
+                    <p className="font-medium">
+                      {alreadyCoveredInClass.length} élève(s) déjà inscrit(s) pour{" "}
+                      {years.find((y) => String(y.id) === targetYearId)?.name || "N+1"}
+                    </p>
+                    <ul className={`text-xs space-y-1 ${textSecondary}`}>
+                      {alreadyCoveredInClass.map((e) => {
+                        const next = targetEnrollmentByStudentId.get(e.studentId)
+                        return (
+                          <li key={e.id}>
+                            <span className={textColor}>{studentFullName(e.student)}</span>
+                            {next && (
+                              <>
+                                {" "}
+                                → {next.class?.name}{" "}
+                                <span className="uppercase tracking-wide opacity-80">
+                                  ({next.status === "PROPOSEE"
+                                    ? "proposée"
+                                    : next.status === "CONFIRMEE"
+                                      ? "confirmée"
+                                      : "active"})
+                                </span>
+                              </>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <button
+                      type="button"
+                      className="text-xs font-medium underline"
+                      onClick={() => setTab("propositions")}
+                    >
+                      Voir dans l&apos;onglet Propositions
+                    </button>
+                  </div>
+                )}
+
                 {passageNeedsOverride.length > 0 && (
                   <div
                     className={`rounded-lg border ${borderColor} p-3 space-y-2`}
@@ -1018,37 +1145,47 @@ export default function PromotionsPage() {
                         : ""}
                     </p>
                     <p className={`text-xs ${textSecondary}`}>
-                      Ces élèves sont en PASSAGE sans classe supérieure définie.
-                      Choisissez la classe cible.
+                      Ces élèves n&apos;ont pas encore d&apos;inscription N+1 et leur
+                      classe n&apos;a pas de classe supérieure définie. Seules les
+                      classes de niveau strictement supérieur sont proposées (saut
+                      de niveau autorisé, régression interdite).
                     </p>
                     <div className="space-y-2">
-                      {passageNeedsOverride.map((e) => (
-                        <div
-                          key={e.id}
-                          className="flex flex-wrap items-center gap-2 text-sm"
-                        >
-                          <span className={`min-w-[160px] font-medium ${textColor}`}>
-                            {studentFullName(e.student)}
-                          </span>
-                          <select
-                            value={overrides[e.id] || ""}
-                            onChange={(ev) =>
-                              setOverrides((prev) => ({
-                                ...prev,
-                                [e.id]: ev.target.value,
-                              }))
-                            }
-                            className={selectCls}
+                      {passageNeedsOverride.map((e) => {
+                        const options = higherClassesFor(e.class)
+                        return (
+                          <div
+                            key={e.id}
+                            className="flex flex-wrap items-center gap-2 text-sm"
                           >
-                            <option value="">Choisir une classe…</option>
-                            {classes.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
+                            <span className={`min-w-[160px] font-medium ${textColor}`}>
+                              {studentFullName(e.student)}
+                            </span>
+                            <select
+                              value={overrides[e.id] || ""}
+                              onChange={(ev) =>
+                                setOverrides((prev) => ({
+                                  ...prev,
+                                  [e.id]: ev.target.value,
+                                }))
+                              }
+                              className={selectCls}
+                            >
+                              <option value="">Choisir une classe…</option>
+                              {options.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                            {options.length === 0 && (
+                              <span className="text-xs text-amber-500">
+                                Aucune classe supérieure disponible
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -1064,7 +1201,14 @@ export default function PromotionsPage() {
                   >
                     Résultat :{" "}
                     <strong>{generateResult.created}</strong> créée(s),{" "}
-                    <strong>{generateResult.skipped}</strong> ignorée(s).
+                    <strong>{generateResult.skipped}</strong> ignorée(s)
+                    {generateResult.skipped > 0 && (
+                      <span className="opacity-80">
+                        {" "}
+                        (souvent déjà inscrits pour N+1)
+                      </span>
+                    )}
+                    .
                     <button
                       type="button"
                       className="ml-3 underline font-medium"
@@ -1085,8 +1229,8 @@ export default function PromotionsPage() {
               <div>
                 <CardTitle className={textColor}>Propositions N+1</CardTitle>
                 <p className={`mt-1 text-sm ${textSecondary}`}>
-                  Inscriptions au statut PROPOSÉE — confirmer pour les activer.
-                  Filtrées par classe cible.
+                  Propositions, confirmations et inscriptions déjà activées pour
+                  l&apos;année cible — filtrées par classe.
                 </p>
               </div>
               <AcademicYearSelect
@@ -1110,7 +1254,8 @@ export default function PromotionsPage() {
                 </div>
               ) : targetItems.length === 0 ? (
                 <p className={`py-8 text-center text-sm ${textSecondary}`}>
-                  Aucune proposition pour cette année.
+                  Aucune inscription de passage/redoublement pour cette année.
+                  Générez d&apos;abord les propositions depuis l&apos;onglet Décisions.
                 </p>
               ) : !selectedPropositionClassId ? (
                 <p className={`py-8 text-center text-sm ${textSecondary}`}>
@@ -1130,6 +1275,7 @@ export default function PromotionsPage() {
                         <th className="px-3 py-2.5 text-left font-medium">Élève</th>
                         <th className="px-3 py-2.5 text-left font-medium">Code</th>
                         <th className="px-3 py-2.5 text-left font-medium">Origine</th>
+                        <th className="px-3 py-2.5 text-left font-medium">Statut</th>
                         <th className="px-3 py-2.5 text-right font-medium">Action</th>
                       </tr>
                     </thead>
@@ -1145,22 +1291,57 @@ export default function PromotionsPage() {
                             )}
                           </td>
                           <td className={`px-3 py-2.5 ${textSecondary}`}>
-                            {e.origine || "—"}
+                            {e.origine === "REDOUBLEMENT"
+                              ? "Redoublement"
+                              : e.origine === "PASSAGE"
+                                ? "Passage"
+                                : e.origine || "—"}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                e.status === "PROPOSEE" &&
+                                  (theme === "dark"
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : "bg-amber-100 text-amber-800"),
+                                e.status === "CONFIRMEE" &&
+                                  (theme === "dark"
+                                    ? "bg-sky-500/20 text-sky-300"
+                                    : "bg-sky-100 text-sky-800"),
+                                e.status === "ACTIVE" &&
+                                  (theme === "dark"
+                                    ? "bg-teal-500/20 text-teal-300"
+                                    : "bg-teal-100 text-teal-800")
+                              )}
+                            >
+                              {e.status === "PROPOSEE"
+                                ? "Proposée"
+                                : e.status === "CONFIRMEE"
+                                  ? "Confirmée"
+                                  : e.status === "ACTIVE"
+                                    ? "Active"
+                                    : e.status}
+                            </span>
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <button
-                              type="button"
-                              disabled={confirmingId === e.id}
-                              onClick={() => handleConfirm(e.id)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-                            >
-                              {confirmingId === e.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                              Confirmer
-                            </button>
+                            {e.status === "PROPOSEE" ? (
+                              <button
+                                type="button"
+                                disabled={confirmingId === e.id}
+                                onClick={() => handleConfirm(e.id)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                              >
+                                {confirmingId === e.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                                Confirmer
+                              </button>
+                            ) : (
+                              <span className={`text-xs ${textSecondary}`}>—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
