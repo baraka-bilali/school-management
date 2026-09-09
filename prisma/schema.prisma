@@ -34,6 +34,7 @@ model User {
   communiques          Communique[]           @relation("CommuniquesCreated")
   communiqueUserReads  CommuniqueUserRead[]
   staffPayments        StaffPayment[]
+  enrollmentDecisionChanges EnrollmentDecisionHistory[]
 
   @@index([schoolId])
   @@index([schoolId, isActive])
@@ -193,6 +194,7 @@ model Enrollment {
   student             Student            @relation(fields: [studentId], references: [id])
   year                AcademicYear       @relation(fields: [yearId], references: [id])
   paiements           Paiement[]
+  decisionHistory     EnrollmentDecisionHistory[]
 
   @@unique([studentId, yearId])
   @@index([classId])
@@ -201,6 +203,24 @@ model Enrollment {
   @@index([yearId, status])
   @@index([yearId, createdAt])
   @@index([classId, yearId, code])
+}
+
+/// Historique des changements de décision de passage (conseil de classe)
+model EnrollmentDecisionHistory {
+  id              Int               @id @default(autoincrement())
+  enrollmentId    Int
+  oldDecision     DecisionPassage?
+  newDecision     DecisionPassage?
+  oldComment      String?           @db.Text
+  newComment      String?           @db.Text
+  changedByUserId Int
+  createdAt       DateTime          @default(now())
+  enrollment      Enrollment        @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  changedBy       User              @relation(fields: [changedByUserId], references: [id])
+
+  @@index([enrollmentId])
+  @@index([changedByUserId])
+  @@index([createdAt])
 }
 
 model School {
@@ -539,6 +559,7 @@ enum DecisionPassage {
   PASSAGE
   REDOUBLEMENT
   ORIENTATION
+  RENVOI
 }
 
 enum TypeEtablissement {

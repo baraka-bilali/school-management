@@ -31,7 +31,9 @@ function getAuth(req: NextRequest): JwtPayload | null {
  * Pour chaque Enrollment source avec decisionPassage:
  * - PASSAGE → Enrollment PROPOSEE année N+1, classe = override || class.nextClassId
  * - REDOUBLEMENT → même classe, PROPOSEE
- * - ORIENTATION / null → ignoré
+ * - ORIENTATION / RENVOI / null → ignoré (aucune proposition)
+ *   Note: RENVOI passe l'Enrollment source à EXPELLED dès l'enregistrement
+ *   de la décision (PATCH /decisions), pas à la génération.
  */
 export async function POST(req: NextRequest) {
   try {
