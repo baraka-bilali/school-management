@@ -56,29 +56,29 @@ export function buildStudentEmailWithSchool({
 }
 
 /**
- * Génère un email pour un élève avec le code de l'école
- * Format: prenom + nom + année@codeEcole.com
- * Ex: "beckerbaraka2026@donbosco.com" (année = fin de l'année scolaire d'inscription)
- * Avec suffixe (doublons): "beckerbaraka22026@donbosco.com"
+ * Génère un email stable pour un élève (sans année).
+ * Format: prenom + nom@codeEcole.com
+ * Ex: "beckerbaraka@donbosco.com"
+ * Avec suffixe (doublons): "beckerbaraka2@donbosco.com"
  */
 export function buildStudentEmailByCode({
   firstName,
   lastName,
-  year,
   schoolCode,
   suffix,
 }: {
   firstName: string
   lastName: string
-  year: number
   schoolCode: string
+  /** @deprecated Ignoré — l'email est désormais stable sans année */
+  year?: number
   suffix?: number
 }): string {
   const fn = normalize(firstName)
   const ln = normalize(lastName)
   const sc = normalize(schoolCode)
   const sfx = suffix && suffix >= 2 ? String(suffix) : ""
-  return `${fn}${ln}${sfx}${year}@${sc}.com`
+  return `${fn}${ln}${sfx}@${sc}.com`
 }
 
 /** Email personnel / enseignant : prenomnom@codeecole.com (sans année) */
