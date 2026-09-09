@@ -24,6 +24,8 @@ export async function PATCH(
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
     const userId = decoded.id
+    const userRole = decoded.role
+    const userSchoolId = decoded.schoolId
     
     const params = await context.params
     const notificationId = parseInt(params.id)
@@ -45,6 +47,16 @@ export async function PATCH(
         { error: "Non autorisé" },
         { status: 403 }
       )
+    }
+
+    // Broadcast école : seuls les admins de cette école (ou super-admin) peuvent marquer
+    if (
+      notification.userId === null &&
+      userRole !== "SUPER_ADMIN" &&
+      notification.schoolId != null &&
+      notification.schoolId !== userSchoolId
+    ) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 })
     }
 
     // Marquer comme lue

@@ -6,6 +6,7 @@ import {
   CreditCard, Calendar, MoreVertical, Megaphone, Send, Loader2
 } from "lucide-react"
 import { authFetch } from "@/lib/auth-fetch"
+import { notifyNotificationsChanged } from "@/lib/notification-events"
 
 interface Notification {
   id: number
@@ -25,7 +26,7 @@ interface NotificationsSectionProps {
   theme: "light" | "dark"
 }
 
-const LIMIT = 10
+const LIMIT = 50
 
 export default function NotificationsSection({ theme }: NotificationsSectionProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -82,7 +83,10 @@ export default function NotificationsSection({ theme }: NotificationsSectionProp
   const markAsRead = async (id: number) => {
     try {
       const res = await authFetch(`/api/notifications/${id}`, { method: "PATCH", credentials: "include" })
-      if (res.ok) setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
+        notifyNotificationsChanged()
+      }
     } catch {}
   }
 
@@ -92,6 +96,7 @@ export default function NotificationsSection({ theme }: NotificationsSectionProp
       if (res.ok) {
         setNotifications((prev) => prev.filter((n) => n.id !== id))
         setConfirmDeleteId(null)
+        notifyNotificationsChanged()
       }
     } catch {}
   }
@@ -99,7 +104,10 @@ export default function NotificationsSection({ theme }: NotificationsSectionProp
   const markAllAsRead = async () => {
     try {
       const res = await authFetch("/api/notifications", { method: "POST", credentials: "include" })
-      if (res.ok) setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+        notifyNotificationsChanged()
+      }
     } catch {}
   }
 

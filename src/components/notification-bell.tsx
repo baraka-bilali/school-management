@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Bell } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { authFetch } from "@/lib/auth-fetch"
 import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notification-events"
 
 interface NotificationBellProps {
   href?: string
@@ -14,7 +15,11 @@ interface NotificationBellProps {
 export default function NotificationBell({ href = "/admin/notifications" }: NotificationBellProps) {
   const router = useRouter()
   const [unreadCount, setUnreadCount] = useState(0)
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light"
+  )
   const prevUnreadRef = useRef(0)
   const countInitializedRef = useRef(false)
 
@@ -47,7 +52,7 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
     await showSystemNotification("Kelasi 360", message, { url: href })
   }
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const res = await authFetch("/api/notifications/count", { credentials: "include" })
       if (res.ok) {
@@ -61,7 +66,7 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
         setUnreadCount(newCount)
       }
     } catch {}
-  }
+  }, [href])
 
   useEffect(() => {
     let cleanup: (() => void) | undefined
@@ -72,9 +77,10 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
         if (!res.ok) return
         const { user } = await res.json()
 
-        const channelName = user.role === "SUPER_ADMIN"
-          ? "notifications:super-admin"
-          : `notifications:user:${user.id}`
+        const channelName =
+          user.role === "SUPER_ADMIN"
+            ? "notifications:super-admin"
+            : `notifications:user:${user.id}`
 
         const channel = getSupabaseBrowser()
           .channel(channelName)
@@ -87,17 +93,28 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
       } catch {}
     }
     initRealtime()
-    return () => { if (cleanup) cleanup() }
-  }, [])
+    return () => {
+      if (cleanup) cleanup()
+    }
+  }, [fetchUnreadCount])
 
   useEffect(() => {
+    // Toujours recompter côté serveur (ne pas forcer 0 : d'autres non lus peuvent rester)
     const onMarkedRead = () => {
-      setUnreadCount(0)
-      prevUnreadRef.current = 0
+      void fetchUnreadCount()
     }
-    window.addEventListener("notificationsMarkedRead", onMarkedRead)
-    return () => window.removeEventListener("notificationsMarkedRead", onMarkedRead)
-  }, [])
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchUnreadCount()
+    }
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onMarkedRead)
+    document.addEventListener("visibilitychange", onVisible)
+    window.addEventListener("focus", onVisible)
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onMarkedRead)
+      document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("focus", onVisible)
+    }
+  }, [fetchUnreadCount])
 
   const isDark = theme === "dark"
 
@@ -109,9 +126,17 @@ export default function NotificationBell({ href = "/admin/notifications" }: Noti
       aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} non lues` : ""}`}
       title="Voir les notifications"
     >
-      <Bell className={`w-6 h-6 ${unreadCount > 0 ? "text-indigo-500 animate-pulse" : isDark ? "text-gray-300" : "text-gray-600"}`} />
+      <Bell
+        className={`w-6 h-6 ${
+          unreadCount > 0
+            ? "text-indigo-500 animate-pulse"
+            : isDark
+              ? "text-gray-300"
+              : "text-gray-600"
+        }`}
+      />
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 animate-bounce">
+        <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
           {unreadCount > 9 ? "9+" : unreadCount}
         </span>
       )}

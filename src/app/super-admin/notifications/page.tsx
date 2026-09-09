@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
+import { notifyNotificationsChanged } from "@/lib/notification-events"
 import {
   Bell,
   ArrowLeft,
@@ -101,7 +102,7 @@ export default function NotificationsPage() {
       const res = await authFetch(`/api/notifications/${id}`, { method: "PATCH", credentials: "include" })
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)))
-        window.dispatchEvent(new Event("notificationsMarkedRead"))
+        notifyNotificationsChanged()
       }
     } catch {}
   }
@@ -111,7 +112,7 @@ export default function NotificationsPage() {
       const res = await authFetch("/api/notifications", { method: "POST", credentials: "include" })
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-        window.dispatchEvent(new Event("notificationsMarkedRead"))
+        notifyNotificationsChanged()
       }
     } catch {}
   }
@@ -122,6 +123,7 @@ export default function NotificationsPage() {
       if (res.ok) {
         setNotifications((prev) => prev.filter((n) => n.id !== id))
         setConfirmDeleteId(null)
+        notifyNotificationsChanged()
       }
     } catch {}
   }
