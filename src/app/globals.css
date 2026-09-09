@@ -146,6 +146,12 @@
   body {
     @apply min-h-dvh bg-background text-foreground;
   }
+  /* Light : même teinte que les portails (#eef2f9) pour éviter une bande blanche
+     sous le contenu (surtout visible avec zoom < 1). */
+  html:not(.dark),
+  html:not(.dark) body {
+    background-color: #eef2f9;
+  }
   html.dark,
   html.dark body {
     /* Aligné sur gray-900 : même teinte que les shells admin / parent / élève
@@ -157,12 +163,28 @@
 /*
  * Densité UI par défaut ≈ zoom navigateur 80 %.
  * Desktop uniquement : sur mobile, on garde 100 % pour les zones tactiles.
- * html/body + shells portails partagent gray-900 (#111827) en dark pour
- * qu’aucune bande de couleur différente n’apparaisse sous le contenu (zoom).
+ * html/body + shells portails partagent gray-900 (#111827) en dark.
+ * Avec zoom:0.8, min-height 100dvh ne couvre plus le viewport visible
+ * (rendu ≈ 80 %). On compense avec 125dvh (= 100 / 0.8) pour éviter
+ * une bande body (blanc / gray-50) sous le contenu.
  */
 @media (min-width: 768px) {
   html {
     zoom: 0.8;
+  }
+  html,
+  body {
+    min-height: 125dvh;
+  }
+}
+
+/* Shells app (parent / élève / prof / staff / admin) */
+.app-shell {
+  min-height: 100dvh;
+}
+@media (min-width: 768px) {
+  .app-shell {
+    min-height: 125dvh;
   }
 }
 
