@@ -23,7 +23,7 @@ import {
 
 type TabKey = "decisions" | "propositions"
 
-type DecisionValue = "PASSAGE" | "REDOUBLEMENT" | "ORIENTATION" | ""
+type DecisionValue = "PASSAGE" | "REDOUBLEMENT" | "ORIENTATION" | "RENVOI" | ""
 
 interface EnrollmentClass {
   id: number
@@ -84,6 +84,7 @@ const DECISION_OPTIONS: { value: DecisionValue; label: string }[] = [
   { value: "PASSAGE", label: "Passage" },
   { value: "REDOUBLEMENT", label: "Redoublement" },
   { value: "ORIENTATION", label: "Orientation" },
+  { value: "RENVOI", label: "Renvoi" },
 ]
 
 function studentFullName(s: DecisionItem["student"]) {
@@ -178,6 +179,16 @@ export default function PromotionsPage() {
     created: number
     skipped: number
   } | null>(null)
+  const [confirmedWarnings, setConfirmedWarnings] = useState<
+    Array<{
+      enrollmentId: number
+      studentName: string
+      confirmedEnrollmentId: number
+      confirmedYearName: string
+      confirmedClassName: string
+      message: string
+    }>
+  >([])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -302,7 +313,12 @@ export default function PromotionsPage() {
 
   const decisionRows = useMemo(
     () =>
-      items.filter((e) => e.status === "ACTIVE" || e.status === "CONFIRMEE"),
+      items.filter(
+        (e) =>
+          e.status === "ACTIVE" ||
+          e.status === "CONFIRMEE" ||
+          e.status === "EXPELLED"
+      ),
     [items]
   )
 
@@ -445,17 +461,38 @@ export default function PromotionsPage() {
       return
     }
 
+    // Prévenir si changement alors qu'une inscription N+1 est déjà confirmée
+    // (l'API renvoie aussi des warnings ; on laisse passer avec confirmation)
     setSaving(true)
     try {
       const res = await authFetch("/api/admin/enrollments/decisions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({
+          updates,
+          targetYearId: targetYearId ? Number(targetYearId) : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur d'enregistrement")
       toast.success(`${data.updated ?? updates.length} décision(s) enregistrée(s)`)
+      if (data.regenerated > 0) {
+        toast.message(`${data.regenerated} proposition(s) N+1 régénérée(s)`)
+      }
+      if (data.deletedProposals > 0) {
+        toast.message(`${data.deletedProposals} proposition(s) N+1 retirée(s)`)
+      }
+      const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      for (const w of warnings) {
+        toast.warning(w.message, { duration: 10000 })
+      }
+      if (warnings.length) {
+        setConfirmedWarnings(warnings)
+      } else {
+        setConfirmedWarnings([])
+      }
       await loadDecisions(sourceYearId)
+      if (targetYearId) await loadPropositions(targetYearId)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur d'enregistrement")
     } finally {
@@ -774,6 +811,39 @@ export default function PromotionsPage() {
               <CardContent className="space-y-4">
                 {!loading && decisionRows.length > 0 && renderDecisionClassProgress()}
 
+                {confirmedWarnings.length > 0 && (
+                  <div
+                    className={cn(
+                      "rounded-xl border px-4 py-3 text-sm space-y-2",
+                      theme === "dark"
+                        ? "border-amber-700/60 bg-amber-950/40 text-amber-100"
+                        : "border-amber-300 bg-amber-50 text-amber-900"
+                    )}
+                  >
+                    <p className="font-semibold">
+                      Attention — inscription(s) N+1 déjà confirmée(s)
+                    </p>
+                    {confirmedWarnings.map((w) => (
+                      <div
+                        key={`${w.enrollmentId}-${w.confirmedEnrollmentId}`}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <p className="text-xs sm:text-sm opacity-90">{w.message}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTab("propositions")
+                            setConfirmedWarnings([])
+                          }}
+                          className="shrink-0 rounded-md border border-amber-600/40 px-2.5 py-1 text-xs font-medium hover:bg-amber-600/10"
+                        >
+                          Voir propositions {w.confirmedYearName} · {w.confirmedClassName}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {loading ? (
                   <div className={`flex items-center gap-2 py-10 justify-center ${textSecondary}`}>
                     <Loader2 className="h-5 w-5 animate-spin text-teal-500" />
@@ -812,11 +882,26 @@ export default function PromotionsPage() {
                             decisionPassage: "" as DecisionValue,
                             commentaireConseil: "",
                           }
+                          const isRenvoi = draft.decisionPassage === "RENVOI"
                           return (
-                            <tr key={e.id} className={hoverBg}>
+                            <tr
+                              key={e.id}
+                              className={cn(
+                                hoverBg,
+                                isRenvoi &&
+                                  (theme === "dark"
+                                    ? "bg-red-950/30"
+                                    : "bg-red-50/80")
+                              )}
+                            >
                               <td className={`px-3 py-2.5 font-medium ${textColor}`}>
                                 {studentFullName(e.student)}
-                                {e.class?.nextClass?.name && (
+                                {e.status === "EXPELLED" && (
+                                  <span className="ml-2 rounded bg-red-600/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-500">
+                                    Renvoyé
+                                  </span>
+                                )}
+                                {e.class?.nextClass?.name && !isRenvoi && (
                                   <span className={`ml-2 text-xs font-normal ${textSecondary}`}>
                                     → {e.class.nextClass.name}
                                   </span>
@@ -836,7 +921,10 @@ export default function PromotionsPage() {
                                         .value as DecisionValue,
                                     })
                                   }
-                                  className={selectCls}
+                                  className={cn(
+                                    selectCls,
+                                    isRenvoi && "border-red-500 text-red-600"
+                                  )}
                                 >
                                   {DECISION_OPTIONS.map((o) => (
                                     <option key={o.value || "empty"} value={o.value}>
@@ -854,8 +942,15 @@ export default function PromotionsPage() {
                                       commentaireConseil: ev.target.value,
                                     })
                                   }
-                                  placeholder="Optionnel"
-                                  className={`w-full ${selectCls}`}
+                                  placeholder={
+                                    isRenvoi
+                                      ? "Motif du renvoi (recommandé)"
+                                      : "Optionnel"
+                                  }
+                                  className={cn(
+                                    `w-full ${selectCls}`,
+                                    isRenvoi && "border-red-400"
+                                  )}
                                 />
                               </td>
                             </tr>
