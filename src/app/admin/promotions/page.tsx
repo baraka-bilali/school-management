@@ -8,12 +8,14 @@ import {
   type AcademicYearOption,
 } from "@/components/academic-year-select"
 import { authFetch } from "@/lib/auth-fetch"
+import { compareClasses } from "@/lib/class-sort"
 import { toDisplayCode } from "@/lib/student-fields"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   ArrowRightLeft,
   Check,
+  CheckCircle2,
   Loader2,
   Save,
   Sparkles,
@@ -21,7 +23,7 @@ import {
 
 type TabKey = "decisions" | "propositions"
 
-type DecisionValue = "PASSAGE" | "REDOUBLEMENT" | "ORIENTATION" | ""
+type DecisionValue = "PASSAGE" | "REDOUBLEMENT" | "ORIENTATION" | "RENVOI" | ""
 
 interface EnrollmentClass {
   id: number
@@ -71,15 +73,82 @@ interface RowDraft {
   commentaireConseil: string
 }
 
+interface ClassGroup {
+  classId: number
+  classInfo: EnrollmentClass
+  rows: DecisionItem[]
+}
+
 const DECISION_OPTIONS: { value: DecisionValue; label: string }[] = [
   { value: "", label: "—" },
   { value: "PASSAGE", label: "Passage" },
   { value: "REDOUBLEMENT", label: "Redoublement" },
   { value: "ORIENTATION", label: "Orientation" },
+  { value: "RENVOI", label: "Renvoi" },
 ]
 
 function studentFullName(s: DecisionItem["student"]) {
   return [s.lastName, s.middleName, s.firstName].filter(Boolean).join(" ")
+}
+
+function sortClassGroups(groups: ClassGroup[]): ClassGroup[] {
+  return [...groups].sort((a, b) => {
+    const ca = a.classInfo
+    const cb = b.classInfo
+    if (ca?.section && ca?.level && cb?.section && cb?.level) {
+      return compareClasses(
+        {
+          section: ca.section,
+          level: ca.level,
+          letter: ca.letter || undefined,
+        },
+        {
+          section: cb.section,
+          level: cb.level,
+          letter: cb.letter || undefined,
+        }
+      )
+    }
+    return (ca?.name || "").localeCompare(cb?.name || "", "fr")
+  })
+}
+
+function groupByClass(items: DecisionItem[]): ClassGroup[] {
+  const map = new Map<number, ClassGroup>()
+  for (const e of items) {
+    const existing = map.get(e.classId)
+    if (existing) {
+      existing.rows.push(e)
+    } else {
+      map.set(e.classId, {
+        classId: e.classId,
+        classInfo: e.class || { id: e.classId, name: `Classe #${e.classId}` },
+        rows: [e],
+      })
+    }
+  }
+  return sortClassGroups(Array.from(map.values()))
+}
+
+function effectiveDecision(
+  e: DecisionItem,
+  drafts: Record<number, RowDraft>
+): DecisionValue {
+  const draft = drafts[e.id]
+  if (draft) return draft.decisionPassage
+  return (e.decisionPassage || "") as DecisionValue
+}
+
+function classProgress(
+  rows: DecisionItem[],
+  drafts: Record<number, RowDraft>
+): { decided: number; total: number; done: boolean } {
+  const total = rows.length
+  let decided = 0
+  for (const e of rows) {
+    if (effectiveDecision(e, drafts)) decided++
+  }
+  return { decided, total, done: total > 0 && decided === total }
 }
 
 export default function PromotionsPage() {
@@ -98,6 +167,9 @@ export default function PromotionsPage() {
   const [targetItems, setTargetItems] = useState<DecisionItem[]>([])
   const [drafts, setDrafts] = useState<Record<number, RowDraft>>({})
   const [overrides, setOverrides] = useState<Record<number, string>>({})
+  const [selectedDecisionClassId, setSelectedDecisionClassId] = useState<string>("")
+  const [selectedPropositionClassId, setSelectedPropositionClassId] =
+    useState<string>("")
   const [loading, setLoading] = useState(false)
   const [loadingTarget, setLoadingTarget] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -107,6 +179,16 @@ export default function PromotionsPage() {
     created: number
     skipped: number
   } | null>(null)
+  const [confirmedWarnings, setConfirmedWarnings] = useState<
+    Array<{
+      enrollmentId: number
+      studentName: string
+      confirmedEnrollmentId: number
+      confirmedYearName: string
+      confirmedClassName: string
+      message: string
+    }>
+  >([])
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -211,7 +293,10 @@ export default function PromotionsPage() {
   }, [])
 
   useEffect(() => {
-    if (sourceYearId) loadDecisions(sourceYearId)
+    if (sourceYearId) {
+      setSelectedDecisionClassId("")
+      loadDecisions(sourceYearId)
+    }
   }, [sourceYearId, loadDecisions])
 
   useEffect(() => {
@@ -220,24 +305,95 @@ export default function PromotionsPage() {
     }
   }, [tab, targetYearId, loadPropositions])
 
+  useEffect(() => {
+    if (tab === "propositions") {
+      setSelectedPropositionClassId("")
+    }
+  }, [targetYearId, tab])
+
   const decisionRows = useMemo(
     () =>
-      items.filter((e) => e.status === "ACTIVE" || e.status === "CONFIRMEE"),
+      items.filter(
+        (e) =>
+          e.status === "ACTIVE" ||
+          e.status === "CONFIRMEE" ||
+          e.status === "EXPELLED"
+      ),
     [items]
   )
 
+  const decisionClassGroups = useMemo(
+    () => groupByClass(decisionRows),
+    [decisionRows]
+  )
+
+  // Auto-select first class (sorted like class list) when classes with enrollments exist
+  useEffect(() => {
+    if (!decisionClassGroups.length) {
+      if (selectedDecisionClassId) setSelectedDecisionClassId("")
+      return
+    }
+    const stillValid = decisionClassGroups.some(
+      (g) => String(g.classId) === selectedDecisionClassId
+    )
+    if (!stillValid) {
+      setSelectedDecisionClassId(String(decisionClassGroups[0].classId))
+    }
+  }, [decisionClassGroups, selectedDecisionClassId])
+
+  const filteredDecisionRows = useMemo(() => {
+    if (!selectedDecisionClassId) return []
+    return decisionRows.filter(
+      (e) => String(e.classId) === selectedDecisionClassId
+    )
+  }, [decisionRows, selectedDecisionClassId])
+
+  const selectedDecisionGroup = useMemo(
+    () =>
+      decisionClassGroups.find(
+        (g) => String(g.classId) === selectedDecisionClassId
+      ) || null,
+    [decisionClassGroups, selectedDecisionClassId]
+  )
+
+  // Propositions: filter by classe cible = enrollment.classId on the PROPOSEE row itself
+  // (not the source-year class). This matches how generate-proposals assigns the target class.
+  const propositionClassGroups = useMemo(
+    () => groupByClass(targetItems),
+    [targetItems]
+  )
+
+  useEffect(() => {
+    if (!propositionClassGroups.length) {
+      if (selectedPropositionClassId) setSelectedPropositionClassId("")
+      return
+    }
+    const stillValid = propositionClassGroups.some(
+      (g) => String(g.classId) === selectedPropositionClassId
+    )
+    if (!stillValid) {
+      setSelectedPropositionClassId(String(propositionClassGroups[0].classId))
+    }
+  }, [propositionClassGroups, selectedPropositionClassId])
+
+  const filteredPropositionRows = useMemo(() => {
+    if (!selectedPropositionClassId) return []
+    return targetItems.filter(
+      (e) => String(e.classId) === selectedPropositionClassId
+    )
+  }, [targetItems, selectedPropositionClassId])
+
+  // Override needs: only for the currently selected decision class (consistency with table filter)
   const passageNeedsOverride = useMemo(() => {
-    return decisionRows.filter((e) => {
+    return filteredDecisionRows.filter((e) => {
       const draft = drafts[e.id]
-      return (
-        draft?.decisionPassage === "PASSAGE" && !e.class?.nextClassId
-      )
+      return draft?.decisionPassage === "PASSAGE" && !e.class?.nextClassId
     })
-  }, [decisionRows, drafts])
+  }, [filteredDecisionRows, drafts])
 
   const dirtyCount = useMemo(() => {
     let n = 0
-    for (const e of decisionRows) {
+    for (const e of filteredDecisionRows) {
       const d = drafts[e.id]
       if (!d) continue
       const origDecision = (e.decisionPassage || "") as DecisionValue
@@ -250,13 +406,25 @@ export default function PromotionsPage() {
       }
     }
     return n
-  }, [decisionRows, drafts])
+  }, [filteredDecisionRows, drafts])
 
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const bgInput = theme === "dark" ? "bg-gray-700" : "bg-white"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700/60" : "hover:bg-gray-50"
+  const chipIdle =
+    theme === "dark"
+      ? "bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700/80"
+      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+  const chipActive =
+    theme === "dark"
+      ? "bg-teal-500/15 border-teal-500/50 text-teal-300"
+      : "bg-teal-50 border-teal-500 text-teal-800"
+  const chipDone =
+    theme === "dark"
+      ? "border-emerald-500/40 text-emerald-300"
+      : "border-emerald-500/60 text-emerald-700"
   const selectCls = `rounded-md border ${borderColor} ${bgInput} ${textColor} px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500`
 
   const updateDraft = (id: number, patch: Partial<RowDraft>) => {
@@ -267,7 +435,8 @@ export default function PromotionsPage() {
   }
 
   const handleSaveDecisions = async () => {
-    const updates = decisionRows
+    // Save only dirty rows of the currently selected class
+    const updates = filteredDecisionRows
       .map((e) => {
         const d = drafts[e.id]
         if (!d) return null
@@ -292,17 +461,38 @@ export default function PromotionsPage() {
       return
     }
 
+    // Prévenir si changement alors qu'une inscription N+1 est déjà confirmée
+    // (l'API renvoie aussi des warnings ; on laisse passer avec confirmation)
     setSaving(true)
     try {
       const res = await authFetch("/api/admin/enrollments/decisions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({
+          updates,
+          targetYearId: targetYearId ? Number(targetYearId) : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur d'enregistrement")
       toast.success(`${data.updated ?? updates.length} décision(s) enregistrée(s)`)
+      if (data.regenerated > 0) {
+        toast.message(`${data.regenerated} proposition(s) N+1 régénérée(s)`)
+      }
+      if (data.deletedProposals > 0) {
+        toast.message(`${data.deletedProposals} proposition(s) N+1 retirée(s)`)
+      }
+      const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      for (const w of warnings) {
+        toast.warning(w.message, { duration: 10000 })
+      }
+      if (warnings.length) {
+        setConfirmedWarnings(warnings)
+      } else {
+        setConfirmedWarnings([])
+      }
       await loadDecisions(sourceYearId)
+      if (targetYearId) await loadPropositions(targetYearId)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur d'enregistrement")
     } finally {
@@ -386,6 +576,158 @@ export default function PromotionsPage() {
     }
   }
 
+  const renderDecisionClassProgress = () => {
+    if (!decisionClassGroups.length) return null
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className={`text-xs font-medium ${textSecondary}`} htmlFor="decision-class">
+            Classe
+          </label>
+          <select
+            id="decision-class"
+            required
+            value={selectedDecisionClassId}
+            onChange={(ev) => setSelectedDecisionClassId(ev.target.value)}
+            className={selectCls}
+            aria-label="Classe (décisions)"
+          >
+            <option value="" disabled>
+              Sélectionnez une classe
+            </option>
+            {decisionClassGroups.map((g) => {
+              const { decided, total, done } = classProgress(g.rows, drafts)
+              return (
+                <option key={g.classId} value={g.classId}>
+                  {g.classInfo.name} — {decided}/{total}
+                  {done ? " ✓ Terminée" : ""}
+                </option>
+              )
+            })}
+          </select>
+          {selectedDecisionGroup &&
+            (() => {
+              const { decided, total, done } = classProgress(
+                selectedDecisionGroup.rows,
+                drafts
+              )
+              return (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium",
+                    done
+                      ? theme === "dark"
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                        : "border-emerald-500/50 bg-emerald-50 text-emerald-800"
+                      : theme === "dark"
+                        ? "border-gray-600 bg-gray-800 text-gray-300"
+                        : "border-gray-200 bg-gray-50 text-gray-700"
+                  )}
+                >
+                  {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                  {done ? "Terminée" : `${decided}/${total}`}
+                </span>
+              )
+            })()}
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="list" aria-label="Progression par classe">
+          {decisionClassGroups.map((g) => {
+            const { decided, total, done } = classProgress(g.rows, drafts)
+            const active = String(g.classId) === selectedDecisionClassId
+            return (
+              <button
+                key={g.classId}
+                type="button"
+                role="listitem"
+                onClick={() => setSelectedDecisionClassId(String(g.classId))}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  active ? chipActive : chipIdle,
+                  done && !active && chipDone
+                )}
+              >
+                <span>{g.classInfo.name}</span>
+                <span
+                  className={cn(
+                    "tabular-nums opacity-80",
+                    done && "font-semibold"
+                  )}
+                >
+                  {decided}/{total}
+                </span>
+                {done && (
+                  <span
+                    className={cn(
+                      "rounded px-1 text-[10px] font-semibold uppercase tracking-wide",
+                      theme === "dark"
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "bg-emerald-100 text-emerald-800"
+                    )}
+                  >
+                    Terminée
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const renderPropositionClassSelector = () => {
+    if (!propositionClassGroups.length) return null
+    return (
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label
+            className={`text-xs font-medium ${textSecondary}`}
+            htmlFor="proposition-class"
+          >
+            Classe cible
+          </label>
+          <select
+            id="proposition-class"
+            required
+            value={selectedPropositionClassId}
+            onChange={(ev) => setSelectedPropositionClassId(ev.target.value)}
+            className={selectCls}
+            aria-label="Classe cible (propositions)"
+          >
+            <option value="" disabled>
+              Sélectionnez une classe
+            </option>
+            {propositionClassGroups.map((g) => (
+              <option key={g.classId} value={g.classId}>
+                {g.classInfo.name} — {g.rows.length}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="list" aria-label="Classes avec propositions">
+          {propositionClassGroups.map((g) => {
+            const active = String(g.classId) === selectedPropositionClassId
+            return (
+              <button
+                key={g.classId}
+                type="button"
+                role="listitem"
+                onClick={() => setSelectedPropositionClassId(String(g.classId))}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                  active ? chipActive : chipIdle
+                )}
+              >
+                <span>{g.classInfo.name}</span>
+                <span className="tabular-nums opacity-80">{g.rows.length}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Layout>
       <div className="space-y-4 md:p-6">
@@ -428,7 +770,7 @@ export default function PromotionsPage() {
         {tab === "decisions" && (
           <>
             <Card theme={theme}>
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle className={textColor}>Décisions de passage</CardTitle>
                   <p className={`mt-1 text-sm ${textSecondary}`}>
@@ -446,7 +788,9 @@ export default function PromotionsPage() {
                   />
                   <button
                     type="button"
-                    disabled={saving || dirtyCount === 0}
+                    disabled={
+                      saving || dirtyCount === 0 || !selectedDecisionClassId
+                    }
                     onClick={handleSaveDecisions}
                     className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
                   >
@@ -464,7 +808,42 @@ export default function PromotionsPage() {
                   </button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {!loading && decisionRows.length > 0 && renderDecisionClassProgress()}
+
+                {confirmedWarnings.length > 0 && (
+                  <div
+                    className={cn(
+                      "rounded-xl border px-4 py-3 text-sm space-y-2",
+                      theme === "dark"
+                        ? "border-amber-700/60 bg-amber-950/40 text-amber-100"
+                        : "border-amber-300 bg-amber-50 text-amber-900"
+                    )}
+                  >
+                    <p className="font-semibold">
+                      Attention — inscription(s) N+1 déjà confirmée(s)
+                    </p>
+                    {confirmedWarnings.map((w) => (
+                      <div
+                        key={`${w.enrollmentId}-${w.confirmedEnrollmentId}`}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <p className="text-xs sm:text-sm opacity-90">{w.message}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTab("propositions")
+                            setConfirmedWarnings([])
+                          }}
+                          className="shrink-0 rounded-md border border-amber-600/40 px-2.5 py-1 text-xs font-medium hover:bg-amber-600/10"
+                        >
+                          Voir propositions {w.confirmedYearName} · {w.confirmedClassName}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {loading ? (
                   <div className={`flex items-center gap-2 py-10 justify-center ${textSecondary}`}>
                     <Loader2 className="h-5 w-5 animate-spin text-teal-500" />
@@ -473,6 +852,10 @@ export default function PromotionsPage() {
                 ) : decisionRows.length === 0 ? (
                   <p className={`py-8 text-center text-sm ${textSecondary}`}>
                     Aucune inscription active pour cette année.
+                  </p>
+                ) : !selectedDecisionClassId ? (
+                  <p className={`py-8 text-center text-sm ${textSecondary}`}>
+                    Sélectionnez une classe
                   </p>
                 ) : (
                   <div className={`overflow-x-auto rounded-lg border ${borderColor}`}>
@@ -487,7 +870,6 @@ export default function PromotionsPage() {
                         <tr>
                           <th className="px-3 py-2.5 text-left font-medium">Élève</th>
                           <th className="px-3 py-2.5 text-left font-medium">Code</th>
-                          <th className="px-3 py-2.5 text-left font-medium">Classe</th>
                           <th className="px-3 py-2.5 text-left font-medium">Décision</th>
                           <th className="px-3 py-2.5 text-left font-medium">
                             Commentaire conseil
@@ -495,27 +877,39 @@ export default function PromotionsPage() {
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${borderColor}`}>
-                        {decisionRows.map((e) => {
+                        {filteredDecisionRows.map((e) => {
                           const draft = drafts[e.id] || {
                             decisionPassage: "" as DecisionValue,
                             commentaireConseil: "",
                           }
+                          const isRenvoi = draft.decisionPassage === "RENVOI"
                           return (
-                            <tr key={e.id} className={hoverBg}>
+                            <tr
+                              key={e.id}
+                              className={cn(
+                                hoverBg,
+                                isRenvoi &&
+                                  (theme === "dark"
+                                    ? "bg-red-950/30"
+                                    : "bg-red-50/80")
+                              )}
+                            >
                               <td className={`px-3 py-2.5 font-medium ${textColor}`}>
                                 {studentFullName(e.student)}
+                                {e.status === "EXPELLED" && (
+                                  <span className="ml-2 rounded bg-red-600/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-500">
+                                    Renvoyé
+                                  </span>
+                                )}
+                                {e.class?.nextClass?.name && !isRenvoi && (
+                                  <span className={`ml-2 text-xs font-normal ${textSecondary}`}>
+                                    → {e.class.nextClass.name}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-3 py-2.5 font-mono text-teal-500">
                                 {toDisplayCode(
                                   e.student.permanentCode || e.student.code
-                                )}
-                              </td>
-                              <td className={`px-3 py-2.5 ${textSecondary}`}>
-                                {e.class?.name}
-                                {e.class?.nextClass?.name && (
-                                  <span className="ml-1 text-xs opacity-70">
-                                    → {e.class.nextClass.name}
-                                  </span>
                                 )}
                               </td>
                               <td className="px-3 py-2.5">
@@ -527,7 +921,10 @@ export default function PromotionsPage() {
                                         .value as DecisionValue,
                                     })
                                   }
-                                  className={selectCls}
+                                  className={cn(
+                                    selectCls,
+                                    isRenvoi && "border-red-500 text-red-600"
+                                  )}
                                 >
                                   {DECISION_OPTIONS.map((o) => (
                                     <option key={o.value || "empty"} value={o.value}>
@@ -545,8 +942,15 @@ export default function PromotionsPage() {
                                       commentaireConseil: ev.target.value,
                                     })
                                   }
-                                  placeholder="Optionnel"
-                                  className={`w-full ${selectCls}`}
+                                  placeholder={
+                                    isRenvoi
+                                      ? "Motif du renvoi (recommandé)"
+                                      : "Optionnel"
+                                  }
+                                  className={cn(
+                                    `w-full ${selectCls}`,
+                                    isRenvoi && "border-red-400"
+                                  )}
                                 />
                               </td>
                             </tr>
@@ -568,6 +972,9 @@ export default function PromotionsPage() {
                 <p className={`text-sm ${textSecondary}`}>
                   Crée des inscriptions PROPOSÉE pour l&apos;année cible (passage /
                   redoublement).
+                  {selectedDecisionGroup
+                    ? ` Overrides affichés pour ${selectedDecisionGroup.classInfo.name}.`
+                    : ""}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -606,6 +1013,9 @@ export default function PromotionsPage() {
                   >
                     <p className={`text-sm font-medium ${textColor}`}>
                       Classes manquantes pour le passage
+                      {selectedDecisionGroup
+                        ? ` — ${selectedDecisionGroup.classInfo.name}`
+                        : ""}
                     </p>
                     <p className={`text-xs ${textSecondary}`}>
                       Ces élèves sont en PASSAGE sans classe supérieure définie.
@@ -620,7 +1030,6 @@ export default function PromotionsPage() {
                           <span className={`min-w-[160px] font-medium ${textColor}`}>
                             {studentFullName(e.student)}
                           </span>
-                          <span className={textSecondary}>{e.class?.name}</span>
                           <select
                             value={overrides[e.id] || ""}
                             onChange={(ev) =>
@@ -672,11 +1081,12 @@ export default function PromotionsPage() {
 
         {tab === "propositions" && (
           <Card theme={theme}>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle className={textColor}>Propositions N+1</CardTitle>
                 <p className={`mt-1 text-sm ${textSecondary}`}>
                   Inscriptions au statut PROPOSÉE — confirmer pour les activer.
+                  Filtrées par classe cible.
                 </p>
               </div>
               <AcademicYearSelect
@@ -688,7 +1098,11 @@ export default function PromotionsPage() {
                 aria-label="Année des propositions"
               />
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {!loadingTarget &&
+                targetItems.length > 0 &&
+                renderPropositionClassSelector()}
+
               {loadingTarget ? (
                 <div className={`flex items-center gap-2 py-10 justify-center ${textSecondary}`}>
                   <Loader2 className="h-5 w-5 animate-spin text-teal-500" />
@@ -697,6 +1111,10 @@ export default function PromotionsPage() {
               ) : targetItems.length === 0 ? (
                 <p className={`py-8 text-center text-sm ${textSecondary}`}>
                   Aucune proposition pour cette année.
+                </p>
+              ) : !selectedPropositionClassId ? (
+                <p className={`py-8 text-center text-sm ${textSecondary}`}>
+                  Sélectionnez une classe
                 </p>
               ) : (
                 <div className={`overflow-x-auto rounded-lg border ${borderColor}`}>
@@ -711,13 +1129,12 @@ export default function PromotionsPage() {
                       <tr>
                         <th className="px-3 py-2.5 text-left font-medium">Élève</th>
                         <th className="px-3 py-2.5 text-left font-medium">Code</th>
-                        <th className="px-3 py-2.5 text-left font-medium">Classe</th>
                         <th className="px-3 py-2.5 text-left font-medium">Origine</th>
                         <th className="px-3 py-2.5 text-right font-medium">Action</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${borderColor}`}>
-                      {targetItems.map((e) => (
+                      {filteredPropositionRows.map((e) => (
                         <tr key={e.id} className={hoverBg}>
                           <td className={`px-3 py-2.5 font-medium ${textColor}`}>
                             {studentFullName(e.student)}
@@ -726,9 +1143,6 @@ export default function PromotionsPage() {
                             {toDisplayCode(
                               e.student.permanentCode || e.student.code
                             )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${textSecondary}`}>
-                            {e.class?.name}
                           </td>
                           <td className={`px-3 py-2.5 ${textSecondary}`}>
                             {e.origine || "—"}
