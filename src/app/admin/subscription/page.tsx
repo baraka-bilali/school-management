@@ -17,6 +17,10 @@ import {
   isSubscriptionAccessBlocked,
   parseSubscriptionDate,
 } from "@/lib/subscription-period"
+import {
+  readSubscriptionAccessCache,
+  writeSubscriptionAccessCache,
+} from "@/lib/subscription-access-cache"
 
 interface School {
   id: number
@@ -263,11 +267,36 @@ function InvoicePrintModal({
   )
 }
 
+function schoolFromCache(): School | null {
+  const cache = readSubscriptionAccessCache()
+  if (!cache) return null
+  if (!cache.etatCompte && !cache.dateFinAbonnement && !cache.expired) return null
+  const name =
+    cache.schoolName ||
+    (typeof window !== "undefined" ? localStorage.getItem("schoolName") : null) ||
+    "Établissement"
+  return {
+    id: 0,
+    nomEtablissement: name,
+    etatCompte: cache.etatCompte || (cache.expired ? "SUSPENDU" : "ACTIF"),
+    dateDebutAbonnement: cache.dateDebutAbonnement ?? null,
+    dateFinAbonnement: cache.dateFinAbonnement,
+    typePaiement: null,
+    montantPaye: null,
+  }
+}
+
 export default function SubscriptionPage() {
-  const [school, setSchool] = useState<School | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [school, setSchool] = useState<School | null>(() => schoolFromCache())
+  const [loading, setLoading] = useState(() => schoolFromCache() === null)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [activeTab, setActiveTab] = useState<"overview" | "history">("overview")
+  const [blockedHint] = useState(() => readSubscriptionAccessCache()?.expired === true)
+  const [hintLabel] = useState<"Suspendu" | "Expiré" | null>(() => {
+    const cache = readSubscriptionAccessCache()
+    if (!cache?.expired) return null
+    return cache.etatCompte === "SUSPENDU" ? "Suspendu" : "Expiré"
+  })
 
   const [payments, setPayments] = useState<SubscriptionPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
@@ -311,10 +340,80 @@ export default function SubscriptionPage() {
 
   const fetchSchoolData = async () => {
     try {
-      setLoading(true)
-      const schoolRes = await authFetch("/api/admin/school")
-      const schoolData = await schoolRes.json()
-      setSchool(schoolData.school)
+      // /api/auth/me est plus léger et donne déjà le statut d'accès
+      const mePromise = fetch("/api/auth/me", { credentials: "include" })
+        .then(async (res) => (res.ok ? res.json() : null))
+        .catch(() => null)
+
+      const schoolPromise = authFetch("/api/admin/school")
+        .then(async (res) => (res.ok ? res.json() : null))
+        .catch(() => null)
+
+      const meData = await mePromise
+      if (meData?.subscription) {
+        const expired = meData.subscription.expired === true
+        const etatCompte = meData.subscription.etatCompte ?? null
+        const dateFinAbonnement = meData.subscription.dateFinAbonnement ?? null
+        const prevCache = readSubscriptionAccessCache()
+        writeSubscriptionAccessCache({
+          expired,
+          etatCompte,
+          dateFinAbonnement,
+          dateDebutAbonnement: prevCache?.dateDebutAbonnement ?? null,
+          schoolName:
+            prevCache?.schoolName ||
+            (typeof window !== "undefined" ? localStorage.getItem("schoolName") : null),
+          daysLeft:
+            typeof meData.subscription.daysLeft === "number"
+              ? meData.subscription.daysLeft
+              : null,
+        })
+        setSchool((prev) => {
+          if (prev && prev.id !== 0) {
+            return {
+              ...prev,
+              etatCompte: etatCompte || prev.etatCompte,
+              dateFinAbonnement: dateFinAbonnement ?? prev.dateFinAbonnement,
+            }
+          }
+          const name =
+            prevCache?.schoolName ||
+            (typeof window !== "undefined" && localStorage.getItem("schoolName")) ||
+            prev?.nomEtablissement ||
+            "Établissement"
+          return {
+            id: prev?.id ?? 0,
+            nomEtablissement: name,
+            etatCompte: etatCompte || (expired ? "SUSPENDU" : "ACTIF"),
+            dateDebutAbonnement: prev?.dateDebutAbonnement ?? prevCache?.dateDebutAbonnement ?? null,
+            dateFinAbonnement,
+            typePaiement: prev?.typePaiement ?? null,
+            montantPaye: prev?.montantPaye ?? null,
+          }
+        })
+        // Afficher le statut dès que /me répond, sans attendre l'école complète
+        setLoading(false)
+      }
+
+      const schoolData = await schoolPromise
+      if (schoolData?.school) {
+        const next: School = schoolData.school
+        setSchool(next)
+        const now = new Date()
+        const expired = isSubscriptionAccessBlocked(
+          next.dateFinAbonnement,
+          next.etatCompte,
+          now
+        )
+        writeSubscriptionAccessCache({
+          expired,
+          etatCompte: next.etatCompte,
+          dateFinAbonnement: next.dateFinAbonnement,
+          dateDebutAbonnement: next.dateDebutAbonnement,
+          schoolName: next.nomEtablissement,
+          daysLeft: null,
+        })
+      }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error)
     } finally {
@@ -354,10 +453,28 @@ export default function SubscriptionPage() {
   const tableRowHover = theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"
 
   if (loading) {
+    const cache = readSubscriptionAccessCache()
+    const expired = cache?.expired === true || blockedHint
+    const label =
+      hintLabel ??
+      (expired
+        ? cache?.etatCompte === "SUSPENDU"
+          ? "Suspendu"
+          : "Expiré"
+        : null)
     return (
       <Layout>
         <div className="p-4 md:p-6">
-          <SubscriptionSkeleton theme={theme} />
+          <SubscriptionSkeleton
+            theme={theme}
+            blockedHint={expired}
+            statusLabel={label}
+            schoolName={
+              cache?.schoolName ||
+              (typeof window !== "undefined" ? localStorage.getItem("schoolName") : null)
+            }
+            dateFinAbonnement={cache?.dateFinAbonnement}
+          />
         </div>
       </Layout>
     )

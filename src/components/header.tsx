@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import NotificationBell from "./notification-bell"
 import Portal from "./portal"
 import FeatureSearch, { useFeatureSearchHotkey } from "./feature-search"
+import { clearSubscriptionAccessCache } from "@/lib/subscription-access-cache"
 
 interface HeaderProps {
   onSidebarToggle: () => void
@@ -202,6 +203,7 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
       localStorage.removeItem("token")
       localStorage.removeItem("schoolName")
       localStorage.removeItem("schoolProfilePhoto")
+      clearSubscriptionAccessCache()
       console.log("🗑️ Cache du nom de l'école nettoyé")
       // Attendre un peu pour montrer l'animation
       await new Promise(resolve => setTimeout(resolve, 1000))
