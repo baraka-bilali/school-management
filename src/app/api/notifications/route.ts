@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
+import { notificationScopeWhere } from "@/lib/notification-scope"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
-const DEFAULT_LIMIT = 10
+const DEFAULT_LIMIT = 50
 
 interface JwtPayload {
   id: number
@@ -11,7 +12,7 @@ interface JwtPayload {
   schoolId?: number
 }
 
-// GET /api/notifications?page=1&limit=10
+// GET /api/notifications?page=1&limit=50&unreadOnly=true
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get("token")?.value
@@ -20,31 +21,26 @@ export async function GET(req: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.id
-    const userRole = decoded.role
-    const userSchoolId = decoded.schoolId
+    const scopeWhere = notificationScopeWhere({
+      userId: decoded.id,
+      userRole: decoded.role,
+      userSchoolId: decoded.schoolId,
+    })
 
     const { searchParams } = new URL(req.url)
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
-    const limit = Math.min(50, parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT)))
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
+    const limit = Math.min(
+      100,
+      parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10)
+    )
     const skip = (page - 1) * limit
+    const unreadOnly = searchParams.get("unreadOnly") === "true"
 
-    const where =
-      userRole === "SUPER_ADMIN"
-        ? {
-            OR: [
-              { userId: null, targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] } },
-              { userId: userId },
-            ],
-          }
-        : {
-            OR: [
-              { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
-              { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
-            ],
-          }
+    const where = unreadOnly
+      ? { AND: [scopeWhere, { isRead: false }] }
+      : scopeWhere
 
-    const [notifications, total] = await Promise.all([
+    const [notifications, total, unreadCount] = await Promise.all([
       prisma.notification.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -52,11 +48,15 @@ export async function GET(req: NextRequest) {
         take: limit,
       }),
       prisma.notification.count({ where }),
+      prisma.notification.count({
+        where: { AND: [scopeWhere, { isRead: false }] },
+      }),
     ])
 
     return NextResponse.json({
       notifications,
       total,
+      unreadCount,
       page,
       limit,
       hasMore: skip + notifications.length < total,
@@ -76,32 +76,16 @@ export async function POST(req: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.id
-    const userRole = decoded.role
-    const userSchoolId = decoded.schoolId
+    const scopeWhere = notificationScopeWhere({
+      userId: decoded.id,
+      userRole: decoded.role,
+      userSchoolId: decoded.schoolId,
+    })
 
-    if (userRole === "SUPER_ADMIN") {
-      await prisma.notification.updateMany({
-        where: {
-          OR: [
-            { userId: null, targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] }, isRead: false },
-            { userId: userId, isRead: false },
-          ],
-        },
-        data: { isRead: true },
-      })
-    } else {
-      await prisma.notification.updateMany({
-        where: {
-          isRead: false,
-          OR: [
-            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
-            { userId: userId },
-          ],
-        },
-        data: { isRead: true },
-      })
-    }
+    await prisma.notification.updateMany({
+      where: { AND: [scopeWhere, { isRead: false }] },
+      data: { isRead: true },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

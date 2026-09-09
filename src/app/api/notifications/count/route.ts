@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
+import { notificationScopeWhere } from "@/lib/notification-scope"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -19,36 +20,15 @@ export async function GET(req: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    const userId = decoded.id
-    const userRole = decoded.role
-    const userSchoolId = decoded.schoolId
+    const scopeWhere = notificationScopeWhere({
+      userId: decoded.id,
+      userRole: decoded.role,
+      userSchoolId: decoded.schoolId,
+    })
 
-    let count
-
-    if (userRole === "SUPER_ADMIN") {
-      count = await prisma.notification.count({
-        where: {
-          isRead: false,
-          OR: [
-            {
-              userId: null,
-              targetRole: { in: ["SUPER_ADMIN_ONLY", "ALL"] as any[] },
-            },
-            { userId: userId },
-          ],
-        },
-      })
-    } else {
-      count = await prisma.notification.count({
-        where: {
-          isRead: false,
-          OR: [
-            { userId: null, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] }, ...(userSchoolId ? { schoolId: userSchoolId } : {}) },
-            { userId: userId, targetRole: { in: ["SCHOOL_USER_ONLY", "ALL"] as any[] } },
-          ],
-        },
-      })
-    }
+    const count = await prisma.notification.count({
+      where: { AND: [scopeWhere, { isRead: false }] },
+    })
 
     return NextResponse.json({ count })
   } catch (error) {
