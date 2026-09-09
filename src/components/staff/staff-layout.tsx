@@ -126,7 +126,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className={cn("min-h-screen transition-colors", bg, desktopBg)}>
+    <div className={cn("app-shell transition-colors", bg, desktopBg)}>
       <StaffSidebar
         profile={
           profile
@@ -144,7 +144,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
       <div
         className={cn(
-          "flex min-h-screen min-w-0 flex-col transition-[padding] duration-300 ease-in-out",
+          "app-shell flex min-w-0 flex-col transition-[padding] duration-300 ease-in-out",
+          bg,
+          desktopBg,
           sidebarExpanded ? "lg:pl-64 xl:pl-72" : "lg:pl-[4.25rem]"
         )}
       >

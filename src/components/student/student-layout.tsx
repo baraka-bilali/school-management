@@ -183,7 +183,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
     : null
 
   return (
-    <div className={cn("min-h-dvh transition-colors", bg, desktopBg)}>
+    <div className={cn("app-shell transition-colors", bg, desktopBg)}>
       <StudentSidebar
         profile={sidebarProfile}
         expanded={sidebarExpanded}
@@ -197,7 +197,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
       <div
         className={cn(
-          "flex min-h-dvh min-w-0 flex-col transition-[padding] duration-300 ease-in-out",
+          "app-shell flex min-w-0 flex-col transition-[padding] duration-300 ease-in-out",
+          bg,
+          desktopBg,
           sidebarExpanded ? "lg:pl-64 xl:pl-72" : "lg:pl-[4.25rem]"
         )}
       >
