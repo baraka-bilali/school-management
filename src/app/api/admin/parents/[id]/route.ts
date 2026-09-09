@@ -167,12 +167,12 @@ export async function PUT(
     }
 
     const body = await req.json()
-    const lastName = String(body.lastName || "").trim()
-    const firstName = String(body.firstName || "").trim()
+    const lastName = String(body.lastName || "").trim().toUpperCase()
+    const firstName = String(body.firstName || "").trim().toUpperCase()
     const middleName =
       body.middleName !== undefined
         ? body.middleName
-          ? String(body.middleName).trim()
+          ? String(body.middleName).trim().toUpperCase()
           : null
         : undefined
     const phone =

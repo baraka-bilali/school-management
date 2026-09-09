@@ -84,6 +84,11 @@ function fullName(p: { lastName?: string | null; middleName?: string | null; fir
   return [p.lastName, p.middleName, p.firstName].filter(Boolean).join(" ").replace(/\s+/g, " ").trim()
 }
 
+/** Identité parent : majuscules comme pour les élèves. */
+function toUpper(v: string) {
+  return v.toUpperCase()
+}
+
 function copyText(value: string) {
   if (navigator.clipboard && window.isSecureContext) {
     void navigator.clipboard.writeText(value)
@@ -1092,7 +1097,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={lookupForm.lastName}
-                      onChange={(e) => setLookupForm({ ...lookupForm, lastName: e.target.value })}
+                      onChange={(e) => setLookupForm({ ...lookupForm, lastName: toUpper(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -1100,7 +1105,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={lookupForm.firstName}
-                      onChange={(e) => setLookupForm({ ...lookupForm, firstName: e.target.value })}
+                      onChange={(e) => setLookupForm({ ...lookupForm, firstName: toUpper(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -1116,7 +1121,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={lookupForm.email}
-                      onChange={(e) => setLookupForm({ ...lookupForm, email: e.target.value })}
+                      onChange={(e) => setLookupForm({ ...lookupForm, email: e.target.value.trim().toLowerCase() })}
                     />
                   </div>
                 </div>
@@ -1216,7 +1221,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={form.lastName}
-                      onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                      onChange={(e) => setForm({ ...form, lastName: toUpper(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -1224,7 +1229,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={form.middleName}
-                      onChange={(e) => setForm({ ...form, middleName: e.target.value })}
+                      onChange={(e) => setForm({ ...form, middleName: toUpper(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -1234,7 +1239,7 @@ function ParentFormModal({
                     <input
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${borderColor} ${bgInput}`}
                       value={form.firstName}
-                      onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                      onChange={(e) => setForm({ ...form, firstName: toUpper(e.target.value) })}
                     />
                   </div>
                   <div>
@@ -1320,7 +1325,7 @@ function ParentFormModal({
                       className={`w-full rounded-lg border py-2 pl-9 pr-3 text-sm ${borderColor} ${bgInput}`}
                       placeholder="Rechercher un élève à lier…"
                       value={studentQ}
-                      onChange={(e) => setStudentQ(e.target.value)}
+                      onChange={(e) => setStudentQ(toUpper(e.target.value))}
                     />
                   </div>
 
