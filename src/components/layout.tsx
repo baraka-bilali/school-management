@@ -7,6 +7,11 @@ import Sidebar from "./sidebar"
 import AdminBottomNav from "./admin-bottom-nav"
 import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
+import {
+  getCachedSubscriptionExpired,
+  readSubscriptionAccessCache,
+  writeSubscriptionAccessCache,
+} from "@/lib/subscription-access-cache"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -24,7 +29,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
-  const [subscriptionExpired, setSubscriptionExpired] = useState(false)
+  const [subscriptionExpired, setSubscriptionExpired] = useState(() => getCachedSubscriptionExpired())
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [studentSchoolId, setStudentSchoolId] = useState<number | null>(null)
@@ -73,11 +78,19 @@ export default function Layout({ children }: LayoutProps) {
     }
     window.addEventListener('communiqueRead', handleCommuniqueRead)
 
+    const syncSubscriptionFromCache = () => {
+      setSubscriptionExpired(getCachedSubscriptionExpired())
+    }
+    window.addEventListener("subscriptionAccessUpdated", syncSubscriptionFromCache)
+    window.addEventListener("storage", syncSubscriptionFromCache)
+
     return () => {
       window.removeEventListener('resize', checkMobile)
       window.removeEventListener('storage', handleThemeChange)
       window.removeEventListener('themeChange', handleThemeChange)
       window.removeEventListener('communiqueRead', handleCommuniqueRead)
+      window.removeEventListener("subscriptionAccessUpdated", syncSubscriptionFromCache)
+      window.removeEventListener("storage", syncSubscriptionFromCache)
     }
   }, [])
 
@@ -100,7 +113,20 @@ export default function Layout({ children }: LayoutProps) {
             return
           }
           if (data.subscription) {
-            setSubscriptionExpired(data.subscription.expired === true)
+            const expired = data.subscription.expired === true
+            setSubscriptionExpired(expired)
+            const prevCache = readSubscriptionAccessCache()
+            writeSubscriptionAccessCache({
+              expired,
+              etatCompte: data.subscription.etatCompte ?? null,
+              dateFinAbonnement: data.subscription.dateFinAbonnement ?? null,
+              dateDebutAbonnement: prevCache?.dateDebutAbonnement ?? null,
+              schoolName: prevCache?.schoolName ?? null,
+              daysLeft:
+                typeof data.subscription.daysLeft === "number"
+                  ? data.subscription.daysLeft
+                  : null,
+            })
           }
           if (userRole === "ELEVE") {
             try {

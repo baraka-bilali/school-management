@@ -43,8 +43,14 @@ export async function GET(req: Request) {
 
     let welcomeMonthGranted = false
 
-    // Première ouverture de l'espace école → 1 mois offert
-    if (user.schoolId && user.role !== "SUPER_ADMIN") {
+    // Première ouverture uniquement (évite des requêtes inutiles si déjà ACTIF/SUSPENDU)
+    const schoolNeedsWelcome =
+      !!user.schoolId &&
+      user.role !== "SUPER_ADMIN" &&
+      user.school?.etatCompte === "EN_ATTENTE" &&
+      !user.school?.dateFinAbonnement
+
+    if (schoolNeedsWelcome && user.schoolId) {
       const welcome = await grantWelcomeMonthIfEligible(user.schoolId)
       if (welcome.granted) {
         welcomeMonthGranted = true

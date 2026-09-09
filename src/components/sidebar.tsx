@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { clearSubscriptionAccessCache } from "@/lib/subscription-access-cache"
 
 interface SidebarProps {
   isOpen: boolean
@@ -164,6 +165,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
       // Clear any client-side token fallback
       localStorage.removeItem("token")
       localStorage.removeItem("schoolName")
+      clearSubscriptionAccessCache()
       // Attendre un peu pour montrer l'animation
       await new Promise(resolve => setTimeout(resolve, 1000))
       setShowLogoutModal(false)
