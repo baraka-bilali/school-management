@@ -8,7 +8,11 @@ import {
   type AcademicYearOption,
 } from "@/components/academic-year-select"
 import { authFetch } from "@/lib/auth-fetch"
-import { compareClasses, isStrictlyHigherClass } from "@/lib/class-sort"
+import {
+  compareClasses,
+  isSameOrHigherClass,
+  isStrictlyHigherClass,
+} from "@/lib/class-sort"
 import { toDisplayCode } from "@/lib/student-fields"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -179,6 +183,7 @@ export default function PromotionsPage() {
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [confirmingId, setConfirmingId] = useState<number | null>(null)
+  const [changingClassId, setChangingClassId] = useState<number | null>(null)
   const [generateResult, setGenerateResult] = useState<{
     created: number
     skipped: number
@@ -433,32 +438,52 @@ export default function PromotionsPage() {
     })
   }, [filteredDecisionRows, drafts, studentIdsWithTargetEnrollment])
 
+  function sortClassOptions(list: Array<ClassOption & { section: string; level: string }>) {
+    return [...list].sort((a, b) =>
+      compareClasses(
+        { section: a.section, level: a.level, letter: a.letter || undefined },
+        { section: b.section, level: b.level, letter: b.letter || undefined }
+      )
+    )
+  }
+
   function higherClassesFor(source: EnrollmentClass | undefined | null): ClassOption[] {
     const withLevels = classes.filter(
       (c): c is ClassOption & { section: string; level: string } =>
         Boolean(c.section && c.level)
     )
     if (!source?.section || !source?.level) {
-      return [...withLevels].sort((a, b) =>
-        compareClasses(
-          { section: a.section, level: a.level, letter: a.letter || undefined },
-          { section: b.section, level: b.level, letter: b.letter || undefined }
-        )
-      )
+      return sortClassOptions(withLevels)
     }
-    return withLevels
-      .filter((c) =>
+    return sortClassOptions(
+      withLevels.filter((c) =>
         isStrictlyHigherClass(
           { section: source.section!, level: source.level! },
           { section: c.section, level: c.level }
         )
       )
-      .sort((a, b) =>
-        compareClasses(
-          { section: a.section, level: a.level, letter: a.letter || undefined },
-          { section: b.section, level: b.level, letter: b.letter || undefined }
+    )
+  }
+
+  /** Même niveau (ex. 3ème A ↔ B) ou supérieur — pour réaffectation N+1. */
+  function peerOrHigherClassesFor(
+    current: EnrollmentClass | undefined | null
+  ): ClassOption[] {
+    const withLevels = classes.filter(
+      (c): c is ClassOption & { section: string; level: string } =>
+        Boolean(c.section && c.level)
+    )
+    if (!current?.section || !current?.level) {
+      return sortClassOptions(withLevels)
+    }
+    return sortClassOptions(
+      withLevels.filter((c) =>
+        isSameOrHigherClass(
+          { section: current.section!, level: current.level! },
+          { section: c.section, level: c.level }
         )
       )
+    )
   }
 
   const dirtyCount = useMemo(() => {
@@ -643,6 +668,37 @@ export default function PromotionsPage() {
       toast.error(err instanceof Error ? err.message : "Erreur de confirmation")
     } finally {
       setConfirmingId(null)
+    }
+  }
+
+  const handleChangeClass = async (enrollmentId: number, classId: number) => {
+    setChangingClassId(enrollmentId)
+    try {
+      const res = await authFetch(`/api/admin/enrollments/${enrollmentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erreur de changement de classe")
+      if (data.unchanged) {
+        return
+      }
+      toast.success(
+        data.enrollment?.class?.name
+          ? `Classe mise à jour → ${data.enrollment.class.name}`
+          : "Classe mise à jour"
+      )
+      const nextClassId = String(classId)
+      await loadPropositions(targetYearId)
+      // Suivre l'élève dans sa nouvelle classe cible
+      setSelectedPropositionClassId(nextClassId)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Erreur de changement de classe"
+      )
+    } finally {
+      setChangingClassId(null)
     }
   }
 
@@ -1129,7 +1185,7 @@ export default function PromotionsPage() {
                       className="text-xs font-medium underline"
                       onClick={() => setTab("propositions")}
                     >
-                      Voir dans l&apos;onglet Propositions
+                      Voir / changer de classe dans Propositions
                     </button>
                   </div>
                 )}
@@ -1229,8 +1285,10 @@ export default function PromotionsPage() {
               <div>
                 <CardTitle className={textColor}>Propositions N+1</CardTitle>
                 <p className={`mt-1 text-sm ${textSecondary}`}>
-                  Propositions, confirmations et inscriptions déjà activées pour
-                  l&apos;année cible — filtrées par classe.
+                  Propositions, confirmations et inscriptions déjà activées —
+                  filtrées par classe cible. Vous pouvez réaffecter un élève
+                  vers une classe du même niveau (ex. 3ème A → 3ème B) ou
+                  supérieure.
                 </p>
               </div>
               <AcademicYearSelect
@@ -1275,12 +1333,15 @@ export default function PromotionsPage() {
                         <th className="px-3 py-2.5 text-left font-medium">Élève</th>
                         <th className="px-3 py-2.5 text-left font-medium">Code</th>
                         <th className="px-3 py-2.5 text-left font-medium">Origine</th>
+                        <th className="px-3 py-2.5 text-left font-medium">Classe</th>
                         <th className="px-3 py-2.5 text-left font-medium">Statut</th>
                         <th className="px-3 py-2.5 text-right font-medium">Action</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${borderColor}`}>
-                      {filteredPropositionRows.map((e) => (
+                      {filteredPropositionRows.map((e) => {
+                        const classOptions = peerOrHigherClassesFor(e.class)
+                        return (
                         <tr key={e.id} className={hoverBg}>
                           <td className={`px-3 py-2.5 font-medium ${textColor}`}>
                             {studentFullName(e.student)}
@@ -1296,6 +1357,28 @@ export default function PromotionsPage() {
                               : e.origine === "PASSAGE"
                                 ? "Passage"
                                 : e.origine || "—"}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <select
+                              value={String(e.classId)}
+                              disabled={changingClassId === e.id}
+                              onChange={(ev) => {
+                                const next = Number(ev.target.value)
+                                if (!next || next === e.classId) return
+                                void handleChangeClass(e.id, next)
+                              }}
+                              className={`${selectCls} max-w-[220px]`}
+                              aria-label={`Classe de ${studentFullName(e.student)}`}
+                            >
+                              {classOptions.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                            {changingClassId === e.id && (
+                              <Loader2 className="ml-2 inline h-3.5 w-3.5 animate-spin text-teal-500" />
+                            )}
                           </td>
                           <td className="px-3 py-2.5">
                             <span
@@ -1328,7 +1411,10 @@ export default function PromotionsPage() {
                             {e.status === "PROPOSEE" ? (
                               <button
                                 type="button"
-                                disabled={confirmingId === e.id}
+                                disabled={
+                                  confirmingId === e.id ||
+                                  changingClassId === e.id
+                                }
                                 onClick={() => handleConfirm(e.id)}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
                               >
@@ -1344,7 +1430,8 @@ export default function PromotionsPage() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

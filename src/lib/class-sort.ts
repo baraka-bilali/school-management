@@ -51,6 +51,25 @@ export function isStrictlyHigherClass(
   return classProgressIndex(to) > classProgressIndex(from)
 }
 
+/** Même niveau scolaire (section + niveau), ignore lettre / filière. Ex: 3ème A ↔ 3ème B. */
+export function isSameProgressLevel(
+  a: Pick<ClassSortable, "section" | "level">,
+  b: Pick<ClassSortable, "section" | "level">
+): boolean {
+  return classProgressIndex(a) === classProgressIndex(b)
+}
+
+/**
+ * Même niveau (changement de lettre/filière) ou niveau supérieur (saut).
+ * Interdit la régression. Ex: 3ème A → 3ème B OK ; 3ème → 2ème NON.
+ */
+export function isSameOrHigherClass(
+  from: Pick<ClassSortable, "section" | "level">,
+  to: Pick<ClassSortable, "section" | "level">
+): boolean {
+  return classProgressIndex(to) >= classProgressIndex(from)
+}
+
 export const SECTION_LABELS: Record<string, string> = {
   Maternelle: "Maternelle",
   Primaire: "Primaire",
