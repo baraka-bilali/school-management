@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
           { lastName: { contains: q.trim(), mode: "insensitive" } },
           { firstName: { contains: q.trim(), mode: "insensitive" } },
           { middleName: { contains: q.trim(), mode: "insensitive" } },
-          { code: { contains: q.trim(), mode: "insensitive" } },
+          { permanentCode: { contains: q.trim(), mode: "insensitive" } },
         ],
       }
     }
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
             firstName: true,
             lastName: true,
             middleName: true,
-            code: true,
+            permanentCode: true,
           },
         },
         class: { select: { id: true, name: true } },
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
       enrollmentId: e.id,
       studentId: e.student.id,
       studentName: `${e.student.lastName} ${e.student.middleName} ${e.student.firstName}`,
-      studentCode: toDisplayCode(e.student.code, e.class.id, e.yearId),
+      studentCode: toDisplayCode(e.code) || e.student.permanentCode,
       classId: e.class.id,
       className: e.class.name,
       yearId: e.year.id,

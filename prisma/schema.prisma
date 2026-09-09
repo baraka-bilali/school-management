@@ -63,7 +63,11 @@ model Class {
   section       String
   stream        String?
   schoolId      Int
+  /// Classe supérieure recommandée pour le passage (optionnel)
+  nextClassId   Int?
   school        School             @relation(fields: [schoolId], references: [id])
+  nextClass     Class?             @relation("ClassPromotion", fields: [nextClassId], references: [id])
+  previousClasses Class[]          @relation("ClassPromotion")
   enrollments   Enrollment[]
   tarifications Tarification[]
   assignments    CourseAssignment[]
@@ -75,12 +79,14 @@ model Class {
   @@index([level])
   @@index([schoolId])
   @@index([section, level, letter])
+  @@index([nextClassId])
 }
 
 model Student {
   id          Int          @id @default(autoincrement())
   userId      Int          @unique
-  code        String
+  /// Matricule permanent, généré une fois à la création, jamais recalculé
+  permanentCode String
   lastName    String
   middleName  String
   firstName   String
@@ -91,7 +97,7 @@ model Student {
   nationality String?
   address     String?      @db.Text
   photoUrl    String?      @db.Text
-  // Parent / Tuteur 1
+  // Parent / Tuteur 1 (legacy / complément fiche — préférer Parent/ParentStudent)
   parentName1  String?
   parentPhone1 String?
   parentJob1   String?
@@ -115,8 +121,8 @@ model Student {
   parentLinks    ParentStudent[]
   user           User         @relation(fields: [userId], references: [id])
 
+  @@unique([permanentCode])
   @@index([lastName])
-  @@index([code])
   @@index([lastName, firstName])
 }
 
@@ -156,12 +162,13 @@ model Parent {
 }
 
 model ParentStudent {
-  id           Int     @id @default(autoincrement())
-  parentId     Int
-  studentId    Int
-  relationship String?
-  parent       Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  student      Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id               Int     @id @default(autoincrement())
+  parentId         Int
+  studentId        Int
+  relationship     String?
+  isPrimaryContact Boolean @default(false)
+  parent           Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student          Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([parentId, studentId])
   @@index([parentId])
@@ -169,24 +176,31 @@ model ParentStudent {
 }
 
 model Enrollment {
-  id         Int              @id @default(autoincrement())
-  studentId  Int
-  classId    Int
-  yearId     Int
-  status     EnrollmentStatus @default(ACTIVE)
-  exitReason String?
-  createdAt  DateTime         @default(now())
-  class      Class            @relation(fields: [classId], references: [id])
-  student    Student          @relation(fields: [studentId], references: [id])
-  year       AcademicYear     @relation(fields: [yearId], references: [id])
-  paiements  Paiement[]
+  id                  Int                @id @default(autoincrement())
+  studentId           Int
+  classId             Int
+  yearId              Int
+  /// Numéro affiché dans la classe pour cette année (ex: "1", "12")
+  code                String?
+  status              EnrollmentStatus   @default(ACTIVE)
+  origine             EnrollmentOrigine  @default(NOUVEL_ENTRANT)
+  decisionPassage     DecisionPassage?
+  dateDecision        DateTime?
+  commentaireConseil  String?            @db.Text
+  exitReason          String?
+  createdAt           DateTime           @default(now())
+  class               Class              @relation(fields: [classId], references: [id])
+  student             Student            @relation(fields: [studentId], references: [id])
+  year                AcademicYear       @relation(fields: [yearId], references: [id])
+  paiements           Paiement[]
 
-  @@unique([studentId, classId, yearId])
+  @@unique([studentId, yearId])
   @@index([classId])
   @@index([yearId])
   @@index([studentId, yearId, status])
   @@index([yearId, status])
   @@index([yearId, createdAt])
+  @@index([classId, yearId, code])
 }
 
 model School {
@@ -510,6 +524,21 @@ enum EnrollmentStatus {
   GRADUATED
   DROPPED_OUT
   EXPELLED
+  PROPOSEE
+  CONFIRMEE
+}
+
+enum EnrollmentOrigine {
+  NOUVEL_ENTRANT
+  PASSAGE
+  REDOUBLEMENT
+  TRANSFERT
+}
+
+enum DecisionPassage {
+  PASSAGE
+  REDOUBLEMENT
+  ORIENTATION
 }
 
 enum TypeEtablissement {

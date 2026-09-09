@@ -40,7 +40,7 @@ export async function getParentFromRequest(req: NextRequest) {
             student: {
               select: {
                 id: true,
-                code: true,
+                permanentCode: true,
                 lastName: true,
                 middleName: true,
                 firstName: true,

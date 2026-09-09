@@ -55,7 +55,7 @@ export async function generateReceiptPdf(paiementId: number): Promise<string> {
           firstName: true,
           lastName: true,
           middleName: true,
-          code: true,
+          permanentCode: true,
         },
       },
       tarification: {
@@ -66,7 +66,8 @@ export async function generateReceiptPdf(paiementId: number): Promise<string> {
         },
       },
       enrollment: {
-        include: {
+        select: {
+          code: true,
           class: { select: { name: true } },
         },
       },
@@ -101,7 +102,7 @@ export async function getReceiptData(paiementId: number) {
           firstName: true,
           lastName: true,
           middleName: true,
-          code: true,
+          permanentCode: true,
         },
       },
       tarification: {
@@ -145,7 +146,7 @@ export async function getReceiptData(paiementId: number) {
     modePaiement: paiement.modePaiement,
     reference: paiement.reference,
     eleve: {
-      code: toDisplayCode(paiement.student.code, paiement.enrollment.class.id, paiement.enrollment.yearId),
+      code: toDisplayCode(paiement.enrollment.code) || paiement.student.permanentCode,
       nom: `${paiement.student.lastName} ${paiement.student.middleName} ${paiement.student.firstName}`,
     },
     classe: paiement.enrollment.class.name,

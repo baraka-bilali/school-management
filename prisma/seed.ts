@@ -246,6 +246,7 @@ async function main() {
       const birthYear = 2012 - Math.floor(boyIndex / 3)
       const email = `eleve.m${boyIndex + 1}@institutmakelele.cd`
       const code = `EL-G-${String(boyIndex + 1).padStart(4, '0')}`
+      const permanentCode = `ELV-${school.id}-${boyIndex + 1}`
 
       const user = await prisma.user.upsert({
         where: { email },
@@ -266,7 +267,7 @@ async function main() {
         update: {},
         create: {
           userId: user.id,
-          code,
+          permanentCode,
           lastName,
           middleName: '',
           firstName,
@@ -276,9 +277,16 @@ async function main() {
       })
 
       await prisma.enrollment.upsert({
-        where: { studentId_classId_yearId: { studentId: student.id, classId: cls.id, yearId: currentYear.id } },
+        where: { studentId_yearId: { studentId: student.id, yearId: currentYear.id } },
         update: {},
-        create: { studentId: student.id, classId: cls.id, yearId: currentYear.id, status: 'ACTIVE' },
+        create: {
+          studentId: student.id,
+          classId: cls.id,
+          yearId: currentYear.id,
+          code: String(g + 1),
+          status: 'ACTIVE',
+          origine: 'NOUVEL_ENTRANT',
+        },
       })
 
       boyIndex++
@@ -291,6 +299,7 @@ async function main() {
       const birthYear = 2012 - Math.floor(girlIndex / 3)
       const email = `eleve.f${girlIndex + 1}@institutmakelele.cd`
       const code = `EL-F-${String(girlIndex + 1).padStart(4, '0')}`
+      const permanentCode = `ELV-${school.id}-F${girlIndex + 1}`
 
       const user = await prisma.user.upsert({
         where: { email },
@@ -311,7 +320,7 @@ async function main() {
         update: {},
         create: {
           userId: user.id,
-          code,
+          permanentCode,
           lastName,
           middleName: '',
           firstName,
@@ -321,9 +330,16 @@ async function main() {
       })
 
       await prisma.enrollment.upsert({
-        where: { studentId_classId_yearId: { studentId: student.id, classId: cls.id, yearId: currentYear.id } },
+        where: { studentId_yearId: { studentId: student.id, yearId: currentYear.id } },
         update: {},
-        create: { studentId: student.id, classId: cls.id, yearId: currentYear.id, status: 'ACTIVE' },
+        create: {
+          studentId: student.id,
+          classId: cls.id,
+          yearId: currentYear.id,
+          code: String(f + 4),
+          status: 'ACTIVE',
+          origine: 'NOUVEL_ENTRANT',
+        },
       })
 
       girlIndex++

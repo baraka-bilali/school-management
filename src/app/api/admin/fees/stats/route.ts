@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
         isAnnule: false,
       },
       include: {
-        student: { select: { firstName: true, lastName: true, middleName: true, code: true } },
+        student: { select: { firstName: true, lastName: true, middleName: true, permanentCode: true } },
         tarification: {
           include: { typeFrais: { select: { nom: true } } },
         },
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
           id: p.id,
           numeroRecu: p.numeroRecu,
           studentName: `${p.student.lastName} ${p.student.middleName} ${p.student.firstName}`,
-          studentCode: toDisplayCode(p.student.code, p.enrollment.class.id, p.enrollment.yearId),
+          studentCode: toDisplayCode(p.enrollment.code) || p.student.permanentCode,
           className: p.enrollment.class.name,
           typeFrais: p.tarification.typeFrais.nom,
           montant: p.montant,

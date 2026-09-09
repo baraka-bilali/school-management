@@ -9,14 +9,13 @@ import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { assertStudentEnrollmentAccess, EnrollmentAccessError } from "@/lib/student-enrollment-access"
 import {
+  generatePermanentCode,
   getNextClassCode,
   isCodeUsedInClass,
   normalizeStudentIdentity,
   studentWithDisplayCode,
-  toStoredCode,
 } from "@/lib/student-fields"
 import { validateStudentCreateInput } from "@/lib/student-create-validation"
-import { emailYearFromAcademicYear } from "@/lib/school-year-utils"
 import { compareClasses } from "@/lib/class-sort"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -96,7 +95,8 @@ export async function GET(req: NextRequest) {
               { lastName: nameFilter },
               { middleName: nameFilter },
               { firstName: nameFilter },
-              { code: nameFilter }
+              { permanentCode: nameFilter },
+              { enrollments: { some: { code: nameFilter } } },
             ]
           }
         ]
@@ -106,7 +106,8 @@ export async function GET(req: NextRequest) {
           { lastName: nameFilter },
           { middleName: nameFilter },
           { firstName: nameFilter },
-          { code: nameFilter }
+          { permanentCode: nameFilter },
+          { enrollments: { some: { code: nameFilter } } },
         ]
       }
     }
@@ -173,7 +174,7 @@ export async function GET(req: NextRequest) {
           ...(shouldSortByClass ? {} : { skip: (page - 1) * pageSize, take: pageSize }),
           select: {
             id: true,
-            code: true,
+            permanentCode: true,
             lastName: true,
             middleName: true,
             firstName: true,
@@ -186,6 +187,8 @@ export async function GET(req: NextRequest) {
                 classId: true,
                 yearId: true,
                 status: true,
+                code: true,
+                origine: true,
                 class: {
                   select: {
                     id: true,
@@ -359,16 +362,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const storedCode = toStoredCode(parsedClassId, displayCode, parsedYearId)
-
-    // Email : année de fin de l'année scolaire d'inscription (2025-2026 → 2026)
-    const emailYear = emailYearFromAcademicYear(academicYear)
     const schoolCode = school.codeEtablissement || school.nomEtablissement
+    const permanentCode = await generatePermanentCode(adminSchoolId)
 
-    let email = buildStudentEmailByCode({ firstName, lastName, year: emailYear, schoolCode })
+    // Email stable sans année (étape 2) — collisions → suffixe numérique
+    let email = buildStudentEmailByCode({ firstName, lastName, schoolCode })
     let suffix = 2
     while (await prisma.user.findUnique({ where: { email } })) {
-      email = buildStudentEmailByCode({ firstName, lastName, year: emailYear, schoolCode, suffix })
+      email = buildStudentEmailByCode({ firstName, lastName, schoolCode, suffix })
       suffix++
       if (suffix > 100) break
     }
@@ -389,7 +390,7 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Créer l'étudiant
+      // Créer l'étudiant (identité permanente)
       const student = await tx.student.create({
         data: {
           lastName,
@@ -397,22 +398,30 @@ export async function POST(req: NextRequest) {
           firstName,
           gender: gender || "M",
           birthDate: parsedBirthDate,
-          code: storedCode,
+          permanentCode,
           userId: user.id,
         },
       })
 
-      // Créer l'inscription
+      // Créer l'inscription annuelle
       await tx.enrollment.create({
         data: {
           studentId: student.id,
           classId: parsedClassId,
           yearId: parsedYearId,
+          code: displayCode,
           status: "ACTIVE",
+          origine: "NOUVEL_ENTRANT",
         },
       })
 
-      return { user, student }
+      return {
+        user,
+        student: {
+          ...student,
+          enrollments: [{ classId: parsedClassId, yearId: parsedYearId, code: displayCode }],
+        },
+      }
     })
 
     // Invalider le cache des étudiants après création
@@ -440,14 +449,10 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         )
       }
-      if (
-        fieldStr.includes("studentId") &&
-        fieldStr.includes("classId") &&
-        fieldStr.includes("yearId")
-      ) {
+      if (fieldStr.includes("studentId") && fieldStr.includes("yearId")) {
         return NextResponse.json(
           {
-            error: "Cet élève est déjà inscrit dans cette classe pour cette année",
+            error: "Cet élève a déjà une inscription pour cette année scolaire",
             field: "academicYearId",
           },
           { status: 400 }

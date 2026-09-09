@@ -37,12 +37,14 @@ interface ClassInfo {
 
 interface ClassStudent {
   id: number
-  code: string
+  code?: string
+  permanentCode?: string
   lastName: string
   middleName?: string | null
   firstName: string
   gender: string
   enrollments?: Array<{
+    code?: string | null
     classId?: number
     yearId?: number
     year?: { id?: number; name?: string | null } | null
@@ -269,11 +271,7 @@ export default function ClassDetailPage() {
                         const fullName = [s.lastName, s.middleName, s.firstName]
                           .filter(Boolean)
                           .join(" ")
-                        const code = toDisplayCode(
-                          s.code,
-                          s.enrollments?.[0]?.classId ?? classId,
-                          s.enrollments?.[0]?.yearId
-                        )
+                        const code = toDisplayCode(s.enrollments?.[0]?.code || s.code || s.permanentCode)
                         return (
                           <tr key={s.id} className={hoverBg}>
                             <td className={`px-4 py-3 tabular-nums ${textSecondary}`}>{index + 1}</td>

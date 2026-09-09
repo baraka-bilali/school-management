@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
-        code: toDisplayCode(student.code, currentEnrollment?.classId, currentEnrollment?.yearId),
+        code: toDisplayCode(currentEnrollment?.code) || student.permanentCode,
         gender: student.gender,
         birthDate: student.birthDate,
         birthPlace: student.birthPlace,
