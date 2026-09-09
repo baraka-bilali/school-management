@@ -160,7 +160,7 @@ export async function createPaiement(options: CreatePaiementOptions) {
         },
         include: {
           student: {
-            select: { firstName: true, lastName: true, middleName: true, code: true },
+            select: { firstName: true, lastName: true, middleName: true, permanentCode: true },
           },
           tarification: {
             include: {
@@ -336,7 +336,7 @@ export async function updatePaiement(options: UpdatePaiementOptions) {
         data: dataToUpdate,
         include: {
           student: {
-            select: { firstName: true, lastName: true, middleName: true, code: true },
+            select: { firstName: true, lastName: true, middleName: true, permanentCode: true },
           },
           tarification: {
             include: {
@@ -420,7 +420,7 @@ export async function annulerPaiement(
       },
       include: {
         student: {
-          select: { firstName: true, lastName: true, code: true },
+          select: { firstName: true, lastName: true, permanentCode: true },
         },
         tarification: {
           include: { typeFrais: { select: { nom: true } } },
@@ -441,7 +441,7 @@ export async function getPaiementById(paiementId: number, schoolId: number) {
     where: { id: paiementId },
     include: {
       student: {
-        select: { firstName: true, lastName: true, middleName: true, code: true },
+        select: { firstName: true, lastName: true, middleName: true, permanentCode: true },
       },
       tarification: {
         include: {
@@ -524,7 +524,7 @@ export async function listPaiements(filters: ListPaiementsFilters) {
       where,
       include: {
         student: {
-          select: { firstName: true, lastName: true, middleName: true, code: true },
+          select: { firstName: true, lastName: true, middleName: true, permanentCode: true },
         },
         tarification: {
           include: {

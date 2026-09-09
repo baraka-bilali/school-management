@@ -7,7 +7,6 @@ import {
   normalizeStudentIdentity,
   normalizeStudentProfile,
   studentWithDisplayCode,
-  toStoredCode,
 } from "@/lib/student-fields"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
@@ -106,7 +105,7 @@ export async function PUT(
       firstName: data.firstName,
     })
 
-    const requiredFields = ["lastName", "middleName", "firstName", "gender", "birthDate", "code"] as const
+    const requiredFields = ["lastName", "middleName", "firstName", "gender", "birthDate"] as const
     for (const field of requiredFields) {
       const value = field === "lastName" || field === "middleName" || field === "firstName"
         ? identity[field]
@@ -116,7 +115,7 @@ export async function PUT(
       }
     }
 
-    const displayCode = String(data.code).trim()
+    const displayCode = data.code != null ? String(data.code).trim() : ""
 
     // Vérifier appartenance école
     const existing = await prisma.student.findUnique({
@@ -131,7 +130,7 @@ export async function PUT(
     const currentEnrollment = await prisma.enrollment.findFirst({
       where: { studentId },
       orderBy: { year: { startDate: "desc" } },
-      select: { classId: true, yearId: true },
+      select: { id: true, classId: true, yearId: true },
     })
 
     if (currentEnrollment && displayCode) {
@@ -149,17 +148,12 @@ export async function PUT(
       }
     }
 
-    const storedCode = currentEnrollment
-      ? toStoredCode(currentEnrollment.classId, displayCode, currentEnrollment.yearId)
-      : displayCode
-
     const profileFields = normalizeStudentProfile(data)
 
-    // 1. Save core fields (always exist in DB)
+    // 1. Save core identity fields (permanentCode never recalculated)
     await prisma.student.update({
       where: { id: studentId },
       data: {
-        code: storedCode,
         lastName: identity.lastName,
         middleName: identity.middleName,
         firstName: identity.firstName,
@@ -168,51 +162,41 @@ export async function PUT(
       },
     })
 
-    // 2. Save extended fields via raw SQL — silently ignored if columns don't exist yet
-    // Run manual-migration-student-extended.sql in Supabase to enable these fields.
+    // Update class display code on current enrollment
+    if (currentEnrollment && displayCode) {
+      await prisma.enrollment.update({
+        where: { id: currentEnrollment.id },
+        data: { code: displayCode },
+      })
+    }
+
+    // 2. Save extended fields via Prisma
     try {
-      await prisma.$executeRawUnsafe(`
-        UPDATE "Student" SET
-          "birthPlace"       = $1,
-          "nationality"      = $2,
-          "address"          = $3,
-          "photoUrl"         = $4,
-          "parentName1"      = $5,
-          "parentPhone1"     = $6,
-          "parentJob1"       = $7,
-          "parentEmail1"     = $8,
-          "parentName2"      = $9,
-          "parentPhone2"     = $10,
-          "parentJob2"       = $11,
-          "parentEmail2"     = $12,
-          "bloodGroup"       = $13,
-          "allergies"        = $14,
-          "medicalNotes"     = $15,
-          "emergencyContact" = $16,
-          "emergencyPhone"   = $17
-        WHERE id = $18
-      `,
-        data.birthPlace       !== undefined ? (profileFields.birthPlace ?? null) : null,
-        data.nationality      !== undefined ? (profileFields.nationality ?? null) : null,
-        data.address          !== undefined ? (profileFields.address ?? null) : null,
-        data.photoUrl         ?? null,
-        data.parentName1      !== undefined ? (profileFields.parentName1 ?? null) : null,
-        data.parentPhone1     ?? null,
-        data.parentJob1       !== undefined ? (profileFields.parentJob1 ?? null) : null,
-        data.parentEmail1     ?? null,
-        data.parentName2      !== undefined ? (profileFields.parentName2 ?? null) : null,
-        data.parentPhone2     ?? null,
-        data.parentJob2       !== undefined ? (profileFields.parentJob2 ?? null) : null,
-        data.parentEmail2     ?? null,
-        data.bloodGroup       ?? null,
-        data.allergies        !== undefined ? (profileFields.allergies ?? null) : null,
-        data.medicalNotes     !== undefined ? (profileFields.medicalNotes ?? null) : null,
-        data.emergencyContact !== undefined ? (profileFields.emergencyContact ?? null) : null,
-        data.emergencyPhone   ?? null,
-        studentId,
-      )
+      await prisma.student.update({
+        where: { id: studentId },
+        data: {
+          birthPlace: data.birthPlace !== undefined ? (profileFields.birthPlace ?? null) : undefined,
+          nationality: data.nationality !== undefined ? (profileFields.nationality ?? null) : undefined,
+          address: data.address !== undefined ? (profileFields.address ?? null) : undefined,
+          photoUrl: data.photoUrl !== undefined ? data.photoUrl ?? null : undefined,
+          parentName1: data.parentName1 !== undefined ? (profileFields.parentName1 ?? null) : undefined,
+          parentPhone1: data.parentPhone1 !== undefined ? data.parentPhone1 ?? null : undefined,
+          parentJob1: data.parentJob1 !== undefined ? (profileFields.parentJob1 ?? null) : undefined,
+          parentEmail1: data.parentEmail1 !== undefined ? data.parentEmail1 ?? null : undefined,
+          parentName2: data.parentName2 !== undefined ? (profileFields.parentName2 ?? null) : undefined,
+          parentPhone2: data.parentPhone2 !== undefined ? data.parentPhone2 ?? null : undefined,
+          parentJob2: data.parentJob2 !== undefined ? (profileFields.parentJob2 ?? null) : undefined,
+          parentEmail2: data.parentEmail2 !== undefined ? data.parentEmail2 ?? null : undefined,
+          bloodGroup: data.bloodGroup !== undefined ? data.bloodGroup ?? null : undefined,
+          allergies: data.allergies !== undefined ? (profileFields.allergies ?? null) : undefined,
+          medicalNotes: data.medicalNotes !== undefined ? (profileFields.medicalNotes ?? null) : undefined,
+          emergencyContact:
+            data.emergencyContact !== undefined ? (profileFields.emergencyContact ?? null) : undefined,
+          emergencyPhone: data.emergencyPhone !== undefined ? data.emergencyPhone ?? null : undefined,
+        },
+      })
     } catch {
-      // Extended columns not yet in DB — base fields were already saved above
+      // Extended fields optional
     }
 
     // 3. Fetch current enrollment state before optional class change
@@ -227,7 +211,7 @@ export async function PUT(
       },
     })
 
-    // Mise à jour de la classe / inscription (plusieurs années possibles)
+    // Mise à jour de la classe / inscription (une seule inscription par année)
     if (data.classId && updatedStudent) {
       const targetClassId = Number(data.classId)
       let yearId = data.yearId ? Number(data.yearId) : undefined
@@ -239,31 +223,51 @@ export async function PUT(
         yearId = yId
       }
 
-      const existingForTarget = await prisma.enrollment.findFirst({
-        where: { studentId, classId: targetClassId, yearId },
+      const existingForYear = await prisma.enrollment.findUnique({
+        where: { studentId_yearId: { studentId, yearId } },
       })
 
-      const currentEnrollment = updatedStudent.enrollments[0]
+      const latestEnrollment = updatedStudent.enrollments[0]
 
-      if (existingForTarget) {
-        if (existingForTarget.status !== "ACTIVE") {
-          await prisma.enrollment.update({
-            where: { id: existingForTarget.id },
-            data: { status: "ACTIVE" },
-          })
-        }
-      } else if (currentEnrollment && currentEnrollment.yearId !== yearId) {
-        await prisma.enrollment.create({
-          data: { studentId, classId: targetClassId, yearId, status: "ACTIVE" },
-        })
-      } else if (currentEnrollment) {
+      if (existingForYear) {
         await prisma.enrollment.update({
-          where: { id: currentEnrollment.id },
-          data: { classId: targetClassId, yearId },
+          where: { id: existingForYear.id },
+          data: {
+            classId: targetClassId,
+            ...(displayCode ? { code: displayCode } : {}),
+            ...(existingForYear.status !== "ACTIVE" ? { status: "ACTIVE" } : {}),
+          },
+        })
+      } else if (latestEnrollment && latestEnrollment.yearId !== yearId) {
+        await prisma.enrollment.create({
+          data: {
+            studentId,
+            classId: targetClassId,
+            yearId,
+            code: displayCode || null,
+            status: "ACTIVE",
+            origine: "PASSAGE",
+          },
+        })
+      } else if (latestEnrollment) {
+        await prisma.enrollment.update({
+          where: { id: latestEnrollment.id },
+          data: {
+            classId: targetClassId,
+            yearId,
+            ...(displayCode ? { code: displayCode } : {}),
+          },
         })
       } else {
         await prisma.enrollment.create({
-          data: { studentId, classId: targetClassId, yearId, status: "ACTIVE" },
+          data: {
+            studentId,
+            classId: targetClassId,
+            yearId,
+            code: displayCode || null,
+            status: "ACTIVE",
+            origine: "NOUVEL_ENTRANT",
+          },
         })
       }
     }

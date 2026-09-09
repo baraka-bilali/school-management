@@ -187,6 +187,16 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
     popular: true,
   },
   {
+    id: "admin-promotions",
+    title: "Passages & réinscriptions",
+    subtitle: "Conseil de classe",
+    href: "/admin/promotions",
+    category: "users",
+    keywords: ["passage", "redoublement", "conseil de classe", "propositions", "fin annee"],
+    icon: GraduationCap,
+    roles: ["ADMIN", "DIRECTEUR_ETUDES", "DIRECTEUR_DISCIPLINE"],
+  },
+  {
     id: "admin-inscriptions",
     title: "Inscription d'élèves",
     subtitle: "Utilisateurs",

@@ -11,7 +11,7 @@ async function assertChildAccess(parentId: number, studentId: number) {
       student: {
         select: {
           id: true,
-          code: true,
+          permanentCode: true,
           lastName: true,
           middleName: true,
           firstName: true,
@@ -62,7 +62,7 @@ export async function GET(
     return NextResponse.json({
       student: {
         id: student.id,
-        code: student.code,
+        code: enrollment?.code || student.permanentCode,
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,
@@ -126,7 +126,7 @@ export async function GET(
     return NextResponse.json({
       student: {
         id: student.id,
-        code: student.code,
+        code: enrollment?.code || student.permanentCode,
         lastName: student.lastName,
         middleName: student.middleName,
         firstName: student.firstName,

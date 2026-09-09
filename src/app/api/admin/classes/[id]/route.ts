@@ -52,6 +52,8 @@ export async function GET(
         section: true,
         letter: true,
         stream: true,
+        nextClassId: true,
+        nextClass: { select: { id: true, name: true } },
         createdAt: true,
       },
     })
@@ -94,7 +96,7 @@ export async function PUT(
 
     const id = parseInt(params.id)
     const body = await req.json()
-    const { level, section, letter, stream } = body
+    const { level, section, letter, stream, nextClassId } = body
 
     // Validation des champs obligatoires
     if (!level || !section) {
@@ -158,6 +160,32 @@ export async function PUT(
     }
 
     // Mettre à jour la classe
+    let resolvedNextClassId: number | null | undefined = undefined
+    if (nextClassId !== undefined) {
+      if (nextClassId === null || nextClassId === "" || nextClassId === 0) {
+        resolvedNextClassId = null
+      } else {
+        const nextId = Number(nextClassId)
+        if (Number.isNaN(nextId) || nextId === id) {
+          return NextResponse.json(
+            { error: "Classe supérieure invalide" },
+            { status: 400 }
+          )
+        }
+        const nextClass = await prisma.class.findFirst({
+          where: { id: nextId, schoolId },
+          select: { id: true },
+        })
+        if (!nextClass) {
+          return NextResponse.json(
+            { error: "Classe supérieure introuvable dans cette école" },
+            { status: 400 }
+          )
+        }
+        resolvedNextClassId = nextId
+      }
+    }
+
     const updatedClass = await prisma.class.update({
       where: { id },
       data: {
@@ -165,8 +193,9 @@ export async function PUT(
         level,
         section,
         letter,
-        stream: stream || null
-      }
+        stream: stream || null,
+        ...(resolvedNextClassId !== undefined ? { nextClassId: resolvedNextClassId } : {}),
+      },
     })
 
     return NextResponse.json(updatedClass)

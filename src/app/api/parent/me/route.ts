@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       year: yearName,
       children: parent.students.map((link) => ({
         id: link.student.id,
-        code: link.student.code,
+        code: link.student.permanentCode,
         lastName: link.student.lastName,
         middleName: link.student.middleName,
         firstName: link.student.firstName,

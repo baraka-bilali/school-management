@@ -63,101 +63,40 @@ export function isStudentProfileComplete(input: Record<string, unknown>): boolea
   })
 }
 
-const CLASS_CODE_SEP = ":"
-
-export type ParsedStoredCode = {
-  classId?: number
-  yearId?: number
-  display: string
-}
-
-/** Décode un code stocké : « 12:3:1 » (classe:année:affichage) ou ancien « 12:1 ». */
-export function parseStoredCode(stored: string | null | undefined): ParsedStoredCode {
-  if (!stored) return { display: "" }
-  const str = String(stored)
-  const parts = str.split(CLASS_CODE_SEP)
-  if (parts.length >= 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
-    return {
-      classId: Number(parts[0]),
-      yearId: Number(parts[1]),
-      display: parts.slice(2).join(CLASS_CODE_SEP),
-    }
-  }
-  if (parts.length === 2 && /^\d+$/.test(parts[0])) {
-    return { classId: Number(parts[0]), display: parts[1] }
-  }
-  return { display: str }
-}
-
-/** Numéro affiché (1, 2, 3…) depuis le code stocké. */
-export function toDisplayCode(
-  stored: string | null | undefined,
-  classId?: number,
-  yearId?: number
-): string {
-  const parsed = parseStoredCode(stored)
-  if (!parsed.display) return ""
-
-  if (classId !== undefined && parsed.classId !== undefined && parsed.classId !== classId) {
-    return parsed.display
-  }
-
-  // Nouveau format : le numéro n'appartient qu'à une année précise
-  if (yearId !== undefined && parsed.yearId !== undefined && parsed.yearId !== yearId) {
-    return ""
-  }
-
-  return parsed.display
+/** Numéro affiché dans la classe pour une inscription (ex: "1", "12"). */
+export function toDisplayCode(code: string | null | undefined): string {
+  if (!code) return ""
+  return String(code).trim()
 }
 
 /**
- * Préfixe classe + année pour unicité globale en BDD.
- * Affichage : 1, 2, 3… par classe et par année scolaire.
+ * Attache le code d'affichage de l'inscription courante sur l'élève
+ * (compat UI qui attend encore `student.code`).
  */
-export function toStoredCode(classId: number, displayCode: string, yearId?: number): string {
-  const display = displayCode.trim()
-  if (!display) return display
-
-  const parsed = parseStoredCode(display)
-  if (parsed.yearId != null && parsed.classId === classId) {
-    return `${classId}${CLASS_CODE_SEP}${parsed.yearId}${CLASS_CODE_SEP}${parsed.display}`
-  }
-
-  if (yearId != null) {
-    return `${classId}${CLASS_CODE_SEP}${yearId}${CLASS_CODE_SEP}${display}`
-  }
-
-  // Ancien format sans année (rétrocompatibilité lecture seule)
-  const sep = display.lastIndexOf(CLASS_CODE_SEP)
-  if (sep >= 0 && display.slice(0, sep) === String(classId)) {
-    return display
-  }
-  return `${classId}${CLASS_CODE_SEP}${display}`
-}
-
 export function studentWithDisplayCode<
-  T extends { code: string | null; enrollments?: Array<{ classId?: number; yearId?: number }> },
->(student: T, classId?: number, yearId?: number): T {
-  const resolvedClassId = classId ?? student.enrollments?.[0]?.classId
-  const resolvedYearId = yearId ?? student.enrollments?.[0]?.yearId
+  T extends {
+    permanentCode?: string | null
+    enrollments?: Array<{ code?: string | null; classId?: number; yearId?: number }>
+  },
+>(student: T, _classId?: number, _yearId?: number): T & { code: string } {
+  const enrollmentCode = student.enrollments?.[0]?.code
   return {
     ...student,
-    code: toDisplayCode(student.code, resolvedClassId, resolvedYearId),
+    code: toDisplayCode(enrollmentCode) || toDisplayCode(student.permanentCode),
   }
 }
 
-/** Prochain numéro de code pour une classe / année (1, 2, 3… par classe et par année). */
+/** Prochain numéro de code pour une classe / année (1, 2, 3…). */
 export async function getNextClassCode(classId: number, yearId: number): Promise<number> {
   const enrollments = await prisma.enrollment.findMany({
     where: { classId, yearId },
-    include: { student: { select: { code: true } } },
+    select: { code: true },
   })
 
   let maxCode = 0
   for (const enrollment of enrollments) {
-    const code = enrollment.student?.code
-    if (!code) continue
-    const display = toDisplayCode(code, classId, yearId)
+    const display = toDisplayCode(enrollment.code)
+    if (!display) continue
     const num = parseInt(display.replace(/\D/g, ""), 10)
     if (!isNaN(num) && num > maxCode) maxCode = num
   }
@@ -179,31 +118,45 @@ export async function isCodeUsedInClass(
   const trimmed = displayCode.trim()
   if (!trimmed) return false
 
-  const stored = toStoredCode(classId, trimmed, yearId)
-
-  const sameStored = await prisma.student.findFirst({
-    where: {
-      code: stored,
-      ...(excludeStudentId ? { id: { not: excludeStudentId } } : {}),
-    },
-    select: { id: true },
-  })
-  if (sameStored) return true
-
-  const enrollments = await prisma.enrollment.findMany({
+  const existing = await prisma.enrollment.findFirst({
     where: {
       classId,
       yearId,
+      code: trimmed,
       ...(excludeStudentId ? { studentId: { not: excludeStudentId } } : {}),
     },
-    include: { student: { select: { code: true } } },
+    select: { id: true },
+  })
+  return Boolean(existing)
+}
+
+/** Génère un matricule permanent unique (ELV-{schoolId}-{n}). */
+export async function generatePermanentCode(schoolId: number): Promise<string> {
+  const prefix = `ELV-${schoolId}-`
+  const students = await prisma.student.findMany({
+    where: {
+      permanentCode: { startsWith: prefix },
+      user: { schoolId },
+    },
+    select: { permanentCode: true },
   })
 
-  return enrollments.some((e) => {
-    const sc = e.student?.code ?? ""
-    return (
-      sc === stored ||
-      toDisplayCode(sc, classId, yearId) === trimmed
-    )
-  })
+  let max = 0
+  for (const s of students) {
+    const suffix = s.permanentCode.slice(prefix.length)
+    const n = parseInt(suffix, 10)
+    if (!isNaN(n) && n > max) max = n
+  }
+
+  let candidate = max + 1
+  // Collision safety
+  while (
+    await prisma.student.findUnique({
+      where: { permanentCode: `${prefix}${candidate}` },
+      select: { id: true },
+    })
+  ) {
+    candidate++
+  }
+  return `${prefix}${candidate}`
 }

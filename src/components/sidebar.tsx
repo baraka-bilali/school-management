@@ -20,6 +20,7 @@ import {
   Megaphone,
   Banknote,
   UserPlus,
+  ArrowRightLeft,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -115,6 +116,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: BarChart3, label: "Tableau de bord", href: "/admin" },
     { icon: Users, label: "Utilisateurs", href: "/admin/users" },
     { icon: GraduationCap, label: "Classes & Filières", href: "/admin/classes" },
+    { icon: ArrowRightLeft, label: "Passages", href: "/admin/promotions" },
     { icon: Wallet, label: "Frais scolaires", href: "/admin/fees" },
     { icon: Landmark, label: "Trésorerie", href: "/admin/treasury" },
     { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },

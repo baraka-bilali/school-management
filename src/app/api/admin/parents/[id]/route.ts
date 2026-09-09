@@ -12,6 +12,12 @@ interface JwtPayload {
 
 const ADMIN_ROLES = ["ADMIN", "DIRECTEUR_DISCIPLINE", "DIRECTEUR_ETUDES"]
 
+type StudentLinkInput = {
+  studentId: number
+  relationship: string | null
+  isPrimaryContact: boolean
+}
+
 function getAuth(req: NextRequest): JwtPayload | null {
   const token = req.cookies.get("token")?.value
   if (!token) return null
@@ -20,6 +26,58 @@ function getAuth(req: NextRequest): JwtPayload | null {
   } catch {
     return null
   }
+}
+
+function parseStudentLinks(body: any): StudentLinkInput[] | undefined {
+  if (Array.isArray(body.students)) {
+    const defaultRelationship = body.relationship
+      ? String(body.relationship).trim()
+      : null
+    return body.students
+      .map((item: any) => {
+        const studentId = parseInt(String(item?.studentId ?? item?.id ?? ""), 10)
+        if (isNaN(studentId)) return null
+        const relationship =
+          item?.relationship !== undefined && item?.relationship !== null
+            ? String(item.relationship).trim() || null
+            : defaultRelationship
+        return {
+          studentId,
+          relationship,
+          isPrimaryContact: Boolean(item?.isPrimaryContact),
+        }
+      })
+      .filter(Boolean) as StudentLinkInput[]
+  }
+
+  if (Array.isArray(body.studentIds)) {
+    const relationship =
+      body.relationship !== undefined
+        ? body.relationship
+          ? String(body.relationship).trim()
+          : null
+        : null
+    const defaultPrimary = Boolean(body.isPrimaryContact)
+    const primaryMap = new Map<number, boolean>()
+    if (body.primaryContactByStudentId && typeof body.primaryContactByStudentId === "object") {
+      for (const [key, value] of Object.entries(body.primaryContactByStudentId)) {
+        const id = parseInt(String(key), 10)
+        if (!isNaN(id)) primaryMap.set(id, Boolean(value))
+      }
+    }
+    return body.studentIds
+      .map((id: unknown) => parseInt(String(id), 10))
+      .filter((n: number) => !isNaN(n))
+      .map((studentId: number) => ({
+        studentId,
+        relationship,
+        isPrimaryContact: primaryMap.has(studentId)
+          ? primaryMap.get(studentId)!
+          : defaultPrimary,
+      }))
+  }
+
+  return undefined
 }
 
 async function getParentInSchool(parentId: number, schoolId: number) {
@@ -32,7 +90,7 @@ async function getParentInSchool(parentId: number, schoolId: number) {
           student: {
             select: {
               id: true,
-              code: true,
+              permanentCode: true,
               lastName: true,
               middleName: true,
               firstName: true,
@@ -43,6 +101,22 @@ async function getParentInSchool(parentId: number, schoolId: number) {
       },
     },
   })
+}
+
+function serializeParent(
+  parent: NonNullable<Awaited<ReturnType<typeof getParentInSchool>>>
+) {
+  return {
+    ...parent,
+    childrenCount: parent.students.length,
+    students: parent.students.map((link) => ({
+      ...link,
+      student: {
+        ...link.student,
+        code: link.student.permanentCode,
+      },
+    })),
+  }
 }
 
 export async function GET(
@@ -65,7 +139,7 @@ export async function GET(
       return NextResponse.json({ error: "Parent introuvable" }, { status: 404 })
     }
 
-    return NextResponse.json({ parent })
+    return NextResponse.json({ parent: serializeParent(parent) })
   } catch (error) {
     console.error("Erreur détail parent:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
@@ -107,12 +181,6 @@ export async function PUT(
           ? String(body.phone).trim()
           : null
         : undefined
-    const relationship =
-      body.relationship !== undefined
-        ? body.relationship
-          ? String(body.relationship).trim()
-          : null
-        : undefined
 
     if (!lastName || !firstName) {
       return NextResponse.json(
@@ -121,12 +189,11 @@ export async function PUT(
       )
     }
 
-    const studentIds: number[] | undefined = Array.isArray(body.studentIds)
-      ? body.studentIds.map((id: unknown) => parseInt(String(id), 10)).filter((n: number) => !isNaN(n))
-      : undefined
+    const links = parseStudentLinks(body)
 
-    if (studentIds) {
-      const uniqueIds = [...new Set(studentIds)]
+    if (links) {
+      const uniqueIds = [...new Set(links.map((l) => l.studentId))]
+      const linkByStudent = new Map(links.map((l) => [l.studentId, l]))
       const validStudents = await prisma.student.count({
         where: {
           id: { in: uniqueIds },
@@ -164,11 +231,15 @@ export async function PUT(
         await tx.parentStudent.deleteMany({ where: { parentId } })
         if (uniqueIds.length > 0) {
           await tx.parentStudent.createMany({
-            data: uniqueIds.map((studentId) => ({
-              parentId,
-              studentId,
-              relationship: relationship ?? null,
-            })),
+            data: uniqueIds.map((studentId) => {
+              const link = linkByStudent.get(studentId)
+              return {
+                parentId,
+                studentId,
+                relationship: link?.relationship ?? null,
+                isPrimaryContact: link?.isPrimaryContact ?? false,
+              }
+            }),
           })
         }
       })
@@ -196,7 +267,7 @@ export async function PUT(
     }
 
     const parent = await getParentInSchool(parentId, auth.schoolId)
-    return NextResponse.json({ parent })
+    return NextResponse.json({ parent: parent ? serializeParent(parent) : parent })
   } catch (error) {
     console.error("Erreur mise à jour parent:", error)
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })

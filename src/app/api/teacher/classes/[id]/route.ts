@@ -44,7 +44,7 @@ export async function GET(
         student: {
           select: {
             id: true,
-            code: true,
+            permanentCode: true,
             lastName: true,
             middleName: true,
             firstName: true,
@@ -93,7 +93,7 @@ export async function GET(
     })),
     students: enrollments.map((e) => ({
       id: e.student.id,
-      code: e.student.code,
+      code: e.code || e.student.permanentCode,
       lastName: e.student.lastName,
       middleName: e.student.middleName,
       firstName: e.student.firstName,

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         paiements: {
           where: { isAnnule: false },
           include: {
-            student: { select: { firstName: true, lastName: true, code: true } },
+            student: { select: { firstName: true, lastName: true, permanentCode: true } },
           },
           orderBy: { datePaiement: "desc" },
           take: 20,
