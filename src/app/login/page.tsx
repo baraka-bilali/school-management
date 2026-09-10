@@ -386,7 +386,10 @@ export default function LoginPage() {
 					<div className="mb-2">
 						<KelasiLogo variant="light" priority className="h-28 w-28 object-contain drop-shadow-md sm:h-32 sm:w-32" />
 					</div>
-					<p className="text-sm text-gray-500 dark:text-gray-400">Connectez-vous à votre compte</p>
+					<p className="text-sm text-gray-500 dark:text-gray-400">
+						Connectez-vous à votre compte{" "}
+						<span className="font-semibold text-gray-700 dark:text-gray-200">Kelasi 360</span>
+					</p>
 				</div>
 				<Card theme={isDark ? "dark" : "light"} className="shadow-lg backdrop-blur-[2px]">
 					<CardHeader>
