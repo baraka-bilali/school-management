@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Search, Users, BookOpen, ClipboardList } from "lucide-react"
+import { ArrowLeft, Search, Users, BookOpen, ClipboardList, PenLine } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
@@ -27,7 +27,7 @@ interface ClassDetail {
     letter: string
     stream: string | null
   }
-  subjects: Array<{ id: number; name: string; color: string | null; weeklyHours: number }>
+  subjects: Array<{ id: number; assignmentId: number; name: string; color: string | null; weeklyHours: number }>
   students: StudentRow[]
 }
 
@@ -125,21 +125,47 @@ export default function TeacherClassDetailPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {subjects.map((s) => (
-              <span
-                key={s.id}
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+              <Link
+                key={s.assignmentId}
+                href={`/teacher/classes/${cls.id}/grades?assignmentId=${s.assignmentId}`}
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-80"
                 style={{
                   backgroundColor: `${s.color || "#4f46e5"}22`,
                   color: s.color || "#4f46e5",
                 }}
               >
                 <BookOpen className="h-3 w-3" />
-                {s.name} · {s.weeklyHours}h/sem.
-              </span>
+                {s.name} · cotation
+              </Link>
             ))}
           </div>
         </div>
       </div>
+
+      {subjects[0] && (
+        <Link
+          href={`/teacher/classes/${cls.id}/grades?assignmentId=${subjects[0].assignmentId}`}
+          className={cn(
+            "flex items-center justify-between rounded-2xl border px-4 py-3.5 transition-colors",
+            border,
+            isDark ? "bg-violet-500/5 hover:bg-violet-500/10" : "bg-violet-50/50 hover:bg-violet-50",
+            shadow
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/10">
+              <PenLine className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <p className={cn("text-sm font-semibold", text)}>Cotation / notes</p>
+              <p className={cn("text-xs", textMuted)}>
+                Colonnes d&apos;évaluation, notes de période et examen
+              </p>
+            </div>
+          </div>
+          <span className="text-sm font-semibold text-violet-600 dark:text-violet-400">Ouvrir →</span>
+        </Link>
+      )}
 
       <Link
         href={`/teacher/tasks/${cls.id}`}
