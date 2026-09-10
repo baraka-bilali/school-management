@@ -1,10 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { toast } from "sonner"
-import { Loader2, RefreshCw, Save } from "lucide-react"
+import { ChevronDown, Loader2, RefreshCw, Save } from "lucide-react"
 
 type TabKey = "cycles" | "maxima"
 
@@ -43,11 +43,24 @@ export default function GradesPage() {
   const [periodMaxInputs, setPeriodMaxInputs] = useState<Record<string, string>>({})
   const [examMaxInputs, setExamMaxInputs] = useState<Record<string, string>>({})
   const [savingMaxima, setSavingMaxima] = useState(false)
+  const [degreeMenuOpen, setDegreeMenuOpen] = useState(false)
+  const degreeMenuRef = useRef<HTMLDivElement>(null)
 
   const selectedDegree = useMemo(
     () => degrees.find((d) => `${d.section}::${d.level}` === degreeKey) || null,
     [degrees, degreeKey]
   )
+
+  useEffect(() => {
+    if (!degreeMenuOpen) return
+    const onPointerDown = (e: MouseEvent) => {
+      if (!degreeMenuRef.current?.contains(e.target as Node)) {
+        setDegreeMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    return () => document.removeEventListener("mousedown", onPointerDown)
+  }, [degreeMenuOpen])
 
   const cycleForDegree = useMemo(() => {
     if (!selectedDegree) return null
@@ -285,22 +298,77 @@ export default function GradesPage() {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm">
+              <div className="block text-sm" ref={degreeMenuRef}>
                 <span className="text-gray-600 dark:text-gray-400">Degré (section + niveau)</span>
-                <select
-                  value={degreeKey}
-                  onChange={(e) => setDegreeKey(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
-                >
-                  <option value="">Choisir…</option>
-                  {degrees.map((d) => (
-                    <option key={`${d.section}::${d.level}`} value={`${d.section}::${d.level}`}>
-                      {d.level} — {d.section}
-                      {d.classNames.length ? ` (${d.classNames.join(", ")})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="relative mt-1">
+                  <button
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded={degreeMenuOpen}
+                    onClick={() => setDegreeMenuOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-left"
+                  >
+                    <span className={selectedDegree ? "text-gray-900 dark:text-gray-100" : "text-gray-400"}>
+                      {selectedDegree
+                        ? `${selectedDegree.level} — ${selectedDegree.section}${
+                            selectedDegree.classNames.length
+                              ? ` (${selectedDegree.classNames.join(", ")})`
+                              : ""
+                          }`
+                        : "Choisir…"}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
+                        degreeMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  {degreeMenuOpen && (
+                    <ul
+                      role="listbox"
+                      className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
+                    >
+                      <li>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          onClick={() => {
+                            setDegreeKey("")
+                            setDegreeMenuOpen(false)
+                          }}
+                        >
+                          Choisir…
+                        </button>
+                      </li>
+                      {degrees.map((d) => {
+                        const key = `${d.section}::${d.level}`
+                        const active = key === degreeKey
+                        return (
+                          <li key={key}>
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={active}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                                active
+                                  ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                                  : "text-gray-800 dark:text-gray-200"
+                              }`}
+                              onClick={() => {
+                                setDegreeKey(key)
+                                setDegreeMenuOpen(false)
+                              }}
+                            >
+                              {d.level} — {d.section}
+                              {d.classNames.length ? ` (${d.classNames.join(", ")})` : ""}
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
 
             {selectedDegree && (

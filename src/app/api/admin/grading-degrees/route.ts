@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { compareClasses } from "@/lib/class-sort"
 
 const ROLES = ["ADMIN", "DIRECTEUR_ETUDES", "SUPER_ADMIN"]
 
@@ -12,8 +13,7 @@ export async function GET(req: NextRequest) {
 
     const rows = await prisma.class.findMany({
       where: { schoolId: user.schoolId },
-      select: { section: true, level: true, name: true },
-      orderBy: [{ section: "asc" }, { level: "asc" }, { letter: "asc" }],
+      select: { section: true, level: true, name: true, letter: true },
     })
 
     const map = new Map<string, { section: string; level: string; classNames: string[] }>()
@@ -24,14 +24,16 @@ export async function GET(req: NextRequest) {
       map.set(key, cur)
     }
 
-    return NextResponse.json({
-      degrees: Array.from(map.values()).map((d) => ({
+    const degrees = Array.from(map.values())
+      .sort((a, b) => compareClasses(a, b))
+      .map((d) => ({
         section: d.section,
         level: d.level,
-        label: `${d.level} ${d.section}`,
+        label: `${d.level} — ${d.section}`,
         classNames: d.classNames,
-      })),
-    })
+      }))
+
+    return NextResponse.json({ degrees })
   } catch (error) {
     return handleApiError(error)
   }
