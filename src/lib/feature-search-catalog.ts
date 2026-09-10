@@ -419,13 +419,12 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
   {
     id: "admin-grades",
     title: "Notes & Bulletins",
-    subtitle: "Bientôt disponible",
+    subtitle: "Cycles, maxima et cotations",
     href: "/admin/grades",
-    category: "coming",
-    keywords: ["notes", "bulletins", "grades", "resultats"],
+    category: "overview",
+    keywords: ["notes", "bulletins", "grades", "resultats", "cotation", "maxima"],
     icon: FileText,
     roles: ADMIN_LIKE,
-    comingSoon: true,
   },
   {
     id: "student-schedule",

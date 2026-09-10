@@ -72,6 +72,7 @@ export async function GET(
     class: classRow,
     subjects: assignments.map((a) => ({
       id: a.subject.id,
+      assignmentId: a.id,
       name: a.subject.name,
       color: a.subject.color,
       weeklyHours: a.weeklyHours,

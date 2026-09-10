@@ -74,8 +74,6 @@ model Class {
   assignments    CourseAssignment[]
   slots         ScheduleSlot[]
   tasks         StudentTask[]
-  periodMaxima  SubjectPeriodMax[]
-  examMaxima    SubjectExamMax[]
 
   @@unique([name, schoolId])
   @@index([section])
@@ -908,43 +906,46 @@ model Period {
   @@index([periodGroupId])
 }
 
-/// Maximum officiel matière × classe × période (travaux journaliers)
+/// Maximum officiel matière × degré (section+level) × période
+/// Toutes les classes parallèles (ex. 7ème A/B/C) partagent le même max.
 model SubjectPeriodMax {
   id        Int      @id @default(autoincrement())
   subjectId Int
-  classId   Int
+  /// Correspond à Class.section (ex: "Primaire", "Education de Base")
+  section   String
+  /// Correspond à Class.level (ex: "7ème", "4ème")
+  level     String
   periodId  Int
   schoolId  Int
   maxPoints Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, classId, periodId])
+  @@unique([subjectId, section, level, periodId])
   @@index([schoolId])
-  @@index([classId])
+  @@index([section, level])
   @@index([periodId])
 }
 
-/// Maximum officiel matière × classe × examen de trimestre/semestre
+/// Maximum officiel matière × degré × examen de trimestre/semestre
 model SubjectExamMax {
   id            Int         @id @default(autoincrement())
   subjectId     Int
-  classId       Int
+  section       String
+  level         String
   periodGroupId Int
   schoolId      Int
   maxPoints     Float
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  class         Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
   periodGroup   PeriodGroup @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, classId, periodGroupId])
+  @@unique([subjectId, section, level, periodGroupId])
   @@index([schoolId])
-  @@index([classId])
+  @@index([section, level])
   @@index([periodGroupId])
 }
 

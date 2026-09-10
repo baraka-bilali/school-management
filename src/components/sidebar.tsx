@@ -122,7 +122,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
     { icon: Megaphone, label: "Communiqués", href: "/admin/communiques" },
     { icon: CreditCard, label: "Abonnement", href: "/admin/subscription" },
     { icon: Calendar, label: "Horaire", href: "/admin/schedule", comingSoon: true },
-    { icon: FileText, label: "Notes & Bulletins", href: "/admin/grades", comingSoon: true },
+    { icon: FileText, label: "Notes & Bulletins", href: "/admin/grades" },
   ]
 
   // Menu caissier (POS — encaissement uniquement)
