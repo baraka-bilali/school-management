@@ -62,10 +62,21 @@ export async function POST(req: NextRequest) {
     requireRole(user, ROLES)
 
     const body = await req.json()
-    const { subjectId, teacherId, classId, weeklyHours, yearId: yearIdBody } = body
+    const { subjectId, teacherId, classId, classIds, weeklyHours, yearId: yearIdBody } = body
 
-    if (!subjectId || !teacherId || !classId) {
-      return NextResponse.json({ error: "Matière, professeur et classe requis" }, { status: 400 })
+    const parsedClassIds: number[] = Array.isArray(classIds)
+      ? classIds.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => Number.isFinite(id) && id > 0)
+      : classId
+        ? [parseInt(String(classId), 10)].filter((id) => Number.isFinite(id) && id > 0)
+        : []
+
+    const uniqueClassIds = [...new Set(parsedClassIds)]
+
+    if (!subjectId || !teacherId || uniqueClassIds.length === 0) {
+      return NextResponse.json(
+        { error: "Matière, professeur et au moins une classe requis" },
+        { status: 400 }
+      )
     }
 
     const yearId = yearIdBody
@@ -76,47 +87,72 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucune année scolaire active" }, { status: 400 })
     }
 
-    const [subject, teacher, cls] = await Promise.all([
-      prisma.subject.findFirst({ where: { id: parseInt(subjectId), schoolId: user.schoolId, isActive: true } }),
-      prisma.teacher.findFirst({ where: { id: parseInt(teacherId), user: { schoolId: user.schoolId } } }),
-      prisma.class.findFirst({ where: { id: parseInt(classId), schoolId: user.schoolId } }),
+    const subjectIdNum = parseInt(subjectId, 10)
+    const teacherIdNum = parseInt(teacherId, 10)
+    const hours = weeklyHours ? parseFloat(weeklyHours) : 2
+
+    const [subject, teacher, classRows] = await Promise.all([
+      prisma.subject.findFirst({
+        where: { id: subjectIdNum, schoolId: user.schoolId, isActive: true },
+      }),
+      prisma.teacher.findFirst({
+        where: { id: teacherIdNum, user: { schoolId: user.schoolId } },
+      }),
+      prisma.class.findMany({
+        where: { id: { in: uniqueClassIds }, schoolId: user.schoolId },
+        select: { id: true, name: true },
+      }),
     ])
 
-    if (!subject || !teacher || !cls) {
-      return NextResponse.json({ error: "Matière, professeur ou classe invalide" }, { status: 400 })
+    if (!subject || !teacher) {
+      return NextResponse.json({ error: "Matière ou professeur invalide" }, { status: 400 })
+    }
+    if (classRows.length !== uniqueClassIds.length) {
+      return NextResponse.json({ error: "Une ou plusieurs classes sont invalides" }, { status: 400 })
     }
 
-    const assignment = await prisma.courseAssignment.upsert({
-      where: {
-        subjectId_classId_yearId_schoolId: {
-          subjectId: parseInt(subjectId),
-          classId: parseInt(classId),
-          yearId,
-          schoolId: user.schoolId,
-        },
-      },
-      create: {
-        subjectId: parseInt(subjectId),
-        teacherId: parseInt(teacherId),
-        classId: parseInt(classId),
-        yearId,
-        weeklyHours: weeklyHours ? parseFloat(weeklyHours) : 2,
-        schoolId: user.schoolId,
-      },
-      update: {
-        teacherId: parseInt(teacherId),
-        weeklyHours: weeklyHours ? parseFloat(weeklyHours) : 2,
-        isActive: true,
-      },
-      include: {
-        subject: { select: { name: true, code: true } },
-        teacher: { select: { lastName: true, middleName: true, firstName: true } },
-        class: { select: { name: true } },
-        year: { select: { name: true } },
-      },
-    })
+    const assignments = await prisma.$transaction(
+      uniqueClassIds.map((cid) =>
+        prisma.courseAssignment.upsert({
+          where: {
+            subjectId_classId_yearId_schoolId: {
+              subjectId: subjectIdNum,
+              classId: cid,
+              yearId,
+              schoolId: user.schoolId,
+            },
+          },
+          create: {
+            subjectId: subjectIdNum,
+            teacherId: teacherIdNum,
+            classId: cid,
+            yearId,
+            weeklyHours: hours,
+            schoolId: user.schoolId,
+          },
+          update: {
+            teacherId: teacherIdNum,
+            weeklyHours: hours,
+            isActive: true,
+          },
+          include: {
+            subject: { select: { name: true, code: true } },
+            teacher: { select: { lastName: true, middleName: true, firstName: true } },
+            class: { select: { name: true } },
+            year: { select: { name: true } },
+          },
+        })
+      )
+    )
 
-    return NextResponse.json({ assignment }, { status: 201 })
+    return NextResponse.json(
+      {
+        assignments,
+        assignment: assignments[0],
+        count: assignments.length,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     return handleApiError(error)
   }
