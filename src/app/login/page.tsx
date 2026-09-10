@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import KelasiLogo from "@/components/kelasi-logo"
 import SplashScreen from "@/components/splash-screen"
 import { SPLASH_SESSION_KEY } from "@/components/splash-screen"
+import LoginAmbientBackground from "@/components/login-ambient-background"
 import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart, LifeBuoy, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -378,15 +379,16 @@ export default function LoginPage() {
 	return (
 		<>
 		{showSplash && <SplashScreen leaving={splashLeaving} />}
-		<div className="min-h-dvh bg-[#eef2f9] dark:bg-gray-900 flex items-center justify-center p-6 transition-colors">
-			<div className="w-full max-w-md">
-				<div className="flex flex-col items-center mb-4">
-					<div className="mb-3">
-						<KelasiLogo variant="light" priority className="h-36 w-36 sm:h-44 sm:w-44 object-contain drop-shadow-md" />
+		<div className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-[#eef2f9] p-6 transition-colors dark:bg-gray-900">
+			<LoginAmbientBackground isDark={isDark} />
+			<div className="relative z-10 my-auto w-full max-w-md py-4">
+				<div className="mb-5 flex flex-col items-center">
+					<div className="mb-2">
+						<KelasiLogo variant="light" priority className="h-28 w-28 object-contain drop-shadow-md sm:h-32 sm:w-32" />
 					</div>
 					<p className="text-sm text-gray-500 dark:text-gray-400">Connectez-vous à votre compte</p>
 				</div>
-				<Card theme={isDark ? "dark" : "light"} className="shadow-lg">
+				<Card theme={isDark ? "dark" : "light"} className="shadow-lg backdrop-blur-[2px]">
 					<CardHeader>
 						<CardTitle>Connexion</CardTitle>
 					</CardHeader>
