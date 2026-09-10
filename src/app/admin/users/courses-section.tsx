@@ -737,14 +737,14 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                         const id = String(c.id)
                         const checked = assignForm.classIds.includes(id)
                         return (
-                          <li key={c.id} className={cn("border-b last:border-b-0", isDark ? "border-gray-800" : "border-gray-100")}>
+                          <li key={c.id}>
                             <button
                               type="button"
                               role="option"
                               aria-selected={checked}
                               onClick={() => toggleAssignClass(id)}
                               className={cn(
-                                "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
+                                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
                                 checked
                                   ? isDark
                                     ? "bg-indigo-950/50 text-indigo-300"
@@ -754,20 +754,12 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                                     : "text-gray-800 hover:bg-gray-50"
                               )}
                             >
-                              <span
-                                className={cn(
-                                  "flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors",
-                                  checked
-                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                    : isDark
-                                      ? "border-gray-600 bg-gray-900"
-                                      : "border-gray-300 bg-white"
-                                )}
-                                aria-hidden
-                              >
-                                {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
-                              </span>
-                              <span className="min-w-0 flex-1 font-medium leading-snug">{c.name}</span>
+                              {checked ? (
+                                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              ) : (
+                                <span className="w-3.5 shrink-0" aria-hidden />
+                              )}
+                              <span className="min-w-0 flex-1 leading-snug">{c.name}</span>
                             </button>
                           </li>
                         )
