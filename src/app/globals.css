@@ -188,6 +188,17 @@
   }
 }
 
+/* Page login : même compensation zoom 0.8 (évite bande basse + formulaire trop haut) */
+.login-shell {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+@media (min-width: 768px) {
+  .login-shell {
+    min-height: 125dvh;
+  }
+}
+
 /* Custom animations */
 @keyframes fall {
   to {
