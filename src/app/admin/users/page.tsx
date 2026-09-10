@@ -468,23 +468,26 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                     </span>
                   </button>
                   {open && (
-                    <div className={`border-t ${borderColor} px-3.5 py-3 space-y-2.5`}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className={textSecondary}>Téléphone</span>
-                        <span className={`font-medium ${textColor}`}>{t.phone || "—"}</span>
+                    <div className={`border-t ${borderColor} px-4 py-4 space-y-4`}>
+                      <div>
+                        <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide ${textSecondary}`}>
+                          <Mail className="h-3.5 w-3.5" />
+                          Email de connexion
+                        </div>
+                        <div className={`mt-2 break-all text-base font-medium ${textColor}`}>
+                          {t.user?.email || "—"}
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className={textSecondary}>Sexe</span>
-                        <span className={`font-medium ${textColor}`}>{t.gender || "—"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className={textSecondary}>Naissance</span>
-                        <span className={`font-medium ${textColor}`}>{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "—"}</span>
-                      </div>
+                      {t.phone ? (
+                        <div>
+                          <div className={`text-xs font-medium uppercase tracking-wide ${textSecondary}`}>Téléphone</div>
+                          <div className={`mt-2 text-sm font-medium ${textColor}`}>{t.phone}</div>
+                        </div>
+                      ) : null}
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleResetTeacherPassword(t) }}
-                        className={`mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors ${theme === "dark" ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" : "bg-orange-50 text-orange-600 hover:bg-orange-100"}`}
+                        className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-colors ${theme === "dark" ? "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25" : "bg-orange-50 text-orange-600 hover:bg-orange-100"}`}
                       >
                         <KeyRound className="h-4 w-4" />
                         Réinitialiser le mot de passe
@@ -644,20 +647,40 @@ function TeachersSection({ theme }: { theme: "light" | "dark" }) {
                       </td>
                     </tr>
                     {/* expanded details row for teachers (animated) */}
-                    <tr key={`${t.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
-                      <td colSpan={9} className="px-3 py-0">
+                    <tr key={`${t.id}-expanded`} className={theme === "dark" ? "bg-gray-700/40" : "bg-gray-50/80"}>
+                      <td colSpan={9} className="px-5 py-0">
                         <div className={cn(
                           "overflow-hidden transition-all duration-300",
-                          detailsTeacherId === t.id ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+                          detailsTeacherId === t.id ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
                         )}>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm py-3">
-                            <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{t.lastName}</div></div>
-                            <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{t.middleName}</div></div>
-                            <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{t.firstName}</div></div>
-                            <div><span className={textSecondary}>Sexe</span><div className={`font-medium ${textColor}`}>{t.gender}</div></div>
-                            <div><span className={textSecondary}>Naissance</span><div className={`font-medium ${textColor}`}>{t.birthDate ? new Date(t.birthDate).toLocaleDateString() : "-"}</div></div>
-                            <div><span className={textSecondary}>Spécialité</span><div className={`font-medium ${textColor}`}>{t.specialty || "-"}</div></div>
-                            <div><span className={textSecondary}>Téléphone</span><div className={`font-medium ${textColor}`}>{t.phone || "-"}</div></div>
+                          <div className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+                            <div className="min-w-0">
+                              <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide ${textSecondary}`}>
+                                <Mail className="h-3.5 w-3.5" />
+                                Email de connexion
+                              </div>
+                              <div className="mt-2.5 flex items-center gap-2 min-w-0">
+                                <span className={`truncate text-base font-medium ${textColor}`}>
+                                  {t.user?.email || "—"}
+                                </span>
+                                {t.user?.email && (
+                                  <button
+                                    type="button"
+                                    title="Copier l'email"
+                                    className={`${textSecondary} hover:text-indigo-600 transition-colors shrink-0`}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      navigator.clipboard?.writeText(t.user.email)
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${textSecondary} sm:max-w-[16rem] sm:text-right`}>
+                              Les autres infos sont déjà dans le tableau.
+                            </p>
                           </div>
                         </div>
                       </td>

@@ -1671,19 +1671,37 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                       )}
                     </tr>
                     {!enrollmentOnly && isOpen && (
-                    <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}>
-                      <td colSpan={9} className="px-3 py-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                            <div><span className={textSecondary}>Code permanent</span><div className={`font-medium ${textColor}`}>{s.permanentCode || "—"}</div></div>
-                            <div><span className={textSecondary}>Code classe</span><div className={`font-medium ${textColor}`}>{studentDisplayCode(s) || "—"}</div></div>
-                            <div><span className={textSecondary}>Nom</span><div className={`font-medium ${textColor}`}>{s.lastName}</div></div>
-                            <div><span className={textSecondary}>Post-nom</span><div className={`font-medium ${textColor}`}>{s.middleName}</div></div>
-                            <div><span className={textSecondary}>Prénom</span><div className={`font-medium ${textColor}`}>{s.firstName}</div></div>
-                            <div><span className={textSecondary}>Sexe</span><div className={`font-medium ${textColor}`}>{s.gender}</div></div>
-                            <div><span className={textSecondary}>Naissance</span><div className={`font-medium ${textColor}`}>{new Date(s.birthDate).toLocaleDateString()}</div></div>
-                            <div><span className={textSecondary}>Classe</span><div className={`font-medium ${textColor}`}>{enr?.class?.name || "-"}</div></div>
-                            <div><span className={textSecondary}>Année</span><div className={`font-medium ${textColor}`}>{enr?.year?.name || "-"}</div></div>
+                    <tr key={`${s.id}-expanded`} className={theme === "dark" ? "bg-gray-700/40" : "bg-gray-50/80"}>
+                      <td colSpan={9} className="px-5 py-5">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+                          <div className="min-w-0">
+                            <div className={`flex items-center gap-2 text-xs font-medium uppercase tracking-wide ${textSecondary}`}>
+                              <Mail className="h-3.5 w-3.5" />
+                              Email de connexion
+                            </div>
+                            <div className="mt-2.5 flex items-center gap-2 min-w-0">
+                              <span className={`truncate text-base font-medium ${textColor}`}>
+                                {s.user?.email || "—"}
+                              </span>
+                              {s.user?.email && (
+                                <button
+                                  type="button"
+                                  title="Copier l'email"
+                                  className={`${textSecondary} hover:text-indigo-600 transition-colors shrink-0`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigator.clipboard?.writeText(s.user.email)
+                                  }}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
+                          <p className={`text-xs leading-relaxed ${textSecondary} sm:max-w-[16rem] sm:text-right`}>
+                            Fiche complète via l’icône œil.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                     )}
