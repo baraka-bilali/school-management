@@ -1,9 +1,11 @@
 "use client"
 
+import type { ReactNode } from "react"
+
 type SchoolIcon = {
   id: string
   className: string
-  paths: (ink: string, inkSoft: string) => React.ReactNode
+  paths: (ink: string, inkSoft: string) => ReactNode
 }
 
 const ICONS: SchoolIcon[] = [
