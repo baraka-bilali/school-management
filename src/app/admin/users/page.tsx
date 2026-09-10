@@ -64,7 +64,7 @@ function UsersPageContent() {
       params.delete("view")
     } else {
       params.set("tab", next)
-      if (next !== "courses") params.delete("view")
+      params.delete("view")
     }
     const qs = params.toString()
     router.replace(qs ? `/admin/users?${qs}` : "/admin/users", { scroll: false })
@@ -174,8 +174,7 @@ function UsersPageContent() {
             )}
             onClick={() => changeTab("courses")}
           >
-            <span className="md:hidden">Cours</span>
-            <span className="hidden md:inline">Cours &amp; Affectations</span>
+            Affectations
           </button>
         </div>
 
