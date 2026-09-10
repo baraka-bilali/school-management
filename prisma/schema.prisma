@@ -74,6 +74,8 @@ model Class {
   assignments    CourseAssignment[]
   slots         ScheduleSlot[]
   tasks         StudentTask[]
+  periodMaxima  SubjectPeriodMax[]
+  examMaxima    SubjectExamMax[]
 
   @@unique([name, schoolId])
   @@index([section])
@@ -195,6 +197,8 @@ model Enrollment {
   year                AcademicYear       @relation(fields: [yearId], references: [id])
   paiements           Paiement[]
   decisionHistory     EnrollmentDecisionHistory[]
+  grades              Grade[]
+  examGrades          ExamGrade[]
 
   @@unique([studentId, yearId])
   @@index([classId])
@@ -285,6 +289,7 @@ model School {
   classes                     Class[]
   subscriptionPayments        SubscriptionPayment[]
   communiques                 Communique[]
+  evaluationCycles            EvaluationCycle[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -645,22 +650,33 @@ model SubscriptionInvoiceCounter {
 // ============================================================
 
 model Subject {
-  id             Int                @id @default(autoincrement())
-  name           String             // ex: Mathématiques
-  code           String             // ex: MATH
-  description    String?            @db.Text
-  color          String?            // ex: #4f46e5
-  coefficient    Float              @default(1)
-  maxWeeklyHours Int                @default(5)
-  schoolId       Int
-  isActive       Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  assignments    CourseAssignment[]
-  tasks          StudentTask[]
+  id              Int                @id @default(autoincrement())
+  name            String             // ex: Mathématiques
+  code            String             // ex: MATH
+  description     String?            @db.Text
+  color           String?            // ex: #4f46e5
+  coefficient     Float              @default(1)
+  maxWeeklyHours  Int                @default(5)
+  /// Libellé de regroupement visuel pour le bulletin (ex: "Mathématiques")
+  groupLabel      String?
+  /// Parent optionnel pour sous-totaux futurs ; chaque matière reste notée indépendamment en V1
+  parentSubjectId Int?
+  schoolId        Int
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  parent          Subject?           @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id])
+  children        Subject[]          @relation("SubjectHierarchy")
+  assignments     CourseAssignment[]
+  tasks           StudentTask[]
+  periodMaxima    SubjectPeriodMax[]
+  examMaxima      SubjectExamMax[]
+  examGrades      ExamGrade[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
+  @@index([parentSubjectId])
+  @@index([groupLabel])
 }
 
 model StudentTask {
@@ -686,22 +702,24 @@ model StudentTask {
 }
 
 model CourseAssignment {
-  id            Int            @id @default(autoincrement())
-  subjectId     Int
-  teacherId     Int
-  classId       Int
-  yearId        Int
-  weeklyHours   Float          // heures allouées par semaine
-  maxDailyHours Float?         // plafond horaire par jour
-  schoolId      Int
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  subject       Subject        @relation(fields: [subjectId], references: [id])
-  teacher       Teacher        @relation(fields: [teacherId], references: [id])
-  class         Class          @relation(fields: [classId], references: [id])
-  year          AcademicYear   @relation(fields: [yearId], references: [id])
-  slots         ScheduleSlot[]
+  id                 Int                 @id @default(autoincrement())
+  subjectId          Int
+  teacherId          Int
+  classId            Int
+  yearId             Int
+  weeklyHours        Float               // heures allouées par semaine
+  maxDailyHours      Float?              // plafond horaire par jour
+  schoolId           Int
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  subject            Subject             @relation(fields: [subjectId], references: [id])
+  teacher            Teacher             @relation(fields: [teacherId], references: [id])
+  class              Class               @relation(fields: [classId], references: [id])
+  year               AcademicYear        @relation(fields: [yearId], references: [id])
+  slots              ScheduleSlot[]
+  evaluationColumns  EvaluationColumn[]
+  examGrades         ExamGrade[]
 
   @@unique([subjectId, classId, yearId, schoolId])
   @@index([schoolId])
@@ -816,4 +834,170 @@ model CommuniqueRead {
   @@unique([communiqueId, studentId])
   @@index([studentId])
   @@index([communiqueId])
+}
+
+// ---------------------------------------------------------------------------
+// Notation / cotations (périodes configurables, colonnes enseignant, notes)
+// ---------------------------------------------------------------------------
+
+/// Primaire (3 trimestres) vs Secondaire/CTEB/Humanités (2 semestres)
+enum EvaluationCycleKind {
+  PRIMARY
+  SECONDARY
+}
+
+/// Configuration d'évaluation d'une école (réutilisable d'une année à l'autre)
+model EvaluationCycle {
+  id           Int                       @id @default(autoincrement())
+  schoolId     Int
+  name         String
+  kind         EvaluationCycleKind
+  isActive     Boolean                   @default(true)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  school       School                    @relation(fields: [schoolId], references: [id])
+  sections     EvaluationCycleSection[]
+  periodGroups PeriodGroup[]
+
+  @@unique([schoolId, kind])
+  @@index([schoolId])
+}
+
+/// Associe un cycle aux valeurs de Class.section (ex: "Primaire", "Humanités")
+model EvaluationCycleSection {
+  id      Int             @id @default(autoincrement())
+  cycleId Int
+  section String
+  cycle   EvaluationCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@unique([cycleId, section])
+  @@index([section])
+}
+
+/// Trimestre ou semestre au sein d'un cycle
+model PeriodGroup {
+  id         Int                @id @default(autoincrement())
+  cycleId    Int
+  name       String
+  sortOrder  Int
+  hasExam    Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  cycle      EvaluationCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  periods    Period[]
+  examMaxima SubjectExamMax[]
+  examGrades ExamGrade[]
+
+  @@unique([cycleId, sortOrder])
+  @@index([cycleId])
+}
+
+/// Période de travaux journaliers (ex: 1ère PER, 2ème PER)
+model Period {
+  id               Int                 @id @default(autoincrement())
+  periodGroupId    Int
+  name             String
+  sortOrder        Int
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  periodGroup      PeriodGroup         @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
+  periodMaxima     SubjectPeriodMax[]
+  evaluationColumns EvaluationColumn[]
+
+  @@unique([periodGroupId, sortOrder])
+  @@index([periodGroupId])
+}
+
+/// Maximum officiel matière × classe × période (travaux journaliers)
+model SubjectPeriodMax {
+  id        Int      @id @default(autoincrement())
+  subjectId Int
+  classId   Int
+  periodId  Int
+  schoolId  Int
+  maxPoints Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, classId, periodId])
+  @@index([schoolId])
+  @@index([classId])
+  @@index([periodId])
+}
+
+/// Maximum officiel matière × classe × examen de trimestre/semestre
+model SubjectExamMax {
+  id            Int         @id @default(autoincrement())
+  subjectId     Int
+  classId       Int
+  periodGroupId Int
+  schoolId      Int
+  maxPoints     Float
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class         Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  periodGroup   PeriodGroup @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, classId, periodGroupId])
+  @@index([schoolId])
+  @@index([classId])
+  @@index([periodGroupId])
+}
+
+/// Colonne d'évaluation créée par l'enseignant (devoir, interrogation, etc.)
+model EvaluationColumn {
+  id                 Int              @id @default(autoincrement())
+  courseAssignmentId Int
+  periodId           Int
+  label              String
+  date               DateTime         @db.Date
+  maxPoints          Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  assignment         CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  period             Period           @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  grades             Grade[]
+
+  @@index([courseAssignmentId, periodId])
+  @@index([periodId])
+}
+
+/// Note d'un élève sur une colonne d'évaluation (liée à l'inscription de l'année)
+model Grade {
+  id                 Int              @id @default(autoincrement())
+  evaluationColumnId Int
+  enrollmentId       Int
+  pointsObtained     Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  column             EvaluationColumn @relation(fields: [evaluationColumnId], references: [id], onDelete: Cascade)
+  enrollment         Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationColumnId, enrollmentId])
+  @@index([enrollmentId])
+}
+
+/// Note d'examen unique (saisie directe sur le maximum officiel, pas de colonnes)
+model ExamGrade {
+  id                 Int              @id @default(autoincrement())
+  enrollmentId       Int
+  subjectId          Int
+  periodGroupId      Int
+  courseAssignmentId Int
+  pointsObtained     Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  enrollment         Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  subject            Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  periodGroup        PeriodGroup      @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
+  assignment         CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, subjectId, periodGroupId])
+  @@index([periodGroupId])
+  @@index([subjectId])
+  @@index([courseAssignmentId])
 }
