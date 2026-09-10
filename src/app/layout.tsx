@@ -74,6 +74,9 @@ export const metadata: Metadata = {
     apple: "/icons/apple-touch-icon.png",
     shortcut: "/icons/favicon.png",
   },
+  verification: {
+    google: "PbiyPc_qDzSGpVKnxNVk2e-OONuaQcS8iBQM4kR0jmA",
+  },
 }
 
 export const viewport: Viewport = {
