@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/cards"
@@ -153,6 +153,22 @@ function formatMoisLabel(mois: string, months: MoisScolaire[]) {
 type TreasuryMainTab = "overview" | "outflows"
 
 export default function AdminTreasuryPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="space-y-6 p-4 md:p-6">
+            <TreasuryPageSkeleton theme="dark" />
+          </div>
+        </Layout>
+      }
+    >
+      <AdminTreasuryPageContent />
+    </Suspense>
+  )
+}
+
+function AdminTreasuryPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))

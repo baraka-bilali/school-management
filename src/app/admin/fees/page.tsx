@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react"
 import dynamic from "next/dynamic"
 import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
@@ -284,6 +284,20 @@ function formatMontant(amount: number, devise: "USD" | "CDF"): string {
 // ============================================================
 
 export default function AdminFeesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        </div>
+      }
+    >
+      <AdminFeesPageContent />
+    </Suspense>
+  )
+}
+
+function AdminFeesPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
