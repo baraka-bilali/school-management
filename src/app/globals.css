@@ -635,3 +635,108 @@ select:-webkit-autofill:focus {
   }
 }
 
+/* ── Login ambient (Copilot-like) ── */
+@keyframes login-orb-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.08);
+  }
+}
+
+@keyframes login-orb-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-8%, -5%, 0) scale(1.12);
+  }
+}
+
+@keyframes login-orb-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, -7%, 0) scale(1.06);
+  }
+}
+
+@keyframes login-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(4deg);
+    opacity: 0.9;
+  }
+}
+
+.login-orb {
+  will-change: transform;
+}
+
+.login-orb-a {
+  animation: login-orb-drift-a 18s ease-in-out infinite;
+}
+
+.login-orb-b {
+  animation: login-orb-drift-b 22s ease-in-out infinite;
+}
+
+.login-orb-c {
+  animation: login-orb-drift-c 26s ease-in-out infinite;
+}
+
+.login-float {
+  will-change: transform, opacity;
+  animation: login-float 9s ease-in-out infinite;
+}
+
+.login-float-1 {
+  animation-duration: 10s;
+  animation-delay: 0s;
+}
+.login-float-2 {
+  animation-duration: 12s;
+  animation-delay: -2s;
+}
+.login-float-3 {
+  animation-duration: 11s;
+  animation-delay: -4s;
+}
+.login-float-4 {
+  animation-duration: 13s;
+  animation-delay: -1s;
+}
+.login-float-5 {
+  animation-duration: 9s;
+  animation-delay: -3s;
+}
+.login-float-6 {
+  animation-duration: 14s;
+  animation-delay: -5s;
+}
+.login-float-7 {
+  animation-duration: 11.5s;
+  animation-delay: -6s;
+}
+.login-float-8 {
+  animation-duration: 12.5s;
+  animation-delay: -7s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-orb,
+  .login-float {
+    animation: none !important;
+  }
+}
+
+
