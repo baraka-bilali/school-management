@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
@@ -34,6 +34,22 @@ interface PaginationState {
 }
 
 export default function UsersPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
+            Chargement…
+          </div>
+        </Layout>
+      }
+    >
+      <UsersPageContent />
+    </Suspense>
+  )
+}
+
+function UsersPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = useMemo(() => parseTab(searchParams.get("tab")), [searchParams])
