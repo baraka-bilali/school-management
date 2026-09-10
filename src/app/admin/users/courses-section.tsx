@@ -219,6 +219,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     subjectId: "",
     teacherId: "",
     classId: "",
+    classIds: [] as string[],
     weeklyHours: "2",
   })
 
@@ -327,7 +328,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
   const openCreateAssignment = () => {
     setEditingAssignment(null)
-    setAssignForm({ subjectId: "", teacherId: "", classId: "", weeklyHours: "2" })
+    setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [], weeklyHours: "2" })
     setShowAssignForm(true)
   }
 
@@ -337,9 +338,19 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       subjectId: String(a.subjectId),
       teacherId: String(a.teacherId),
       classId: String(a.classId),
+      classIds: [String(a.classId)],
       weeklyHours: String(a.weeklyHours),
     })
     setShowAssignForm(true)
+  }
+
+  const toggleAssignClass = (id: string) => {
+    setAssignForm((prev) => {
+      const selected = prev.classIds.includes(id)
+        ? prev.classIds.filter((x) => x !== id)
+        : [...prev.classIds, id]
+      return { ...prev, classIds: selected, classId: selected[0] || "" }
+    })
   }
 
   const handleAssignmentSubmit = async (e: React.FormEvent) => {
@@ -347,6 +358,9 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     setSubmitting(true)
     try {
       const isEdit = !!editingAssignment
+      if (!isEdit && assignForm.classIds.length === 0) {
+        throw new Error("Sélectionnez au moins une classe")
+      }
       const res = await authFetch(
         isEdit
           ? `/api/admin/course-assignments/${editingAssignment!.id}`
@@ -354,15 +368,36 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
         {
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(assignForm),
+          body: JSON.stringify(
+            isEdit
+              ? {
+                  subjectId: assignForm.subjectId,
+                  teacherId: assignForm.teacherId,
+                  classId: assignForm.classId,
+                  weeklyHours: assignForm.weeklyHours,
+                }
+              : {
+                  subjectId: assignForm.subjectId,
+                  teacherId: assignForm.teacherId,
+                  classIds: assignForm.classIds.map((id) => parseInt(id, 10)),
+                  weeklyHours: assignForm.weeklyHours,
+                }
+          ),
         }
       )
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
-      toast.success(isEdit ? "Affectation modifiée" : "Affectation enregistrée")
+      if (isEdit) {
+        toast.success("Affectation modifiée")
+      } else {
+        const n = data.count ?? assignForm.classIds.length
+        toast.success(
+          n > 1 ? `${n} affectations enregistrées` : "Affectation enregistrée"
+        )
+      }
       setShowAssignForm(false)
       setEditingAssignment(null)
-      setAssignForm({ subjectId: "", teacherId: "", classId: "", weeklyHours: "2" })
+      setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [], weeklyHours: "2" })
       await loadData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur")
@@ -817,13 +852,71 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
               </select>
             </div>
             <div>
-              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Classe *</label>
-              <select className={inputClass} value={assignForm.classId} onChange={(e) => setAssignForm({ ...assignForm, classId: e.target.value })} required>
-                <option value="">Sélectionner</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>
+                {editingAssignment ? "Classe *" : "Classes *"}
+              </label>
+              {editingAssignment ? (
+                <select
+                  className={inputClass}
+                  value={assignForm.classId}
+                  onChange={(e) =>
+                    setAssignForm({
+                      ...assignForm,
+                      classId: e.target.value,
+                      classIds: e.target.value ? [e.target.value] : [],
+                    })
+                  }
+                  required
+                >
+                  <option value="">Sélectionner</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  className={cn(
+                    "max-h-48 overflow-y-auto rounded-lg border px-2 py-1.5",
+                    isDark ? "border-gray-600 bg-gray-800" : "border-gray-300 bg-white"
+                  )}
+                >
+                  {classes.length === 0 ? (
+                    <p className={cn("px-1 py-2 text-sm", textSecondary)}>Aucune classe</p>
+                  ) : (
+                    classes.map((c) => {
+                      const id = String(c.id)
+                      const checked = assignForm.classIds.includes(id)
+                      return (
+                        <label
+                          key={c.id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+                            isDark ? "hover:bg-gray-700/60" : "hover:bg-gray-50",
+                            textColor
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleAssignClass(id)}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span>{c.name}</span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+              {!editingAssignment && (
+                <p className={cn("mt-1.5 text-xs", textSecondary)}>
+                  {assignForm.classIds.length === 0
+                    ? "Sélectionnez une ou plusieurs classes"
+                    : `${assignForm.classIds.length} classe${assignForm.classIds.length > 1 ? "s" : ""} sélectionnée${assignForm.classIds.length > 1 ? "s" : ""}`}
+                </p>
+              )}
             </div>
             <div>
               <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Heures par semaine</label>
