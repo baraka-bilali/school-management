@@ -180,6 +180,11 @@ export async function GET(req: NextRequest) {
             firstName: true,
             gender: true,
             birthDate: true,
+            user: {
+              select: {
+                email: true,
+              },
+            },
             enrollments: {
               where: activeYearId ? { yearId: activeYearId } : undefined,
               select: {
