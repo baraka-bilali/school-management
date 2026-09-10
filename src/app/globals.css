@@ -188,6 +188,17 @@
   }
 }
 
+/* Page login : même compensation zoom 0.8 (évite bande basse + formulaire trop haut) */
+.login-shell {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+@media (min-width: 768px) {
+  .login-shell {
+    min-height: 125dvh;
+  }
+}
+
 /* Custom animations */
 @keyframes fall {
   to {
@@ -634,4 +645,141 @@ select:-webkit-autofill:focus {
     overscroll-behavior-y: none;
   }
 }
+
+/* ── Login ambient (Copilot-like) ── */
+@keyframes login-orb-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.08);
+  }
+}
+
+@keyframes login-orb-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-8%, -5%, 0) scale(1.12);
+  }
+}
+
+@keyframes login-orb-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, -7%, 0) scale(1.06);
+  }
+}
+
+@keyframes login-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(4deg);
+    opacity: 0.9;
+  }
+}
+
+.login-orb {
+  will-change: transform;
+}
+
+.login-orb-a {
+  animation: login-orb-drift-a 18s ease-in-out infinite;
+}
+
+.login-orb-b {
+  animation: login-orb-drift-b 22s ease-in-out infinite;
+}
+
+.login-orb-c {
+  animation: login-orb-drift-c 26s ease-in-out infinite;
+}
+
+.login-float {
+  will-change: transform, opacity;
+  animation: login-float 9s ease-in-out infinite;
+}
+
+.login-float-1 {
+  animation-duration: 10s;
+  animation-delay: 0s;
+}
+.login-float-2 {
+  animation-duration: 12s;
+  animation-delay: -2s;
+}
+.login-float-3 {
+  animation-duration: 11s;
+  animation-delay: -4s;
+}
+.login-float-4 {
+  animation-duration: 13s;
+  animation-delay: -1s;
+}
+.login-float-5 {
+  animation-duration: 9s;
+  animation-delay: -3s;
+}
+.login-float-6 {
+  animation-duration: 14s;
+  animation-delay: -5s;
+}
+.login-float-7 {
+  animation-duration: 11.5s;
+  animation-delay: -6s;
+}
+.login-float-8 {
+  animation-duration: 12.5s;
+  animation-delay: -7s;
+}
+.login-float-9 {
+  animation-duration: 10.5s;
+  animation-delay: -1.5s;
+}
+.login-float-10 {
+  animation-duration: 13.5s;
+  animation-delay: -3.5s;
+}
+.login-float-11 {
+  animation-duration: 11s;
+  animation-delay: -8s;
+}
+.login-float-12 {
+  animation-duration: 12s;
+  animation-delay: -4.5s;
+}
+.login-float-13 {
+  animation-duration: 14.5s;
+  animation-delay: -2.5s;
+}
+.login-float-14 {
+  animation-duration: 10s;
+  animation-delay: -6.5s;
+}
+.login-float-15 {
+  animation-duration: 9.5s;
+  animation-delay: -0.8s;
+}
+.login-float-16 {
+  animation-duration: 13s;
+  animation-delay: -5.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-orb,
+  .login-float {
+    animation: none !important;
+  }
+}
+
 
