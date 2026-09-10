@@ -1,13 +1,15 @@
 "use client"
 
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { Plus, Pencil, Trash2, Eye } from "lucide-react"
 import Portal from "@/components/portal"
 import { cn } from "@/lib/utils"
 import { TableLoadingRow } from "@/components/ui/table-loading"
+import { SubjectsSection } from "./subjects-section"
 
 // Options spécialisées où la lettre est optionnelle (une seule classe par option)
 const STREAM_LETTER_OPTIONAL = new Set([
@@ -36,7 +38,31 @@ interface ClassForm {
   stream: string
 }
 
+type ClassesTab = "classes" | "subjects"
+
 export default function ClassesPage() {
+  return (
+    <Suspense
+      fallback={
+        <Layout>
+          <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
+            Chargement…
+          </div>
+        </Layout>
+      }
+    >
+      <ClassesPageContent />
+    </Suspense>
+  )
+}
+
+function ClassesPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tab = useMemo<ClassesTab>(
+    () => (searchParams.get("tab") === "subjects" ? "subjects" : "classes"),
+    [searchParams]
+  )
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -307,25 +333,70 @@ export default function ClassesPage() {
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const hoverBg = theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+
+  const changeTab = (next: ClassesTab) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "classes") params.delete("tab")
+    else params.set("tab", next)
+    const qs = params.toString()
+    router.replace(qs ? `/admin/classes?${qs}` : "/admin/classes", { scroll: false })
+  }
 
   return (
     <Layout>
       <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className={`text-2xl font-bold ${textColor}`}>Classes & Filières</h1>
-            <p className={textSecondary}>Gestion des classes et filières selon le format RDC</p>
+            <p className={textSecondary}>
+              {tab === "subjects"
+                ? "Gestion des matières (structure pédagogique)"
+                : "Gestion des classes et filières selon le format RDC"}
+            </p>
           </div>
+          {tab === "classes" && (
+            <button
+              onClick={handleCreate}
+              aria-label="Créer une classe"
+              title="Créer une classe"
+              className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className={cn("inline-flex gap-1 rounded-xl border p-1", borderColor, theme === "dark" ? "bg-gray-800/80" : "bg-gray-100/80")}>
           <button
-            onClick={handleCreate}
-            aria-label="Créer une classe"
-            title="Créer une classe"
-            className="inline-flex items-center justify-center rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 transition-colors"
+            type="button"
+            onClick={() => changeTab("classes")}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200",
+              tab === "classes"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : cn(textSecondary, "hover:text-indigo-500")
+            )}
           >
-            <Plus className="h-4 w-4" />
+            Classes
+          </button>
+          <button
+            type="button"
+            onClick={() => changeTab("subjects")}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200",
+              tab === "subjects"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
+                : cn(textSecondary, "hover:text-indigo-500")
+            )}
+          >
+            Matières
           </button>
         </div>
 
+        {tab === "subjects" ? (
+          <SubjectsSection theme={theme} />
+        ) : (
         <Card theme={theme}>
           <CardHeader>
             <CardTitle>Liste des classes</CardTitle>
@@ -435,6 +506,7 @@ export default function ClassesPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Modal de création/édition */}
         {mounted && (

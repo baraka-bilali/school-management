@@ -57,6 +57,13 @@ function UsersPageContent() {
   const [isMounted, setIsMounted] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
 
+  // Ancien emplacement des matières → Classes & Filières
+  useEffect(() => {
+    if (searchParams.get("tab") === "courses" && searchParams.get("view") === "subjects") {
+      router.replace("/admin/classes?tab=subjects")
+    }
+  }, [searchParams, router])
+
   const changeTab = (next: TabKey) => {
     const params = new URLSearchParams(searchParams.toString())
     if (next === "students") {
@@ -64,7 +71,7 @@ function UsersPageContent() {
       params.delete("view")
     } else {
       params.set("tab", next)
-      if (next !== "courses") params.delete("view")
+      params.delete("view")
     }
     const qs = params.toString()
     router.replace(qs ? `/admin/users?${qs}` : "/admin/users", { scroll: false })
@@ -174,8 +181,7 @@ function UsersPageContent() {
             )}
             onClick={() => changeTab("courses")}
           >
-            <span className="md:hidden">Cours</span>
-            <span className="hidden md:inline">Cours &amp; Affectations</span>
+            Affectations
           </button>
         </div>
 
