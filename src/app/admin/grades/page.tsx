@@ -86,6 +86,7 @@ export default function GradesPage() {
     if (degRes.ok) {
       const d = await degRes.json()
       setDegrees(d.degrees || [])
+      setDegreeMenuOpen(false)
     }
     if (subRes.ok) {
       const s = await subRes.json()
