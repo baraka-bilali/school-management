@@ -4,6 +4,7 @@ import "./no-translate.css"
 import ClientOnly from "@/components/client-only"
 import PwaShell from "@/components/pwa-shell"
 import { ReactQueryProvider } from "@/lib/react-query"
+import { Toaster } from "sonner"
 
 const SITE_URL = "https://kelasi360.com"
 
@@ -119,6 +120,7 @@ export default function RootLayout({
           <ClientOnly>
             <PwaShell />
           </ClientOnly>
+          <Toaster richColors position="top-center" closeButton />
         </ReactQueryProvider>
       </body>
     </html>

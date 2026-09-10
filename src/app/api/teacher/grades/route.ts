@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { findCycleForSection } from "@/lib/grading/cycles"
 import { normalizePeriodResult, roundGrade } from "@/lib/grading/normalize"
+import { normalizeGradeStream } from "@/lib/grading/degree"
 
 /**
  * GET ?assignmentId=&periodId=
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     },
     include: {
       subject: { select: { id: true, name: true, code: true, color: true } },
-      class: { select: { id: true, name: true, section: true, level: true, letter: true } },
+      class: { select: { id: true, name: true, section: true, level: true, letter: true, stream: true } },
     },
   })
 
@@ -73,6 +74,11 @@ export async function GET(req: NextRequest) {
     (g) => g.id === selectedPeriodMeta?.periodGroupId
   )
 
+  const gradeStream =
+    assignment.class.section === "Humanités"
+      ? normalizeGradeStream(assignment.class.stream)
+      : ""
+
   const [enrollments, columns, officialPeriodMax, officialExamMax, examGrade] =
     await Promise.all([
       prisma.enrollment.findMany({
@@ -104,10 +110,11 @@ export async function GET(req: NextRequest) {
       selectedPeriodId
         ? prisma.subjectPeriodMax.findUnique({
             where: {
-              subjectId_section_level_periodId: {
+              subjectId_section_level_stream_periodId: {
                 subjectId: assignment.subjectId,
                 section: assignment.class.section,
                 level: assignment.class.level,
+                stream: gradeStream,
                 periodId: selectedPeriodId,
               },
             },
@@ -116,10 +123,11 @@ export async function GET(req: NextRequest) {
       selectedGroup
         ? prisma.subjectExamMax.findUnique({
             where: {
-              subjectId_section_level_periodGroupId: {
+              subjectId_section_level_stream_periodGroupId: {
                 subjectId: assignment.subjectId,
                 section: assignment.class.section,
                 level: assignment.class.level,
+                stream: gradeStream,
                 periodGroupId: selectedGroup.id,
               },
             },

@@ -906,15 +906,18 @@ model Period {
   @@index([periodGroupId])
 }
 
-/// Maximum officiel matière × degré (section+level) × période
-/// Toutes les classes parallèles (ex. 7ème A/B/C) partagent le même max.
+/// Maximum officiel matière × degré (section+level[+filière]) × période
+/// Primaire/EB : stream vide. Humanités : stream = filière (ex. Scientifique).
+/// Classes parallèles du même degré+filière partagent le même max.
 model SubjectPeriodMax {
   id        Int      @id @default(autoincrement())
   subjectId Int
-  /// Correspond à Class.section (ex: "Primaire", "Education de Base")
+  /// Correspond à Class.section (ex: "Primaire", "Education de Base", "Humanités")
   section   String
-  /// Correspond à Class.level (ex: "7ème", "4ème")
+  /// Correspond à Class.level (ex: "7ème", "1ère")
   level     String
+  /// Correspond à Class.stream ; "" si pas de filière (primaire, EB, etc.)
+  stream    String   @default("")
   periodId  Int
   schoolId  Int
   maxPoints Float
@@ -923,18 +926,19 @@ model SubjectPeriodMax {
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, section, level, periodId])
+  @@unique([subjectId, section, level, stream, periodId])
   @@index([schoolId])
-  @@index([section, level])
+  @@index([section, level, stream])
   @@index([periodId])
 }
 
-/// Maximum officiel matière × degré × examen de trimestre/semestre
+/// Maximum officiel matière × degré[+filière] × examen de trimestre/semestre
 model SubjectExamMax {
   id            Int         @id @default(autoincrement())
   subjectId     Int
   section       String
   level         String
+  stream        String      @default("")
   periodGroupId Int
   schoolId      Int
   maxPoints     Float
@@ -943,9 +947,9 @@ model SubjectExamMax {
   subject       Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   periodGroup   PeriodGroup @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, section, level, periodGroupId])
+  @@unique([subjectId, section, level, stream, periodGroupId])
   @@index([schoolId])
-  @@index([section, level])
+  @@index([section, level, stream])
   @@index([periodGroupId])
 }
 
