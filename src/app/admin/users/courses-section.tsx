@@ -167,29 +167,51 @@ function ConfirmModal({
 function FormModal({
   theme,
   title,
+  subtitle,
   onClose,
   children,
+  size = "md",
 }: {
   theme: "light" | "dark"
   title: string
+  subtitle?: string
   onClose: () => void
   children: React.ReactNode
+  size?: "md" | "lg" | "xl"
 }) {
   const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-500"
+  const maxW = size === "xl" ? "max-w-3xl" : size === "lg" ? "max-w-2xl" : "max-w-md"
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className={cn("relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl animate-scale-up", bgColor, borderColor)}>
-        <div className={cn("sticky top-0 z-10 flex items-center justify-between border-b p-5", bgColor, borderColor)}>
-          <h3 className={cn("text-lg font-bold", textColor)}>{title}</h3>
-          <button type="button" onClick={onClose} className={cn("rounded-lg p-1 transition-colors hover:bg-black/5 dark:hover:bg-white/10", textSecondary)}>
+      <div
+        className={cn(
+          "relative flex w-full max-h-[92vh] flex-col overflow-hidden rounded-2xl border shadow-2xl animate-scale-up",
+          maxW,
+          bgColor,
+          borderColor
+        )}
+      >
+        <div className={cn("flex shrink-0 items-start justify-between gap-3 border-b px-6 py-5", bgColor, borderColor)}>
+          <div className="min-w-0">
+            <h3 className={cn("text-lg font-bold sm:text-xl", textColor)}>{title}</h3>
+            {subtitle ? <p className={cn("mt-1 text-sm", textSecondary)}>{subtitle}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cn(
+              "rounded-lg p-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10",
+              textSecondary
+            )}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
       </div>
     </ModalOverlay>
   )
@@ -220,7 +242,6 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     teacherId: "",
     classId: "",
     classIds: [] as string[],
-    weeklyHours: "2",
   })
 
   const isDark = theme === "dark"
@@ -328,7 +349,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
   const openCreateAssignment = () => {
     setEditingAssignment(null)
-    setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [], weeklyHours: "2" })
+    setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [] })
     setShowAssignForm(true)
   }
 
@@ -339,7 +360,6 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       teacherId: String(a.teacherId),
       classId: String(a.classId),
       classIds: [String(a.classId)],
-      weeklyHours: String(a.weeklyHours),
     })
     setShowAssignForm(true)
   }
@@ -374,13 +394,11 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   subjectId: assignForm.subjectId,
                   teacherId: assignForm.teacherId,
                   classId: assignForm.classId,
-                  weeklyHours: assignForm.weeklyHours,
                 }
               : {
                   subjectId: assignForm.subjectId,
                   teacherId: assignForm.teacherId,
                   classIds: assignForm.classIds.map((id) => parseInt(id, 10)),
-                  weeklyHours: assignForm.weeklyHours,
                 }
           ),
         }
@@ -397,7 +415,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       }
       setShowAssignForm(false)
       setEditingAssignment(null)
-      setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [], weeklyHours: "2" })
+      setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [] })
       await loadData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur")
@@ -697,7 +715,6 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                         <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700")}>
                           {a.className}
                         </span>
-                        <span className={cn("text-xs", textSecondary)}>{a.weeklyHours}h/sem</span>
                       </div>
                     </div>
                   ))}
@@ -711,7 +728,6 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                         <th className={cn("px-4 py-3 font-semibold", textSecondary)}>Professeur</th>
                         <th className={cn("px-4 py-3 font-semibold", textSecondary)}>Matière</th>
                         <th className={cn("px-4 py-3 font-semibold", textSecondary)}>Classe</th>
-                        <th className={cn("px-4 py-3 font-semibold", textSecondary)}>H/sem.</th>
                         <th className={cn("px-4 py-3 font-semibold", textSecondary)}>Actions</th>
                       </tr>
                     </thead>
@@ -733,7 +749,6 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                             </span>
                           </td>
                           <td className={cn("px-4 py-3.5", textSecondary)}>{a.className}</td>
-                          <td className={cn("px-4 py-3.5", textSecondary)}>{a.weeklyHours}h</td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center gap-1">
                               <button
@@ -824,37 +839,106 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       {showAssignForm && (
         <FormModal
           theme={theme}
+          size="xl"
           title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
+          subtitle={
+            editingAssignment
+              ? "Modifiez le professeur, la matière ou la classe."
+              : "Assignez un professeur et une matière à une ou plusieurs classes."
+          }
           onClose={() => {
             setShowAssignForm(false)
             setEditingAssignment(null)
           }}
         >
-          <form onSubmit={handleAssignmentSubmit} className="space-y-4">
-            <div>
-              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Professeur *</label>
-              <select className={inputClass} value={assignForm.teacherId} onChange={(e) => setAssignForm({ ...assignForm, teacherId: e.target.value })} required>
-                <option value="">Sélectionner</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.lastName} {t.middleName} {t.firstName}
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleAssignmentSubmit} className="flex min-h-0 flex-col gap-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={cn("mb-1.5 block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
+                  Professeur *
+                </label>
+                <select
+                  className={inputClass}
+                  value={assignForm.teacherId}
+                  onChange={(e) => setAssignForm({ ...assignForm, teacherId: e.target.value })}
+                  required
+                >
+                  <option value="">Sélectionner un professeur</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.lastName} {t.middleName} {t.firstName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={cn("mb-1.5 block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
+                  Matière *
+                </label>
+                <select
+                  className={inputClass}
+                  value={assignForm.subjectId}
+                  onChange={(e) => setAssignForm({ ...assignForm, subjectId: e.target.value })}
+                  required
+                >
+                  <option value="">Sélectionner une matière</option>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Matière *</label>
-              <select className={inputClass} value={assignForm.subjectId} onChange={(e) => setAssignForm({ ...assignForm, subjectId: e.target.value })} required>
-                <option value="">Sélectionner</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>
-                {editingAssignment ? "Classe *" : "Classes *"}
-              </label>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <label className={cn("block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
+                    {editingAssignment ? "Classe *" : "Classes *"}
+                  </label>
+                  {!editingAssignment && (
+                    <p className={cn("mt-1 text-xs", textSecondary)}>
+                      Cochez toutes les classes concernées (ex. 7ème A, B, C).
+                    </p>
+                  )}
+                </div>
+                {!editingAssignment && classes.length > 0 && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAssignForm((prev) => ({
+                          ...prev,
+                          classIds: classes.map((c) => String(c.id)),
+                          classId: String(classes[0]?.id || ""),
+                        }))
+                      }
+                      className={cn(
+                        "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
+                        isDark
+                          ? "bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25"
+                          : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                      )}
+                    >
+                      Tout sélectionner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssignForm((prev) => ({ ...prev, classIds: [], classId: "" }))}
+                      className={cn(
+                        "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
+                        isDark
+                          ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      )}
+                    >
+                      Tout désélectionner
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {editingAssignment ? (
                 <select
                   className={inputClass}
@@ -878,12 +962,14 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
               ) : (
                 <div
                   className={cn(
-                    "max-h-48 overflow-y-auto rounded-lg border px-2 py-1.5",
-                    isDark ? "border-gray-600 bg-gray-800" : "border-gray-300 bg-white"
+                    "grid max-h-[min(22rem,45vh)] grid-cols-1 gap-1.5 overflow-y-auto rounded-xl border p-3 sm:grid-cols-2",
+                    isDark ? "border-gray-700 bg-gray-950/40" : "border-gray-200 bg-gray-50/80"
                   )}
                 >
                   {classes.length === 0 ? (
-                    <p className={cn("px-1 py-2 text-sm", textSecondary)}>Aucune classe</p>
+                    <p className={cn("col-span-full px-1 py-6 text-center text-sm", textSecondary)}>
+                      Aucune classe disponible
+                    </p>
                   ) : (
                     classes.map((c) => {
                       const id = String(c.id)
@@ -892,9 +978,14 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                         <label
                           key={c.id}
                           className={cn(
-                            "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
-                            isDark ? "hover:bg-gray-700/60" : "hover:bg-gray-50",
-                            textColor
+                            "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                            checked
+                              ? isDark
+                                ? "border-indigo-500/50 bg-indigo-500/15 text-indigo-100"
+                                : "border-indigo-200 bg-indigo-50 text-indigo-900"
+                              : isDark
+                                ? "border-transparent bg-gray-900/80 text-gray-200 hover:border-gray-600"
+                                : "border-transparent bg-white text-gray-800 hover:border-gray-200"
                           )}
                         >
                           <input
@@ -903,39 +994,60 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                             onChange={() => toggleAssignClass(id)}
                             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span>{c.name}</span>
+                          <span className="min-w-0 flex-1 font-medium leading-snug">{c.name}</span>
                         </label>
                       )
                     })
                   )}
                 </div>
               )}
+
               {!editingAssignment && (
-                <p className={cn("mt-1.5 text-xs", textSecondary)}>
+                <p className={cn("text-xs font-medium", assignForm.classIds.length ? "text-indigo-600 dark:text-indigo-400" : textSecondary)}>
                   {assignForm.classIds.length === 0
-                    ? "Sélectionnez une ou plusieurs classes"
+                    ? "Aucune classe sélectionnée"
                     : `${assignForm.classIds.length} classe${assignForm.classIds.length > 1 ? "s" : ""} sélectionnée${assignForm.classIds.length > 1 ? "s" : ""}`}
                 </p>
               )}
             </div>
-            <div>
-              <label className={cn("mb-1.5 block text-xs font-medium", textSecondary)}>Heures par semaine</label>
-              <input type="number" step="0.5" min="0.5" className={inputClass} value={assignForm.weeklyHours} onChange={(e) => setAssignForm({ ...assignForm, weeklyHours: e.target.value })} />
+
+            <div className={cn("flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end", borderColor)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAssignForm(false)
+                  setEditingAssignment(null)
+                }}
+                className={cn(
+                  "rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
+                  isDark
+                    ? "border border-gray-600 text-gray-300 hover:bg-gray-800"
+                    : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editingAssignment ? (
+                  <Pencil className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {submitting
+                  ? "Enregistrement..."
+                  : editingAssignment
+                    ? "Enregistrer"
+                    : assignForm.classIds.length > 1
+                      ? `Assigner (${assignForm.classIds.length})`
+                      : "Assigner"}
+              </button>
             </div>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : editingAssignment ? (
-                <Pencil className="h-4 w-4" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              {submitting ? "Enregistrement..." : editingAssignment ? "Enregistrer" : "Assigner"}
-            </button>
           </form>
         </FormModal>
       )}
