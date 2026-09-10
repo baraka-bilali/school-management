@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { toast } from "sonner"
-import { ChevronDown, Loader2, RefreshCw, Save } from "lucide-react"
+import { CheckCircle2, ChevronDown, Loader2, RefreshCw, Save } from "lucide-react"
+import { degreeKey as buildDegreeKey, formatDegreeLabel } from "@/lib/grading/degree"
 
 type TabKey = "cycles" | "maxima"
 
@@ -26,6 +27,7 @@ type Cycle = {
 type Degree = {
   section: string
   level: string
+  stream: string
   label: string
   classNames: string[]
 }
@@ -43,11 +45,15 @@ export default function GradesPage() {
   const [periodMaxInputs, setPeriodMaxInputs] = useState<Record<string, string>>({})
   const [examMaxInputs, setExamMaxInputs] = useState<Record<string, string>>({})
   const [savingMaxima, setSavingMaxima] = useState(false)
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
   const [degreeMenuOpen, setDegreeMenuOpen] = useState(false)
   const degreeMenuRef = useRef<HTMLDivElement>(null)
 
   const selectedDegree = useMemo(
-    () => degrees.find((d) => `${d.section}::${d.level}` === degreeKey) || null,
+    () =>
+      degrees.find(
+        (d) => buildDegreeKey(d.section, d.level, d.stream) === degreeKey
+      ) || null,
     [degrees, degreeKey]
   )
 
@@ -118,12 +124,18 @@ export default function GradesPage() {
     if (!subjectId || !selectedDegree) {
       setPeriodMaxInputs({})
       setExamMaxInputs({})
+      setSaveFeedback(null)
       return
     }
+    setSaveFeedback(null)
     ;(async () => {
-      const res = await authFetch(
-        `/api/admin/subject-maxima?subjectId=${subjectId}&section=${encodeURIComponent(selectedDegree.section)}&level=${encodeURIComponent(selectedDegree.level)}`
-      )
+      const params = new URLSearchParams({
+        subjectId: String(subjectId),
+        section: selectedDegree.section,
+        level: selectedDegree.level,
+        stream: selectedDegree.stream || "",
+      })
+      const res = await authFetch(`/api/admin/subject-maxima?${params}`)
       if (!res.ok) return
       const data = await res.json()
       const p: Record<string, string> = {}
@@ -142,6 +154,7 @@ export default function GradesPage() {
   const saveMaxima = async () => {
     if (!subjectId || !selectedDegree || !cycleForDegree) return
     setSavingMaxima(true)
+    setSaveFeedback(null)
     try {
       const periodMaxima = cycleForDegree.periodGroups.flatMap((g) =>
         g.periods
@@ -159,6 +172,10 @@ export default function GradesPage() {
         }))
         .filter((x) => Number.isFinite(x.maxPoints) && x.maxPoints >= 0)
 
+      if (periodMaxima.length === 0 && examMaxima.length === 0) {
+        throw new Error("Renseignez au moins un maximum avant d’enregistrer")
+      }
+
       const res = await authFetch("/api/admin/subject-maxima", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -166,17 +183,27 @@ export default function GradesPage() {
           subjectId,
           section: selectedDegree.section,
           level: selectedDegree.level,
+          stream: selectedDegree.stream || "",
           periodMaxima,
           examMaxima,
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || "Enregistrement impossible")
+        throw new Error(data.error || "Enregistrement impossible")
       }
-      toast.success("Maxima enregistrés pour ce degré")
+      const label = formatDegreeLabel(
+        selectedDegree.section,
+        selectedDegree.level,
+        selectedDegree.stream
+      )
+      const msg = `Maxima enregistrés pour ${label}`
+      setSaveFeedback(msg)
+      toast.success(msg)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur")
+      const msg = e instanceof Error ? e.message : "Erreur"
+      setSaveFeedback(null)
+      toast.error(msg)
     } finally {
       setSavingMaxima(false)
     }
@@ -188,7 +215,8 @@ export default function GradesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Notes & Bulletins</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Configuration des cycles d&apos;évaluation et des maxima officiels par degré.
+            Configuration des cycles d&apos;évaluation et des maxima officiels par degré
+            (et par filière en Humanités).
           </p>
         </div>
 
@@ -300,7 +328,9 @@ export default function GradesPage() {
                 </select>
               </label>
               <div className="block text-sm" ref={degreeMenuRef}>
-                <span className="text-gray-600 dark:text-gray-400">Degré (section + niveau)</span>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Degré{selectedDegree?.section === "Humanités" ? " + filière" : " (section + niveau)"}
+                </span>
                 <div className="relative mt-1">
                   <button
                     type="button"
@@ -311,7 +341,11 @@ export default function GradesPage() {
                   >
                     <span className={selectedDegree ? "text-gray-900 dark:text-gray-100" : "text-gray-400"}>
                       {selectedDegree
-                        ? `${selectedDegree.level} — ${selectedDegree.section}${
+                        ? `${formatDegreeLabel(
+                            selectedDegree.section,
+                            selectedDegree.level,
+                            selectedDegree.stream
+                          )}${
                             selectedDegree.classNames.length
                               ? ` (${selectedDegree.classNames.join(", ")})`
                               : ""
@@ -342,7 +376,7 @@ export default function GradesPage() {
                         </button>
                       </li>
                       {degrees.map((d) => {
-                        const key = `${d.section}::${d.level}`
+                        const key = buildDegreeKey(d.section, d.level, d.stream)
                         const active = key === degreeKey
                         return (
                           <li key={key}>
@@ -360,7 +394,7 @@ export default function GradesPage() {
                                 setDegreeMenuOpen(false)
                               }}
                             >
-                              {d.level} — {d.section}
+                              {formatDegreeLabel(d.section, d.level, d.stream)}
                               {d.classNames.length ? ` (${d.classNames.join(", ")})` : ""}
                             </button>
                           </li>
@@ -372,10 +406,10 @@ export default function GradesPage() {
               </div>
             </div>
 
-            {selectedDegree && (
-              <p className="text-xs text-gray-500">
-                Ces maxima s&apos;appliquent automatiquement à toutes les classes parallèles :{" "}
-                {selectedDegree.classNames.join(", ") || "aucune classe pour ce degré"}.
+            {selectedDegree?.section === "Humanités" && (
+              <p className="text-xs text-amber-700 dark:text-amber-400/90 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+                En Humanités, les maxima sont définis <strong>par filière</strong> (ex. Scientifique vs
+                Commerciale et Gestion). Choisissez la bonne filière ci-dessus.
               </p>
             )}
 
@@ -403,12 +437,13 @@ export default function GradesPage() {
                             min={0}
                             step="0.5"
                             value={periodMaxInputs[String(p.id)] ?? ""}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              setSaveFeedback(null)
                               setPeriodMaxInputs((prev) => ({
                                 ...prev,
                                 [String(p.id)]: e.target.value,
                               }))
-                            }
+                            }}
                             className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
                           />
                         </label>
@@ -421,12 +456,13 @@ export default function GradesPage() {
                             min={0}
                             step="0.5"
                             value={examMaxInputs[String(g.id)] ?? ""}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              setSaveFeedback(null)
                               setExamMaxInputs((prev) => ({
                                 ...prev,
                                 [String(g.id)]: e.target.value,
                               }))
-                            }
+                            }}
                             className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
                           />
                         </label>
@@ -446,8 +482,22 @@ export default function GradesPage() {
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Enregistrer les maxima
+                  {savingMaxima ? "Enregistrement…" : "Enregistrer les maxima"}
                 </button>
+
+                {saveFeedback && (
+                  <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{saveFeedback}</span>
+                  </div>
+                )}
+
+                {selectedDegree && (
+                  <p className="text-xs text-gray-500">
+                    Ces maxima s&apos;appliquent aux classes :{" "}
+                    {selectedDegree.classNames.join(", ") || "aucune classe pour ce degré"}.
+                  </p>
+                )}
               </div>
             )}
           </div>

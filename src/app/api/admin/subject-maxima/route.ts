@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError } from "@/lib/fees/api-helpers"
+import { normalizeGradeStream } from "@/lib/grading/degree"
 
 const ROLES = ["ADMIN", "DIRECTEUR_ETUDES", "SUPER_ADMIN"]
 
 /**
- * GET ?subjectId=&section=&level=
- * Retourne les maxima période + examen pour un degré donné.
+ * GET ?subjectId=&section=&level=&stream=
+ * Retourne les maxima période + examen pour un degré (+ filière Humanités).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
     const subjectId = parseInt(searchParams.get("subjectId") || "", 10)
     const section = searchParams.get("section") || ""
     const level = searchParams.get("level") || ""
+    const stream =
+      section === "Humanités"
+        ? normalizeGradeStream(searchParams.get("stream"))
+        : ""
 
     if (!subjectId || !section || !level) {
       return NextResponse.json(
@@ -33,9 +38,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Matière introuvable" }, { status: 404 })
     }
 
-    const [periodMaxima, examMaxima, degrees] = await Promise.all([
+    const [periodMaxima, examMaxima] = await Promise.all([
       prisma.subjectPeriodMax.findMany({
-        where: { schoolId: user.schoolId, subjectId, section, level },
+        where: { schoolId: user.schoolId, subjectId, section, level, stream },
         include: {
           period: {
             select: {
@@ -49,16 +54,10 @@ export async function GET(req: NextRequest) {
         },
       }),
       prisma.subjectExamMax.findMany({
-        where: { schoolId: user.schoolId, subjectId, section, level },
+        where: { schoolId: user.schoolId, subjectId, section, level, stream },
         include: {
           periodGroup: { select: { id: true, name: true, sortOrder: true, hasExam: true } },
         },
-      }),
-      prisma.class.findMany({
-        where: { schoolId: user.schoolId },
-        select: { section: true, level: true },
-        distinct: ["section", "level"],
-        orderBy: [{ section: "asc" }, { level: "asc" }],
       }),
     ])
 
@@ -66,6 +65,7 @@ export async function GET(req: NextRequest) {
       subject,
       section,
       level,
+      stream,
       periodMaxima: periodMaxima.map((m) => ({
         id: m.id,
         periodId: m.periodId,
@@ -80,7 +80,6 @@ export async function GET(req: NextRequest) {
         maxPoints: m.maxPoints,
         periodGroupName: m.periodGroup.name,
       })),
-      degrees,
     })
   } catch (error) {
     return handleApiError(error)
@@ -89,7 +88,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * PUT body: {
- *   subjectId, section, level,
+ *   subjectId, section, level, stream?,
  *   periodMaxima: [{ periodId, maxPoints }],
  *   examMaxima: [{ periodGroupId, maxPoints }]
  * }
@@ -103,12 +102,20 @@ export async function PUT(req: NextRequest) {
     const subjectId = parseInt(body.subjectId, 10)
     const section = String(body.section || "").trim()
     const level = String(body.level || "").trim()
+    const stream =
+      section === "Humanités" ? normalizeGradeStream(body.stream) : ""
     const periodMaxima = Array.isArray(body.periodMaxima) ? body.periodMaxima : []
     const examMaxima = Array.isArray(body.examMaxima) ? body.examMaxima : []
 
     if (!subjectId || !section || !level) {
       return NextResponse.json(
         { error: "subjectId, section et level requis" },
+        { status: 400 }
+      )
+    }
+    if (section === "Humanités" && !stream) {
+      return NextResponse.json(
+        { error: "La filière (stream) est requise pour les Humanités" },
         { status: 400 }
       )
     }
@@ -119,6 +126,9 @@ export async function PUT(req: NextRequest) {
     if (!subject) {
       return NextResponse.json({ error: "Matière introuvable" }, { status: 404 })
     }
+
+    let savedPeriods = 0
+    let savedExams = 0
 
     await prisma.$transaction(async (tx) => {
       for (const row of periodMaxima) {
@@ -136,10 +146,11 @@ export async function PUT(req: NextRequest) {
 
         await tx.subjectPeriodMax.upsert({
           where: {
-            subjectId_section_level_periodId: {
+            subjectId_section_level_stream_periodId: {
               subjectId,
               section,
               level,
+              stream,
               periodId,
             },
           },
@@ -147,12 +158,14 @@ export async function PUT(req: NextRequest) {
             subjectId,
             section,
             level,
+            stream,
             periodId,
             schoolId: user.schoolId,
             maxPoints,
           },
           update: { maxPoints },
         })
+        savedPeriods += 1
       }
 
       for (const row of examMaxima) {
@@ -167,10 +180,11 @@ export async function PUT(req: NextRequest) {
 
         await tx.subjectExamMax.upsert({
           where: {
-            subjectId_section_level_periodGroupId: {
+            subjectId_section_level_stream_periodGroupId: {
               subjectId,
               section,
               level,
+              stream,
               periodGroupId,
             },
           },
@@ -178,16 +192,23 @@ export async function PUT(req: NextRequest) {
             subjectId,
             section,
             level,
+            stream,
             periodGroupId,
             schoolId: user.schoolId,
             maxPoints,
           },
           update: { maxPoints },
         })
+        savedExams += 1
       }
     })
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({
+      ok: true,
+      savedPeriods,
+      savedExams,
+      message: "Maxima enregistrés",
+    })
   } catch (error) {
     return handleApiError(error)
   }

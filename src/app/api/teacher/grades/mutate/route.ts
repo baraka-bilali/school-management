@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
+import { normalizeGradeStream } from "@/lib/grading/degree"
 
 async function getOwnedAssignment(teacherId: number, schoolId: number, yearId: number, assignmentId: number) {
   return prisma.courseAssignment.findFirst({
@@ -131,25 +132,33 @@ export async function PUT(req: NextRequest) {
 
     const cls = await prisma.class.findFirst({
       where: { id: assignment.classId },
-      select: { section: true, level: true },
+      select: { section: true, level: true, stream: true },
     })
     if (!cls) {
       return NextResponse.json({ error: "Classe introuvable" }, { status: 404 })
     }
 
+    const gradeStream =
+      cls.section === "Humanités" ? normalizeGradeStream(cls.stream) : ""
+
     const examMax = await prisma.subjectExamMax.findUnique({
       where: {
-        subjectId_section_level_periodGroupId: {
+        subjectId_section_level_stream_periodGroupId: {
           subjectId: assignment.subjectId,
           section: cls.section,
           level: cls.level,
+          stream: gradeStream,
           periodGroupId,
         },
       },
     })
     if (!examMax) {
       return NextResponse.json(
-        { error: "Maximum officiel d'examen non défini pour ce degré" },
+        {
+          error: gradeStream
+            ? `Maximum officiel d'examen non défini pour ${cls.level} ${cls.section} — ${gradeStream}`
+            : "Maximum officiel d'examen non défini pour ce degré",
+        },
         { status: 400 }
       )
     }
