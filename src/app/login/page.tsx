@@ -379,9 +379,9 @@ export default function LoginPage() {
 	return (
 		<>
 		{showSplash && <SplashScreen leaving={splashLeaving} />}
-		<div className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-[#eef2f9] p-6 transition-colors dark:bg-gray-900">
+		<div className="login-shell relative isolate flex w-full items-center justify-center overflow-hidden bg-[#eef2f9] px-6 py-8 transition-colors dark:bg-gray-900">
 			<LoginAmbientBackground isDark={isDark} />
-			<div className="relative z-10 my-auto w-full max-w-md py-4">
+			<div className="relative z-10 w-full max-w-md">
 				<div className="mb-5 flex flex-col items-center">
 					<div className="mb-2">
 						<KelasiLogo variant="light" priority className="h-28 w-28 object-contain drop-shadow-md sm:h-32 sm:w-32" />

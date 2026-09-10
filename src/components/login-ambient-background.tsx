@@ -3,6 +3,7 @@
 /**
  * Fond ambiant type Copilot/VS Code pour la page login :
  * orbes lumineux + icônes scolaires SVG flottantes.
+ * Couvre tout le shell (y compris 125dvh desktop avec zoom 0.8).
  */
 export default function LoginAmbientBackground({ isDark }: { isDark: boolean }) {
   const ink = isDark ? "rgba(129, 140, 248, 0.22)" : "rgba(79, 70, 229, 0.16)"
@@ -13,6 +14,12 @@ export default function LoginAmbientBackground({ isDark }: { isDark: boolean }) 
       className="login-ambient pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden
     >
+      {/* Couche de fond pleine — évite toute bande plate sous le zoom */}
+      <div
+        className={`absolute inset-0 ${
+          isDark ? "bg-gray-900" : "bg-[#eef2f9]"
+        }`}
+      />
       {/* Orbes diffus (style Copilot) */}
       <div
         className={`login-orb login-orb-a absolute -left-[12%] top-[8%] h-[42vmin] w-[42vmin] rounded-full blur-3xl ${
