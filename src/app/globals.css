@@ -742,6 +742,38 @@ select:-webkit-autofill:focus {
   animation-duration: 12.5s;
   animation-delay: -7s;
 }
+.login-float-9 {
+  animation-duration: 10.5s;
+  animation-delay: -1.5s;
+}
+.login-float-10 {
+  animation-duration: 13.5s;
+  animation-delay: -3.5s;
+}
+.login-float-11 {
+  animation-duration: 11s;
+  animation-delay: -8s;
+}
+.login-float-12 {
+  animation-duration: 12s;
+  animation-delay: -4.5s;
+}
+.login-float-13 {
+  animation-duration: 14.5s;
+  animation-delay: -2.5s;
+}
+.login-float-14 {
+  animation-duration: 10s;
+  animation-delay: -6.5s;
+}
+.login-float-15 {
+  animation-duration: 9.5s;
+  animation-delay: -0.8s;
+}
+.login-float-16 {
+  animation-duration: 13s;
+  animation-delay: -5.5s;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .login-orb,
