@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     shortcut: "/icons/favicon.png",
   },
   verification: {
-    google: "PbiyPc_qDzSGpVKnxNVk2e-OONuaQcS8iBQM4kR0jmA",
+    google: "mDPs4vAXCymMXAjbI60lghcHi4SLmXprhvZBBtgbAdQ",
   },
 }
 
