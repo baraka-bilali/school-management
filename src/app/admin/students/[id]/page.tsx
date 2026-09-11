@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import Layout from "@/components/layout"
 import Portal from "@/components/portal"
 import StudentDetailSkeleton from "@/components/admin/student-detail-skeleton"
 import { authFetch } from "@/lib/auth-fetch"
@@ -155,7 +154,6 @@ export default function StudentDetailsPage() {
   const [editData, setEditData] = useState<EditData | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-
 
   // QR
   const [showQR, setShowQR] = useState(false)
@@ -382,17 +380,17 @@ export default function StudentDetailsPage() {
 
   if (loading) {
     return (
-      <Layout>
+      <>
         <div className="p-6">
           <StudentDetailSkeleton theme={theme} />
         </div>
-      </Layout>
+      </>
     )
   }
 
   if (error || !student) {
     return (
-      <Layout>
+      <>
         <div className="flex items-center justify-center" style={{ height: "calc(100vh - 140px)" }}>
           <div className="text-center p-8">
             <p className={`${txt} text-xl font-semibold mb-2`}>{error || "Élève introuvable"}</p>
@@ -401,14 +399,14 @@ export default function StudentDetailsPage() {
             </button>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
   const enrollment = student.enrollments[0]
 
   return (
-    <Layout>
+    <>
       {/* ──────────────────── QR modal ──────────────────── */}
       {showQR && (
         <Portal>
@@ -718,6 +716,6 @@ export default function StudentDetailsPage() {
         </div>
 
       </div>
-    </Layout>
+    </>
   )
 }

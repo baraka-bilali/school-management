@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Layout from "@/components/layout"
 import { StudentsSection } from "../users/students-section"
 
 export default function InscriptionsPage() {
@@ -55,23 +54,19 @@ export default function InscriptionsPage() {
 
   if (allowed === null) {
     return (
-      <Layout>
-        <div className="p-6 text-center text-gray-500">Chargement...</div>
-      </Layout>
+      <div className="p-6 text-center text-gray-500">Chargement...</div>
     )
   }
 
   if (!allowed) return null
 
   return (
-    <Layout>
-      <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Inscription</h1>
           <p className={textSecondary}>Enregistrement des nouveaux élèves</p>
         </div>
         <StudentsSection theme={theme} enrollmentOnly />
       </div>
-    </Layout>
   )
 }

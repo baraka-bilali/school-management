@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { getSupabaseBrowser } from "@/lib/supabase-client"
 import { notifyNotificationsChanged } from "@/lib/notification-events"
@@ -297,8 +296,7 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className={`min-h-screen ${bgPrimary}`}>
+      <div className={`min-h-screen ${bgPrimary}`}>
           <div
             className="flex items-center justify-center"
             style={{ height: "calc(100vh - 140px)" }}
@@ -309,13 +307,11 @@ export default function NotificationsPage() {
             </div>
           </div>
         </div>
-      </Layout>
     )
   }
 
   return (
-    <Layout>
-      <div className={`min-h-screen ${bgPrimary}`}>
+    <div className={`min-h-screen ${bgPrimary}`}>
         <div className={`sticky top-0 z-10 ${bgCard} border-b ${borderColor}`}>
           <div className="max-w-3xl mx-auto px-4 sm:px-6">
             <div className="flex items-center h-14 gap-3">
@@ -559,6 +555,5 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
-    </Layout>
   )
 }

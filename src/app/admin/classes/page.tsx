@@ -3,7 +3,6 @@
 import { Fragment, Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { Plus, Pencil, Trash2, Eye } from "lucide-react"
 import Portal from "@/components/portal"
@@ -44,11 +43,9 @@ export default function ClassesPage() {
   return (
     <Suspense
       fallback={
-        <Layout>
-          <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
             Chargement…
           </div>
-        </Layout>
       }
     >
       <ClassesPageContent />
@@ -344,8 +341,7 @@ function ClassesPageContent() {
   }
 
   return (
-    <Layout>
-      <div className="p-6 space-y-4">
+    <div className="p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className={`text-2xl font-bold ${textColor}`}>Classes & Filières</h1>
@@ -762,8 +758,6 @@ function ClassesPageContent() {
           </Portal>
         )}
       </div>
-    </Layout>
   )
 }
-
 

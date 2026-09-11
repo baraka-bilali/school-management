@@ -13,6 +13,27 @@ import {
   writeSubscriptionAccessCache,
 } from "@/lib/subscription-access-cache"
 
+const ROLE_CACHE_KEY = "admin-shell-role"
+const ENROLL_CACHE_KEY = "admin-shell-can-enroll"
+
+function readCachedRole(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    return sessionStorage.getItem(ROLE_CACHE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function readCachedCanEnroll(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return sessionStorage.getItem(ENROLL_CACHE_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
 interface LayoutProps {
   children: React.ReactNode
 }
@@ -27,13 +48,13 @@ export default function Layout({ children }: LayoutProps) {
     return true
   })
   const [isMobile, setIsMobile] = useState(false)
-  const [role, setRole] = useState<string | null>(null)
+  const [role, setRole] = useState<string | null>(() => readCachedRole())
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
   const [subscriptionExpired, setSubscriptionExpired] = useState(() => getCachedSubscriptionExpired())
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
   const [studentSchoolId, setStudentSchoolId] = useState<number | null>(null)
-  const [canEnrollStudents, setCanEnrollStudents] = useState(false)
+  const [canEnrollStudents, setCanEnrollStudents] = useState(() => readCachedCanEnroll())
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
@@ -105,8 +126,15 @@ export default function Layout({ children }: LayoutProps) {
           const data = await res.json()
           const userRole = data.user?.role || null
           setRole(userRole)
+          try {
+            if (userRole) sessionStorage.setItem(ROLE_CACHE_KEY, userRole)
+            else sessionStorage.removeItem(ROLE_CACHE_KEY)
+          } catch {}
           if (typeof data.user?.canEnrollStudents === "boolean") {
             setCanEnrollStudents(data.user.canEnrollStudents)
+            try {
+              sessionStorage.setItem(ENROLL_CACHE_KEY, data.user.canEnrollStudents ? "1" : "0")
+            } catch {}
           }
           if (userRole === "SUPER_ADMIN") {
             router.replace("/super-admin")

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { authFetch } from "@/lib/auth-fetch"
 import {
@@ -463,7 +462,7 @@ export default function SubscriptionPage() {
           : "Expiré"
         : null)
     return (
-      <Layout>
+      <>
         <div className="p-4 md:p-6">
           <SubscriptionSkeleton
             theme={theme}
@@ -476,19 +475,19 @@ export default function SubscriptionPage() {
             dateFinAbonnement={cache?.dateFinAbonnement}
           />
         </div>
-      </Layout>
+      </>
     )
   }
 
   if (!school) {
     return (
-      <Layout>
+      <>
         <div className="p-6">
           <div className="flex items-center justify-center py-32">
             <p className={textColor}>Aucune donnée d&apos;abonnement disponible</p>
           </div>
         </div>
-      </Layout>
+      </>
     )
   }
 
@@ -529,7 +528,7 @@ export default function SubscriptionPage() {
           : "bg-red-500/15 text-red-500"
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6 max-w-3xl mx-auto">
         <div>
           <h1 className={`text-2xl md:text-3xl font-bold ${textColor} mb-1`}>Abonnement</h1>
@@ -782,6 +781,6 @@ export default function SubscriptionPage() {
           theme={theme}
         />
       )}
-    </Layout>
+    </>
   )
 }

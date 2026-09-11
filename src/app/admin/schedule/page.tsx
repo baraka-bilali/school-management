@@ -1,6 +1,5 @@
 "use client"
 
-import Layout from "@/components/layout"
 import { Calendar, Clock, BookOpen, Users, Coffee } from "lucide-react"
 
 export default function SchedulePage() {
@@ -33,8 +32,7 @@ export default function SchedulePage() {
   ]
 
   return (
-    <Layout>
-      <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -76,6 +74,5 @@ export default function SchedulePage() {
           </p>
         </div>
       </div>
-    </Layout>
   )
 }

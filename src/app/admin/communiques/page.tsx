@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Layout from "@/components/layout"
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import TextAlign from "@tiptap/extension-text-align"
@@ -415,8 +414,7 @@ export default function AdminCommuniquesPage() {
   const latest = communiques[0]
 
   return (
-    <Layout>
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-start gap-3">
           <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
@@ -851,6 +849,5 @@ export default function AdminCommuniquesPage() {
           </Portal>
         )}
       </div>
-    </Layout>
   )
 }

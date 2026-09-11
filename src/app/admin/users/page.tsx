@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import React from "react"
@@ -37,11 +36,9 @@ export default function UsersPage() {
   return (
     <Suspense
       fallback={
-        <Layout>
-          <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-gray-500 dark:text-gray-400">
             Chargement…
           </div>
-        </Layout>
       }
     >
       <UsersPageContent />
@@ -119,8 +116,7 @@ function UsersPageContent() {
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
 
   return (
-    <Layout>
-      <div className="space-y-4 md:p-6">
+    <div className="space-y-4 md:p-6">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Utilisateurs</h1>
           <p className={textSecondary}>Gestion des élèves, parents, enseignants et personnel administratif.</p>
@@ -193,7 +189,6 @@ function UsersPageContent() {
           {tab === "courses" && <CoursesSection theme={theme} />}
         </div>
       </div>
-    </Layout>
   )
 }
 

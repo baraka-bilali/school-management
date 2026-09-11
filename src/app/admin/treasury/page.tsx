@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Layout from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/cards"
 import { SelecteurAnneeScolaire } from "@/components/treasury/school-year-select"
 import { SelecteurMois } from "@/components/treasury/school-month-select"
@@ -156,11 +155,9 @@ export default function AdminTreasuryPage() {
   return (
     <Suspense
       fallback={
-        <Layout>
-          <div className="space-y-6 p-4 md:p-6">
+        <div className="space-y-6 p-4 md:p-6">
             <TreasuryPageSkeleton theme="dark" />
           </div>
-        </Layout>
       }
     >
       <AdminTreasuryPageContent />
@@ -650,8 +647,7 @@ function AdminTreasuryPageContent() {
     }`
 
   return (
-    <Layout>
-      <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
         {/* En-tête */}
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
@@ -1186,6 +1182,5 @@ function AdminTreasuryPageContent() {
           </div>
         )}
       </div>
-    </Layout>
   )
 }
