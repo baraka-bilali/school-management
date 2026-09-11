@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useId, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +27,23 @@ type MenuSelectProps = {
   "aria-label"?: string
 }
 
+type ListCoords = {
+  left: number
+  width: number
+  maxHeight: number
+  /** CSS top when opening below; unused when placement is top. */
+  top: number
+  /** CSS bottom when opening above. */
+  bottom: number
+  placement: "top" | "bottom"
+}
+
+const LIST_GAP = 6
+const VIEWPORT_PAD = 8
+/** Prefer a tall list so long option sets stay usable (~28rem). */
+const PREFERRED_MAX_H = 448
+const MIN_LIST_H = 160
+
 /**
  * Custom listbox with radio-style “pastille” selection.
  * Used across admin filters and forms instead of native &lt;select&gt;.
@@ -43,69 +61,101 @@ export function MenuSelect({
   "aria-label": ariaLabel,
 }: MenuSelectProps) {
   const [open, setOpen] = useState(false)
+  const [coords, setCoords] = useState<ListCoords | null>(null)
+  const [mounted, setMounted] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const listId = useId()
   const showClear = allowClear ?? Boolean(placeholder)
 
   const selected = options.find((o) => o.value === value) || null
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+
+    const rect = trigger.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom - LIST_GAP - VIEWPORT_PAD
+    const spaceAbove = rect.top - LIST_GAP - VIEWPORT_PAD
+    const preferred = Math.min(PREFERRED_MAX_H, Math.floor(window.innerHeight * 0.72))
+
+    // Open upward when the bottom side is clearly too short (e.g. last table rows).
+    const placeBelow =
+      spaceBelow >= Math.min(preferred, MIN_LIST_H) || spaceBelow >= spaceAbove
+
+    const available = placeBelow ? spaceBelow : spaceAbove
+    const maxHeight = Math.max(120, Math.min(preferred, available))
+
+    setCoords({
+      left: Math.max(VIEWPORT_PAD, Math.min(rect.left, window.innerWidth - rect.width - VIEWPORT_PAD)),
+      width: rect.width,
+      maxHeight,
+      top: rect.bottom + LIST_GAP,
+      bottom: window.innerHeight - rect.top + LIST_GAP,
+      placement: placeBelow ? "bottom" : "top",
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setCoords(null)
+      return
+    }
+    updatePosition()
+  }, [open, updatePosition, options.length])
+
+  useEffect(() => {
     if (!open) return
+
     const onPointerDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (rootRef.current?.contains(target)) return
+      if (listRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false)
     }
+    const onReposition = () => updatePosition()
+
     document.addEventListener("mousedown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
+    window.addEventListener("resize", onReposition)
+    // Capture scroll from nested overflow containers (tables, cards).
+    window.addEventListener("scroll", onReposition, true)
+
     return () => {
       document.removeEventListener("mousedown", onPointerDown)
       document.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("resize", onReposition)
+      window.removeEventListener("scroll", onReposition, true)
     }
-  }, [open])
+  }, [open, updatePosition])
 
-  return (
-    <div className={cn("block text-sm", className)} ref={rootRef}>
-      {label ? <span className="text-gray-600 dark:text-gray-400">{label}</span> : null}
-      <div className={cn("relative", label ? "mt-1" : undefined)}>
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label={ariaLabel || label || placeholder}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-controls={listId}
-          onClick={() => !disabled && setOpen((o) => !o)}
-          className={cn(
-            "flex w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
-            "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
-            disabled && "cursor-not-allowed opacity-60",
-            triggerClassName
-          )}
-        >
-          <span
-            className={cn(
-              "min-w-0 flex-1 truncate text-[15px] leading-snug",
-              selected ? "font-medium text-gray-900 dark:text-gray-100" : "text-gray-400"
-            )}
-          >
-            {selected?.label ?? placeholder}
-          </span>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-gray-500 transition-transform",
-              open && "rotate-180"
-            )}
-          />
-        </button>
-
-        {open && (
+  const listbox =
+    open && coords && mounted
+      ? createPortal(
           <ul
+            ref={listRef}
             id={listId}
             role="listbox"
-            className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-700 dark:bg-slate-900"
+            className={cn(
+              "menu-select-scroll fixed z-[220] overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1.5 shadow-xl",
+              "dark:border-gray-700 dark:bg-slate-900"
+            )}
+            style={{
+              left: coords.left,
+              width: coords.width,
+              maxHeight: coords.maxHeight,
+              ...(coords.placement === "bottom"
+                ? { top: coords.top }
+                : { bottom: coords.bottom }),
+            }}
           >
             {showClear && (
               <li>
@@ -152,8 +202,48 @@ export function MenuSelect({
                 </li>
               )
             })}
-          </ul>
-        )}
+          </ul>,
+          document.body
+        )
+      : null
+
+  return (
+    <div className={cn("block text-sm", className)} ref={rootRef}>
+      {label ? <span className="text-gray-600 dark:text-gray-400">{label}</span> : null}
+      <div className={cn("relative", label ? "mt-1" : undefined)}>
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={disabled}
+          aria-label={ariaLabel || label || placeholder}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => !disabled && setOpen((o) => !o)}
+          className={cn(
+            "flex w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
+            "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+            disabled && "cursor-not-allowed opacity-60",
+            triggerClassName
+          )}
+        >
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-[15px] leading-snug",
+              selected ? "font-medium text-gray-900 dark:text-gray-100" : "text-gray-400"
+            )}
+          >
+            {selected?.label ?? placeholder}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-gray-500 transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+        {listbox}
       </div>
     </div>
   )
