@@ -516,25 +516,160 @@ select:-webkit-autofill:focus {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
-/* ── Écran de démarrage façon Discord (100% CSS) ── */
+/* ── Splash Kelasi 360 — révélation marque (fond login + lockup) ── */
 .splash-root {
-  background: radial-gradient(circle at 50% 40%, #6b7bff 0%, #5865f2 45%, #4451e0 100%);
+  background: #eef2f9;
 }
 
-@keyframes splash-pop {
+.splash-ambient {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.splash-ambient-base {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    155deg,
+    #eef2f9 0%,
+    #e4eaf8 38%,
+    #dde7fb 68%,
+    #e8eef9 100%
+  );
+}
+
+.splash-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(48px);
+  will-change: transform;
+}
+
+.splash-orb-a {
+  left: -12%;
+  top: 8%;
+  height: 42vmin;
+  width: 42vmin;
+  background: rgba(129, 140, 248, 0.42);
+  animation: splash-orb-a 10s ease-in-out infinite;
+}
+
+.splash-orb-b {
+  right: -8%;
+  top: 38%;
+  height: 38vmin;
+  width: 38vmin;
+  background: rgba(56, 189, 248, 0.32);
+  animation: splash-orb-b 12s ease-in-out infinite;
+}
+
+.splash-orb-c {
+  left: 28%;
+  bottom: -18%;
+  height: 48vmin;
+  width: 48vmin;
+  background: rgba(96, 165, 250, 0.28);
+  animation: splash-orb-c 14s ease-in-out infinite;
+}
+
+.splash-ambient-glow {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  height: 70vmin;
+  width: 70vmin;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background: rgba(165, 180, 252, 0.28);
+  filter: blur(40px);
+}
+
+.splash-ambient-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black 20%, transparent 75%);
+}
+
+@keyframes splash-orb-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5%, 7%, 0) scale(1.06);
+  }
+}
+
+@keyframes splash-orb-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-6%, -4%, 0) scale(1.1);
+  }
+}
+
+@keyframes splash-orb-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -6%, 0) scale(1.05);
+  }
+}
+
+/* Lockup : logo seul au centre, puis décale à gauche pour le mot-marque */
+.splash-brand {
+  /* Décale le groupe vers la gauche une fois le texte prêt → reste centré optiquement */
+  animation: splash-brand-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.85s both;
+}
+
+.splash-mark {
+  animation: splash-mark-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.splash-mark-shift {
+  animation: splash-mark-shift 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.85s both;
+}
+
+.splash-wordmark {
+  overflow: hidden;
+  max-width: 0;
+  opacity: 0;
+  animation: splash-wordmark-open 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.9s both;
+}
+
+.splash-word-kelasi,
+.splash-word-360 {
+  display: block;
+  white-space: nowrap;
+  transform: translateX(14px);
+  opacity: 0;
+}
+
+.splash-word-kelasi {
+  animation: splash-word-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.05s both;
+}
+
+.splash-word-360 {
+  animation: splash-word-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.18s both;
+}
+
+@keyframes splash-mark-in {
   0% {
-    transform: scale(0.3);
+    transform: scale(0.72);
     opacity: 0;
   }
-  55% {
-    transform: scale(1.12);
+  60% {
+    transform: scale(1.04);
     opacity: 1;
-  }
-  72% {
-    transform: scale(0.92);
-  }
-  86% {
-    transform: scale(1.03);
   }
   100% {
     transform: scale(1);
@@ -542,19 +677,45 @@ select:-webkit-autofill:focus {
   }
 }
 
-@keyframes splash-bounce {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
+/* Quelques mm vers la droite, puis le mot apparaît à droite du logo */
+@keyframes splash-mark-shift {
+  from {
+    transform: translateX(0);
   }
-  30% {
-    transform: translateY(-16px) scale(1.05);
+  to {
+    transform: translateX(8px);
   }
-  55% {
-    transform: translateY(0) scale(0.96);
+}
+
+@keyframes splash-brand-settle {
+  from {
+    transform: translateX(0);
   }
-  70% {
-    transform: translateY(-7px) scale(1.02);
+  to {
+    /* Recentre le lockup logo+texte après l’ouverture du mot-marque */
+    transform: translateX(-1.75rem);
+  }
+}
+
+@keyframes splash-wordmark-open {
+  from {
+    max-width: 0;
+    opacity: 0;
+  }
+  to {
+    max-width: 10rem;
+    opacity: 1;
+  }
+}
+
+@keyframes splash-word-in {
+  from {
+    transform: translateX(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
@@ -568,70 +729,30 @@ select:-webkit-autofill:focus {
   }
 }
 
-/* Le pop joue une fois, puis le rebond boucle en continu */
-.splash-logo-pop {
-  animation: splash-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both,
-    splash-bounce 1.6s ease-in-out 0.7s infinite;
-}
-
 .splash-leaving {
-  animation: splash-fade-out 0.45s ease forwards;
+  animation: splash-fade-out 0.5s ease forwards;
 }
 
-/* Anneaux pulsés derrière le logo */
-@keyframes splash-ring {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.5;
+@media (prefers-reduced-motion: reduce) {
+  .splash-orb,
+  .splash-brand,
+  .splash-mark,
+  .splash-mark-shift,
+  .splash-wordmark,
+  .splash-word-kelasi,
+  .splash-word-360 {
+    animation: none !important;
   }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
+
+  .splash-mark,
+  .splash-mark-shift,
+  .splash-wordmark,
+  .splash-word-kelasi,
+  .splash-word-360 {
+    opacity: 1 !important;
+    transform: none !important;
+    max-width: none !important;
   }
-}
-
-.splash-ring {
-  position: absolute;
-  height: 7rem;
-  width: 7rem;
-  border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  animation: splash-ring 2s ease-out infinite;
-}
-
-.splash-ring-2 {
-  animation-delay: 1s;
-}
-
-/* Points de chargement rebondissants */
-@keyframes splash-dot {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.5;
-  }
-  40% {
-    transform: translateY(-8px);
-    opacity: 1;
-  }
-}
-
-.splash-dots span {
-  height: 0.6rem;
-  width: 0.6rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.9);
-  display: inline-block;
-  animation: splash-dot 1.2s ease-in-out infinite;
-}
-
-.splash-dots span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.splash-dots span:nth-child(3) {
-  animation-delay: 0.3s;
 }
 
 /* PWA — mode standalone (écran d'accueil) */

@@ -101,11 +101,12 @@ export default function LoginPage() {
 	useEffect(() => {
 		if (sessionStorage.getItem(SPLASH_SESSION_KEY)) return
 		setShowSplash(true)
-		const leaveTimer = setTimeout(() => setSplashLeaving(true), 2200)
+		// Logo (~0.75s) + révélation mot-marque (~1.2s) + pause, puis fondu
+		const leaveTimer = setTimeout(() => setSplashLeaving(true), 2900)
 		const hideTimer = setTimeout(() => {
 			setShowSplash(false)
 			sessionStorage.setItem(SPLASH_SESSION_KEY, "1")
-		}, 2650)
+		}, 3400)
 		return () => {
 			clearTimeout(leaveTimer)
 			clearTimeout(hideTimer)
