@@ -516,6 +516,35 @@ select:-webkit-autofill:focus {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
+/* Thin scrollbar for MenuSelect option lists */
+.menu-select-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+.dark .menu-select-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.menu-select-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.menu-select-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+.menu-select-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+}
+.dark .menu-select-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+}
+.menu-select-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+.dark .menu-select-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
 /* ── Écran de démarrage façon Discord (100% CSS) ── */
 .splash-root {
   background: radial-gradient(circle at 50% 40%, #6b7bff 0%, #5865f2 45%, #4451e0 100%);
