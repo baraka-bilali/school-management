@@ -17,7 +17,7 @@ import {
 	isStudentProfileComplete,
 	STUDENT_PROFILE_REQUIRED_LABELS,
 	type StudentProfileRequiredField,
-} from "@/lib/student-fields"
+} from "@/lib/student-profile-completion"
 
 type ModalStep =
   | "none"
