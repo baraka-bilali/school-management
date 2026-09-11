@@ -450,46 +450,68 @@ export default function Dashboard() {
             <p className={`text-xs font-semibold ${textSecondary} mb-1`}>USD ($)</p>
             <div className="h-[108px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlySeries} margin={{ top: 2, right: 8, bottom: 0, left: 0 }}>
+                <BarChart
+                  data={monthlySeries}
+                  margin={{ top: 2, right: 4, bottom: 0, left: 0 }}
+                  barCategoryGap="12%"
+                  barGap={1}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tick={{ fontSize: 10 }} />
+                  <XAxis
+                    dataKey="month"
+                    stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                    tick={{ fontSize: 8 }}
+                    interval={0}
+                    tickMargin={2}
+                  />
                   <YAxis
                     stroke={palette.payment}
                     ticks={chartYAxis.usdTicks}
                     domain={[0, chartYAxis.yMaxUsd]}
                     tickFormatter={(v) => v >= 1000 ? `$${v / 1000}k` : `$${v}`}
                     tick={{ fontSize: 10 }}
-                    width={44}
+                    width={40}
                   />
                   <Tooltip
                     formatter={(value) => [formatUsd(Number(value ?? 0)), "USD"]}
                     labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Bar dataKey="paymentsUsd" radius={[4, 4, 0, 0]} fill={palette.payment} name="USD" />
+                  <Bar dataKey="paymentsUsd" radius={[3, 3, 0, 0]} fill={palette.payment} name="USD" maxBarSize={14} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <p className={`text-xs font-semibold ${textSecondary} mt-3 mb-1`}>Francs congolais (FC)</p>
             <div className="h-[108px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlySeries} margin={{ top: 2, right: 8, bottom: 0, left: 0 }}>
+                <BarChart
+                  data={monthlySeries}
+                  margin={{ top: 2, right: 4, bottom: 0, left: 0 }}
+                  barCategoryGap="12%"
+                  barGap={1}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                  <XAxis dataKey="month" stroke={theme === "dark" ? "#9ca3af" : "#6b7280"} tick={{ fontSize: 10 }} />
+                  <XAxis
+                    dataKey="month"
+                    stroke={theme === "dark" ? "#9ca3af" : "#6b7280"}
+                    tick={{ fontSize: 8 }}
+                    interval={0}
+                    tickMargin={2}
+                  />
                   <YAxis
                     stroke="#06b6d4"
                     ticks={chartYAxis.cdfTicks}
                     domain={[0, chartYAxis.yMaxCdf]}
                     tickFormatter={(v) => v >= 1000000 ? `${Math.round(v / 1000000)}M` : v >= 1000 ? `${Math.round(v / 1000)}K` : `${v}`}
                     tick={{ fontSize: 10 }}
-                    width={44}
+                    width={40}
                   />
                   <Tooltip
                     formatter={(value) => [`${new Intl.NumberFormat("fr-FR").format(Number(value ?? 0))} FC`, "CDF"]}
                     labelFormatter={(label) => `Mois: ${String(label ?? "")}`}
                     contentStyle={{ borderRadius: 12, border: `1px solid ${gridColor}` }}
                   />
-                  <Bar dataKey="paymentsCdf" radius={[4, 4, 0, 0]} fill="#06b6d4" name="CDF" />
+                  <Bar dataKey="paymentsCdf" radius={[3, 3, 0, 0]} fill="#06b6d4" name="CDF" maxBarSize={14} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

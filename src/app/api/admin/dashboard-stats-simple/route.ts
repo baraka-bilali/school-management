@@ -6,6 +6,7 @@ import { ensureDefaultFeeType, getDefaultFeeTypeId } from "@/lib/fees/default-fe
 import { SECTION_ORDER } from "@/lib/class-sort"
 import {
   getSchoolYearMonths,
+  getFeeCollectionMonths,
   getEnrollmentCampaignMonths,
   schoolYearFromRecord,
   buildSchoolYearChartCumulative,
@@ -115,8 +116,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const chartStart = schoolYearMonths[0]?.dateDebut ?? new Date()
-    const chartEnd = schoolYearMonths[schoolYearMonths.length - 1]?.dateFin ?? new Date()
+    const feeCollectionMonths = getFeeCollectionMonths(anneeBounds)
+    const chartStart = feeCollectionMonths[0]?.dateDebut ?? new Date()
+    const chartEnd = feeCollectionMonths[feeCollectionMonths.length - 1]?.dateFin ?? new Date()
 
     const paymentWhere: {
       schoolId: number
@@ -212,14 +214,12 @@ export async function GET(request: NextRequest) {
       )
     )
 
-    for (const month of schoolYearMonths) {
+    for (const month of feeCollectionMonths) {
       const shortName = month.dateDebut.toLocaleDateString("fr-FR", { month: "short" })
       monthLabels.push(shortName.charAt(0).toUpperCase() + shortName.slice(1))
     }
 
-    for (let i = 0; i < schoolYearMonths.length; i++) {
-      const month = schoolYearMonths[i]
-
+    for (const month of feeCollectionMonths) {
       const monthPayments = allPayments.filter((p) => {
         const d = new Date(p.datePaiement)
         return d >= month.dateDebut && d <= month.dateFin

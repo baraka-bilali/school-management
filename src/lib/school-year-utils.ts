@@ -47,6 +47,9 @@ export function formatPeriodSubtitle(
 
 const SCHOOL_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6] as const
 
+/** Collecte des frais : juil. → juin (confirmation dès juillet pour certaines écoles). */
+const FEE_COLLECTION_MONTHS = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6] as const
+
 const MONTH_NAMES_FR = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
@@ -119,6 +122,28 @@ export function getSchoolYearMonths(annee: AnneeScolaire): MoisScolaire[] {
 
   return SCHOOL_MONTHS.map((month) => {
     const calendarYear = month >= 9 ? startYear : startYear + 1
+    const value = `${calendarYear}-${String(month).padStart(2, "0")}`
+    const dateDebut = new Date(calendarYear, month - 1, 1)
+    const dateFin = new Date(calendarYear, month, 0, 23, 59, 59, 999)
+    return {
+      value,
+      label: `${MONTH_NAMES_FR[month - 1]} ${calendarYear}`,
+      dateDebut,
+      dateFin,
+    }
+  })
+}
+
+/**
+ * Les 12 mois de collecte des frais (juil. → juin) pour une année donnée.
+ * Inclut juillet et août pour les confirmations / frais anticipés.
+ */
+export function getFeeCollectionMonths(annee: AnneeScolaire): MoisScolaire[] {
+  const parsed = parseSchoolYearLabel(annee.label)
+  const startYear = parsed?.startYear ?? annee.dateDebut.getFullYear()
+
+  return FEE_COLLECTION_MONTHS.map((month) => {
+    const calendarYear = month >= 7 ? startYear : startYear + 1
     const value = `${calendarYear}-${String(month).padStart(2, "0")}`
     const dateDebut = new Date(calendarYear, month - 1, 1)
     const dateFin = new Date(calendarYear, month, 0, 23, 59, 59, 999)
