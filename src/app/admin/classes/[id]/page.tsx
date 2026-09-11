@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { authFetch } from "@/lib/auth-fetch"
 import { toDisplayCode } from "@/lib/student-fields"
@@ -163,8 +162,7 @@ export default function ClassDetailPage() {
       : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
 
   return (
-    <Layout>
-      <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <button
@@ -336,6 +334,5 @@ export default function ClassDetailPage() {
           </Card>
         </div>
       </div>
-    </Layout>
   )
 }

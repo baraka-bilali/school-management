@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import {
   AcademicYearSelect,
@@ -855,8 +854,7 @@ export default function PromotionsPage() {
   }
 
   return (
-    <Layout>
-      <div className="space-y-4 md:p-6">
+    <div className="space-y-4 md:p-6">
         <div>
           <h1 className={`text-2xl font-bold ${textColor}`}>Passages</h1>
           <p className={textSecondary}>
@@ -1440,6 +1438,5 @@ export default function PromotionsPage() {
           </Card>
         )}
       </div>
-    </Layout>
   )
 }

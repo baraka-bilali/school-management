@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { Megaphone, Clock, Eye, ArrowLeft, Loader2, Users } from "lucide-react"
 
@@ -70,18 +69,15 @@ export default function AdminCommuniqueViewPage() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[calc(100vh-140px)]">
+      <div className="flex items-center justify-center min-h-[calc(100vh-140px)]">
           <Loader2 className={`w-8 h-8 animate-spin ${textSecondary}`} />
         </div>
-      </Layout>
     )
   }
 
   if (notFound || !communique) {
     return (
-      <Layout>
-        <div className={`min-h-screen ${bgPage} flex items-center justify-center`}>
+      <div className={`min-h-screen ${bgPage} flex items-center justify-center`}>
           <div className="text-center">
             <Megaphone className={`w-16 h-16 mx-auto mb-4 ${theme === "dark" ? "text-gray-600" : "text-gray-300"}`} />
             <p className={`font-medium ${textColor}`}>Communiqué introuvable</p>
@@ -90,13 +86,11 @@ export default function AdminCommuniqueViewPage() {
             </button>
           </div>
         </div>
-      </Layout>
     )
   }
 
   return (
-    <Layout>
-      <div className={`min-h-screen ${bgPage}`}>
+    <div className={`min-h-screen ${bgPage}`}>
         {/* Header */}
         <div className={`sticky top-0 z-10 ${bgCard} border-b ${borderColor}`}>
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
@@ -154,6 +148,5 @@ export default function AdminCommuniqueViewPage() {
           </div>
         </div>
       </div>
-    </Layout>
   )
 }

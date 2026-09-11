@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import Layout from "@/components/layout"
 import {
   Settings2,
   BadgeDollarSign,
@@ -323,8 +322,7 @@ export default function SettingsPage() {
   const currentYear = years.find((y) => y.id === settings.currentYearId)
 
   return (
-    <Layout>
-      <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-indigo-500/10 shrink-0">
             <Settings2 className="w-6 h-6 text-indigo-500" />
@@ -672,7 +670,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    </Layout>
   )
 }
 

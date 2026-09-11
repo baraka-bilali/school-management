@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react"
 import dynamic from "next/dynamic"
 import { useRouter, useSearchParams } from "next/navigation"
-import Layout from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import {
   Wallet,
@@ -916,7 +915,7 @@ function AdminFeesPageContent() {
   const showTabSkeleton = isInitialLoad || isRefreshing
 
   return (
-    <Layout>
+    <>
       <div className="p-4 md:p-6 space-y-6">
         {/* En-tête */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -2027,10 +2026,9 @@ function AdminFeesPageContent() {
           }}
         />
       )}
-    </Layout>
+    </>
   )
 }
-
 
 // ============================================================
 // FORMULAIRE DE PAIEMENT
@@ -2725,7 +2723,6 @@ function PaymentFormModal({
   )
 }
 
-
 // ============================================================
 // MODAL : CRÉER UN TYPE DE FRAIS
 // ============================================================
@@ -2848,7 +2845,6 @@ function CreateFeeTypeModal({
     </Portal>
   )
 }
-
 
 // ============================================================
 // ONGLET TARIFICATIONS - GRILLE TARIFAIRE PAR CLASSE
@@ -3135,7 +3131,6 @@ function TarificationsTab({
     </div>
   )
 }
-
 
 // ============================================================
 // MODAL : CRÉER UNE TARIFICATION

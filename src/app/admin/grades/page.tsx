@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { toast } from "sonner"
 import { CheckCircle2, ChevronDown, Loader2, RefreshCw, Save } from "lucide-react"
@@ -210,8 +209,7 @@ export default function GradesPage() {
   }
 
   return (
-    <Layout>
-      <div className="p-4 sm:p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Notes & Bulletins</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -503,6 +501,5 @@ export default function GradesPage() {
           </div>
         )}
       </div>
-    </Layout>
   )
 }
