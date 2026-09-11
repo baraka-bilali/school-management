@@ -1,5 +1,14 @@
 import { prisma } from "@/lib/prisma"
 
+// Réexport des helpers purs (client-safe) pour les routes API / serveur.
+export {
+  STUDENT_PROFILE_REQUIRED_FIELDS,
+  STUDENT_PROFILE_REQUIRED_LABELS,
+  getMissingStudentProfileFields,
+  isStudentProfileComplete,
+  type StudentProfileRequiredField,
+} from "@/lib/student-profile-completion"
+
 /** Met en majuscules les champs texte identité (saisie libre, stockage uniforme). */
 export function toUpperText(value: string | null | undefined): string {
   return (value ?? "").trim().toUpperCase()
@@ -44,23 +53,6 @@ export function normalizeStudentProfile(input: {
   if (input.medicalNotes !== undefined) out.medicalNotes = upper(input.medicalNotes)
 
   return out
-}
-
-/** Champs obligatoires pour la complétion du profil élève (première connexion). */
-export function isStudentProfileComplete(input: Record<string, unknown>): boolean {
-  const required = [
-    "birthPlace",
-    "nationality",
-    "address",
-    "parentName1",
-    "parentPhone1",
-    "emergencyContact",
-    "emergencyPhone",
-  ] as const
-  return required.every((key) => {
-    const value = input[key]
-    return typeof value === "string" && value.trim().length > 0
-  })
 }
 
 /** Numéro affiché dans la classe pour une inscription (ex: "1", "12"). */
