@@ -12,7 +12,12 @@ import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
 import Portal from "@/components/portal"
 import { BLOOD_GROUPS } from "@/lib/blood-groups"
-import { isStudentProfileComplete } from "@/lib/student-fields"
+import {
+	getMissingStudentProfileFields,
+	isStudentProfileComplete,
+	STUDENT_PROFILE_REQUIRED_LABELS,
+	type StudentProfileRequiredField,
+} from "@/lib/student-fields"
 
 type ModalStep =
   | "none"
@@ -375,6 +380,15 @@ export default function LoginPage() {
 	}
 
 	const profileFormComplete = isStudentProfileComplete(profileForm)
+	const missingProfileFields = getMissingStudentProfileFields(profileForm)
+	const missingProfileSet = new Set<StudentProfileRequiredField>(missingProfileFields)
+	const fieldErrorClass = (key: StudentProfileRequiredField) =>
+		missingProfileSet.has(key)
+			? "border-red-400 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500/60"
+			: ""
+	const emergencyPhoneLooksMisplaced =
+		missingProfileSet.has("emergencyPhone") &&
+		/^\+?\d[\d\s./-]{6,}$/.test(profileForm.emergencyContact.trim())
 
 	return (
 		<>
@@ -675,7 +689,8 @@ export default function LoginPage() {
 											value={profileForm.birthPlace}
 											onChange={(e) => setProfileForm({ ...profileForm, birthPlace: profileUpper(e.target.value) })}
 											placeholder="Ex : Kinshasa"
-											className="uppercase"
+											className={`uppercase ${fieldErrorClass("birthPlace")}`}
+											aria-invalid={missingProfileSet.has("birthPlace")}
 										/>
 									</div>
 									<div>
@@ -687,7 +702,8 @@ export default function LoginPage() {
 											value={profileForm.nationality}
 											onChange={(e) => setProfileForm({ ...profileForm, nationality: profileUpper(e.target.value) })}
 											placeholder="Ex : Congolaise"
-											className="uppercase"
+											className={`uppercase ${fieldErrorClass("nationality")}`}
+											aria-invalid={missingProfileSet.has("nationality")}
 										/>
 									</div>
 								</div>
@@ -701,7 +717,8 @@ export default function LoginPage() {
 										value={profileForm.address}
 										onChange={(e) => setProfileForm({ ...profileForm, address: profileUpper(e.target.value) })}
 										placeholder="Ex : Av. de l'Université, Commune de Lingwala"
-										className="uppercase"
+										className={`uppercase ${fieldErrorClass("address")}`}
+										aria-invalid={missingProfileSet.has("address")}
 									/>
 								</div>
 
@@ -711,31 +728,48 @@ export default function LoginPage() {
 										Parent / Tuteur principal <span className="text-red-500">*</span>
 									</p>
 									<div className="space-y-3">
-										<Input
-											lightSurface
-											value={profileForm.parentName1}
-											onChange={(e) => setProfileForm({ ...profileForm, parentName1: profileUpper(e.target.value) })}
-											placeholder="Nom complet du parent/tuteur"
-											className="rounded-xl uppercase"
-										/>
-										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-											<div className="relative">
-												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-												<Input
-													lightSurface
-													value={profileForm.parentPhone1}
-													onChange={(e) => setProfileForm({ ...profileForm, parentPhone1: e.target.value })}
-													placeholder="Téléphone"
-													className="pl-8"
-												/>
-											</div>
+										<div>
+											<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+												Nom complet <span className="text-red-500">*</span>
+											</label>
 											<Input
 												lightSurface
-												type="email"
-												value={profileForm.parentEmail1}
-												onChange={(e) => setProfileForm({ ...profileForm, parentEmail1: e.target.value })}
-												placeholder="Email (optionnel)"
+												value={profileForm.parentName1}
+												onChange={(e) => setProfileForm({ ...profileForm, parentName1: profileUpper(e.target.value) })}
+												placeholder="Nom complet du parent/tuteur"
+												className={`rounded-xl uppercase ${fieldErrorClass("parentName1")}`}
+												aria-invalid={missingProfileSet.has("parentName1")}
 											/>
+										</div>
+										<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+											<div>
+												<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+													Téléphone <span className="text-red-500">*</span>
+												</label>
+												<div className="relative">
+													<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+													<Input
+														lightSurface
+														value={profileForm.parentPhone1}
+														onChange={(e) => setProfileForm({ ...profileForm, parentPhone1: e.target.value })}
+														placeholder="Téléphone"
+														className={`pl-8 ${fieldErrorClass("parentPhone1")}`}
+														aria-invalid={missingProfileSet.has("parentPhone1")}
+													/>
+												</div>
+											</div>
+											<div>
+												<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+													Email <span className="font-normal text-gray-400">(optionnel)</span>
+												</label>
+												<Input
+													lightSurface
+													type="email"
+													value={profileForm.parentEmail1}
+													onChange={(e) => setProfileForm({ ...profileForm, parentEmail1: e.target.value })}
+													placeholder="Email (optionnel)"
+												/>
+											</div>
 										</div>
 									</div>
 								</div>
@@ -781,24 +815,41 @@ export default function LoginPage() {
 										Contact d&apos;urgence <span className="text-red-500">*</span>
 									</p>
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-										<Input
-											lightSurface
-											value={profileForm.emergencyContact}
-											onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: profileUpper(e.target.value) })}
-											placeholder="Nom du contact"
-											className="uppercase"
-										/>
-										<div className="relative">
-											<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+										<div>
+											<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+												Nom du contact <span className="text-red-500">*</span>
+											</label>
 											<Input
 												lightSurface
-												value={profileForm.emergencyPhone}
-												onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
-												placeholder="Numéro d'urgence"
-												className="pl-8"
+												value={profileForm.emergencyContact}
+												onChange={(e) => setProfileForm({ ...profileForm, emergencyContact: profileUpper(e.target.value) })}
+												placeholder="Ex : Maman, Oncle Jean…"
+												className={`uppercase ${fieldErrorClass("emergencyContact")}`}
+												aria-invalid={missingProfileSet.has("emergencyContact")}
 											/>
 										</div>
+										<div>
+											<label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+												Numéro d&apos;urgence <span className="text-red-500">*</span>
+											</label>
+											<div className="relative">
+												<Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+												<Input
+													lightSurface
+													value={profileForm.emergencyPhone}
+													onChange={(e) => setProfileForm({ ...profileForm, emergencyPhone: e.target.value })}
+													placeholder="Ex : 0998 235 198"
+													className={`pl-8 ${fieldErrorClass("emergencyPhone")}`}
+													aria-invalid={missingProfileSet.has("emergencyPhone")}
+												/>
+											</div>
+										</div>
 									</div>
+									{emergencyPhoneLooksMisplaced && (
+										<p className="mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2">
+											Le champ de gauche demande un <strong>nom</strong>. Mettez le numéro téléphone dans « Numéro d&apos;urgence » (à droite).
+										</p>
+									)}
 								</div>
 
 								<div className="rounded-xl border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/5 p-4 space-y-3">
@@ -861,9 +912,16 @@ export default function LoginPage() {
 									)}
 									Enregistrer et continuer
 								</button>
-								<p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-									Complétez tous les champs obligatoires (*) pour accéder à votre espace.
-								</p>
+								{missingProfileFields.length > 0 ? (
+									<p className="mt-2 text-center text-xs text-red-600 dark:text-red-400">
+										Champs encore requis :{" "}
+										{missingProfileFields.map((key) => STUDENT_PROFILE_REQUIRED_LABELS[key]).join(" · ")}
+									</p>
+								) : (
+									<p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+										Tous les champs obligatoires (*) sont remplis.
+									</p>
+								)}
 							</div>
 						</div>
 					</div>
