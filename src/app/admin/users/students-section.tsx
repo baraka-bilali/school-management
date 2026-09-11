@@ -16,6 +16,7 @@ import {
   AcademicYearSelect,
   type AcademicYearOption,
 } from "@/components/academic-year-select"
+import { MenuSelect } from "@/components/ui/menu-select"
 import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
 interface PaginationState {
@@ -1343,16 +1344,16 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
           {/* Version mobile : Filtres en colonne */}
           <div className="md:hidden flex flex-col gap-2.5 w-full">
             <div className="grid grid-cols-2 gap-2">
-              <select
-                className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+              <MenuSelect
+                aria-label="Classe"
                 value={filters.classId || ""}
-                onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
-              >
-                <option value="">Toutes les classes</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, classId: value || undefined }))
+                }
+                placeholder="Toutes les classes"
+                options={classes.map((c) => ({ value: String(c.id), label: c.name }))}
+                triggerClassName={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium`}
+              />
               <AcademicYearSelect
                 years={years}
                 currentYearId={currentYearId}
@@ -1361,7 +1362,7 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                   setFilters((f) => ({ ...f, yearId: value === "all" ? "all" : value }))
                 }
                 allowAll
-                className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+                className={`rounded-xl border ${borderColor} ${bgInput} ${textColor} px-3.5 py-2.5 text-sm font-medium`}
               />
             </div>
             {/* Tri : sélecteur segmenté (plus adapté au mobile qu'une liste déroulante) */}
@@ -1393,16 +1394,16 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
 
           {/* Version desktop : Filtres en ligne */}
           <div className="hidden md:flex items-center gap-2">
-            <select
-              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+            <MenuSelect
+              aria-label="Classe"
               value={filters.classId || ""}
-              onChange={(e) => setFilters((f) => ({ ...f, classId: e.target.value || undefined }))}
-            >
-              <option value="">Toutes les classes</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={(value) =>
+                setFilters((f) => ({ ...f, classId: value || undefined }))
+              }
+              placeholder="Toutes les classes"
+              options={classes.map((c) => ({ value: String(c.id), label: c.name }))}
+              triggerClassName={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm min-w-[12rem]`}
+            />
             <AcademicYearSelect
               years={years}
               currentYearId={currentYearId}
@@ -1411,17 +1412,21 @@ function StudentsSection({ theme, enrollmentOnly = false }: { theme: "light" | "
                 setFilters((f) => ({ ...f, yearId: value === "all" ? "all" : value }))
               }
               allowAll
-              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
+              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm min-w-[11rem]`}
             />
-            <select
-              className={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm`}
-              value={filters.sort}
-              onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}
-            >
-              <option value="name_asc">Nom (A→Z)</option>
-              <option value="name_desc">Nom (Z→A)</option>
-              <option value="class">Classe</option>
-            </select>
+            <MenuSelect
+              aria-label="Tri"
+              value={filters.sort || "name_asc"}
+              onChange={(value) => setFilters((f) => ({ ...f, sort: value }))}
+              placeholder="Tri"
+              allowClear={false}
+              options={[
+                { value: "name_asc", label: "Nom (A→Z)" },
+                { value: "name_desc", label: "Nom (Z→A)" },
+                { value: "class", label: "Classe" },
+              ]}
+              triggerClassName={`rounded-md border ${borderColor} ${bgInput} ${textColor} px-3 py-2 text-sm min-w-[10rem]`}
+            />
           </div>
         </div>
 

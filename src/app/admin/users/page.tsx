@@ -17,6 +17,7 @@ import { ParentsSection } from "./parents-section"
 import { TableLoadingBlock, TableLoadingRow } from "@/components/ui/table-loading"
 
 import { STAFF_ROLES, STAFF_ROLES_CORE, STAFF_ROLE_LABELS, type StaffRole } from "@/lib/staff-roles"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 type TabKey = "students" | "teachers" | "staff" | "parents" | "courses"
 
@@ -1543,11 +1544,18 @@ function CreateStaffModal({
             </div>
             <div>
               <label className={labelCls}>Rôle *</label>
-              <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as StaffRole })}>
-                {availableRoles.map((role) => (
-                  <option key={role} value={role}>{STAFF_ROLE_LABELS[role]}</option>
-                ))}
-              </select>
+              <MenuSelect
+                aria-label="Rôle"
+                value={form.role}
+                onChange={(v) => setForm({ ...form, role: v as StaffRole })}
+                options={availableRoles.map((role) => ({
+                  value: role,
+                  label: STAFF_ROLE_LABELS[role],
+                }))}
+                allowClear={false}
+                placeholder="Choisir un rôle"
+                triggerClassName={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Téléphone</label>

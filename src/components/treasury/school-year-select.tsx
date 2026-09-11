@@ -1,5 +1,6 @@
 "use client"
 
+import { MenuSelect } from "@/components/ui/menu-select"
 import { cn } from "@/lib/utils"
 import type { AnneeScolaire } from "@/lib/school-year-utils"
 import { formatAcademicYearOptionLabel, isAcademicYearCurrent } from "@/lib/school-year-utils"
@@ -20,26 +21,25 @@ export function SelecteurAnneeScolaire({
   theme = "light",
   className,
 }: SelecteurAnneeScolaireProps) {
-  const inputBg = theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"
-  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800"
-
   return (
-    <select
-      value={value ?? ""}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className={cn(
-        "px-3 py-2 rounded-xl border text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-indigo-500/50",
-        inputBg,
-        textColor,
+    <MenuSelect
+      aria-label="Année scolaire"
+      value={value == null ? "" : String(value)}
+      onChange={(v) => {
+        if (!v) return
+        onChange(Number(v))
+      }}
+      options={years.map((y) => ({
+        value: String(y.id),
+        label: formatAcademicYearOptionLabel(y.label, isAcademicYearCurrent(y.id, undefined, y)),
+      }))}
+      placeholder="Choisir une année…"
+      allowClear={false}
+      triggerClassName={cn(
+        "min-w-[180px] text-sm",
+        theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : undefined,
         className
       )}
-      aria-label="Année scolaire"
-    >
-      {years.map((y) => (
-        <option key={y.id} value={y.id}>
-          {formatAcademicYearOptionLabel(y.label, isAcademicYearCurrent(y.id, undefined, y))}
-        </option>
-      ))}
-    </select>
+    />
   )
 }

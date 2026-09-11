@@ -1,5 +1,7 @@
 "use client"
 
+import { MenuSelect } from "@/components/ui/menu-select"
+import { cn } from "@/lib/utils"
 import {
   formatAcademicYearOptionLabel,
   isAcademicYearCurrent,
@@ -23,6 +25,7 @@ interface AcademicYearSelectProps {
   allLabel?: string
   placeholder?: string
   disabled?: boolean
+  label?: string
   "aria-label"?: string
 }
 
@@ -37,26 +40,33 @@ export function AcademicYearSelect({
   allLabel = "Toutes les années",
   placeholder,
   disabled,
+  label,
   "aria-label": ariaLabel = "Année scolaire",
 }: AcademicYearSelectProps) {
+  const options = [
+    ...(allowAll ? [{ value: allValue, label: allLabel }] : []),
+    ...years.map((y) => ({
+      value: String(y.id),
+      label: formatAcademicYearOptionLabel(
+        y.name,
+        isAcademicYearCurrent(y.id, currentYearId, y)
+      ),
+    })),
+  ]
+
+  const stringValue = value === "" || value == null ? "" : String(value)
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={className}
-      disabled={disabled}
+    <MenuSelect
+      label={label}
       aria-label={ariaLabel}
-    >
-      {allowAll && <option value={allValue}>{allLabel}</option>}
-      {placeholder && <option value="">{placeholder}</option>}
-      {years.map((y) => (
-        <option key={y.id} value={y.id}>
-          {formatAcademicYearOptionLabel(
-            y.name,
-            isAcademicYearCurrent(y.id, currentYearId, y)
-          )}
-        </option>
-      ))}
-    </select>
+      value={stringValue}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder || (allowAll ? allLabel : "Choisir une année…")}
+      allowClear={Boolean(placeholder) && !allowAll}
+      disabled={disabled}
+      triggerClassName={cn(className)}
+    />
   )
 }

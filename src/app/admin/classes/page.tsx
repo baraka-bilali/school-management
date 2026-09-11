@@ -9,6 +9,7 @@ import Portal from "@/components/portal"
 import { cn } from "@/lib/utils"
 import { TableLoadingRow } from "@/components/ui/table-loading"
 import { SubjectsSection } from "./subjects-section"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 // Options spécialisées où la lettre est optionnelle (une seule classe par option)
 const STREAM_LETTER_OPTIONAL = new Set([
@@ -19,6 +20,42 @@ const STREAM_LETTER_OPTIONAL = new Set([
   "Sociale", "Arts Plastiques", "Musique", "Coupe et Couture", "Imprimerie",
   "Nutrition", "Santé Publique",
 ])
+
+const STREAM_OPTIONS: { value: string; label: string }[] = [
+  { value: "Pédagogie Générale", label: "Humanités Générales · Pédagogie Générale" },
+  { value: "Latin-Philosophie", label: "Humanités Générales · Latin-Philosophie" },
+  { value: "Math-Physique", label: "Humanités Générales · Math-Physique" },
+  { value: "Chimie-Biologie", label: "Humanités Générales · Chimie-Biologie" },
+  { value: "Commerciale et Gestion", label: "Commercial et Administratif · Commerciale et Gestion" },
+  { value: "Secrétariat", label: "Commercial et Administratif · Secrétariat" },
+  { value: "Électricité", label: "Industriel · Électricité" },
+  { value: "Mécanique Générale", label: "Industriel · Mécanique Générale" },
+  { value: "Mécanique Automobile", label: "Industriel · Mécanique Automobile" },
+  { value: "Électronique", label: "Industriel · Électronique" },
+  { value: "Aviation", label: "Industriel · Aviation" },
+  { value: "Construction", label: "Bâtiment et Travaux Publics · Construction" },
+  { value: "Menuiserie", label: "Bâtiment et Travaux Publics · Menuiserie" },
+  { value: "Dessin de Bâtiment", label: "Bâtiment et Travaux Publics · Dessin de Bâtiment" },
+  { value: "Agriculture Générale", label: "Agricole · Agriculture Générale" },
+  { value: "Vétérinaire", label: "Agricole · Vétérinaire" },
+  { value: "Pêche et Forêt", label: "Agricole · Pêche et Forêt" },
+  { value: "Sociale", label: "Social et Artistique · Sociale" },
+  { value: "Arts Plastiques", label: "Social et Artistique · Arts Plastiques" },
+  { value: "Musique", label: "Social et Artistique · Musique" },
+  { value: "Coupe et Couture", label: "Social et Artistique · Coupe et Couture" },
+  { value: "Imprimerie", label: "Social et Artistique · Imprimerie" },
+  { value: "Nutrition", label: "Santé · Nutrition" },
+  { value: "Santé Publique", label: "Santé · Santé Publique" },
+]
+
+const SECTION_OPTIONS = [
+  { value: "Maternelle", label: "Maternelle" },
+  { value: "Primaire", label: "Primaire" },
+  { value: "Education de Base", label: "Éducation de Base" },
+  { value: "Humanités", label: "Humanités" },
+]
+
+const LETTER_OPTIONS = ["A", "B", "C", "D", "E", "F"].map((l) => ({ value: l, label: l }))
 
 interface Class {
   id: number
@@ -629,98 +666,54 @@ function ClassesPageContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={`block ${textColor} mb-1`}>Section *</label>
-                    <select
-                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
+                    <MenuSelect
+                      aria-label="Section"
                       value={form.section}
-                      onChange={(e) => { setForm({ ...form, section: e.target.value, level: "", stream: "" }); setFormError(null) }}
-                    >
-                      <option value="">Sélectionner</option>
-                      <option value="Maternelle">Maternelle</option>
-                      <option value="Primaire">Primaire</option>
-                      <option value="Education de Base">Éducation de Base</option>
-                      <option value="Humanités">Humanités</option>
-                    </select>
+                      onChange={(v) => { setForm({ ...form, section: v, level: "", stream: "" }); setFormError(null) }}
+                      placeholder="Sélectionner"
+                      triggerClassName={`w-full rounded-md ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"}`}
+                      options={SECTION_OPTIONS}
+                    />
                   </div>
                   <div>
                     <label className={`block ${textColor} mb-1`}>Niveau *</label>
-                    <select
-                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
+                    <MenuSelect
+                      aria-label="Niveau"
                       value={form.level}
-                      onChange={(e) => { setForm({ ...form, level: e.target.value }); setFormError(null) }}
+                      onChange={(v) => { setForm({ ...form, level: v }); setFormError(null) }}
                       disabled={!form.section}
-                    >
-                      <option value="">{form.section ? "Sélectionner" : "Choisir une section d'abord"}</option>
-                      {(LEVELS_BY_SECTION[form.section] ?? []).map((lvl) => (
-                        <option key={lvl} value={lvl}>{lvl}</option>
-                      ))}
-                    </select>
+                      placeholder={form.section ? "Sélectionner" : "Choisir une section d'abord"}
+                      triggerClassName={`w-full rounded-md ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"}`}
+                      options={(LEVELS_BY_SECTION[form.section] ?? []).map((lvl) => ({
+                        value: lvl,
+                        label: lvl,
+                      }))}
+                    />
                   </div>
                   <div>
                     <label className={`block ${textColor} mb-1`}>
                       Lettre{(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? " (optionnelle)" : " *"}
                     </label>
-                    <select
-                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
+                    <MenuSelect
+                      aria-label="Lettre"
                       value={form.letter}
-                      onChange={(e) => { setForm({ ...form, letter: e.target.value }); setFormError(null) }}
-                    >
-                      <option value="">{(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? "Aucune" : "Sélectionner"}</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="C">C</option>
-                      <option value="D">D</option>
-                      <option value="E">E</option>
-                      <option value="F">F</option>
-                    </select>
+                      onChange={(v) => { setForm({ ...form, letter: v }); setFormError(null) }}
+                      placeholder={(form.section === "Maternelle" || (form.section === "Humanités" && STREAM_LETTER_OPTIONAL.has(form.stream))) ? "Aucune" : "Sélectionner"}
+                      triggerClassName={`w-full rounded-md ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"}`}
+                      options={LETTER_OPTIONS}
+                    />
                   </div>
                   <div>
                     <label className={`block ${textColor} mb-1`}>Filière / Option</label>
-                    <select
-                      className={`w-full rounded-md border ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"} px-3 py-2`}
+                    <MenuSelect
+                      aria-label="Filière / Option"
                       value={form.stream}
-                      onChange={(e) => { setForm({ ...form, stream: e.target.value }); setFormError(null) }}
+                      onChange={(v) => { setForm({ ...form, stream: v }); setFormError(null) }}
                       disabled={form.section !== "Humanités"}
-                    >
-                      <option value="">— Aucune —</option>
-                      <optgroup label="Humanités Générales">
-                        <option value="Pédagogie Générale">Pédagogie Générale</option>
-                        <option value="Latin-Philosophie">Latin-Philosophie</option>
-                        <option value="Math-Physique">Math-Physique</option>
-                        <option value="Chimie-Biologie">Chimie-Biologie</option>
-                      </optgroup>
-                      <optgroup label="Commercial et Administratif">
-                        <option value="Commerciale et Gestion">Commerciale et Gestion</option>
-                        <option value="Secrétariat">Secrétariat</option>
-                      </optgroup>
-                      <optgroup label="Industriel">
-                        <option value="Électricité">Électricité</option>
-                        <option value="Mécanique Générale">Mécanique Générale</option>
-                        <option value="Mécanique Automobile">Mécanique Automobile</option>
-                        <option value="Électronique">Électronique</option>
-                        <option value="Aviation">Aviation</option>
-                      </optgroup>
-                      <optgroup label="Bâtiment et Travaux Publics">
-                        <option value="Construction">Construction</option>
-                        <option value="Menuiserie">Menuiserie</option>
-                        <option value="Dessin de Bâtiment">Dessin de Bâtiment</option>
-                      </optgroup>
-                      <optgroup label="Agricole">
-                        <option value="Agriculture Générale">Agriculture Générale</option>
-                        <option value="Vétérinaire">Vétérinaire</option>
-                        <option value="Pêche et Forêt">Pêche et Forêt</option>
-                      </optgroup>
-                      <optgroup label="Social et Artistique">
-                        <option value="Sociale">Sociale</option>
-                        <option value="Arts Plastiques">Arts Plastiques</option>
-                        <option value="Musique">Musique</option>
-                        <option value="Coupe et Couture">Coupe et Couture</option>
-                        <option value="Imprimerie">Imprimerie</option>
-                      </optgroup>
-                      <optgroup label="Santé">
-                        <option value="Nutrition">Nutrition</option>
-                        <option value="Santé Publique">Santé Publique</option>
-                      </optgroup>
-                    </select>
+                      placeholder="— Aucune —"
+                      triggerClassName={`w-full rounded-md ${theme === "dark" ? "border-gray-600 bg-gray-700 text-gray-100" : "border-gray-300 bg-white text-gray-900"}`}
+                      options={STREAM_OPTIONS}
+                    />
                   </div>
                 </div>
                 
