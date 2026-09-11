@@ -23,6 +23,7 @@ import {
   Save,
   Sparkles,
 } from "lucide-react"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 type TabKey = "decisions" | "propositions"
 
@@ -709,27 +710,22 @@ export default function PromotionsPage() {
           <label className={`text-xs font-medium ${textSecondary}`} htmlFor="decision-class">
             Classe
           </label>
-          <select
-            id="decision-class"
-            required
-            value={selectedDecisionClassId}
-            onChange={(ev) => setSelectedDecisionClassId(ev.target.value)}
-            className={selectCls}
+          <MenuSelect
             aria-label="Classe (décisions)"
-          >
-            <option value="" disabled>
-              Sélectionnez une classe
-            </option>
-            {decisionClassGroups.map((g) => {
+            value={selectedDecisionClassId}
+            onChange={setSelectedDecisionClassId}
+            placeholder="Sélectionnez une classe"
+            allowClear={false}
+            className="min-w-[200px]"
+            triggerClassName={selectCls}
+            options={decisionClassGroups.map((g) => {
               const { decided, total, done } = classProgress(g.rows, drafts)
-              return (
-                <option key={g.classId} value={g.classId}>
-                  {g.classInfo.name} — {decided}/{total}
-                  {done ? " ✓ Terminée" : ""}
-                </option>
-              )
+              return {
+                value: String(g.classId),
+                label: `${g.classInfo.name} — ${decided}/${total}${done ? " ✓ Terminée" : ""}`,
+              }
             })}
-          </select>
+          />
           {selectedDecisionGroup &&
             (() => {
               const { decided, total, done } = classProgress(
@@ -811,23 +807,19 @@ export default function PromotionsPage() {
           >
             Classe cible
           </label>
-          <select
-            id="proposition-class"
-            required
-            value={selectedPropositionClassId}
-            onChange={(ev) => setSelectedPropositionClassId(ev.target.value)}
-            className={selectCls}
+          <MenuSelect
             aria-label="Classe cible (propositions)"
-          >
-            <option value="" disabled>
-              Sélectionnez une classe
-            </option>
-            {propositionClassGroups.map((g) => (
-              <option key={g.classId} value={g.classId}>
-                {g.classInfo.name} — {g.rows.length}
-              </option>
-            ))}
-          </select>
+            value={selectedPropositionClassId}
+            onChange={setSelectedPropositionClassId}
+            placeholder="Sélectionnez une classe"
+            allowClear={false}
+            className="min-w-[200px]"
+            triggerClassName={selectCls}
+            options={propositionClassGroups.map((g) => ({
+              value: String(g.classId),
+              label: `${g.classInfo.name} — ${g.rows.length}`,
+            }))}
+          />
         </div>
         <div className="flex flex-wrap gap-1.5" role="list" aria-label="Classes avec propositions">
           {propositionClassGroups.map((g) => {
@@ -1037,25 +1029,24 @@ export default function PromotionsPage() {
                                 )}
                               </td>
                               <td className="px-3 py-2.5">
-                                <select
+                                <MenuSelect
+                                  aria-label={`Décision pour ${studentFullName(e.student)}`}
                                   value={draft.decisionPassage}
-                                  onChange={(ev) =>
+                                  onChange={(v) =>
                                     updateDraft(e.id, {
-                                      decisionPassage: ev.target
-                                        .value as DecisionValue,
+                                      decisionPassage: v as DecisionValue,
                                     })
                                   }
-                                  className={cn(
+                                  placeholder="—"
+                                  options={DECISION_OPTIONS.filter((o) => o.value !== "").map((o) => ({
+                                    value: o.value,
+                                    label: o.label,
+                                  }))}
+                                  triggerClassName={cn(
                                     selectCls,
                                     isRenvoi && "border-red-500 text-red-600"
                                   )}
-                                >
-                                  {DECISION_OPTIONS.map((o) => (
-                                    <option key={o.value || "empty"} value={o.value}>
-                                      {o.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                />
                               </td>
                               <td className="px-3 py-2.5 min-w-[180px]">
                                 <input
@@ -1215,23 +1206,23 @@ export default function PromotionsPage() {
                             <span className={`min-w-[160px] font-medium ${textColor}`}>
                               {studentFullName(e.student)}
                             </span>
-                            <select
+                            <MenuSelect
+                              aria-label={`Classe cible pour ${studentFullName(e.student)}`}
                               value={overrides[e.id] || ""}
-                              onChange={(ev) =>
+                              onChange={(v) =>
                                 setOverrides((prev) => ({
                                   ...prev,
-                                  [e.id]: ev.target.value,
+                                  [e.id]: v,
                                 }))
                               }
-                              className={selectCls}
-                            >
-                              <option value="">Choisir une classe…</option>
-                              {options.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="Choisir une classe…"
+                              className="min-w-[180px]"
+                              triggerClassName={selectCls}
+                              options={options.map((c) => ({
+                                value: String(c.id),
+                                label: c.name,
+                              }))}
+                            />
                             {options.length === 0 && (
                               <span className="text-xs text-amber-500">
                                 Aucune classe supérieure disponible
@@ -1357,23 +1348,23 @@ export default function PromotionsPage() {
                                 : e.origine || "—"}
                           </td>
                           <td className="px-3 py-2.5">
-                            <select
+                            <MenuSelect
+                              aria-label={`Classe de ${studentFullName(e.student)}`}
                               value={String(e.classId)}
                               disabled={changingClassId === e.id}
-                              onChange={(ev) => {
-                                const next = Number(ev.target.value)
+                              onChange={(v) => {
+                                const next = Number(v)
                                 if (!next || next === e.classId) return
                                 void handleChangeClass(e.id, next)
                               }}
-                              className={`${selectCls} max-w-[220px]`}
-                              aria-label={`Classe de ${studentFullName(e.student)}`}
-                            >
-                              {classOptions.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
+                              allowClear={false}
+                              className="max-w-[220px]"
+                              triggerClassName={selectCls}
+                              options={classOptions.map((c) => ({
+                                value: String(c.id),
+                                label: c.name,
+                              }))}
+                            />
                             {changingClassId === e.id && (
                               <Loader2 className="ml-2 inline h-3.5 w-3.5 animate-spin text-teal-500" />
                             )}

@@ -34,6 +34,7 @@ import {
   FileText,
   CreditCard,
 } from "lucide-react"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 // ============================================================
 // TYPES
@@ -718,53 +719,54 @@ function AdminTreasuryPageContent() {
                 {treasuryMainTab === "outflows" && (
                 <div className="flex flex-wrap gap-3 items-center pt-1 border-t border-dashed border-gray-200 dark:border-gray-700">
                   {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-                    <select
+                    <MenuSelect
+                      aria-label="Filtrer par personnel"
                       value={trFilterPayee}
-                      onChange={(e) => setTrFilterPayee(e.target.value)}
-                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[180px]`}
-                    >
-                      <option value="">Tout le personnel</option>
-                      {teacherPayees.length > 0 && (
-                        <optgroup label="Professeurs">
-                          {teacherPayees.map((t) => (
-                            <option key={t.key} value={t.key}>{t.name}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {staffPayees.length > 0 && (
-                        <optgroup label="Personnel administratif">
-                          {staffPayees.map((t) => (
-                            <option key={t.key} value={t.key}>{t.name} ({t.roleLabel})</option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
+                      onChange={setTrFilterPayee}
+                      placeholder="Tout le personnel"
+                      className="min-w-[180px]"
+                      triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                      options={[
+                        ...teacherPayees.map((t) => ({
+                          value: t.key,
+                          label: `Professeurs · ${t.name}`,
+                        })),
+                        ...staffPayees.map((t) => ({
+                          value: t.key,
+                          label: `Personnel · ${t.name} (${t.roleLabel})`,
+                        })),
+                      ]}
+                    />
                   )}
 
                   {(treasurySubTab === "overview" || treasurySubTab === "salaires") && (
-                    <select
+                    <MenuSelect
+                      aria-label="Filtrer par type"
                       value={trFilterType}
-                      onChange={(e) => setTrFilterType(e.target.value)}
-                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[130px]`}
-                    >
-                      <option value="">Tous les types</option>
-                      {PAYMENT_TYPES.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
+                      onChange={setTrFilterType}
+                      placeholder="Tous les types"
+                      className="min-w-[130px]"
+                      triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                      options={PAYMENT_TYPES.map((t) => ({
+                        value: t.value,
+                        label: t.label,
+                      }))}
+                    />
                   )}
 
                   {(treasurySubTab === "overview" || treasurySubTab === "depenses") && (
-                    <select
+                    <MenuSelect
+                      aria-label="Filtrer par catégorie"
                       value={trFilterCategorie}
-                      onChange={(e) => setTrFilterCategorie(e.target.value)}
-                      className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[140px]`}
-                    >
-                      <option value="">Toutes catégories</option>
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
-                      ))}
-                    </select>
+                      onChange={setTrFilterCategorie}
+                      placeholder="Toutes catégories"
+                      className="min-w-[140px]"
+                      triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                      options={EXPENSE_CATEGORIES.map((c) => ({
+                        value: c.value,
+                        label: c.label,
+                      }))}
+                    />
                   )}
 
                   {(periodShortcut !== "this_month" || trFilterMonth || trFilterPayee || trFilterType || trFilterCategorie) && (
@@ -888,27 +890,23 @@ function AdminTreasuryPageContent() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Personnel *</label>
-                      <select value={tpPayeeKey} onChange={(e) => setTpPayeeKey(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
-                        <option value="">Sélectionner...</option>
-                        {teacherPayees.length > 0 && (
-                          <optgroup label="Professeurs">
-                            {teacherPayees.map((t) => (
-                              <option key={t.key} value={t.key}>
-                                {t.name}{t.specialty ? ` (${t.specialty})` : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {staffPayees.length > 0 && (
-                          <optgroup label="Personnel administratif">
-                            {staffPayees.map((t) => (
-                              <option key={t.key} value={t.key}>
-                                {t.name} ({t.roleLabel})
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
+                      <MenuSelect
+                        aria-label="Personnel"
+                        value={tpPayeeKey}
+                        onChange={setTpPayeeKey}
+                        placeholder="Sélectionner..."
+                        triggerClassName={`w-full ${inputBg} ${textColor} text-sm rounded-xl`}
+                        options={[
+                          ...teacherPayees.map((t) => ({
+                            value: t.key,
+                            label: `Professeurs · ${t.name}${t.specialty ? ` (${t.specialty})` : ""}`,
+                          })),
+                          ...staffPayees.map((t) => ({
+                            value: t.key,
+                            label: `Personnel · ${t.name} (${t.roleLabel})`,
+                          })),
+                        ]}
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Montant ($) *</label>
@@ -916,9 +914,17 @@ function AdminTreasuryPageContent() {
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Type *</label>
-                      <select value={tpType} onChange={(e) => setTpType(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
-                        {PAYMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
+                      <MenuSelect
+                        aria-label="Type de paiement"
+                        value={tpType}
+                        onChange={setTpType}
+                        allowClear={false}
+                        triggerClassName={`w-full ${inputBg} ${textColor} text-sm rounded-xl`}
+                        options={PAYMENT_TYPES.map((t) => ({
+                          value: t.value,
+                          label: t.label,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Mois *</label>
@@ -926,9 +932,17 @@ function AdminTreasuryPageContent() {
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Mode de paiement</label>
-                      <select value={tpModePaiement} onChange={(e) => setTpModePaiement(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
-                        {MODES_PAIEMENT.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                      </select>
+                      <MenuSelect
+                        aria-label="Mode de paiement"
+                        value={tpModePaiement}
+                        onChange={setTpModePaiement}
+                        allowClear={false}
+                        triggerClassName={`w-full ${inputBg} ${textColor} text-sm rounded-xl`}
+                        options={MODES_PAIEMENT.map((m) => ({
+                          value: m.value,
+                          label: m.label,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Référence</label>
@@ -957,9 +971,17 @@ function AdminTreasuryPageContent() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Catégorie</label>
-                      <select value={expCategorie} onChange={(e) => setExpCategorie(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
-                        {EXPENSE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                      </select>
+                      <MenuSelect
+                        aria-label="Catégorie de dépense"
+                        value={expCategorie}
+                        onChange={setExpCategorie}
+                        allowClear={false}
+                        triggerClassName={`w-full ${inputBg} ${textColor} text-sm rounded-xl`}
+                        options={EXPENSE_CATEGORIES.map((c) => ({
+                          value: c.value,
+                          label: c.label,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Montant *</label>
@@ -977,9 +999,17 @@ function AdminTreasuryPageContent() {
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Mode de paiement</label>
-                      <select value={expModePaiement} onChange={(e) => setExpModePaiement(e.target.value)} className={`w-full px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}>
-                        {MODES_PAIEMENT.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                      </select>
+                      <MenuSelect
+                        aria-label="Mode de paiement dépense"
+                        value={expModePaiement}
+                        onChange={setExpModePaiement}
+                        allowClear={false}
+                        triggerClassName={`w-full ${inputBg} ${textColor} text-sm rounded-xl`}
+                        options={MODES_PAIEMENT.map((m) => ({
+                          value: m.value,
+                          label: m.label,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium ${textSecondary} mb-1`}>Référence</label>

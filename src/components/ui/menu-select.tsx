@@ -11,18 +11,24 @@ export type MenuSelectOption = {
 }
 
 type MenuSelectProps = {
-  label: string
+  /** Visible field label. Omit or pass empty string for compact filter rows. */
+  label?: string
   value: string
   options: MenuSelectOption[]
   onChange: (value: string) => void
   placeholder?: string
+  /** Show a clear/placeholder row at the top (default: true when placeholder is set). */
+  allowClear?: boolean
   className?: string
+  /** Extra classes on the trigger button (filters, dark theme, etc.). */
+  triggerClassName?: string
   disabled?: boolean
+  "aria-label"?: string
 }
 
 /**
- * Custom listbox used for admin Notes & Bulletins (degré / matière).
- * Expands below the field with radio-style selection — same pattern on mobile and desktop.
+ * Custom listbox with radio-style “pastille” selection.
+ * Used across admin filters and forms instead of native &lt;select&gt;.
  */
 export function MenuSelect({
   label,
@@ -30,12 +36,16 @@ export function MenuSelect({
   options,
   onChange,
   placeholder = "Choisir…",
+  allowClear,
   className,
+  triggerClassName,
   disabled = false,
+  "aria-label": ariaLabel,
 }: MenuSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const listId = useId()
+  const showClear = allowClear ?? Boolean(placeholder)
 
   const selected = options.find((o) => o.value === value) || null
 
@@ -57,11 +67,12 @@ export function MenuSelect({
 
   return (
     <div className={cn("block text-sm", className)} ref={rootRef}>
-      <span className="text-gray-600 dark:text-gray-400">{label}</span>
-      <div className="relative mt-1">
+      {label ? <span className="text-gray-600 dark:text-gray-400">{label}</span> : null}
+      <div className={cn("relative", label ? "mt-1" : undefined)}>
         <button
           type="button"
           disabled={disabled}
+          aria-label={ariaLabel || label || placeholder}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={listId}
@@ -70,7 +81,8 @@ export function MenuSelect({
             "flex w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left transition-colors",
             "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
-            disabled && "cursor-not-allowed opacity-60"
+            disabled && "cursor-not-allowed opacity-60",
+            triggerClassName
           )}
         >
           <span
@@ -93,31 +105,25 @@ export function MenuSelect({
           <ul
             id={listId}
             role="listbox"
-            className="absolute left-0 right-0 top-full z-40 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-700 dark:bg-slate-900"
+            className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-700 dark:bg-slate-900"
           >
-            <li>
-              <button
-                type="button"
-                role="option"
-                aria-selected={!value}
-                className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-[15px] text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-slate-800"
-                onClick={() => {
-                  onChange("")
-                  setOpen(false)
-                }}
-              >
-                <span className="min-w-0 flex-1">{placeholder}</span>
-                <span
-                  className={cn(
-                    "h-5 w-5 shrink-0 rounded-full border-2",
-                    !value
-                      ? "border-indigo-500 bg-indigo-500 shadow-[inset_0_0_0_3px_white] dark:shadow-[inset_0_0_0_3px_rgb(15,23,42)]"
-                      : "border-gray-300 dark:border-gray-500"
-                  )}
-                  aria-hidden
-                />
-              </button>
-            </li>
+            {showClear && (
+              <li>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!value}
+                  className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-[15px] text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    onChange("")
+                    setOpen(false)
+                  }}
+                >
+                  <span className="min-w-0 flex-1">{placeholder}</span>
+                  <RadioDot active={!value} />
+                </button>
+              </li>
+            )}
             {options.map((opt) => {
               const active = opt.value === value
               return (
@@ -141,15 +147,7 @@ export function MenuSelect({
                     }}
                   >
                     <span className="min-w-0 flex-1 leading-snug">{opt.label}</span>
-                    <span
-                      className={cn(
-                        "h-5 w-5 shrink-0 rounded-full border-2",
-                        active
-                          ? "border-indigo-500 bg-indigo-500 shadow-[inset_0_0_0_3px_white] dark:shadow-[inset_0_0_0_3px_rgb(15,23,42)]"
-                          : "border-gray-300 dark:border-gray-500"
-                      )}
-                      aria-hidden
-                    />
+                    <RadioDot active={active} />
                   </button>
                 </li>
               )
@@ -158,5 +156,19 @@ export function MenuSelect({
         )}
       </div>
     </div>
+  )
+}
+
+function RadioDot({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cn(
+        "h-5 w-5 shrink-0 rounded-full border-2",
+        active
+          ? "border-indigo-500 bg-indigo-500 shadow-[inset_0_0_0_3px_white] dark:shadow-[inset_0_0_0_3px_rgb(15,23,42)]"
+          : "border-gray-300 dark:border-gray-500"
+      )}
+      aria-hidden
+    />
   )
 }

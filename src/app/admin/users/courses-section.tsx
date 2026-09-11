@@ -9,6 +9,7 @@ import { Plus, Trash2, Users, X, Loader2, Pencil, AlertTriangle, Check } from "l
 import { toast } from "sonner"
 import { authFetch } from "@/lib/auth-fetch"
 import { TableLoadingBlock } from "@/components/ui/table-loading"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 interface Subject {
   id: number
@@ -599,37 +600,33 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                 <label className={cn("mb-1.5 block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
                   Professeur *
                 </label>
-                <select
-                  className={inputClass}
+                <MenuSelect
+                  aria-label="Professeur"
                   value={assignForm.teacherId}
-                  onChange={(e) => setAssignForm({ ...assignForm, teacherId: e.target.value })}
-                  required
-                >
-                  <option value="">Sélectionner un professeur</option>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.lastName} {t.middleName} {t.firstName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setAssignForm({ ...assignForm, teacherId: v })}
+                  placeholder="Sélectionner un professeur"
+                  options={teachers.map((t) => ({
+                    value: String(t.id),
+                    label: [t.lastName, t.middleName, t.firstName].filter(Boolean).join(" "),
+                  }))}
+                  triggerClassName={inputClass}
+                />
               </div>
               <div>
                 <label className={cn("mb-1.5 block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
                   Matière *
                 </label>
-                <select
-                  className={inputClass}
+                <MenuSelect
+                  aria-label="Matière"
                   value={assignForm.subjectId}
-                  onChange={(e) => setAssignForm({ ...assignForm, subjectId: e.target.value })}
-                  required
-                >
-                  <option value="">Sélectionner une matière</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setAssignForm({ ...assignForm, subjectId: v })}
+                  placeholder="Sélectionner une matière"
+                  options={subjects.map((s) => ({
+                    value: String(s.id),
+                    label: `${s.name} (${s.code})`,
+                  }))}
+                  triggerClassName={inputClass}
+                />
               </div>
             </div>
 

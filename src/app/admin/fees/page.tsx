@@ -46,6 +46,7 @@ import { formatAcademicYearOptionLabel, parseSchoolYearLabel } from "@/lib/schoo
 import { formatRelativeDateLabel, formatDateSidebar, formatTimeLabel } from "@/lib/date-labels"
 import { FeesStatsSkeleton, FeesTabSkeleton } from "@/components/fees/fees-tab-skeletons"
 import type { ReceiptData } from "@/components/receipt-pdf"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 const ReceiptDownloadButton = dynamic(
   () => import("@/components/receipt-download-button"),
@@ -1765,49 +1766,54 @@ function AdminFeesPageContent() {
                         </div>
 
                         {/* Filtre classe */}
-                        <select
+                        <MenuSelect
+                          aria-label="Filtrer par classe"
                           value={sfClassFilter}
-                          onChange={(e) => setSfClassFilter(e.target.value)}
-                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[180px] max-w-[280px]`}
-                        >
-                          <option value="">Toutes les classes</option>
-                          {SECTION_ORDER.map((section) => {
+                          onChange={setSfClassFilter}
+                          placeholder="Toutes les classes"
+                          className="min-w-[180px] max-w-[280px]"
+                          triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                          options={SECTION_ORDER.flatMap((section) => {
                             const sectionClasses = sortedClasses.filter((c) => c.section === section)
-                            if (sectionClasses.length === 0) return null
-                            return (
-                              <optgroup key={section} label={SECTION_LABELS[section] ?? section}>
-                                {sectionClasses.map((c) => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </optgroup>
-                            )
+                            const sectionLabel = SECTION_LABELS[section] ?? section
+                            return sectionClasses.map((c) => ({
+                              value: String(c.id),
+                              label: `${sectionLabel} · ${c.name}`,
+                            }))
                           })}
-                        </select>
+                        />
 
                         {/* Filtre type de frais */}
-                        <select
+                        <MenuSelect
+                          aria-label="Filtrer par type de frais"
                           value={sfTypeFilter}
-                          onChange={(e) => setSfTypeFilter(e.target.value)}
-                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[200px]`}
-                        >
-                          <option value="">Frais scolaire (défaut)</option>
-                          <option value="all">Tous les types combinés</option>
-                          {typesFrais.filter((t) => t.isActive && !t.isDefault).map((t) => (
-                            <option key={t.id} value={t.id}>{t.nom}</option>
-                          ))}
-                        </select>
+                          onChange={setSfTypeFilter}
+                          allowClear={false}
+                          className="min-w-[200px]"
+                          triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                          options={[
+                            { value: "", label: "Frais scolaire (défaut)" },
+                            { value: "all", label: "Tous les types combinés" },
+                            ...typesFrais
+                              .filter((t) => t.isActive && !t.isDefault)
+                              .map((t) => ({ value: String(t.id), label: t.nom })),
+                          ]}
+                        />
 
                         {/* Filtre statut */}
-                        <select
+                        <MenuSelect
+                          aria-label="Filtrer par statut"
                           value={sfStatusFilter}
-                          onChange={(e) => setSfStatusFilter(e.target.value as typeof sfStatusFilter)}
-                          className={`px-3 py-2 rounded-xl border ${inputBg} ${textColor} text-sm min-w-[130px]`}
-                        >
-                          <option value="">Tous les statuts</option>
-                          <option value="solde">Soldé</option>
-                          <option value="partiel">Partiel</option>
-                          <option value="impaye">Impayé</option>
-                        </select>
+                          onChange={(v) => setSfStatusFilter(v as typeof sfStatusFilter)}
+                          placeholder="Tous les statuts"
+                          className="min-w-[130px]"
+                          triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                          options={[
+                            { value: "solde", label: "Soldé" },
+                            { value: "partiel", label: "Partiel" },
+                            { value: "impaye", label: "Impayé" },
+                          ]}
+                        />
 
                         {/* Filtre montant + devise */}
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1832,14 +1838,17 @@ function AdminFeesPageContent() {
                               </button>
                             ))}
                           </div>
-                          <select
+                          <MenuSelect
+                            aria-label="Mode de filtre montant"
                             value={sfAmountMode}
-                            onChange={(e) => setSfAmountMode(e.target.value as "gte" | "lt")}
-                            className={`px-2 py-2 rounded-xl border ${inputBg} ${textColor} text-sm`}
-                          >
-                            <option value="gte">Payé ≥</option>
-                            <option value="lt">Payé &lt;</option>
-                          </select>
+                            onChange={(v) => setSfAmountMode(v as "gte" | "lt")}
+                            allowClear={false}
+                            triggerClassName={`${inputBg} ${textColor} text-sm rounded-xl`}
+                            options={[
+                              { value: "gte", label: "Payé ≥" },
+                              { value: "lt", label: "Payé <" },
+                            ]}
+                          />
                           <input
                             type="number"
                             placeholder={sfCurrencyFilter === "USD" ? "Montant $" : sfCurrencyFilter === "CDF" ? "Montant FC" : "Montant"}
@@ -3085,21 +3094,24 @@ function TarificationsTab({
           ) : (
             <span className={`text-sm ${textSecondary}`}>Aucune année active — configurez-la dans Paramètres</span>
           )}
-          <select
-            value={selectedTypeId}
-            onChange={(e) => setSelectedTypeId(parseInt(e.target.value))}
-            className={`px-3 py-2 rounded-xl border text-sm font-medium min-w-[200px] ${
+          <MenuSelect
+            aria-label="Type de frais"
+            value={selectedTypeId === "" ? "" : String(selectedTypeId)}
+            onChange={(v) => setSelectedTypeId(v ? parseInt(v, 10) : "")}
+            allowClear={false}
+            className="min-w-[200px]"
+            triggerClassName={`text-sm font-medium rounded-xl ${
               theme === "dark"
                 ? "bg-gray-700 border-gray-600 text-gray-100"
                 : "bg-white border-gray-300 text-gray-800"
-            } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
-          >
-            {typesFrais.filter((t) => t.isActive).map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nom}{t.isDefault ? " (défaut)" : ""}
-              </option>
-            ))}
-          </select>
+            }`}
+            options={typesFrais
+              .filter((t) => t.isActive)
+              .map((t) => ({
+                value: String(t.id),
+                label: `${t.nom}${t.isDefault ? " (défaut)" : ""}`,
+              }))}
+          />
         </div>
 
         <button
@@ -3503,16 +3515,17 @@ function CreateTarificationModal({
             {/* Type de frais */}
             <div>
               <label className={`block text-sm font-semibold ${textColor} mb-2`}>Type de frais</label>
-              <select
-                value={typeFraisId}
-                onChange={(e) => handleTypeFraisChange(e.target.value ? parseInt(e.target.value) : "")}
-                className={selectClasses}
-              >
-                <option value="">Sélectionner un type</option>
-                {activeTypes.map((t) => (
-                  <option key={t.id} value={t.id}>{t.nom}</option>
-                ))}
-              </select>
+              <MenuSelect
+                aria-label="Type de frais"
+                value={typeFraisId === "" ? "" : String(typeFraisId)}
+                onChange={(v) => handleTypeFraisChange(v ? parseInt(v, 10) : "")}
+                placeholder="Sélectionner un type"
+                triggerClassName={selectClasses}
+                options={activeTypes.map((t) => ({
+                  value: String(t.id),
+                  label: t.nom,
+                }))}
+              />
             </div>
 
             {/* Année scolaire (depuis Paramètres) */}
