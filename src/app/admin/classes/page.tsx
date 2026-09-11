@@ -398,7 +398,108 @@ function ClassesPageContent() {
             <CardTitle>Liste des classes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile: cartes compactes — nom + filière, pas de colonnes redondantes */}
+            <div className="md:hidden space-y-4">
+              {loading ? (
+                <p className={`py-8 text-center text-[15px] ${textSecondary}`}>Chargement...</p>
+              ) : classes.length === 0 ? (
+                <p className={`py-8 text-center text-[15px] ${textSecondary}`}>Aucune classe trouvée.</p>
+              ) : (
+                SECTION_ORDER.map((section) => {
+                  const sectionClasses = classes
+                    .filter((cls) => cls.section === section)
+                    .sort((a, b) => {
+                      const levels = LEVELS_BY_SECTION[section] ?? []
+                      const ai = levels.indexOf(a.level)
+                      const bi = levels.indexOf(b.level)
+                      const aIdx = ai === -1 ? 999 : ai
+                      const bIdx = bi === -1 ? 999 : bi
+                      if (aIdx !== bIdx) return aIdx - bIdx
+                      return a.letter.localeCompare(b.letter)
+                    })
+                  if (sectionClasses.length === 0) return null
+                  const style = sectionStyles[section] ?? {
+                    bg: theme === "dark" ? "bg-gray-700" : "bg-gray-100",
+                    text: textColor,
+                  }
+                  return (
+                    <div key={`m-${section}`} className="space-y-2">
+                      <div className={cn("rounded-xl px-3.5 py-2.5", style.bg)}>
+                        <p className={cn("text-[13px] font-semibold", style.text)}>
+                          {SECTION_LABELS[section]}
+                          <span className="ml-1.5 font-normal opacity-80">
+                            · {sectionClasses.length} classe{sectionClasses.length > 1 ? "s" : ""}
+                          </span>
+                        </p>
+                      </div>
+                      {sectionClasses.map((cls) => {
+                        const meta = [cls.letter ? `Div. ${cls.letter}` : null, cls.stream || null]
+                          .filter(Boolean)
+                          .join(" · ")
+                        return (
+                          <div
+                            key={`m-cls-${cls.id}`}
+                            className={cn(
+                              "flex items-center gap-3 rounded-2xl border px-3.5 py-3.5",
+                              theme === "dark" ? "border-gray-700 bg-gray-800/60" : "border-gray-200 bg-white"
+                            )}
+                          >
+                            <Link href={`/admin/classes/${cls.id}`} className="min-w-0 flex-1">
+                              <p className="text-[15px] font-semibold leading-snug text-indigo-500">
+                                {cls.name}
+                              </p>
+                              {meta ? (
+                                <p className={cn("mt-1 text-xs truncate", textSecondary)}>{meta}</p>
+                              ) : null}
+                            </Link>
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <Link
+                                href={`/admin/classes/${cls.id}`}
+                                className={cn(
+                                  "rounded-full p-2.5 transition-colors",
+                                  textSecondary,
+                                  theme === "dark" ? "hover:bg-teal-900/30 hover:text-teal-400" : "hover:bg-teal-50 hover:text-teal-600"
+                                )}
+                                aria-label="Voir les élèves"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(cls)}
+                                className={cn(
+                                  "rounded-full p-2.5 transition-colors",
+                                  textSecondary,
+                                  theme === "dark" ? "hover:bg-indigo-900/30 hover:text-indigo-400" : "hover:bg-indigo-50 hover:text-indigo-600"
+                                )}
+                                aria-label="Modifier"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(cls)}
+                                className={cn(
+                                  "rounded-full p-2.5 transition-colors",
+                                  textSecondary,
+                                  theme === "dark" ? "hover:bg-red-900/30 hover:text-red-400" : "hover:bg-red-50 hover:text-red-600"
+                                )}
+                                aria-label="Supprimer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Desktop: tableau complet */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className={theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-600"}>
                   <tr>

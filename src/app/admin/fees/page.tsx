@@ -1366,59 +1366,116 @@ function AdminFeesPageContent() {
                       )}
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className={headerBg}>
-                          <tr>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Nom</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Tarifications</th>
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
-                            {!isCashier && (
-                            <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                          {typesFrais.map((t) => (
-                            <tr key={t.id} className={hoverRow}>
-                              <td className={`px-4 py-3 ${textColor} font-medium`}>
-                                {t.nom}
-                                {t.isDefault && (
-                                  <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
-                                    Par défaut
-                                  </span>
-                                )}
-                              </td>
-                              <td className={`px-4 py-3 ${textSecondary} text-sm`}>{t.description || "—"}</td>
-                              <td className={`px-4 py-3 ${textColor}`}>{t._count.tarifications}</td>
-                              <td className="px-4 py-3">
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    <>
+                      {/* Mobile: nom + statut + nb tarifs */}
+                      <div className="md:hidden space-y-2.5">
+                        {typesFrais.map((t) => (
+                          <div
+                            key={`m-type-${t.id}`}
+                            className={`rounded-2xl border ${borderColor} ${theme === "dark" ? "bg-gray-800/50" : "bg-white"} p-4`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-[15px] font-semibold leading-snug ${textColor}`}>
+                                  {t.nom}
+                                  {t.isDefault && (
+                                    <span className="ml-2 align-middle rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                      Par défaut
+                                    </span>
+                                  )}
+                                </p>
+                                <p className={`mt-1 text-xs ${textSecondary}`}>
+                                  {t._count.tarifications} tarification{t._count.tarifications > 1 ? "s" : ""}
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                                   t.isActive
                                     ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
                                     : "bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
-                                }`}>
-                                  {t.isActive ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                                  {t.isActive ? "Actif" : "Inactif"}
-                                </span>
-                              </td>
+                                }`}
+                              >
+                                {t.isActive ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                                {t.isActive ? "Actif" : "Inactif"}
+                              </span>
+                            </div>
+                            {!isCashier && (
+                              <div className="mt-3 flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  className={`rounded-lg p-2.5 ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}
+                                  aria-label="Modifier"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`rounded-lg p-2.5 ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}
+                                  aria-label="Supprimer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop: tableau complet */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full">
+                          <thead className={headerBg}>
+                            <tr>
+                              <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Nom</th>
+                              <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
+                              <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Tarifications</th>
+                              <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Statut</th>
                               {!isCashier && (
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-1">
-                                  <button className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}>
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button className={`p-1.5 rounded-lg ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}>
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
+                              <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
                               )}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
+                            {typesFrais.map((t) => (
+                              <tr key={t.id} className={hoverRow}>
+                                <td className={`px-4 py-3 ${textColor} font-medium`}>
+                                  {t.nom}
+                                  {t.isDefault && (
+                                    <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                      Par défaut
+                                    </span>
+                                  )}
+                                </td>
+                                <td className={`px-4 py-3 ${textSecondary} text-sm`}>{t.description || "—"}</td>
+                                <td className={`px-4 py-3 ${textColor}`}>{t._count.tarifications}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    t.isActive
+                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                      : "bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
+                                  }`}>
+                                    {t.isActive ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                                    {t.isActive ? "Actif" : "Inactif"}
+                                  </span>
+                                </td>
+                                {!isCashier && (
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1">
+                                    <button className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}>
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button className={`p-1.5 rounded-lg ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}>
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -1829,7 +1886,67 @@ function AdminFeesPageContent() {
                           <p className={`text-sm ${textSecondary} mt-1`}>Modifiez les filtres pour afficher des résultats</p>
                         </div>
                       ) : (
-                        <div className={`overflow-x-auto rounded-xl border ${borderColor}`}>
+                        <>
+                          {/* Mobile: infos essentielles uniquement */}
+                          <div className="md:hidden space-y-2.5">
+                            {paginatedStudentFees.map((s) => {
+                              const percent = getStudentPercent(s)
+                              const remaining = getStudentPrimaryRemaining(s)
+                              return (
+                                <div
+                                  key={`m-sf-${s.studentId}`}
+                                  className={`rounded-2xl border ${borderColor} ${theme === "dark" ? "bg-gray-800/50" : "bg-white"} p-4`}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <p className={`text-[15px] font-semibold leading-snug ${textColor}`}>
+                                        {s.lastName} {s.firstName}
+                                      </p>
+                                      <p className={`mt-1 text-xs ${textSecondary}`}>{s.className}</p>
+                                    </div>
+                                    <span
+                                      className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        s.status === "solde"
+                                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                          : s.status === "partiel"
+                                          ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                      }`}
+                                    >
+                                      {s.status === "solde" ? "Soldé" : s.status === "partiel" ? "Partiel" : "Impayé"}
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 flex items-center gap-3">
+                                    <div className={`h-2 flex-1 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          percent >= 100 ? "bg-green-500" : percent >= 50 ? "bg-orange-400" : "bg-red-400"
+                                        }`}
+                                        style={{ width: `${Math.min(percent, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className={`text-xs font-medium tabular-nums ${textSecondary}`}>{percent}%</span>
+                                  </div>
+                                  <div className="mt-3 flex items-center justify-between gap-2">
+                                    <p className={`text-sm font-medium ${remaining > 0 ? "text-red-500" : "text-green-500"}`}>
+                                      Reste {formatStudentAmounts(s, "remaining")}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => openPaymentModal(studentRowToEnrollment(s))}
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700"
+                                    >
+                                      <DollarSign className="h-3.5 w-3.5" />
+                                      Payer
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* Desktop: tableau complet */}
+                          <div className={`hidden md:block overflow-x-auto rounded-xl border ${borderColor}`}>
                           <table className="w-full text-sm">
                             <thead>
                               <tr className={headerBg}>
@@ -1933,7 +2050,8 @@ function AdminFeesPageContent() {
                               ))}
                             </tbody>
                           </table>
-                        </div>
+                          </div>
+                        </>
                       )}
 
                       {filteredStudentFees.length > 0 && sfTotalPages > 1 && (
@@ -3024,106 +3142,193 @@ function TarificationsTab({
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className={headerBg}>
-                    <tr>
-                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Classe</th>
-                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
-                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Paiements</th>
-                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
-                      <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                    {filteredTarifs
-                      .sort((a, b) => (a.class?.name || "").localeCompare(b.class?.name || ""))
-                      .map((tarif) => (
-                        <tr key={tarif.id} className={hoverRow}>
-                          <td className={`px-4 py-3`}>
-                            <div className="flex items-center gap-2">
-                              <Building className="w-4 h-4 text-indigo-400" />
-                              <span className={`font-medium ${textColor}`}>
-                                {tarif.class?.name || "Toutes les classes"}
-                              </span>
+              <>
+                {/* Mobile: classe + montant + actions */}
+                <div className="md:hidden space-y-2.5">
+                  {filteredTarifs
+                    .sort((a, b) => (a.class?.name || "").localeCompare(b.class?.name || ""))
+                    .map((tarif) => (
+                      <div
+                        key={`m-tarif-${tarif.id}`}
+                        className={`rounded-2xl border ${borderColor} ${theme === "dark" ? "bg-gray-800/50" : "bg-white"} p-4`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-[15px] font-semibold leading-snug ${textColor}`}>
+                              {tarif.class?.name || "Toutes les classes"}
+                            </p>
+                            <p className={`mt-1 text-xs ${textSecondary}`}>
+                              {tarif._count.paiements} paiement{tarif._count.paiements > 1 ? "s" : ""}
+                            </p>
+                          </div>
+                          {editingTarif === tarif.id ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <input
+                                type="number"
+                                value={editMontant}
+                                onChange={(e) => setEditMontant(e.target.value)}
+                                className={`w-24 px-2 py-1.5 rounded-lg border text-sm ${
+                                  theme === "dark"
+                                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                                    : "bg-white border-gray-300 text-gray-800"
+                                } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveMontant(tarif.id)
+                                  if (e.key === "Escape") setEditingTarif(null)
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveMontant(tarif.id)}
+                                disabled={saving}
+                                className="p-2 rounded-lg text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10"
+                              >
+                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTarif(null)}
+                                className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
-                          </td>
-                          <td className={`px-4 py-3`}>
-                            {editingTarif === tarif.id ? (
+                          ) : (
+                            <p className="shrink-0 text-[15px] font-bold text-green-600 dark:text-green-400">
+                              {formatMontant(tarif.montant, tarif.devise)}
+                            </p>
+                          )}
+                        </div>
+                        {editingTarif !== tarif.id && (
+                          <div className="mt-3 flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingTarif(tarif.id)
+                                setEditMontant(String(tarif.montant))
+                              }}
+                              className={`rounded-lg p-2.5 ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}
+                              aria-label="Modifier le montant"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTarif(tarif.id)}
+                              className={`rounded-lg p-2.5 ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}
+                              aria-label="Supprimer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+
+                {/* Desktop: tableau complet */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className={headerBg}>
+                      <tr>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Classe</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Montant</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Paiements</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Description</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold ${textSecondary} uppercase`}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
+                      {filteredTarifs
+                        .sort((a, b) => (a.class?.name || "").localeCompare(b.class?.name || ""))
+                        .map((tarif) => (
+                          <tr key={tarif.id} className={hoverRow}>
+                            <td className={`px-4 py-3`}>
                               <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  value={editMontant}
-                                  onChange={(e) => setEditMontant(e.target.value)}
-                                  className={`w-28 px-2 py-1 rounded-lg border text-sm ${
-                                    theme === "dark"
-                                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                                      : "bg-white border-gray-300 text-gray-800"
-                                  } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSaveMontant(tarif.id)
-                                    if (e.key === "Escape") setEditingTarif(null)
-                                  }}
-                                />
+                                <Building className="w-4 h-4 text-indigo-400" />
+                                <span className={`font-medium ${textColor}`}>
+                                  {tarif.class?.name || "Toutes les classes"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className={`px-4 py-3`}>
+                              {editingTarif === tarif.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    value={editMontant}
+                                    onChange={(e) => setEditMontant(e.target.value)}
+                                    className={`w-28 px-2 py-1 rounded-lg border text-sm ${
+                                      theme === "dark"
+                                        ? "bg-gray-700 border-gray-600 text-gray-100"
+                                        : "bg-white border-gray-300 text-gray-800"
+                                    } focus:outline-none focus:ring-2 focus:ring-indigo-500/50`}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleSaveMontant(tarif.id)
+                                      if (e.key === "Escape") setEditingTarif(null)
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => handleSaveMontant(tarif.id)}
+                                    disabled={saving}
+                                    className="p-1 rounded text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                  >
+                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTarif(null)}
+                                    className="p-1 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                  {formatMontant(tarif.montant, tarif.devise)}
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-4 py-3`}>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                tarif._count.paiements > 0
+                                  ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                                  : "bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
+                              }`}>
+                                {tarif._count.paiements} paiement{tarif._count.paiements > 1 ? "s" : ""}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-3 text-sm ${textSecondary}`}>
+                              {tarif.description || "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1">
                                 <button
-                                  onClick={() => handleSaveMontant(tarif.id)}
-                                  disabled={saving}
-                                  className="p-1 rounded text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                  onClick={() => {
+                                    setEditingTarif(tarif.id)
+                                    setEditMontant(String(tarif.montant))
+                                  }}
+                                  className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}
+                                  title="Modifier le montant"
                                 >
-                                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => setEditingTarif(null)}
-                                  className="p-1 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  onClick={() => handleDeleteTarif(tarif.id)}
+                                  className={`p-1.5 rounded-lg ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}
+                                  title="Supprimer"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                            ) : (
-                              <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                                {formatMontant(tarif.montant, tarif.devise)}
-                              </span>
-                            )}
-                          </td>
-                          <td className={`px-4 py-3`}>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                              tarif._count.paiements > 0
-                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
-                                : "bg-gray-100 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
-                            }`}>
-                              {tarif._count.paiements} paiement{tarif._count.paiements > 1 ? "s" : ""}
-                            </span>
-                          </td>
-                          <td className={`px-4 py-3 text-sm ${textSecondary}`}>
-                            {tarif.description || "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => {
-                                  setEditingTarif(tarif.id)
-                                  setEditMontant(String(tarif.montant))
-                                }}
-                                className={`p-1.5 rounded-lg ${textSecondary} hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors`}
-                                title="Modifier le montant"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTarif(tarif.id)}
-                                className={`p-1.5 rounded-lg ${textSecondary} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors`}
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
