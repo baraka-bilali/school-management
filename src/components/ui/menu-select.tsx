@@ -1,6 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,19 +29,22 @@ type MenuSelectProps = {
   /** Show a clear/placeholder row at the top (default: true when placeholder is set). */
   allowClear?: boolean
   className?: string
-  /** Extra classes on the trigger button (filters, dark theme, etc.). */
+  /** Extra classes on the trigger button / native select (filters, dark theme, etc.). */
   triggerClassName?: string
   disabled?: boolean
   "aria-label"?: string
+  /**
+   * `menu` — always the pastille listbox (Notes & Bulletins).
+   * `responsive` — pastille list on mobile only; native &lt;select&gt; from tablet up (default).
+   */
+  mode?: "menu" | "responsive"
 }
 
 type ListCoords = {
   left: number
   width: number
   maxHeight: number
-  /** CSS top when opening below; unused when placement is top. */
   top: number
-  /** CSS bottom when opening above. */
   bottom: number
   placement: "top" | "bottom"
 }
@@ -43,10 +54,32 @@ const VIEWPORT_PAD = 8
 /** Prefer a tall list so long option sets stay usable (~28rem). */
 const PREFERRED_MAX_H = 448
 const MIN_LIST_H = 160
+/** Tailwind `md` — tablet and up use the native select in responsive mode. */
+const MOBILE_MQ = "(max-width: 767px)"
+
+function subscribeMobile(cb: () => void) {
+  const mql = window.matchMedia(MOBILE_MQ)
+  mql.addEventListener("change", cb)
+  return () => mql.removeEventListener("change", cb)
+}
+
+function getMobileSnapshot() {
+  return window.matchMedia(MOBILE_MQ).matches
+}
+
+function getMobileServerSnapshot() {
+  // SSR / first paint: assume tablet+ so desktop stays native (no pastille flash).
+  return false
+}
+
+function useIsMobileViewport() {
+  return useSyncExternalStore(subscribeMobile, getMobileSnapshot, getMobileServerSnapshot)
+}
 
 /**
  * Custom listbox with radio-style “pastille” selection.
- * Used across admin filters and forms instead of native &lt;select&gt;.
+ * By default only on mobile; tablet/desktop use a native &lt;select&gt;
+ * unless `mode="menu"` (Notes & Bulletins).
  */
 export function MenuSelect({
   label,
@@ -59,7 +92,98 @@ export function MenuSelect({
   triggerClassName,
   disabled = false,
   "aria-label": ariaLabel,
+  mode = "responsive",
 }: MenuSelectProps) {
+  const isMobile = useIsMobileViewport()
+  const useMenu = mode === "menu" || isMobile
+
+  if (!useMenu) {
+    return (
+      <NativeSelect
+        label={label}
+        value={value}
+        options={options}
+        onChange={onChange}
+        placeholder={placeholder}
+        allowClear={allowClear}
+        className={className}
+        triggerClassName={triggerClassName}
+        disabled={disabled}
+        aria-label={ariaLabel}
+      />
+    )
+  }
+
+  return (
+    <PastilleMenuSelect
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      placeholder={placeholder}
+      allowClear={allowClear}
+      className={className}
+      triggerClassName={triggerClassName}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    />
+  )
+}
+
+function NativeSelect({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = "Choisir…",
+  allowClear,
+  className,
+  triggerClassName,
+  disabled = false,
+  "aria-label": ariaLabel,
+}: Omit<MenuSelectProps, "mode">) {
+  const showClear = allowClear ?? Boolean(placeholder)
+
+  return (
+    <label className={cn("block text-sm", className)}>
+      {label ? <span className="text-gray-600 dark:text-gray-400">{label}</span> : null}
+      <select
+        value={value}
+        disabled={disabled}
+        aria-label={ariaLabel || label || placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "w-full rounded-xl border px-3.5 py-2.5 text-[15px] leading-snug transition-colors",
+          "border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+          disabled && "cursor-not-allowed opacity-60",
+          label ? "mt-1" : undefined,
+          triggerClassName
+        )}
+      >
+        {showClear ? <option value="">{placeholder}</option> : null}
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value} disabled={opt.disabled}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function PastilleMenuSelect({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = "Choisir…",
+  allowClear,
+  className,
+  triggerClassName,
+  disabled = false,
+  "aria-label": ariaLabel,
+}: Omit<MenuSelectProps, "mode">) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState<ListCoords | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -84,7 +208,6 @@ export function MenuSelect({
     const spaceAbove = rect.top - LIST_GAP - VIEWPORT_PAD
     const preferred = Math.min(PREFERRED_MAX_H, Math.floor(window.innerHeight * 0.72))
 
-    // Open upward when the bottom side is clearly too short (e.g. last table rows).
     const placeBelow =
       spaceBelow >= Math.min(preferred, MIN_LIST_H) || spaceBelow >= spaceAbove
 
@@ -92,7 +215,10 @@ export function MenuSelect({
     const maxHeight = Math.max(120, Math.min(preferred, available))
 
     setCoords({
-      left: Math.max(VIEWPORT_PAD, Math.min(rect.left, window.innerWidth - rect.width - VIEWPORT_PAD)),
+      left: Math.max(
+        VIEWPORT_PAD,
+        Math.min(rect.left, window.innerWidth - rect.width - VIEWPORT_PAD)
+      ),
       width: rect.width,
       maxHeight,
       top: rect.bottom + LIST_GAP,
@@ -126,7 +252,6 @@ export function MenuSelect({
     document.addEventListener("mousedown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
     window.addEventListener("resize", onReposition)
-    // Capture scroll from nested overflow containers (tables, cards).
     window.addEventListener("scroll", onReposition, true)
 
     return () => {
