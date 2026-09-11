@@ -254,58 +254,92 @@ export default function ClassDetailPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className={theme === "dark" ? "bg-gray-900/50 text-gray-400" : "bg-gray-50 text-gray-600"}>
-                      <tr>
-                        <th className="px-4 py-2.5 text-left font-medium">#</th>
-                        <th className="px-4 py-2.5 text-left font-medium">Matricule</th>
-                        <th className="px-4 py-2.5 text-left font-medium">Nom</th>
-                        <th className="px-4 py-2.5 text-left font-medium">Sexe</th>
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${borderColor}`}>
-                      {filteredStudents.map((s, index) => {
-                        const fullName = [s.lastName, s.middleName, s.firstName]
-                          .filter(Boolean)
-                          .join(" ")
-                        const code = toDisplayCode(s.enrollments?.[0]?.code || s.code || s.permanentCode)
-                        return (
-                          <tr key={s.id} className={hoverBg}>
-                            <td className={`px-4 py-3 tabular-nums ${textSecondary}`}>{index + 1}</td>
-                            <td className="px-4 py-3">
-                              <Link
-                                href={`/admin/students/${s.id}`}
-                                className="font-mono text-sm font-semibold text-teal-500 hover:text-teal-400"
-                              >
-                                {code}
-                              </Link>
-                            </td>
-                            <td className={`px-4 py-3 font-medium ${textColor}`}>
-                              <Link
-                                href={`/admin/students/${s.id}`}
-                                className="hover:text-indigo-400 transition-colors"
-                              >
-                                {fullName}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                  s.gender === "F"
-                                    ? "bg-pink-500/15 text-pink-400"
-                                    : "bg-indigo-500/15 text-indigo-400"
-                                }`}
-                              >
-                                {s.gender === "F" ? "Fille" : "Garçon"}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  {/* Mobile: nom + matricule + sexe */}
+                  <div className="md:hidden space-y-2 p-3">
+                    {filteredStudents.map((s) => {
+                      const fullName = [s.lastName, s.middleName, s.firstName]
+                        .filter(Boolean)
+                        .join(" ")
+                      const code = toDisplayCode(s.enrollments?.[0]?.code || s.code || s.permanentCode)
+                      return (
+                        <Link
+                          key={`m-stu-${s.id}`}
+                          href={`/admin/students/${s.id}`}
+                          className={`flex items-center gap-3 rounded-2xl border px-3.5 py-3.5 ${borderColor} ${hoverBg}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-[15px] font-semibold leading-snug ${textColor}`}>{fullName}</p>
+                            <p className="mt-1 font-mono text-xs font-semibold text-teal-500">{code}</p>
+                          </div>
+                          <span
+                            className={`shrink-0 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              s.gender === "F"
+                                ? "bg-pink-500/15 text-pink-400"
+                                : "bg-indigo-500/15 text-indigo-400"
+                            }`}
+                          >
+                            {s.gender === "F" ? "F" : "G"}
+                          </span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+
+                  {/* Desktop: tableau */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className={theme === "dark" ? "bg-gray-900/50 text-gray-400" : "bg-gray-50 text-gray-600"}>
+                        <tr>
+                          <th className="px-4 py-2.5 text-left font-medium">#</th>
+                          <th className="px-4 py-2.5 text-left font-medium">Matricule</th>
+                          <th className="px-4 py-2.5 text-left font-medium">Nom</th>
+                          <th className="px-4 py-2.5 text-left font-medium">Sexe</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${borderColor}`}>
+                        {filteredStudents.map((s, index) => {
+                          const fullName = [s.lastName, s.middleName, s.firstName]
+                            .filter(Boolean)
+                            .join(" ")
+                          const code = toDisplayCode(s.enrollments?.[0]?.code || s.code || s.permanentCode)
+                          return (
+                            <tr key={s.id} className={hoverBg}>
+                              <td className={`px-4 py-3 tabular-nums ${textSecondary}`}>{index + 1}</td>
+                              <td className="px-4 py-3">
+                                <Link
+                                  href={`/admin/students/${s.id}`}
+                                  className="font-mono text-sm font-semibold text-teal-500 hover:text-teal-400"
+                                >
+                                  {code}
+                                </Link>
+                              </td>
+                              <td className={`px-4 py-3 font-medium ${textColor}`}>
+                                <Link
+                                  href={`/admin/students/${s.id}`}
+                                  className="hover:text-indigo-400 transition-colors"
+                                >
+                                  {fullName}
+                                </Link>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    s.gender === "F"
+                                      ? "bg-pink-500/15 text-pink-400"
+                                      : "bg-indigo-500/15 text-indigo-400"
+                                  }`}
+                                >
+                                  {s.gender === "F" ? "Fille" : "Garçon"}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

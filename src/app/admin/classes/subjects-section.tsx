@@ -313,19 +313,19 @@ export function SubjectsSection({ theme }: { theme: "light" | "dark" }) {
             <>
               <div className="md:hidden space-y-2.5">
                 {subjects.map((s) => (
-                  <div key={`m-subj-${s.id}`} className={cn("flex items-center gap-3 rounded-xl border p-3.5", borderColor)}>
+                  <div key={`m-subj-${s.id}`} className={cn("flex items-center gap-3 rounded-2xl border p-4", borderColor)}>
                     <span className="h-4 w-4 shrink-0 rounded-full ring-2 ring-white/20" style={{ backgroundColor: s.color || "#4f46e5" }} />
                     <div className="min-w-0 flex-1">
-                      <div className={cn("truncate text-sm font-semibold", textColor)}>{s.name}</div>
-                      <div className={cn("mt-0.5 truncate text-xs", textSecondary)}>
-                        Code {s.code} · Coef {s.coefficient} · {s.maxWeeklyHours}h/sem
+                      <div className={cn("truncate text-[15px] font-semibold", textColor)}>{s.name}</div>
+                      <div className={cn("mt-1 truncate text-xs", textSecondary)}>
+                        {s.code} · Coef {s.coefficient}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => openEditSubject(s)}
                       title="Modifier"
-                      className={cn("shrink-0 rounded-lg p-2 transition-colors", isDark ? "text-indigo-400 hover:bg-indigo-500/10" : "text-indigo-600 hover:bg-indigo-50")}
+                      className={cn("shrink-0 rounded-lg p-2.5 transition-colors", isDark ? "text-indigo-400 hover:bg-indigo-500/10" : "text-indigo-600 hover:bg-indigo-50")}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -333,7 +333,7 @@ export function SubjectsSection({ theme }: { theme: "light" | "dark" }) {
                       type="button"
                       onClick={() => setDeleteTarget({ id: s.id, name: s.name })}
                       title="Supprimer"
-                      className="shrink-0 rounded-lg p-2 text-red-500 transition-colors hover:bg-red-500/10"
+                      className="shrink-0 rounded-lg p-2.5 text-red-500 transition-colors hover:bg-red-500/10"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
