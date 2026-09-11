@@ -36,8 +36,8 @@ export const DEFAULT_EVALUATION_CYCLES: DefaultCycleDef[] = [
         sortOrder: 2,
         hasExam: true,
         periods: [
-          { name: "1ère période", sortOrder: 1 },
-          { name: "2ème période", sortOrder: 2 },
+          { name: "3ème période", sortOrder: 1 },
+          { name: "4ème période", sortOrder: 2 },
         ],
       },
       {
@@ -45,8 +45,8 @@ export const DEFAULT_EVALUATION_CYCLES: DefaultCycleDef[] = [
         sortOrder: 3,
         hasExam: true,
         periods: [
-          { name: "1ère période", sortOrder: 1 },
-          { name: "2ème période", sortOrder: 2 },
+          { name: "5ème période", sortOrder: 1 },
+          { name: "6ème période", sortOrder: 2 },
         ],
       },
     ],
