@@ -318,6 +318,7 @@ export default function GradesPage() {
           <div className="space-y-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <MenuSelect
+                mode="menu"
                 label="Matière"
                 placeholder="Choisir…"
                 value={subjectId === "" ? "" : String(subjectId)}
@@ -328,6 +329,7 @@ export default function GradesPage() {
                 }}
               />
               <MenuSelect
+                mode="menu"
                 label={
                   selectedDegree?.section === "Humanités"
                     ? "Degré + filière"
