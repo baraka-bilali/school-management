@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { authFetch } from "@/lib/auth-fetch"
 import { toast } from "sonner"
-import { CheckCircle2, ChevronDown, Loader2, RefreshCw, Save } from "lucide-react"
+import { CheckCircle2, Loader2, RefreshCw, Save } from "lucide-react"
 import { degreeKey as buildDegreeKey, formatDegreeLabel } from "@/lib/grading/degree"
+import { MenuSelect } from "@/components/ui/menu-select"
 
 type TabKey = "cycles" | "maxima"
 
@@ -45,8 +46,6 @@ export default function GradesPage() {
   const [examMaxInputs, setExamMaxInputs] = useState<Record<string, string>>({})
   const [savingMaxima, setSavingMaxima] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
-  const [degreeMenuOpen, setDegreeMenuOpen] = useState(false)
-  const degreeMenuRef = useRef<HTMLDivElement>(null)
 
   const selectedDegree = useMemo(
     () =>
@@ -56,16 +55,25 @@ export default function GradesPage() {
     [degrees, degreeKey]
   )
 
-  useEffect(() => {
-    if (!degreeMenuOpen) return
-    const onPointerDown = (e: MouseEvent) => {
-      if (!degreeMenuRef.current?.contains(e.target as Node)) {
-        setDegreeMenuOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown)
-    return () => document.removeEventListener("mousedown", onPointerDown)
-  }, [degreeMenuOpen])
+  const subjectOptions = useMemo(
+    () =>
+      subjects.map((s) => ({
+        value: String(s.id),
+        label: `${s.name} (${s.code})`,
+      })),
+    [subjects]
+  )
+
+  const degreeOptions = useMemo(
+    () =>
+      degrees.map((d) => {
+        const key = buildDegreeKey(d.section, d.level, d.stream)
+        const base = formatDegreeLabel(d.section, d.level, d.stream)
+        const classes = d.classNames.length ? ` (${d.classNames.join(", ")})` : ""
+        return { value: key, label: `${base}${classes}` }
+      }),
+    [degrees]
+  )
 
   const cycleForDegree = useMemo(() => {
     if (!selectedDegree) return null
@@ -91,7 +99,6 @@ export default function GradesPage() {
     if (degRes.ok) {
       const d = await degRes.json()
       setDegrees(d.degrees || [])
-      setDegreeMenuOpen(false)
     }
     if (subRes.ok) {
       const s = await subRes.json()
@@ -310,98 +317,30 @@ export default function GradesPage() {
         ) : (
           <div className="space-y-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Matière</span>
-                <select
-                  value={subjectId}
-                  onChange={(e) => setSubjectId(e.target.value ? Number(e.target.value) : "")}
-                  className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
-                >
-                  <option value="">Choisir…</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="block text-sm" ref={degreeMenuRef}>
-                <span className="text-gray-600 dark:text-gray-400">
-                  Degré{selectedDegree?.section === "Humanités" ? " + filière" : " (section + niveau)"}
-                </span>
-                <div className="relative mt-1">
-                  <button
-                    type="button"
-                    aria-haspopup="listbox"
-                    aria-expanded={degreeMenuOpen}
-                    onClick={() => setDegreeMenuOpen((o) => !o)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-left"
-                  >
-                    <span className={selectedDegree ? "text-gray-900 dark:text-gray-100" : "text-gray-400"}>
-                      {selectedDegree
-                        ? `${formatDegreeLabel(
-                            selectedDegree.section,
-                            selectedDegree.level,
-                            selectedDegree.stream
-                          )}${
-                            selectedDegree.classNames.length
-                              ? ` (${selectedDegree.classNames.join(", ")})`
-                              : ""
-                          }`
-                        : "Choisir…"}
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${
-                        degreeMenuOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                  {degreeMenuOpen && (
-                    <ul
-                      role="listbox"
-                      className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
-                    >
-                      <li>
-                        <button
-                          type="button"
-                          className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-                          onClick={() => {
-                            setDegreeKey("")
-                            setDegreeMenuOpen(false)
-                          }}
-                        >
-                          Choisir…
-                        </button>
-                      </li>
-                      {degrees.map((d) => {
-                        const key = buildDegreeKey(d.section, d.level, d.stream)
-                        const active = key === degreeKey
-                        return (
-                          <li key={key}>
-                            <button
-                              type="button"
-                              role="option"
-                              aria-selected={active}
-                              className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
-                                active
-                                  ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
-                                  : "text-gray-800 dark:text-gray-200"
-                              }`}
-                              onClick={() => {
-                                setDegreeKey(key)
-                                setDegreeMenuOpen(false)
-                              }}
-                            >
-                              {formatDegreeLabel(d.section, d.level, d.stream)}
-                              {d.classNames.length ? ` (${d.classNames.join(", ")})` : ""}
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </div>
+              <MenuSelect
+                label="Matière"
+                placeholder="Choisir…"
+                value={subjectId === "" ? "" : String(subjectId)}
+                options={subjectOptions}
+                onChange={(v) => {
+                  setSaveFeedback(null)
+                  setSubjectId(v ? Number(v) : "")
+                }}
+              />
+              <MenuSelect
+                label={
+                  selectedDegree?.section === "Humanités"
+                    ? "Degré + filière"
+                    : "Degré (section + niveau)"
+                }
+                placeholder="Choisir…"
+                value={degreeKey}
+                options={degreeOptions}
+                onChange={(v) => {
+                  setSaveFeedback(null)
+                  setDegreeKey(v)
+                }}
+              />
             </div>
 
             {selectedDegree?.section === "Humanités" && (
