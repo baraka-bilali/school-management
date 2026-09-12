@@ -6,8 +6,9 @@ import { toast } from "sonner"
 import { CheckCircle2, Loader2, RefreshCw, Save } from "lucide-react"
 import { degreeKey as buildDegreeKey, formatDegreeLabel } from "@/lib/grading/degree"
 import { MenuSelect } from "@/components/ui/menu-select"
+import { PrimaryCurriculumPanel } from "@/components/admin/primary-curriculum-panel"
 
-type TabKey = "cycles" | "maxima"
+type TabKey = "cycles" | "maxima" | "branches"
 
 type Cycle = {
   id: number
@@ -230,6 +231,7 @@ export default function GradesPage() {
             [
               ["cycles", "Cycles & périodes"],
               ["maxima", "Maxima officiels"],
+              ["branches", "Branches primaire"],
             ] as const
           ).map(([key, label]) => (
             <button

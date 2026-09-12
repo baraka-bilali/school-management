@@ -53,6 +53,10 @@ export async function GET(
         letter: true,
         stream: true,
         nextClassId: true,
+        titulaireTeacherId: true,
+        titulaireTeacher: {
+          select: { id: true, lastName: true, middleName: true, firstName: true },
+        },
         nextClass: { select: { id: true, name: true } },
         createdAt: true,
       },
