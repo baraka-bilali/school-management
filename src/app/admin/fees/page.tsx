@@ -881,16 +881,46 @@ function AdminFeesPageContent() {
     return filters
   }, [years, currentYearId])
 
-  const openStudentFeeStatus = (p: PaiementRecord) => {
-    const yearId = p.tarification.year.id || currentYearId
-    if (!p.studentId || !yearId) return
+  const openStudentFeeStatusModal = (opts: {
+    studentId: number
+    yearId?: number | null
+    studentName: string
+    studentCode?: string
+    className: string
+    yearName?: string
+  }) => {
+    const yearId = opts.yearId || currentYearId
+    if (!opts.studentId || !yearId) return
+    const yearName =
+      opts.yearName || years.find((y) => y.id === yearId)?.name || ""
     setStudentStatusModal({
-      studentId: p.studentId,
+      studentId: opts.studentId,
       yearId,
+      studentName: opts.studentName,
+      studentCode: opts.studentCode || "",
+      className: opts.className,
+      yearName,
+    })
+  }
+
+  const openStudentFeeStatus = (p: PaiementRecord) => {
+    openStudentFeeStatusModal({
+      studentId: p.studentId,
+      yearId: p.tarification.year.id,
       studentName: `${p.student.lastName} ${p.student.firstName}`.trim(),
       studentCode: p.student.code || p.student.permanentCode || "",
       className: p.enrollment.class.name,
       yearName: p.tarification.year.name,
+    })
+  }
+
+  const openStudentFeeStatusFromRow = (s: StudentFeeRow) => {
+    openStudentFeeStatusModal({
+      studentId: s.studentId,
+      yearId: currentYearId,
+      studentName: `${s.lastName} ${s.firstName}`.trim(),
+      studentCode: s.code,
+      className: s.className,
     })
   }
 
@@ -1941,14 +1971,25 @@ function AdminFeesPageContent() {
                                     <p className={`text-sm font-medium ${remaining > 0 ? "text-red-500" : "text-green-500"}`}>
                                       Reste {formatStudentAmounts(s, "remaining")}
                                     </p>
-                                    <button
-                                      type="button"
-                                      onClick={() => openPaymentModal(studentRowToEnrollment(s))}
-                                      className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700"
-                                    >
-                                      <DollarSign className="h-3.5 w-3.5" />
-                                      Payer
-                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => openStudentFeeStatusFromRow(s)}
+                                        className={`inline-flex items-center justify-center p-2 rounded-lg border ${borderColor} ${textSecondary} hover:text-teal-600 hover:border-teal-400 dark:hover:text-teal-400 transition-colors`}
+                                        title="Voir la situation des paiements"
+                                        aria-label="Voir la situation des paiements"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openPaymentModal(studentRowToEnrollment(s))}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700"
+                                      >
+                                        <DollarSign className="h-3.5 w-3.5" />
+                                        Payer
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               )
@@ -2039,9 +2080,9 @@ function AdminFeesPageContent() {
                                     <div className="flex items-center gap-1.5">
                                       <button
                                         type="button"
-                                        onClick={() => router.push(`/admin/students/${s.studentId}`)}
-                                        className={`inline-flex items-center justify-center p-1.5 rounded-lg border ${borderColor} ${textSecondary} hover:text-indigo-600 hover:border-indigo-400 dark:hover:text-indigo-400 transition-colors`}
-                                        title="Voir la fiche élève"
+                                        onClick={() => openStudentFeeStatusFromRow(s)}
+                                        className={`inline-flex items-center justify-center p-1.5 rounded-lg border ${borderColor} ${textSecondary} hover:text-teal-600 hover:border-teal-400 dark:hover:text-teal-400 transition-colors`}
+                                        title="Voir la situation des paiements"
                                       >
                                         <Eye className="w-4 h-4" />
                                       </button>
