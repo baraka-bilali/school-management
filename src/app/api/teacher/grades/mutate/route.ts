@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { normalizeGradeStream } from "@/lib/grading/degree"
+import { assertPeriodNotLocked, assertExamNotLocked } from "@/lib/grading/grade-locks"
 
 async function getOwnedAssignment(teacherId: number, schoolId: number, yearId: number, assignmentId: number) {
   return prisma.courseAssignment.findFirst({
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Période introuvable" }, { status: 404 })
   }
 
+  const periodLock = await assertPeriodNotLocked({
+    schoolId: ctx.schoolId,
+    classId: assignment.classId,
+    subjectId: assignment.subjectId,
+    periodId,
+  })
+  if (periodLock.locked) {
+    return NextResponse.json({ error: periodLock.message }, { status: 423 })
+  }
+
   const column = await prisma.evaluationColumn.create({
     data: {
       courseAssignmentId: assignmentId,
@@ -71,6 +82,29 @@ export async function PUT(req: NextRequest) {
     const assignment = await getOwnedAssignment(ctx.teacherId, ctx.schoolId, ctx.yearId, assignmentId)
     if (!assignment) {
       return NextResponse.json({ error: "Cours non assigné" }, { status: 404 })
+    }
+
+    // Verrou: si une colonne cible une période validée, bloquer
+    const colIds = grades
+      .map((r: { evaluationColumnId?: unknown }) => parseInt(String(r.evaluationColumnId ?? ""), 10))
+      .filter((id: number) => Number.isFinite(id) && id > 0)
+    if (colIds.length) {
+      const cols = await prisma.evaluationColumn.findMany({
+        where: { id: { in: colIds }, courseAssignmentId: assignmentId },
+        select: { periodId: true },
+      })
+      const periodIds = [...new Set(cols.map((c) => c.periodId))]
+      for (const pid of periodIds) {
+        const lock = await assertPeriodNotLocked({
+          schoolId: ctx.schoolId,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+          periodId: pid,
+        })
+        if (lock.locked) {
+          return NextResponse.json({ error: lock.message }, { status: 423 })
+        }
+      }
     }
 
     await prisma.$transaction(async (tx) => {
@@ -128,6 +162,16 @@ export async function PUT(req: NextRequest) {
     const assignment = await getOwnedAssignment(ctx.teacherId, ctx.schoolId, ctx.yearId, assignmentId)
     if (!assignment) {
       return NextResponse.json({ error: "Cours non assigné" }, { status: 404 })
+    }
+
+    const examLock = await assertExamNotLocked({
+      schoolId: ctx.schoolId,
+      classId: assignment.classId,
+      subjectId: assignment.subjectId,
+      periodGroupId,
+    })
+    if (examLock.locked) {
+      return NextResponse.json({ error: examLock.message }, { status: 423 })
     }
 
     const cls = await prisma.class.findFirst({

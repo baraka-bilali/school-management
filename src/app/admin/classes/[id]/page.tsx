@@ -13,6 +13,7 @@ import {
   Users,
   UserRound,
 } from "lucide-react"
+import { PrimaryTitulaireCard } from "@/components/admin/primary-titulaire-card"
 
 const GenderChart = dynamic(
   () => import("@/components/dashboard-charts").then((m) => m.GenderChart),
@@ -32,6 +33,7 @@ interface ClassInfo {
   section: string
   letter: string | null
   stream: string | null
+  titulaireTeacherId?: number | null
 }
 
 interface ClassStudent {
@@ -198,6 +200,15 @@ export default function ClassDetailPage() {
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error}
           </div>
+        )}
+
+        {!loading && classInfo && (
+          <PrimaryTitulaireCard
+            classId={classInfo.id}
+            section={classInfo.section}
+            titulaireTeacherId={classInfo.titulaireTeacherId}
+            onChanged={() => void load()}
+          />
         )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">

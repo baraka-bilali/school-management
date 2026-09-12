@@ -66,14 +66,18 @@ model Class {
   schoolId      Int
   /// Classe supérieure recommandée pour le passage (optionnel)
   nextClassId   Int?
+  /// Enseignant titulaire (primaire) — note toutes les branches de la classe
+  titulaireTeacherId Int?
   school        School             @relation(fields: [schoolId], references: [id])
   nextClass     Class?             @relation("ClassPromotion", fields: [nextClassId], references: [id])
   previousClasses Class[]          @relation("ClassPromotion")
+  titulaireTeacher Teacher?        @relation("ClassTitulaire", fields: [titulaireTeacherId], references: [id])
   enrollments   Enrollment[]
   tarifications Tarification[]
   assignments    CourseAssignment[]
   slots         ScheduleSlot[]
   tasks         StudentTask[]
+  gradeLocks    GradeEntryLock[]
 
   @@unique([name, schoolId])
   @@index([section])
@@ -81,6 +85,7 @@ model Class {
   @@index([schoolId])
   @@index([section, level, letter])
   @@index([nextClassId])
+  @@index([titulaireTeacherId])
 }
 
 model Student {
@@ -142,6 +147,7 @@ model Teacher {
   payments    TeacherPayment[]
   assignments CourseAssignment[]
   tasks         StudentTask[]
+  titulaireClasses Class[] @relation("ClassTitulaire")
 
   @@index([lastName])
   @@index([specialty])
@@ -288,6 +294,8 @@ model School {
   subscriptionPayments        SubscriptionPayment[]
   communiques                 Communique[]
   evaluationCycles            EvaluationCycle[]
+  primaryDegrees              PrimaryDegree[]
+  gradeLocks                  GradeEntryLock[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -670,6 +678,8 @@ model Subject {
   periodMaxima    SubjectPeriodMax[]
   examMaxima      SubjectExamMax[]
   examGrades      ExamGrade[]
+  primaryBranch   PrimaryBranch?
+  gradeLocks      GradeEntryLock[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -885,6 +895,7 @@ model PeriodGroup {
   periods    Period[]
   examMaxima SubjectExamMax[]
   examGrades ExamGrade[]
+  gradeLocks GradeEntryLock[]
 
   @@unique([cycleId, sortOrder])
   @@index([cycleId])
@@ -901,6 +912,7 @@ model Period {
   periodGroup      PeriodGroup         @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
   periodMaxima     SubjectPeriodMax[]
   evaluationColumns EvaluationColumn[]
+  gradeLocks       GradeEntryLock[]
 
   @@unique([periodGroupId, sortOrder])
   @@index([periodGroupId])
@@ -1005,4 +1017,124 @@ model ExamGrade {
   @@index([periodGroupId])
   @@index([subjectId])
   @@index([courseAssignmentId])
+}
+
+// ============================================================
+// CURRICULUM PRIMAIRE OFFICIEL (Domaines / Groupes / Branches)
+// Source de vérité : maxPeriode uniquement
+// maxExamen = 2×, maxTrimestre = 4×, maxAnnuel = 12×
+// ============================================================
+
+enum PrimaryDegreeCode {
+  ELEMENTAIRE // 1ère, 2ème
+  MOYEN       // 3ème, 4ème — needsReview
+  TERMINAL_5  // 5ème — needsReview
+  TERMINAL_6  // 6ème
+}
+
+enum GradeLockKind {
+  PERIOD
+  EXAM
+}
+
+/// Structure officielle d'un degré primaire pour une école
+model PrimaryDegree {
+  id          Int               @id @default(autoincrement())
+  schoolId    Int
+  code        PrimaryDegreeCode
+  name        String
+  /// Niveaux Class.level couverts (ex: ["1ère","2ème"])
+  levelsJson  String            @db.Text
+  /// true = données provisoires à faire confirmer par un enseignant
+  needsReview Boolean           @default(false)
+  sortOrder   Int               @default(0)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  domains     PrimaryDomain[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+}
+
+model PrimaryDomain {
+  id        Int              @id @default(autoincrement())
+  degreeId  Int
+  name      String
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  degree    PrimaryDegree    @relation(fields: [degreeId], references: [id], onDelete: Cascade)
+  groups    PrimaryGroup[]
+  branches  PrimaryBranch[]
+
+  @@index([degreeId, sortOrder])
+}
+
+/// Regroupement intermédiaire optionnel (ex: Français, Mathématiques)
+model PrimaryGroup {
+  id        Int             @id @default(autoincrement())
+  domainId  Int
+  name      String
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  domain    PrimaryDomain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  branches  PrimaryBranch[]
+
+  @@index([domainId, sortOrder])
+}
+
+/// Branche notée — seul maxPeriode est stocké (source de vérité)
+model PrimaryBranch {
+  id                  Int            @id @default(autoincrement())
+  domainId            Int
+  /// null = branche directement sous le domaine
+  groupId             Int?
+  name                String
+  maxPeriode          Float
+  /// Overrides optionnels si un cas hors formule 2×/4×/12× apparaît
+  maxExamenOverride   Float?
+  maxTrimestreOverride Float?
+  maxAnnuelOverride   Float?
+  sortOrder           Int            @default(0)
+  /// Matière liée pour la notation / affectations
+  subjectId           Int?           @unique
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  domain              PrimaryDomain  @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  group               PrimaryGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  subject             Subject?       @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([domainId, sortOrder])
+  @@index([groupId])
+}
+
+/// Verrouillage après validation d'une période ou d'un examen
+model GradeEntryLock {
+  id                 Int           @id @default(autoincrement())
+  schoolId           Int
+  classId            Int
+  subjectId          Int
+  kind               GradeLockKind
+  periodId           Int?
+  periodGroupId      Int?
+  courseAssignmentId Int?
+  lockedAt           DateTime      @default(now())
+  lockedByUserId     Int
+  unlockedAt         DateTime?
+  unlockedByUserId   Int?
+  unlockReason       String?       @db.Text
+  school             School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class              Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject            Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  period             Period?       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodGroup        PeriodGroup?  @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, classId, subjectId])
+  @@index([periodId])
+  @@index([periodGroupId])
+  @@index([lockedByUserId])
 }

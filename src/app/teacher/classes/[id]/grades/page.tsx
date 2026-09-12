@@ -75,6 +75,9 @@ function TeacherGradesContent() {
   const [examDraft, setExamDraft] = useState<Record<string, string>>({})
   const [newCol, setNewCol] = useState({ label: "", date: "", maxPoints: "" })
 
+  const [lockBusy, setLockBusy] = useState(false)
+  const [isLocked, setIsLocked] = useState(false)
+
   const load = useCallback(async (pid?: number | null) => {
     if (!assignmentId) return
     setLoading(true)
@@ -105,6 +108,63 @@ function TeacherGradesContent() {
       setLoading(false)
     }
   }, [assignmentId])
+
+
+  async function validateCurrent() {
+    if (!ctx || !periodId) return
+    setLockBusy(true)
+    try {
+      const res = await fetch("/api/teacher/grades/lock", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "validate",
+          assignmentId: ctx.assignment.id,
+          kind: "PERIOD",
+          periodId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Validation impossible")
+      setIsLocked(true)
+      toast.success(data.message || "Période validée")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erreur")
+    } finally {
+      setLockBusy(false)
+    }
+  }
+
+  async function unlockCurrent() {
+    if (!ctx || !periodId) return
+    const reason = window.prompt("Motif du déverrouillage (obligatoire) :")
+    if (!reason || !reason.trim()) return
+    setLockBusy(true)
+    try {
+      const res = await fetch("/api/teacher/grades/lock", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "unlock",
+          assignmentId: ctx.assignment.id,
+          kind: "PERIOD",
+          periodId,
+          unlockReason: reason.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Déverrouillage impossible")
+      setIsLocked(false)
+      toast.success(data.message || "Déverrouillé")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erreur")
+    } finally {
+      setLockBusy(false)
+    }
+  }
+
 
   useEffect(() => {
     void load()
@@ -481,6 +541,25 @@ function TeacherGradesContent() {
           onClick={() => void saveGrades()}
           className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
+          {isLocked ? (
+            <button
+              type="button"
+              disabled={lockBusy}
+              onClick={() => void unlockCurrent()}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+            >
+              Déverrouiller
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={lockBusy || !periodId}
+              onClick={() => void validateCurrent()}
+              className="inline-flex items-center gap-2 rounded-lg bg-teal-700 text-white px-3 py-2 text-sm disabled:opacity-50"
+            >
+              Valider la période
+            </button>
+          )}
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Enregistrer les notes de période
         </button>
