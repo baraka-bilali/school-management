@@ -43,7 +43,6 @@ import {
 import Portal from "@/components/portal"
 import { sortClasses, compareClasses, SECTION_ORDER, SECTION_LABELS } from "@/lib/class-sort"
 import { formatAcademicYearOptionLabel, parseSchoolYearLabel } from "@/lib/school-year-utils"
-import { formatRelativeDateLabel, formatDateSidebar, formatTimeLabel } from "@/lib/date-labels"
 import { FeesStatsSkeleton, FeesTabSkeleton } from "@/components/fees/fees-tab-skeletons"
 import type { ReceiptData } from "@/components/receipt-pdf"
 import { MenuSelect } from "@/components/ui/menu-select"
@@ -854,30 +853,17 @@ function AdminFeesPageContent() {
     return filters
   }, [years, currentYearId])
 
-  const paiementsGrouped = useMemo(() => {
-    const groups = new Map<
-      string,
-      {
-        title: string
-        sidebar: ReturnType<typeof formatDateSidebar>
-        items: PaiementRecord[]
-      }
-    >()
-    for (const p of paiements) {
-      const sidebar = formatDateSidebar(p.datePaiement)
-      const title = formatRelativeDateLabel(p.datePaiement)
-      if (!groups.has(sidebar.groupKey)) {
-        groups.set(sidebar.groupKey, { title, sidebar, items: [] })
-      }
-      groups.get(sidebar.groupKey)!.items.push(p)
-    }
-    return Array.from(groups.values())
-  }, [paiements])
-
-  const getStudentInitials = (p: PaiementRecord) => {
-    const a = p.student.firstName?.[0] ?? ""
-    const b = p.student.lastName?.[0] ?? ""
-    return `${b}${a}`.toUpperCase()
+  const openStudentFeeStatus = (p: PaiementRecord) => {
+    // Prefer name: API may expose permanentCode instead of code
+    const query = `${p.student.lastName} ${p.student.firstName}`.trim() || p.student.code || ""
+    setSfSearch(query)
+    setSfClassFilter("")
+    setSfStatusFilter("")
+    setSfAmountThreshold("")
+    setSfCurrencyFilter("")
+    setSfTypeFilter("")
+    setSfPage(1)
+    setActiveTab("students")
   }
 
   const tabs = [
@@ -1504,8 +1490,21 @@ function AdminFeesPageContent() {
             {/* === PAIEMENTS === */}
             {activeTab === "payments" && (
               <Card theme={theme}>
-                <CardContent className="pt-5">
-                  <div className="space-y-5">
+                <CardHeader>
+                  <CardTitle>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-2">
+                        <Receipt className="w-5 h-5 text-teal-500" />
+                        Journal des paiements
+                      </div>
+                      <span className={`text-sm font-normal ${textSecondary}`}>
+                        {paiementsPagination.total} paiement{paiementsPagination.total > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className={`space-y-3 px-4 sm:px-6 py-4 border-b ${borderColor}`}>
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="space-y-3 flex-1 min-w-0">
                         <div className="flex gap-2 overflow-x-auto scrollbar-hide md:flex-wrap">
@@ -1584,155 +1583,127 @@ function AdminFeesPageContent() {
                         Excel
                       </button>
                     </div>
-
-                    {paiementsLoading ? (
-                      <div className="space-y-3" aria-live="polite" aria-busy="true">
-                        <div className="flex items-center justify-center gap-2 py-2">
-                          <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-                          <span className={`text-sm ${textSecondary}`}>Chargement des paiements…</span>
-                        </div>
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="flex gap-2.5 sm:gap-4 animate-pulse">
-                            <div className="w-8 sm:w-12 shrink-0">
-                              <div className={`h-6 w-8 mx-auto rounded-md ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                            </div>
-                            <div className={`flex-1 rounded-xl border ${borderColor} px-3 py-2.5`}>
-                              <div className="flex items-center gap-2.5">
-                                <div className={`w-8 h-8 rounded-full shrink-0 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                                <div className="flex-1 space-y-1.5">
-                                  <div className={`h-3.5 w-2/3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                                  <div className={`h-2.5 w-1/2 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                                </div>
-                                <div className={`h-4 w-14 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : paiements.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Receipt className={`w-16 h-16 mx-auto mb-4 ${textSecondary} opacity-20`} />
-                        <p className={`text-lg font-medium ${textColor}`}>Aucun paiement</p>
-                        <p className={`text-sm ${textSecondary} mt-1`}>
-                          {paymentsYearFilter != null || paymentsTypeFilter
-                            ? "Aucun résultat pour ces filtres"
-                            : "Les paiements enregistrés apparaîtront ici"}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {paiementsGrouped.map((group) => (
-                          <div key={group.sidebar.groupKey} className="flex gap-2.5 sm:gap-4">
-                            <div className="w-8 sm:w-12 shrink-0 text-left sm:text-center pt-0.5">
-                              <p className={`text-sm sm:text-xl font-bold leading-none ${textColor}`}>
-                                {group.sidebar.primary}
-                              </p>
-                              {group.sidebar.secondary && (
-                                <p className={`text-[9px] sm:text-[10px] font-medium uppercase mt-0.5 ${textSecondary}`}>
-                                  {group.sidebar.secondary}
-                                </p>
-                              )}
-                            </div>
-                            <div className={`flex-1 rounded-xl border ${borderColor} ${cardBg} shadow-sm overflow-hidden`}>
-                              <div className={`px-3 py-1.5 border-b ${borderColor} ${headerBg}`}>
-                                <p className={`text-[11px] font-semibold ${textSecondary}`}>{group.title}</p>
-                              </div>
-                              <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
-                                {group.items.map((p) => (
-                                  <div key={p.id} className={`flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 ${hoverRow}`}>
-                                    <div className="hidden sm:flex w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 items-center justify-center text-[10px] font-bold shrink-0">
-                                      {getStudentInitials(p)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-semibold leading-snug ${textColor} truncate`}>
-                                        {p.student.lastName} {p.student.firstName}
-                                      </p>
-                                      <p className={`text-[11px] sm:text-xs ${textSecondary} mt-0.5 truncate`}>
-                                        {p.tarification.typeFrais.nom}
-                                        <span className="hidden sm:inline">
-                                          {" "}
-                                          · {formatTimeLabel(p.datePaiement)} · {p.enrollment.class.name} ·{" "}
-                                          {p.tarification.year.name}
-                                        </span>
-                                      </p>
-                                      <p className={`hidden sm:block text-[11px] ${textSecondary} truncate`}>
-                                        {getModePaiementLabel(p.modePaiement)} ·{" "}
-                                        <span className="font-mono">{p.numeroRecu}</span>
-                                      </p>
-                                    </div>
-                                    <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
-                                      <p className="text-sm font-bold leading-none text-green-500">
-                                        {formatMontant(p.montant, p.tarification.devise)}
-                                      </p>
-                                      {p.isAnnule ? (
-                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
-                                          <X className="w-2.5 h-2.5" /> Annulé
-                                        </span>
-                                      ) : (
-                                        <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
-                                          <Check className="w-2.5 h-2.5" /> Valide
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-
-                        {paiementsPagination.totalPages > 1 && (
-                          <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t ${borderColor}`}>
-                            <p className={`text-sm ${textSecondary}`}>
-                              {paiementsPagination.total} paiement{paiementsPagination.total > 1 ? "s" : ""} · page {paiementsPagination.page} / {paiementsPagination.totalPages}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={paymentsPage <= 1}
-                                onClick={() => setPaymentsPage((p) => Math.max(1, p - 1))}
-                                className={`p-2 rounded-lg border ${borderColor} disabled:opacity-40 ${hoverRow}`}
-                                aria-label="Page précédente"
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                              </button>
-                              {Array.from({ length: Math.min(paiementsPagination.totalPages, 5) }, (_, i) => {
-                                const start = Math.max(
-                                  1,
-                                  Math.min(paymentsPage - 2, paiementsPagination.totalPages - 4)
-                                )
-                                const pageNum = start + i
-                                if (pageNum > paiementsPagination.totalPages) return null
-                                return (
-                                  <button
-                                    key={pageNum}
-                                    type="button"
-                                    onClick={() => setPaymentsPage(pageNum)}
-                                    className={`min-w-[2.25rem] h-9 px-2 rounded-lg text-sm font-medium transition-colors ${
-                                      pageNum === paymentsPage
-                                        ? "bg-indigo-600 text-white"
-                                        : `${borderColor} border ${hoverRow} ${textSecondary}`
-                                    }`}
-                                  >
-                                    {pageNum}
-                                  </button>
-                                )
-                              })}
-                              <button
-                                type="button"
-                                disabled={paymentsPage >= paiementsPagination.totalPages}
-                                onClick={() => setPaymentsPage((p) => Math.min(paiementsPagination.totalPages, p + 1))}
-                                className={`p-2 rounded-lg border ${borderColor} disabled:opacity-40 ${hoverRow}`}
-                                aria-label="Page suivante"
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {paiementsLoading ? (
+                    <div className="flex items-center justify-center p-12 gap-2" aria-live="polite" aria-busy="true">
+                      <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
+                      <span className={`text-sm ${textSecondary}`}>Chargement des paiements…</span>
+                    </div>
+                  ) : paiements.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 gap-3">
+                      <Receipt className={`w-12 h-12 ${textSecondary} opacity-40`} />
+                      <p className={textSecondary}>Aucun paiement enregistré.</p>
+                      <p className={`text-sm ${textSecondary}`}>
+                        {paymentsYearFilter != null || paymentsTypeFilter
+                          ? "Aucun résultat pour ces filtres"
+                          : "Les paiements enregistrés apparaîtront ici"}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <ul className={`divide-y ${borderColor}`}>
+                        <li className={`grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_8.5rem_6.5rem_auto] gap-3 px-4 sm:px-6 py-2.5 text-[11px] font-semibold uppercase tracking-wide ${textSecondary}`}>
+                          <span>Élève</span>
+                          <span className="hidden sm:inline">Date</span>
+                          <span className="hidden sm:inline text-right">Montant</span>
+                          <span className="text-right w-[4.75rem]">Action</span>
+                        </li>
+                        {paiements.map((p) => {
+                          const dateLabel = formatDate(p.datePaiement)
+                          const studentName = `${p.student.lastName} ${p.student.firstName}`.trim()
+                          return (
+                            <li
+                              key={p.id}
+                              className={`grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_8.5rem_6.5rem_auto] items-center gap-3 px-4 sm:px-6 py-3.5 transition-colors ${hoverRow}`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-500/10 text-teal-500">
+                                  <Receipt className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => openStudentFeeStatus(p)}
+                                    className="block max-w-full truncate text-left text-sm font-semibold text-teal-500 hover:underline"
+                                    title="Voir l'état de paiement de l'élève"
+                                  >
+                                    {studentName}
+                                  </button>
+                                  <p className={`text-xs ${textSecondary} truncate`}>
+                                    {p.tarification.typeFrais.nom}
+                                    <span className="hidden sm:inline">
+                                      {" "}
+                                      · {p.enrollment.class.name} ·{" "}
+                                      <span className="font-mono">{p.numeroRecu}</span>
+                                    </span>
+                                  </p>
+                                  <p className={`sm:hidden text-xs ${textSecondary} mt-0.5`}>
+                                    {dateLabel}
+                                    {" · "}
+                                    <span className={p.isAnnule ? "text-red-500 font-medium" : "text-green-500 font-semibold"}>
+                                      {formatMontant(p.montant, p.tarification.devise)}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                              <span className={`hidden sm:inline-flex items-center gap-1.5 text-sm tabular-nums ${textColor}`}>
+                                <Calendar className={`h-3.5 w-3.5 shrink-0 ${textSecondary}`} />
+                                {dateLabel}
+                              </span>
+                              <div className="hidden sm:flex flex-col items-end gap-0.5">
+                                <span className={`text-sm font-bold tabular-nums ${p.isAnnule ? "text-red-500 line-through" : "text-green-500"}`}>
+                                  {formatMontant(p.montant, p.tarification.devise)}
+                                </span>
+                                {p.isAnnule ? (
+                                  <span className="text-[10px] font-medium text-red-500">Annulé</span>
+                                ) : (
+                                  <span className={`text-[10px] ${textSecondary}`}>{getModePaiementLabel(p.modePaiement)}</span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openStudentFeeStatus(p)}
+                                className="inline-flex w-[4.75rem] justify-center shrink-0 items-center gap-1.5 rounded-lg bg-teal-500/10 px-3.5 py-2 text-xs font-semibold text-teal-500 transition-colors hover:bg-teal-500/20 ml-auto"
+                                title="Voir l'état de l'élève"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                Voir
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+
+                      {paiementsPagination.totalPages > 1 && (
+                        <div className={`flex items-center justify-between px-4 sm:px-6 py-4 border-t ${borderColor}`}>
+                          <span className={`text-sm ${textSecondary}`}>
+                            Page {paiementsPagination.page} / {paiementsPagination.totalPages}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPaymentsPage((p) => Math.max(1, p - 1))}
+                              disabled={paymentsPage <= 1}
+                              className={`p-2 rounded-lg border ${borderColor} ${textSecondary} disabled:opacity-40 transition-colors`}
+                              aria-label="Page précédente"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPaymentsPage((p) => Math.min(paiementsPagination.totalPages, p + 1))}
+                              disabled={paymentsPage >= paiementsPagination.totalPages}
+                              className={`p-2 rounded-lg border ${borderColor} ${textSecondary} disabled:opacity-40 transition-colors`}
+                              aria-label="Page suivante"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
