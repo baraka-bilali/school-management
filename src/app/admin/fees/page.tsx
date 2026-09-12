@@ -1586,24 +1586,24 @@ function AdminFeesPageContent() {
                     </div>
 
                     {paiementsLoading ? (
-                      <div className="space-y-6" aria-live="polite" aria-busy="true">
+                      <div className="space-y-3" aria-live="polite" aria-busy="true">
                         <div className="flex items-center justify-center gap-2 py-2">
                           <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
                           <span className={`text-sm ${textSecondary}`}>Chargement des paiements…</span>
                         </div>
                         {[1, 2, 3].map((i) => (
-                          <div key={i} className="flex gap-4 sm:gap-6 animate-pulse">
-                            <div className="w-12 sm:w-14 shrink-0">
-                              <div className={`h-8 w-10 mx-auto rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                          <div key={i} className="flex gap-2.5 sm:gap-4 animate-pulse">
+                            <div className="w-8 sm:w-12 shrink-0">
+                              <div className={`h-6 w-8 mx-auto rounded-md ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
                             </div>
-                            <div className={`flex-1 rounded-2xl border ${borderColor} p-4 space-y-3`}>
-                              <div className="flex gap-3">
-                                <div className={`w-10 h-10 rounded-full shrink-0 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                                <div className="flex-1 space-y-2">
-                                  <div className={`h-4 w-2/3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
-                                  <div className={`h-3 w-1/2 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                            <div className={`flex-1 rounded-xl border ${borderColor} px-3 py-2.5`}>
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-full shrink-0 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                <div className="flex-1 space-y-1.5">
+                                  <div className={`h-3.5 w-2/3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                  <div className={`h-2.5 w-1/2 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
                                 </div>
-                                <div className={`h-5 w-16 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
+                                <div className={`h-4 w-14 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`} />
                               </div>
                             </div>
                           </div>
@@ -1620,55 +1620,57 @@ function AdminFeesPageContent() {
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-6">
+                      <div className="space-y-3">
                         {paiementsGrouped.map((group) => (
-                          <div key={group.sidebar.groupKey} className="flex gap-3 sm:gap-6">
-                            <div className="w-8 sm:w-14 shrink-0 text-left sm:text-center pt-1">
-                              <p className={`text-base sm:text-2xl font-bold leading-none ${textColor}`}>
+                          <div key={group.sidebar.groupKey} className="flex gap-2.5 sm:gap-4">
+                            <div className="w-8 sm:w-12 shrink-0 text-left sm:text-center pt-0.5">
+                              <p className={`text-sm sm:text-xl font-bold leading-none ${textColor}`}>
                                 {group.sidebar.primary}
                               </p>
                               {group.sidebar.secondary && (
-                                <p className={`text-[10px] sm:text-xs font-medium uppercase mt-0.5 sm:mt-1 ${textSecondary}`}>
+                                <p className={`text-[9px] sm:text-[10px] font-medium uppercase mt-0.5 ${textSecondary}`}>
                                   {group.sidebar.secondary}
                                 </p>
                               )}
                             </div>
-                            <div className={`flex-1 rounded-2xl border ${borderColor} ${cardBg} shadow-sm overflow-hidden`}>
-                              <div className={`px-4 py-2 border-b ${borderColor} ${headerBg}`}>
-                                <p className={`text-xs font-semibold ${textSecondary}`}>{group.title}</p>
+                            <div className={`flex-1 rounded-xl border ${borderColor} ${cardBg} shadow-sm overflow-hidden`}>
+                              <div className={`px-3 py-1.5 border-b ${borderColor} ${headerBg}`}>
+                                <p className={`text-[11px] font-semibold ${textSecondary}`}>{group.title}</p>
                               </div>
                               <div className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"}`}>
                                 {group.items.map((p) => (
-                                  <div key={p.id} className={`flex items-start gap-3 p-3 sm:p-4 ${hoverRow}`}>
-                                    <div className="hidden sm:flex w-10 h-10 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 items-center justify-center text-xs font-bold shrink-0">
+                                  <div key={p.id} className={`flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 ${hoverRow}`}>
+                                    <div className="hidden sm:flex w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 items-center justify-center text-[10px] font-bold shrink-0">
                                       {getStudentInitials(p)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <p className={`text-sm font-semibold ${textColor} truncate`}>
+                                      <p className={`text-sm font-semibold leading-snug ${textColor} truncate`}>
                                         {p.student.lastName} {p.student.firstName}
                                       </p>
-                                      <p className={`text-xs ${textSecondary} mt-0.5 truncate`}>
+                                      <p className={`text-[11px] sm:text-xs ${textSecondary} mt-0.5 truncate`}>
                                         {p.tarification.typeFrais.nom}
+                                        <span className="hidden sm:inline">
+                                          {" "}
+                                          · {formatTimeLabel(p.datePaiement)} · {p.enrollment.class.name} ·{" "}
+                                          {p.tarification.year.name}
+                                        </span>
                                       </p>
-                                      <p className={`hidden sm:block text-xs ${textSecondary} mt-0.5`}>
-                                        {formatTimeLabel(p.datePaiement)} · {p.enrollment.class.name} · {p.tarification.year.name}
-                                      </p>
-                                      <p className={`hidden sm:block text-xs ${textSecondary} mt-0.5`}>
+                                      <p className={`hidden sm:block text-[11px] ${textSecondary} truncate`}>
                                         {getModePaiementLabel(p.modePaiement)} ·{" "}
                                         <span className="font-mono">{p.numeroRecu}</span>
                                       </p>
                                     </div>
-                                    <div className="text-right shrink-0 space-y-1">
-                                      <p className="text-sm font-bold text-green-500">
+                                    <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
+                                      <p className="text-sm font-bold leading-none text-green-500">
                                         {formatMontant(p.montant, p.tarification.devise)}
                                       </p>
                                       {p.isAnnule ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
-                                          <X className="w-3 h-3" /> Annulé
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400">
+                                          <X className="w-2.5 h-2.5" /> Annulé
                                         </span>
                                       ) : (
-                                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
-                                          <Check className="w-3 h-3" /> Valide
+                                        <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-400">
+                                          <Check className="w-2.5 h-2.5" /> Valide
                                         </span>
                                       )}
                                     </div>
