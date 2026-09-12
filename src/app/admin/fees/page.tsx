@@ -175,6 +175,7 @@ interface EnrollmentOption {
 
 interface PaiementRecord {
   id: number
+  studentId: number
   numeroRecu: string
   montant: number
   datePaiement: string
@@ -182,13 +183,32 @@ interface PaiementRecord {
   reference: string | null
   notes: string | null
   isAnnule: boolean
-  student: { firstName: string; lastName: string; middleName: string; code: string }
+  student: {
+    firstName: string
+    lastName: string
+    middleName: string
+    code?: string
+    permanentCode?: string
+  }
   tarification: {
     typeFrais: { nom: string; code: string }
-    year: { name: string }
+    year: { id?: number; name: string }
     devise: "USD" | "CDF"
   }
   enrollment: { class: { name: string } }
+}
+
+interface StudentYearBalance {
+  usd: { totalDu: number; totalPaye: number; solde: number }
+  cdf: { totalDu: number; totalPaye: number; solde: number }
+  details: Array<{
+    tarificationId: number
+    typeFrais: string
+    montantTotal: number
+    totalPaye: number
+    solde: number
+    devise: "USD" | "CDF"
+  }>
 }
 
 interface BalanceInfo {
@@ -380,6 +400,14 @@ function AdminFeesPageContent() {
 
   // Modals
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [studentStatusModal, setStudentStatusModal] = useState<{
+    studentId: number
+    yearId: number
+    studentName: string
+    studentCode: string
+    className: string
+    yearName: string
+  } | null>(null)
   const [paymentInitialEnrollment, setPaymentInitialEnrollment] = useState<EnrollmentOption | null>(null)
   const [showCreateTypeModal, setShowCreateTypeModal] = useState(false)
   const [showCreateTarifModal, setShowCreateTarifModal] = useState(false)
@@ -854,16 +882,16 @@ function AdminFeesPageContent() {
   }, [years, currentYearId])
 
   const openStudentFeeStatus = (p: PaiementRecord) => {
-    // Prefer name: API may expose permanentCode instead of code
-    const query = `${p.student.lastName} ${p.student.firstName}`.trim() || p.student.code || ""
-    setSfSearch(query)
-    setSfClassFilter("")
-    setSfStatusFilter("")
-    setSfAmountThreshold("")
-    setSfCurrencyFilter("")
-    setSfTypeFilter("")
-    setSfPage(1)
-    setActiveTab("students")
+    const yearId = p.tarification.year.id || currentYearId
+    if (!p.studentId || !yearId) return
+    setStudentStatusModal({
+      studentId: p.studentId,
+      yearId,
+      studentName: `${p.student.lastName} ${p.student.firstName}`.trim(),
+      studentCode: p.student.code || p.student.permanentCode || "",
+      className: p.enrollment.class.name,
+      yearName: p.tarification.year.name,
+    })
   }
 
   const tabs = [
@@ -1626,7 +1654,7 @@ function AdminFeesPageContent() {
                                     type="button"
                                     onClick={() => openStudentFeeStatus(p)}
                                     className="block max-w-full truncate text-left text-sm font-semibold text-teal-500 hover:underline"
-                                    title="Voir l'état de paiement de l'élève"
+                                    title="Voir la situation des paiements"
                                   >
                                     {studentName}
                                   </button>
@@ -1665,7 +1693,7 @@ function AdminFeesPageContent() {
                                 type="button"
                                 onClick={() => openStudentFeeStatus(p)}
                                 className="inline-flex w-[4.75rem] justify-center shrink-0 items-center gap-1.5 rounded-lg bg-teal-500/10 px-3.5 py-2 text-xs font-semibold text-teal-500 transition-colors hover:bg-teal-500/20 ml-auto"
-                                title="Voir l'état de l'élève"
+                                title="Voir la situation des paiements"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                                 Voir
@@ -2111,6 +2139,19 @@ function AdminFeesPageContent() {
         />
       )}
 
+      {studentStatusModal && (
+        <StudentFeeStatusModal
+          theme={theme}
+          studentId={studentStatusModal.studentId}
+          yearId={studentStatusModal.yearId}
+          studentName={studentStatusModal.studentName}
+          studentCode={studentStatusModal.studentCode}
+          className={studentStatusModal.className}
+          yearName={studentStatusModal.yearName}
+          onClose={() => setStudentStatusModal(null)}
+        />
+      )}
+
       {showCreateTarifModal && !isCashier && (
         <CreateTarificationModal
           theme={theme}
@@ -2129,6 +2170,278 @@ function AdminFeesPageContent() {
     </>
   )
 }
+
+
+// ============================================================
+// MODAL : SITUATION DES PAIEMENTS D'UN ÉLÈVE
+// ============================================================
+
+function StudentFeeStatusModal({
+  theme,
+  studentId,
+  yearId,
+  studentName,
+  studentCode,
+  className,
+  yearName,
+  onClose,
+}: {
+  theme: "light" | "dark"
+  studentId: number
+  yearId: number
+  studentName: string
+  studentCode: string
+  className: string
+  yearName: string
+  onClose: () => void
+}) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [balance, setBalance] = useState<StudentYearBalance | null>(null)
+  const [recentPayments, setRecentPayments] = useState<PaiementRecord[]>([])
+
+  const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
+  const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-500"
+  const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
+  const bgColor = theme === "dark" ? "bg-gray-800" : "bg-white"
+  const panelBg = theme === "dark" ? "bg-gray-900/60" : "bg-gray-50"
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [balanceRes, paymentsRes] = await Promise.all([
+          fetch(`/api/admin/fees/balance?studentId=${studentId}&yearId=${yearId}`),
+          fetch(`/api/admin/fees/paiements?studentId=${studentId}&yearId=${yearId}&pageSize=8`),
+        ])
+
+        if (!balanceRes.ok) {
+          const body = await balanceRes.json().catch(() => ({}))
+          throw new Error(body.error || "Impossible de charger la situation de l'élève")
+        }
+
+        const balanceJson = await balanceRes.json()
+        const paymentsJson = paymentsRes.ok ? await paymentsRes.json() : { data: [] }
+
+        if (!cancelled) {
+          setBalance(balanceJson.data as StudentYearBalance)
+          setRecentPayments((paymentsJson.data || []) as PaiementRecord[])
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Erreur de chargement")
+          setBalance(null)
+          setRecentPayments([])
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [studentId, yearId])
+
+  const usd = balance?.usd
+  const cdf = balance?.cdf
+  const totalPaye = (usd?.totalPaye ?? 0) + (cdf?.totalPaye ?? 0)
+  const totalSolde = (usd?.solde ?? 0) + (cdf?.solde ?? 0)
+  const status: "solde" | "partiel" | "impaye" =
+    totalSolde <= 0 && totalPaye > 0 ? "solde" : totalPaye > 0 ? "partiel" : "impaye"
+
+  const statusMeta = {
+    solde: {
+      label: "Soldé",
+      className: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+      Icon: CheckCircle,
+    },
+    partiel: {
+      label: "Partiel",
+      className: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
+      Icon: Clock,
+    },
+    impaye: {
+      label: "Impayé",
+      className: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+      Icon: AlertCircle,
+    },
+  }[status]
+  const StatusIcon = statusMeta.Icon
+
+  const modeLabel = (mode: string) =>
+    MODES_PAIEMENT.find((m) => m.value === mode)?.label || mode
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative ${bgColor} rounded-2xl border ${borderColor} shadow-2xl w-full max-w-2xl overflow-hidden`}>
+          <div className="px-5 sm:px-6 py-4 border-b border-teal-500/20 bg-gradient-to-r from-teal-600 to-cyan-600">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-teal-50/90 text-xs font-medium uppercase tracking-wide">
+                  <Receipt className="w-3.5 h-3.5" />
+                  Situation des paiements
+                </div>
+                <h3 className="mt-1 text-lg font-bold text-white truncate">{studentName}</h3>
+                <p className="text-teal-50/90 text-sm truncate">
+                  {className}
+                  {studentCode ? ` · ${studentCode}` : ""}
+                  {yearName ? ` · ${yearName}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 rounded-lg text-white/90 hover:bg-white/10 transition-colors shrink-0"
+                aria-label="Fermer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto space-y-5">
+            {loading ? (
+              <div className="flex items-center justify-center py-16 gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
+                <span className={`text-sm ${textSecondary}`}>Chargement de la situation…</span>
+              </div>
+            ) : error ? (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            ) : balance ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusMeta.className}`}>
+                    <StatusIcon className="w-3.5 h-3.5" />
+                    {statusMeta.label}
+                  </span>
+                  <span className={`text-xs ${textSecondary}`}>
+                    {balance.details.length} type{balance.details.length > 1 ? "s" : ""} de frais
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    ["USD", usd],
+                    ["CDF", cdf],
+                  ] as const).map(([devise, bucket]) => {
+                    if (!bucket || (bucket.totalDu <= 0 && bucket.totalPaye <= 0)) return null
+                    const pct = bucket.totalDu > 0 ? Math.min(100, Math.round((bucket.totalPaye / bucket.totalDu) * 100)) : 0
+                    return (
+                      <div key={devise} className={`rounded-xl border ${borderColor} ${panelBg} p-4`}>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <p className={`text-xs font-semibold uppercase tracking-wide ${textSecondary}`}>{devise}</p>
+                          <p className={`text-xs font-medium ${textSecondary}`}>{pct}%</p>
+                        </div>
+                        <div className={`h-1.5 rounded-full mb-3 ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"}`}>
+                          <div
+                            className={`h-full rounded-full ${bucket.solde <= 0 ? "bg-green-500" : pct >= 50 ? "bg-orange-400" : "bg-red-400"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex justify-between gap-3">
+                            <span className={textSecondary}>Attendu</span>
+                            <span className={`font-medium ${textColor}`}>{formatMontant(bucket.totalDu, devise)}</span>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <span className={textSecondary}>Payé</span>
+                            <span className="font-medium text-green-500">{formatMontant(bucket.totalPaye, devise)}</span>
+                          </div>
+                          <div className="flex justify-between gap-3 pt-1 border-t border-dashed border-gray-300 dark:border-gray-600">
+                            <span className={`font-medium ${textColor}`}>Reste</span>
+                            <span className={`font-bold ${bucket.solde > 0 ? "text-orange-500" : "text-green-500"}`}>
+                              {formatMontant(bucket.solde, devise)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {balance.details.length > 0 && (
+                  <div>
+                    <h4 className={`text-sm font-semibold ${textColor} mb-2`}>Détail par frais</h4>
+                    <ul className={`rounded-xl border ${borderColor} divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"} overflow-hidden`}>
+                      {balance.details.map((d) => (
+                        <li key={`${d.tarificationId}-${d.devise}`} className={`flex items-center justify-between gap-3 px-3.5 py-2.5 ${panelBg}`}>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium ${textColor} truncate`}>{d.typeFrais}</p>
+                            <p className={`text-xs ${textSecondary}`}>
+                              Payé {formatMontant(d.totalPaye, d.devise)} / {formatMontant(d.montantTotal, d.devise)}
+                            </p>
+                          </div>
+                          <span className={`text-sm font-semibold shrink-0 ${d.solde > 0 ? "text-orange-500" : "text-green-500"}`}>
+                            {d.solde > 0 ? `Reste ${formatMontant(d.solde, d.devise)}` : "Soldé"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className={`text-sm font-semibold ${textColor} mb-2`}>Derniers paiements</h4>
+                  {recentPayments.length === 0 ? (
+                    <p className={`text-sm ${textSecondary} rounded-xl border ${borderColor} ${panelBg} px-3.5 py-4`}>
+                      Aucun paiement enregistré pour cette année.
+                    </p>
+                  ) : (
+                    <ul className={`rounded-xl border ${borderColor} divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-100"} overflow-hidden`}>
+                      {recentPayments.map((p) => (
+                        <li key={p.id} className={`flex items-center justify-between gap-3 px-3.5 py-2.5 ${panelBg}`}>
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium ${textColor} truncate`}>
+                              {p.tarification.typeFrais.nom}
+                              {p.isAnnule ? <span className="ml-2 text-[10px] font-semibold text-red-500">Annulé</span> : null}
+                            </p>
+                            <p className={`text-xs ${textSecondary} truncate`}>
+                              {new Date(p.datePaiement).toLocaleDateString("fr-FR", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                              {" · "}
+                              {modeLabel(p.modePaiement)}
+                              {" · "}
+                              <span className="font-mono">{p.numeroRecu}</span>
+                            </p>
+                          </div>
+                          <span className={`text-sm font-bold shrink-0 ${p.isAnnule ? "text-red-500 line-through" : "text-green-500"}`}>
+                            {formatMontant(p.montant, p.tarification.devise)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div className={`px-5 sm:px-6 py-4 border-t ${borderColor} flex justify-end`}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`px-4 py-2 rounded-xl border ${borderColor} text-sm font-medium ${textColor} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
 
 // ============================================================
 // FORMULAIRE DE PAIEMENT
