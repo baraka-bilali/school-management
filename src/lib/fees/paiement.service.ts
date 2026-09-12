@@ -529,7 +529,7 @@ export async function listPaiements(filters: ListPaiementsFilters) {
         tarification: {
           include: {
             typeFrais: { select: { nom: true, code: true } },
-            year: { select: { name: true } },
+            year: { select: { id: true, name: true } },
           },
         },
         enrollment: {
