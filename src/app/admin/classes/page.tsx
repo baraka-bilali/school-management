@@ -119,6 +119,7 @@ function ClassesPageContent() {
   const [mountedDelete, setMountedDelete] = useState(false)
   const [visibleDelete, setVisibleDelete] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Gestion du thème
   useEffect(() => {
@@ -145,6 +146,7 @@ function ClassesPageContent() {
 
   const fetchClasses = async () => {
     setLoading(true)
+    setFetchError(null)
     const perfLabel = `[PERF] Classes fetch`
     console.time(perfLabel)
     
@@ -152,6 +154,9 @@ function ClassesPageContent() {
       const response = await fetch("/api/admin/classes")
       const text = await response.text()
       const data = text ? JSON.parse(text) : { classes: [] }
+      if (!response.ok) {
+        throw new Error(data.error || `Erreur ${response.status} lors du chargement des classes`)
+      }
       setClasses(Array.isArray(data.classes) ? data.classes : [])
       
       console.timeEnd(perfLabel)
@@ -160,6 +165,7 @@ function ClassesPageContent() {
       console.error("Erreur lors de la récupération des classes:", error)
       console.timeEnd(perfLabel)
       setClasses([])
+      setFetchError(error instanceof Error ? error.message : "Impossible de charger les classes")
     } finally {
       setLoading(false)
     }
@@ -435,12 +441,19 @@ function ClassesPageContent() {
             <CardTitle>Liste des classes</CardTitle>
           </CardHeader>
           <CardContent>
+            {fetchError && (
+              <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+                {fetchError}
+              </div>
+            )}
             {/* Mobile: cartes compactes — nom + filière, pas de colonnes redondantes */}
             <div className="md:hidden space-y-4">
               {loading ? (
                 <p className={`py-8 text-center text-[15px] ${textSecondary}`}>Chargement...</p>
               ) : classes.length === 0 ? (
-                <p className={`py-8 text-center text-[15px] ${textSecondary}`}>Aucune classe trouvée.</p>
+                <p className={`py-8 text-center text-[15px] ${textSecondary}`}>
+                  {fetchError ? "Impossible d'afficher les classes." : "Aucune classe trouvée."}
+                </p>
               ) : (
                 SECTION_ORDER.map((section) => {
                   const sectionClasses = classes
@@ -557,7 +570,7 @@ function ClassesPageContent() {
                       {classes.length === 0 ? (
                         <tr>
                           <td colSpan={7} className={`px-3 py-8 text-center ${textSecondary}`}>
-                            Aucune classe trouvée.
+                            {fetchError ? "Impossible d'afficher les classes." : "Aucune classe trouvée."}
                           </td>
                         </tr>
                       ) : (
