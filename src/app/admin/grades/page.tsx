@@ -250,13 +250,13 @@ export default function GradesPage() {
           ))}
         </div>
 
-        {loading ? (
+        {tab === "branches" ? (
+          <PrimaryCurriculumPanel />
+        ) : loading ? (
           <div className="flex items-center gap-2 text-gray-500 py-12 justify-center">
             <Loader2 className="h-5 w-5 animate-spin" />
             Chargement…
           </div>
-        ) : tab === "branches" ? (
-          <PrimaryCurriculumPanel />
         ) : tab === "cycles" ? (
           <div className="space-y-4">
             <div className="flex justify-end">

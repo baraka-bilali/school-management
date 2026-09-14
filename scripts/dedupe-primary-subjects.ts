@@ -30,8 +30,14 @@ function slugCode(input: string, maxLen = 20): string {
   return base || "BR"
 }
 
+function shortHash(input: string): string {
+  let h = 0
+  for (let i = 0; i < input.length; i++) h = (Math.imul(31, h) + input.charCodeAt(i)) | 0
+  return Math.abs(h).toString(36).toUpperCase().padStart(4, "0").slice(0, 4)
+}
+
 function canonicalCode(branchName: string): string {
-  return `PRI-${slugCode(branchName, 20)}`.slice(0, 32)
+  return `PRI-${slugCode(branchName, 16)}-${shortHash(norm(branchName))}`.slice(0, 32)
 }
 
 type GroupMember = {
@@ -247,7 +253,8 @@ async function main() {
             UPDATE "SubjectExamMax" SET "subjectId" = ${item.keepId}
             WHERE "subjectId" = ${fromId}`
 
-          // Assignments: move columns from conflicting dups, then reassign or delete
+          // Assignments: remount related rows onto the survivor before delete
+          // (ExamGrade / ScheduleSlot cascade on CourseAssignment delete).
           const assignments = await tx.courseAssignment.findMany({ where: { subjectId: fromId } })
           for (const a of assignments) {
             const existing = await tx.courseAssignment.findUnique({
@@ -265,15 +272,36 @@ async function main() {
                 where: { courseAssignmentId: a.id },
                 data: { courseAssignmentId: existing.id },
               })
+              await tx.scheduleSlot.updateMany({
+                where: { assignmentId: a.id },
+                data: { assignmentId: existing.id },
+              })
+              // Exam grades: drop conflicts on keep subject (unique is enrollment+subject+periodGroup)
+              await tx.$executeRaw`
+                DELETE FROM "ExamGrade" AS a
+                USING "ExamGrade" AS b
+                WHERE a."courseAssignmentId" = ${a.id}
+                  AND b."subjectId" = ${item.keepId}
+                  AND a."enrollmentId" = b."enrollmentId"
+                  AND a."periodGroupId" = b."periodGroupId"`
+              await tx.examGrade.updateMany({
+                where: { courseAssignmentId: a.id },
+                data: { courseAssignmentId: existing.id, subjectId: item.keepId },
+              })
               await tx.courseAssignment.delete({ where: { id: a.id } })
             } else {
               await tx.courseAssignment.update({
                 where: { id: a.id },
                 data: { subjectId: item.keepId },
               })
+              await tx.examGrade.updateMany({
+                where: { courseAssignmentId: a.id },
+                data: { subjectId: item.keepId },
+              })
             }
           }
 
+          // Any remaining exam grades still on fromId (orphaned / no assignment path)
           await tx.$executeRaw`
             DELETE FROM "ExamGrade" AS a
             USING "ExamGrade" AS b

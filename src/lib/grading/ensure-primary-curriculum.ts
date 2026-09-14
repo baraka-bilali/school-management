@@ -23,11 +23,6 @@ function slugCode(input: string, maxLen = 20): string {
   return base || "BR"
 }
 
-/** One Subject per pedagogical branch name (shared across degrees). */
-function canonicalSubjectCode(branchName: string): string {
-  return `PRI-${slugCode(branchName, 20)}`.slice(0, 32)
-}
-
 function normName(s: string): string {
   return s
     .toLowerCase()
@@ -35,6 +30,18 @@ function normName(s: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+/** Stable short hash so truncated slugs stay unique (Lecture-Écriture variants, etc.). */
+function shortHash(input: string): string {
+  let h = 0
+  for (let i = 0; i < input.length; i++) h = (Math.imul(31, h) + input.charCodeAt(i)) | 0
+  return Math.abs(h).toString(36).toUpperCase().padStart(4, "0").slice(0, 4)
+}
+
+/** One Subject per pedagogical branch name (shared across degrees). */
+function canonicalSubjectCode(branchName: string): string {
+  return `PRI-${slugCode(branchName, 16)}-${shortHash(normName(branchName))}`.slice(0, 32)
 }
 
 async function ensurePrimaryCycleExists(schoolId: number) {
