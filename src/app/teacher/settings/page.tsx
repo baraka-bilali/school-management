@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
+import { PasswordChangeFields, passwordsMatch } from "@/components/auth/password-change-fields"
 
 interface TeacherInfo {
   lastName: string
@@ -83,8 +84,6 @@ export default function TeacherSettingsPage() {
   const [loadingProfile, setLoadingProfile] = useState(true)
 
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" })
-  const [showNew, setShowNew] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordStatus, setPasswordStatus] = useState<"idle" | "success" | "error">("idle")
   const [passwordError, setPasswordError] = useState("")
@@ -145,10 +144,7 @@ export default function TeacherSettingsPage() {
     }
   }
 
-  const passwordOk =
-    passwordForm.newPassword.length >= 6 &&
-    passwordForm.confirmPassword.length >= 6 &&
-    passwordForm.newPassword === passwordForm.confirmPassword
+  const passwordOk = passwordsMatch(passwordForm)
 
   const fullName = teacher
     ? `${teacher.lastName} ${teacher.middleName} ${teacher.firstName}`.replace(/\s+/g, " ").trim()
@@ -246,47 +242,12 @@ export default function TeacherSettingsPage() {
       <SectionCard icon={Lock} iconBg="bg-orange-50 dark:bg-orange-500/10" iconColor="text-orange-500" title="Sécurité">
         <p className={cn("mb-4 text-sm", textMuted)}>Changer mon mot de passe</p>
         <form onSubmit={handleChangePassword} className="space-y-4 lg:max-w-lg">
-          <div>
-            <label className={cn("mb-1.5 block text-sm font-medium", textMuted)}>
-              Nouveau mot de passe <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Input
-                type={showNew ? "text" : "password"}
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                placeholder="Au moins 6 caractères"
-                className={cn("rounded-xl pr-10", isDark && "border-gray-700 bg-gray-800")}
-                minLength={6}
-                required
-              />
-              <button type="button" onClick={() => setShowNew(!showNew)} className={cn("absolute right-3 top-1/2 -translate-y-1/2", textMuted)}>
-                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className={cn("mb-1.5 block text-sm font-medium", textMuted)}>
-              Confirmer le mot de passe <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Input
-                type={showConfirm ? "text" : "password"}
-                value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                placeholder="Retapez votre mot de passe"
-                className={cn("rounded-xl pr-10", isDark && "border-gray-700 bg-gray-800")}
-                minLength={6}
-                required
-              />
-              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className={cn("absolute right-3 top-1/2 -translate-y-1/2", textMuted)}>
-                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          {passwordForm.newPassword && passwordForm.confirmPassword && !passwordOk && (
-            <p className="text-sm text-red-500">Les mots de passe ne correspondent pas</p>
-          )}
+          <PasswordChangeFields
+            values={passwordForm}
+            onChange={setPasswordForm}
+            variant="themed"
+            idPrefix="settings-pwd"
+          />
           {passwordStatus === "success" && (
             <div className="flex items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-600 dark:bg-green-500/10 dark:text-green-400">
               <Check className="h-4 w-4" /> Mot de passe modifié avec succès !
