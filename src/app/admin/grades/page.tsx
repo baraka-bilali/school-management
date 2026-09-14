@@ -255,6 +255,8 @@ export default function GradesPage() {
             <Loader2 className="h-5 w-5 animate-spin" />
             Chargement…
           </div>
+        ) : tab === "branches" ? (
+          <PrimaryCurriculumPanel />
         ) : tab === "cycles" ? (
           <div className="space-y-4">
             <div className="flex justify-end">
