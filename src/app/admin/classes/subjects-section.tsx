@@ -291,7 +291,7 @@ export function SubjectsSection({ theme }: { theme: "light" | "dark" }) {
           <div>
             <CardTitle className={textColor}>Matières / Cours</CardTitle>
             <p className={cn("mt-1 text-xs", textSecondary)}>
-              Structure pédagogique (nom, code, coefficient, heures). Les affectations se font dans Utilisateurs → Affectations.
+              Catalogue transversal (secondaire / humanités). Les branches du primaire (Domaine → Groupe → Branche) se gèrent dans Notes &amp; Bulletins → Branches primaire.
             </p>
           </div>
           <button

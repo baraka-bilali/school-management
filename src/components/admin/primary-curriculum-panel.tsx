@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { authFetch } from "@/lib/auth-fetch"
 import { toast } from "sonner"
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Loader2, RefreshCw } from "lucide-react"
 
 type BranchRow = {
   id: number
@@ -37,11 +37,17 @@ type DegreeRow = {
   domains: DomainRow[]
 }
 
+function shortDegreeLabel(d: DegreeRow): string {
+  if (d.levels.length) return d.levels.join(" · ")
+  return d.name
+}
+
 export function PrimaryCurriculumPanel() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [degrees, setDegrees] = useState<DegreeRow[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [openDomains, setOpenDomains] = useState<Record<number, boolean>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,20 +57,27 @@ export function PrimaryCurriculumPanel() {
       if (!res.ok) throw new Error(data.error || "Chargement impossible")
       const list = (data.degrees || []) as DegreeRow[]
       setDegrees(list)
-      if (!selectedId && list.length) setSelectedId(list[0].id)
+      setSelectedId((prev) => prev ?? (list[0]?.id ?? null))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erreur")
     } finally {
       setLoading(false)
     }
-  }, [selectedId])
+  }, [])
 
   useEffect(() => {
     void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [load])
 
   const selected = degrees.find((d) => d.id === selectedId) || null
+
+  useEffect(() => {
+    if (!selected) return
+    // Expand all domains for newly selected degree
+    const next: Record<number, boolean> = {}
+    for (const domain of selected.domains) next[domain.id] = true
+    setOpenDomains(next)
+  }, [selected?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function syncCatalog() {
     setSyncing(true)
@@ -129,8 +142,9 @@ export function PrimaryCurriculumPanel() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Structures officielles RDC (Domaines → Groupes → Branches). Seul le{" "}
-          <strong>max période</strong> est stocké ; examen = 2×, trimestre = 4×, annuel = 12×.
+          Branches organisées par <strong>degré / niveau</strong> (Domaines → Groupes → Branches).
+          Une matière canonique unique est partagée entre degrés ; seul le{" "}
+          <strong>max période</strong> varie (examen = 2×, trimestre = 4×, annuel = 12×).
         </p>
         <button
           type="button"
@@ -143,24 +157,48 @@ export function PrimaryCurriculumPanel() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {degrees.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setSelectedId(d.id)}
-            className={`rounded-full px-3 py-1.5 text-sm border ${
-              selectedId === d.id ? "bg-teal-700 text-white border-teal-700" : "hover:bg-muted"
-            }`}
-          >
-            {d.name}
-            {d.needsReview ? " ⚠" : ""}
-          </button>
-        ))}
+      {/* Degree / level picker — one section per degré */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {degrees.map((d) => {
+          const active = selectedId === d.id
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setSelectedId(d.id)}
+              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                active
+                  ? "border-teal-700 bg-teal-700 text-white"
+                  : "hover:bg-muted border-border"
+              }`}
+            >
+              <div className="text-xs opacity-80">{d.name.replace(/\s*\([^)]*\)\s*$/, "")}</div>
+              <div className="text-sm font-semibold mt-0.5">{shortDegreeLabel(d)}</div>
+              <div className={`text-xs mt-1 ${active ? "text-teal-100" : "text-muted-foreground"}`}>
+                max période {d.maxPeriodeTotal}
+                {d.needsReview ? " · à vérifier" : ""}
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {selected && (
         <div className="space-y-4">
+          <div className="rounded-xl border px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-muted/30">
+            <div>
+              <h2 className="font-semibold text-base">{selected.name}</h2>
+              <p className="text-sm text-muted-foreground">
+                Niveaux : <strong>{selected.levels.join(", ") || "—"}</strong>
+              </p>
+            </div>
+            <div className="text-xs text-muted-foreground text-right">
+              Maxima généraux → période {selected.maxPeriodeTotal} · examen{" "}
+              {selected.maximaGeneraux.maxExamen} · trimestre {selected.maximaGeneraux.maxTrimestre}{" "}
+              · annuel {selected.maximaGeneraux.maxAnnuel}
+            </div>
+          </div>
+
           {selected.needsReview && (
             <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4">
               <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -184,51 +222,54 @@ export function PrimaryCurriculumPanel() {
             </div>
           )}
 
-          <div className="rounded-xl border p-4 text-sm grid gap-1 sm:grid-cols-4">
-            <div>
-              <div className="text-muted-foreground">Maxima généraux (période)</div>
-              <div className="text-lg font-semibold">{selected.maxPeriodeTotal}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Examen (2×)</div>
-              <div className="text-lg font-semibold">{selected.maximaGeneraux.maxExamen}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Trimestre (4×)</div>
-              <div className="text-lg font-semibold">{selected.maximaGeneraux.maxTrimestre}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Annuel (12×)</div>
-              <div className="text-lg font-semibold">{selected.maximaGeneraux.maxAnnuel}</div>
-            </div>
-          </div>
-
-          {selected.domains.map((domain) => (
-            <div key={domain.id} className="rounded-xl border overflow-hidden">
-              <div className="bg-muted/50 px-4 py-2 flex justify-between gap-2">
-                <h3 className="font-semibold text-sm">{domain.name}</h3>
-                <span className="text-xs text-muted-foreground">Sous-total: {domain.maxPeriodeSubtotal}</span>
-              </div>
-              <div className="divide-y">
-                {domain.groups.map((group) => (
-                  <div key={group.id} className="p-3 space-y-2">
-                    <div className="text-sm font-medium flex justify-between">
-                      <span>{group.name}</span>
-                      <span className="text-xs text-muted-foreground">{group.maxPeriodeSubtotal}</span>
-                    </div>
-                    {group.branches.map((b) => (
-                      <BranchEditor key={b.id} branch={b} onSave={saveBranchMax} />
+          {selected.domains.map((domain) => {
+            const open = openDomains[domain.id] !== false
+            return (
+              <div key={domain.id} className="rounded-xl border overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full bg-muted/50 px-4 py-2.5 flex items-center justify-between gap-2 text-left"
+                  onClick={() =>
+                    setOpenDomains((prev) => ({ ...prev, [domain.id]: !open }))
+                  }
+                >
+                  <span className="font-semibold text-sm inline-flex items-center gap-2">
+                    {open ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    {domain.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Sous-total période : {domain.maxPeriodeSubtotal}
+                  </span>
+                </button>
+                {open && (
+                  <div className="divide-y">
+                    {domain.groups.map((group) => (
+                      <div key={group.id} className="p-3 space-y-2">
+                        <div className="text-sm font-medium flex justify-between">
+                          <span>{group.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {group.maxPeriodeSubtotal}
+                          </span>
+                        </div>
+                        {group.branches.map((b) => (
+                          <BranchEditor key={b.id} branch={b} onSave={saveBranchMax} />
+                        ))}
+                      </div>
+                    ))}
+                    {domain.branches.map((b) => (
+                      <div key={b.id} className="p-3">
+                        <BranchEditor branch={b} onSave={saveBranchMax} />
+                      </div>
                     ))}
                   </div>
-                ))}
-                {domain.branches.map((b) => (
-                  <div key={b.id} className="p-3">
-                    <BranchEditor branch={b} onSave={saveBranchMax} />
-                  </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -261,7 +302,8 @@ function BranchEditor({
         />
       </label>
       <span className="text-xs text-muted-foreground whitespace-nowrap">
-        → ex {branch.maxima.maxExamen} · trim {branch.maxima.maxTrimestre} · an {branch.maxima.maxAnnuel}
+        → ex {branch.maxima.maxExamen} · trim {branch.maxima.maxTrimestre} · an{" "}
+        {branch.maxima.maxAnnuel}
       </span>
       <button
         type="button"

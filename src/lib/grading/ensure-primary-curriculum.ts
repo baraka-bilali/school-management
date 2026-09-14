@@ -13,14 +13,7 @@ import { DEFAULT_EVALUATION_CYCLES } from "@/lib/grading/default-cycles"
 
 const PRIMARY_SECTION = "Primaire"
 
-const DEGREE_CODE_PREFIX: Record<PrimaryDegreeCatalog["code"], string> = {
-  ELEMENTAIRE: "EL",
-  MOYEN: "MO",
-  TERMINAL_5: "T5",
-  TERMINAL_6: "T6",
-}
-
-function slugCode(input: string, maxLen = 18): string {
+function slugCode(input: string, maxLen = 20): string {
   const base = input
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -30,18 +23,25 @@ function slugCode(input: string, maxLen = 18): string {
   return base || "BR"
 }
 
-function branchSubjectCode(
-  degreeCode: PrimaryDegreeCatalog["code"],
-  branchName: string,
-  sortOrder: number
-): string {
-  const prefix = DEGREE_CODE_PREFIX[degreeCode]
-  const slug = slugCode(branchName, 12)
-  return `P${prefix}-${slug}-${sortOrder}`.slice(0, 32)
+function normName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
-function branchSubjectName(branch: PrimaryBranchCatalog, degreeName: string): string {
-  return `${branch.name} · ${degreeName}`
+/** Stable short hash so truncated slugs stay unique (Lecture-Écriture variants, etc.). */
+function shortHash(input: string): string {
+  let h = 0
+  for (let i = 0; i < input.length; i++) h = (Math.imul(31, h) + input.charCodeAt(i)) | 0
+  return Math.abs(h).toString(36).toUpperCase().padStart(4, "0").slice(0, 4)
+}
+
+/** One Subject per pedagogical branch name (shared across degrees). */
+function canonicalSubjectCode(branchName: string): string {
+  return `PRI-${slugCode(branchName, 16)}-${shortHash(normName(branchName))}`.slice(0, 32)
 }
 
 async function ensurePrimaryCycleExists(schoolId: number) {
@@ -181,8 +181,8 @@ async function upsertBranch(params: {
   examGroups: Array<{ id: number }>
   groupLabel?: string | null
 }) {
-  const subjectName = branchSubjectName(params.branchSeed, params.degreeName)
-  const desiredCode = branchSubjectCode(params.degreeCode, params.branchSeed.name, params.sortOrder)
+  const subjectName = params.branchSeed.name
+  const desiredCode = canonicalSubjectCode(params.branchSeed.name)
 
   let existingBranch = await prisma.primaryBranch.findFirst({
     where: {
@@ -193,6 +193,7 @@ async function upsertBranch(params: {
     include: { subject: true },
   })
 
+  // Prefer: existing link → same canonical code → another branch with same name already linked
   let subject =
     existingBranch?.subjectId != null
       ? await prisma.subject.findFirst({
@@ -207,11 +208,50 @@ async function upsertBranch(params: {
   }
 
   if (!subject) {
+    const sibling = await prisma.primaryBranch.findFirst({
+      where: {
+        name: params.branchSeed.name,
+        subjectId: { not: null },
+        domain: { degree: { schoolId: params.schoolId } },
+      },
+      include: { subject: true },
+    })
+    if (sibling?.subject && sibling.subject.schoolId === params.schoolId) {
+      subject = sibling.subject
+    }
+  }
+
+  // Fallback: match by normalized name among primary-linked subjects
+  if (!subject) {
+    const candidates = await prisma.subject.findMany({
+      where: {
+        schoolId: params.schoolId,
+        isActive: true,
+        primaryBranches: { some: {} },
+      },
+      select: { id: true, name: true, code: true, groupLabel: true, isActive: true, schoolId: true },
+    })
+    const hit = candidates.find((c) => normName(c.name) === normName(subjectName))
+    if (hit) {
+      subject = await prisma.subject.findUnique({ where: { id: hit.id } })
+    }
+  }
+
+  if (!subject) {
+    let code = desiredCode
+    const clash = await prisma.subject.findFirst({
+      where: { schoolId: params.schoolId, code },
+      select: { id: true },
+    })
+    if (clash) {
+      code = `${desiredCode}`.slice(0, 28) + `-${Date.now().toString(36).slice(-3)}`.toUpperCase()
+      code = code.slice(0, 32)
+    }
     subject = await prisma.subject.create({
       data: {
         schoolId: params.schoolId,
         name: subjectName,
-        code: desiredCode,
+        code,
         color: "#0f766e",
         coefficient: 1,
         maxWeeklyHours: 2,
@@ -219,10 +259,18 @@ async function upsertBranch(params: {
       },
     })
   } else {
+    // Normalize display name; adopt canonical code when free or already ours
+    const codeOwner = await prisma.subject.findFirst({
+      where: { schoolId: params.schoolId, code: desiredCode },
+      select: { id: true },
+    })
     subject = await prisma.subject.update({
       where: { id: subject.id },
       data: {
         name: subjectName,
+        ...(codeOwner == null || codeOwner.id === subject.id
+          ? { code: desiredCode }
+          : {}),
         groupLabel: params.groupLabel ?? subject.groupLabel,
         isActive: true,
       },

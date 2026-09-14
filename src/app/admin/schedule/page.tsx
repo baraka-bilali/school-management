@@ -7,7 +7,8 @@ export default function SchedulePage() {
     {
       icon: BookOpen,
       title: "Matières & Codes",
-      description: "Chaque cours dispose d'un code abrégé (ex. MATH, FR, PHY) et d'un coefficient.",
+      description:
+        "Une fiche Subject unique par matière (ex. MATH, FR, PHY) — jamais une matière dupliquée par filière ou niveau.",
     },
     {
       icon: Users,
@@ -16,8 +17,9 @@ export default function SchedulePage() {
     },
     {
       icon: Clock,
-      title: "Durée hebdomadaire",
-      description: "Définissez les heures allouées par semaine et le plafond quotidien à ne pas dépasser.",
+      title: "Heures & coefficients",
+      description:
+        "Heures hebdo et coefficients vivent dans l'entrée de grille (niveau / filière), pas dans une nouvelle matière.",
     },
     {
       icon: Coffee,

@@ -235,7 +235,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     setLoading(true)
     try {
       const [subRes, assignRes, teachRes, metaRes] = await Promise.all([
-        authFetch("/api/admin/subjects"),
+        // Affectations need primary canonical subjects too (titulaire / manuelles).
+        authFetch("/api/admin/subjects?includePrimary=1"),
         authFetch("/api/admin/course-assignments"),
         authFetch("/api/admin/teachers?pageSize=200"),
         authFetch("/api/admin/meta"),

@@ -95,7 +95,8 @@ export default function GradesPage() {
   const loadMeta = useCallback(async () => {
     const [degRes, subRes] = await Promise.all([
       authFetch("/api/admin/grading-degrees"),
-      authFetch("/api/admin/subjects"),
+      // Include primary-linked canonical subjects for maxima editing by degree.
+      authFetch("/api/admin/subjects?includePrimary=1"),
     ])
     if (degRes.ok) {
       const d = await degRes.json()
@@ -249,7 +250,9 @@ export default function GradesPage() {
           ))}
         </div>
 
-        {loading ? (
+        {tab === "branches" ? (
+          <PrimaryCurriculumPanel />
+        ) : loading ? (
           <div className="flex items-center gap-2 text-gray-500 py-12 justify-center">
             <Loader2 className="h-5 w-5 animate-spin" />
             Chargement…

@@ -9,8 +9,20 @@ export async function GET(req: NextRequest) {
     const user = getAuthUser(req)
     requireRole(user, ROLES)
 
+    const { searchParams } = new URL(req.url)
+    // Primary branches live in Notes → Branches primaire; keep Matières/Cours clean.
+    const includePrimary = searchParams.get("includePrimary") === "1"
+
     const subjects = await prisma.subject.findMany({
-      where: { schoolId: user.schoolId, isActive: true },
+      where: {
+        schoolId: user.schoolId,
+        isActive: true,
+        ...(includePrimary
+          ? {}
+          : {
+              primaryBranches: { none: {} },
+            }),
+      },
       orderBy: { name: "asc" },
     })
 
