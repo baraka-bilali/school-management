@@ -6,11 +6,13 @@ import KelasiLogo from "@/components/kelasi-logo"
 import SplashScreen from "@/components/splash-screen"
 import { SPLASH_SESSION_KEY } from "@/components/splash-screen"
 import LoginAmbientBackground from "@/components/login-ambient-background"
-import { Mail, Lock, Eye, EyeOff, LogIn, KeyRound, Sparkles, PartyPopper, User, Phone, MapPin, Shield, Check, ChevronRight, X, Heart, LifeBuoy, MessageCircle } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, LogIn, Sparkles, PartyPopper, User, Phone, MapPin, Check, X, Heart, LifeBuoy, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/cards"
 import Portal from "@/components/portal"
+import { ForcePasswordChangeModal } from "@/components/auth/force-password-change-modal"
+import { PasswordFirstLoginChoiceModal } from "@/components/auth/password-first-login-choice-modal"
 import { BLOOD_GROUPS } from "@/lib/blood-groups"
 import {
 	getMissingStudentProfileFields,
@@ -117,13 +119,6 @@ export default function LoginPage() {
 	const [step, setStep] = useState<ModalStep>("none")
 	const [pendingRole, setPendingRole] = useState<string>("")
 	const [pendingStudentProfileCompleted, setPendingStudentProfileCompleted] = useState(true)
-
-	// Password change form
-	const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "" })
-	const [changingPassword, setChangingPassword] = useState(false)
-	const [passwordError, setPasswordError] = useState("")
-	const [showNewPassword, setShowNewPassword] = useState(false)
-	const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
 	// Profile completion form
 	const [profileForm, setProfileForm] = useState({
@@ -309,47 +304,29 @@ export default function LoginPage() {
 		setStep("change_password")
 	}
 
-	// Changer le mot de passe (admin ou élève)
-	const handleChangePassword = async (e: React.FormEvent) => {
-		e.preventDefault()
-		setChangingPassword(true)
-		setPasswordError("")
+	/** Après succès de la modale partagée (tous rôles). */
+	const handlePasswordChanged = async () => {
 		try {
-			const res = await fetch("/api/auth/change-password", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-				body: JSON.stringify(passwordForm),
-			})
-			let data
-			try { data = await res.json() } catch { throw new Error("Erreur de communication") }
-			if (!res.ok) throw new Error(data.error || "Erreur lors du changement")
-
-			// Récupérer nom utilisateur
-			try {
-				const meRes = await fetch("/api/auth/me", { credentials: "include" })
-				if (meRes.ok) {
-					const meData = await meRes.json()
-					setUserName(meData.user?.name || meData.user?.prenom || "")
-					if (!pendingRole) setPendingRole(meData.user?.role || "")
-				}
-			} catch {}
-
-			localStorage.removeItem("schoolName")
-
-			// Après changement de mot de passe, si ELEVE et profil non complété → compléter profil
-			if ((pendingRole === "ELEVE") && !pendingStudentProfileCompleted) {
-				setStep("profile_completion")
-			} else {
-				setStep("welcome")
-				const role = pendingRole
-				setTimeout(() => redirectByRole(role), 3500)
+			const meRes = await fetch("/api/auth/me", { credentials: "include" })
+			if (meRes.ok) {
+				const meData = await meRes.json()
+				setUserName(meData.user?.name || meData.user?.prenom || userName)
+				if (!pendingRole) setPendingRole(meData.user?.role || "")
 			}
-		} catch (err: unknown) {
-			setPasswordError(err instanceof Error ? err.message : "Erreur inconnue")
-		} finally {
-			setChangingPassword(false)
+		} catch {
+			/* ignore */
 		}
+
+		localStorage.removeItem("schoolName")
+
+		if (pendingRole === "ELEVE" && !pendingStudentProfileCompleted) {
+			setStep("profile_completion")
+			return
+		}
+
+		setStep("welcome")
+		const role = pendingRole
+		setTimeout(() => redirectByRole(role), 3500)
 	}
 
 	// Sauvegarder le profil étudiant
@@ -483,158 +460,20 @@ export default function LoginPage() {
 				</footer>
 			</div>
 
-			{/* ── Modal : Choix mot de passe (ELEVE première connexion) ── */}
-			{step === "password_choice" && (
-				<Portal>
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-						<div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-							<div className="p-6 bg-gradient-to-br from-indigo-50 to-blue-50 border-b border-indigo-100">
-								<div className="flex items-center gap-3 mb-1">
-									<div className="w-12 h-12 rounded-full bg-indigo-500/15 flex items-center justify-center">
-										<KeyRound className="w-6 h-6 text-indigo-600" />
-									</div>
-									<div>
-										<h2 className="text-xl font-bold text-gray-900">Première connexion</h2>
-										<p className="text-sm text-gray-500">Bienvenue, {userName || "élève"} !</p>
-									</div>
-								</div>
-							</div>
-							<div className="p-6">
-								<p className="text-gray-700 mb-2">
-									Un mot de passe temporaire vous a été attribué par votre école.
-								</p>
-								<p className="text-gray-600 text-sm mb-6">
-									Souhaitez-vous le changer ou continuer avec ce mot de passe ?
-								</p>
-								<div className="space-y-3">
-									<button
-										onClick={handleChooseChangePassword}
-										className="w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400 transition-all group"
-									>
-										<div className="flex items-center gap-3">
-											<div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-												<Shield className="w-5 h-5 text-indigo-600" />
-											</div>
-											<div className="text-left">
-												<p className="font-semibold text-gray-900">Oui, créer mon propre mot de passe</p>
-												<p className="text-xs text-gray-500">Recommandé pour votre sécurité</p>
-											</div>
-										</div>
-										<ChevronRight className="w-5 h-5 text-indigo-400" />
-									</button>
-									<button
-										onClick={handleSkipPasswordChange}
-										className="w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all group"
-									>
-										<div className="flex items-center gap-3">
-											<div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-												<Lock className="w-5 h-5 text-gray-500" />
-											</div>
-											<div className="text-left">
-												<p className="font-semibold text-gray-900">Non, garder le mot de passe actuel</p>
-												<p className="text-xs text-gray-500">Vous pourrez le changer plus tard dans Paramètres</p>
-											</div>
-										</div>
-										<ChevronRight className="w-5 h-5 text-gray-400" />
-									</button>
-								</div>
-							</div>
-						</div>
-					</div>
-				</Portal>
-			)}
-
-			{/* ── Modal : Changement de mot de passe ── */}
-			{step === "change_password" && (
-				<Portal>
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-						<div className="bg-white rounded-xl max-w-md w-full shadow-2xl">
-							<div className="p-6 border-b border-yellow-200 bg-yellow-50">
-								<div className="flex items-center gap-3 mb-2">
-									<div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
-										<KeyRound className="w-6 h-6 text-yellow-600" />
-									</div>
-									<div>
-										<h2 className="text-xl font-bold text-gray-900">
-											{pendingRole === "ELEVE" ? "Créer votre mot de passe" : "Changement de mot de passe requis"}
-										</h2>
-										<p className="text-sm text-gray-600">Première connexion détectée</p>
-									</div>
-								</div>
-							</div>
-							<form onSubmit={handleChangePassword} className="p-6 space-y-4">
-								{passwordError && (
-									<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{passwordError}</div>
-								)}
-								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe <span className="text-red-500">*</span></label>
-									<div className="relative">
-										<Input
-											lightSurface
-											type={showNewPassword ? "text" : "password"}
-											value={passwordForm.newPassword}
-											onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-											className="w-full pr-10"
-											placeholder="Au moins 6 caractères"
-											required
-											minLength={6}
-										/>
-										<button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
-											{showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-										</button>
-									</div>
-								</div>
-								<div>
-									<label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe <span className="text-red-500">*</span></label>
-									<div className="relative">
-										<Input
-											lightSurface
-											type={showConfirmPassword ? "text" : "password"}
-											value={passwordForm.confirmPassword}
-											onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-											className="w-full pr-10"
-											placeholder="Retapez votre mot de passe"
-											required
-											minLength={6}
-										/>
-										<button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
-											{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-										</button>
-									</div>
-								</div>
-								{passwordForm.newPassword && passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword && (
-									<p className="text-sm text-red-600">Les mots de passe ne correspondent pas</p>
-								)}
-								<div className="flex gap-3 pt-2">
-									{pendingRole === "ELEVE" && (
-										<button
-											type="button"
-											onClick={() => setStep("password_choice")}
-											className="flex-none px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-										>
-											Retour
-										</button>
-									)}
-									<Button
-										type="submit"
-										className="flex-1"
-										disabled={
-											changingPassword ||
-											!passwordForm.newPassword ||
-											!passwordForm.confirmPassword ||
-											passwordForm.newPassword !== passwordForm.confirmPassword ||
-											passwordForm.newPassword.length < 6
-										}
-									>
-										<KeyRound className="w-4 h-4 mr-2" />
-										{changingPassword ? "Enregistrement..." : "Confirmer"}
-									</Button>
-								</div>
-							</form>
-						</div>
-					</div>
-				</Portal>
-			)}
+			{/* ── Modales MDP partagées (tous rôles) ── */}
+			<PasswordFirstLoginChoiceModal
+				open={step === "password_choice"}
+				userName={userName}
+				onChooseChange={handleChooseChangePassword}
+				onKeepCurrent={handleSkipPasswordChange}
+			/>
+			<ForcePasswordChangeModal
+				open={step === "change_password"}
+				userName={userName}
+				role={pendingRole}
+				onBack={pendingRole === "ELEVE" ? () => setStep("password_choice") : undefined}
+				onSuccess={handlePasswordChanged}
+			/>
 
 			{/* ── Modal : Complétion du profil (ELEVE) ── */}
 			{step === "profile_completion" && (
