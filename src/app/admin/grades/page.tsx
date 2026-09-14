@@ -95,7 +95,8 @@ export default function GradesPage() {
   const loadMeta = useCallback(async () => {
     const [degRes, subRes] = await Promise.all([
       authFetch("/api/admin/grading-degrees"),
-      authFetch("/api/admin/subjects"),
+      // Include primary-linked canonical subjects for maxima editing by degree.
+      authFetch("/api/admin/subjects?includePrimary=1"),
     ])
     if (degRes.ok) {
       const d = await degRes.json()

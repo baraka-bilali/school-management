@@ -678,7 +678,8 @@ model Subject {
   periodMaxima    SubjectPeriodMax[]
   examMaxima      SubjectExamMax[]
   examGrades      ExamGrade[]
-  primaryBranch   PrimaryBranch?
+  /// Branches primaire partageant cette matière canonique (1 Subject → N degrés)
+  primaryBranches PrimaryBranch[]
   gradeLocks      GradeEntryLock[]
 
   @@unique([schoolId, code])
@@ -1099,8 +1100,8 @@ model PrimaryBranch {
   maxTrimestreOverride Float?
   maxAnnuelOverride   Float?
   sortOrder           Int            @default(0)
-  /// Matière liée pour la notation / affectations
-  subjectId           Int?           @unique
+  /// Matière canonique partagée entre degrés (pas une fiche par degré)
+  subjectId           Int?
   isActive            Boolean        @default(true)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -1110,6 +1111,7 @@ model PrimaryBranch {
 
   @@index([domainId, sortOrder])
   @@index([groupId])
+  @@index([subjectId])
 }
 
 /// Verrouillage après validation d'une période ou d'un examen
