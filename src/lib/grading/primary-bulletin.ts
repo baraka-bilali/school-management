@@ -6,6 +6,7 @@ import { toDisplayCode } from "@/lib/student-fields"
 export type BulletinSchoolInfo = {
   schoolName: string
   schoolAddress: string | null
+  schoolCity: string | null
   schoolPhone: string | null
   schoolEmail: string | null
   logoUrl: string | null
@@ -22,18 +23,37 @@ export type BulletinBranchLine = {
   maxPoints: number
 }
 
+export type BulletinDomainSubtotal = {
+  domainName: string
+  obtained: number
+  maxPoints: number
+  percentage: number | null
+  hasScore: boolean
+}
+
 export type BulletinStudentPayload = {
   enrollmentId: number
   studentId: number
   code: string
+  permanentCode: string
   lastName: string
   middleName: string
   firstName: string
   fullName: string
+  gender: string
+  birthDate: string | null
+  birthPlace: string | null
   lines: BulletinBranchLine[]
+  domainSubtotals: BulletinDomainSubtotal[]
+  /** Maxima généraux = somme des maxima des branches */
   totalObtained: number
   totalMax: number
   percentage: number | null
+  /** Rang dans la classe pour l'événement (1 = premier) */
+  place: number | null
+  /** Application / conduite : non saisis encore — cases prévues */
+  application: string | null
+  conduite: string | null
 }
 
 export type PrimaryBulletinPayload = {
@@ -53,6 +73,8 @@ export type PrimaryBulletinPayload = {
     letter: string
     titulaireName: string | null
   }
+  /** Effectif de la classe (élèves actifs) */
+  studentCount: number
   students: BulletinStudentPayload[]
 }
 
@@ -76,9 +98,67 @@ function titulaireName(t: {
   return displayName(t) || null
 }
 
+function buildDomainSubtotals(lines: BulletinBranchLine[]): BulletinDomainSubtotal[] {
+  const map = new Map<
+    string,
+    { obtained: number; maxPoints: number; hasScore: boolean }
+  >()
+  for (const line of lines) {
+    const cur = map.get(line.domainName) || {
+      obtained: 0,
+      maxPoints: 0,
+      hasScore: false,
+    }
+    cur.maxPoints += line.maxPoints
+    if (line.obtained != null) {
+      cur.obtained += line.obtained
+      cur.hasScore = true
+    }
+    map.set(line.domainName, cur)
+  }
+  return [...map.entries()].map(([domainName, v]) => ({
+    domainName,
+    obtained: roundGrade(v.obtained),
+    maxPoints: roundGrade(v.maxPoints),
+    percentage:
+      v.hasScore && v.maxPoints > 0
+        ? roundGrade((v.obtained / v.maxPoints) * 100, 1)
+        : null,
+    hasScore: v.hasScore,
+  }))
+}
+
+/** Rang dense : 1,2,2,4… sur le pourcentage (nulls en dernier). */
+function assignPlaces(
+  rows: Array<{ enrollmentId: number; percentage: number | null }>
+): Map<number, number | null> {
+  const ranked = [...rows].sort((a, b) => {
+    if (a.percentage == null && b.percentage == null) return 0
+    if (a.percentage == null) return 1
+    if (b.percentage == null) return -1
+    return b.percentage - a.percentage
+  })
+  const places = new Map<number, number | null>()
+  let lastPct: number | null = null
+  let lastPlace = 0
+  ranked.forEach((row, i) => {
+    if (row.percentage == null) {
+      places.set(row.enrollmentId, null)
+      return
+    }
+    if (lastPct === null || row.percentage !== lastPct) {
+      lastPlace = i + 1
+      lastPct = row.percentage
+    }
+    places.set(row.enrollmentId, lastPlace)
+  })
+  return places
+}
+
 /**
  * Charge les données de bulletins primaire pour une classe + événement.
- * Si enrollmentId est fourni, ne retourne que cet élève.
+ * Si enrollmentId est fourni, ne retourne que cet élève (le rang est
+ * calculé sur toute la classe).
  */
 export async function loadPrimaryBulletins(params: {
   schoolId: number
@@ -153,13 +233,13 @@ export async function loadPrimaryBulletins(params: {
 
   const degreeCode = primaryDegreeCodeForLevel(cls.level)
 
-  const [enrollments, assignments, curriculumBranches] = await Promise.all([
+  // Toujours charger toute la classe pour calculer la place / l'effectif
+  const [allEnrollments, assignments, curriculumBranches] = await Promise.all([
     prisma.enrollment.findMany({
       where: {
         classId,
         yearId,
         status: "ACTIVE",
-        ...(enrollmentFilter ? { id: enrollmentFilter } : {}),
       },
       include: {
         student: {
@@ -169,6 +249,9 @@ export async function loadPrimaryBulletins(params: {
             lastName: true,
             middleName: true,
             firstName: true,
+            gender: true,
+            birthDate: true,
+            birthPlace: true,
           },
         },
       },
@@ -239,9 +322,9 @@ export async function loadPrimaryBulletins(params: {
   }
 
   const branchRows: BranchRow[] = []
+  const subjectIds = assignments.map((a) => a.subjectId)
 
   if (kind === "PERIOD" && periodId) {
-    const subjectIds = assignments.map((a) => a.subjectId)
     const maxima = await prisma.subjectPeriodMax.findMany({
       where: {
         subjectId: { in: subjectIds },
@@ -255,6 +338,9 @@ export async function loadPrimaryBulletins(params: {
 
     for (const a of assignments) {
       const meta = branchMetaBySubject.get(a.subjectId)
+      // Préférer max curriculum (maxPeriode) si SubjectPeriodMax manquant
+      const curriculumMax =
+        curriculumBranches.find((b) => b.subjectId === a.subjectId)?.maxPeriode
       branchRows.push({
         subjectId: a.subjectId,
         assignmentId: a.id,
@@ -262,11 +348,10 @@ export async function loadPrimaryBulletins(params: {
         domainName: meta?.domainName || "Autres",
         groupName: meta?.groupName ?? null,
         sortKey: meta?.sortKey || `9999|9999|9999|${a.subject.name}`,
-        maxPoints: maxBySubject.get(a.subjectId) ?? 0,
+        maxPoints: maxBySubject.get(a.subjectId) ?? curriculumMax ?? 0,
       })
     }
   } else if (kind === "EXAM" && periodGroupId) {
-    const subjectIds = assignments.map((a) => a.subjectId)
     const maxima = await prisma.subjectExamMax.findMany({
       where: {
         subjectId: { in: subjectIds },
@@ -280,6 +365,11 @@ export async function loadPrimaryBulletins(params: {
 
     for (const a of assignments) {
       const meta = branchMetaBySubject.get(a.subjectId)
+      const curriculumMax = curriculumBranches.find(
+        (b) => b.subjectId === a.subjectId
+      )
+      const examMax =
+        curriculumMax != null ? curriculumMax.maxPeriode * 2 : undefined
       branchRows.push({
         subjectId: a.subjectId,
         assignmentId: a.id,
@@ -287,7 +377,7 @@ export async function loadPrimaryBulletins(params: {
         domainName: meta?.domainName || "Autres",
         groupName: meta?.groupName ?? null,
         sortKey: meta?.sortKey || `9999|9999|9999|${a.subject.name}`,
-        maxPoints: maxBySubject.get(a.subjectId) ?? 0,
+        maxPoints: maxBySubject.get(a.subjectId) ?? examMax ?? 0,
       })
     }
   }
@@ -295,7 +385,7 @@ export async function loadPrimaryBulletins(params: {
   branchRows.sort((a, b) => a.sortKey.localeCompare(b.sortKey, "fr"))
 
   const assignmentIds = branchRows.map((b) => b.assignmentId)
-  const enrollmentIds = enrollments.map((e) => e.id)
+  const enrollmentIds = allEnrollments.map((e) => e.id)
 
   const scoresByAssignmentEnrollment = new Map<string, number | null>()
 
@@ -324,7 +414,7 @@ export async function loadPrimaryBulletins(params: {
     for (const branch of branchRows) {
       const cols = colsByAssignment.get(branch.assignmentId) || []
       const sumColumnMax = cols.reduce((s, c) => s + c.maxPoints, 0)
-      for (const enr of enrollments) {
+      for (const enr of allEnrollments) {
         let sumObtained = 0
         let hasAny = false
         for (const col of cols) {
@@ -363,7 +453,7 @@ export async function loadPrimaryBulletins(params: {
     }
   }
 
-  const students: BulletinStudentPayload[] = enrollments.map((enr) => {
+  const builtAll = allEnrollments.map((enr) => {
     const lines: BulletinBranchLine[] = branchRows.map((b) => {
       const obtained =
         scoresByAssignmentEnrollment.get(`${b.assignmentId}:${enr.id}`) ?? null
@@ -398,22 +488,46 @@ export async function loadPrimaryBulletins(params: {
       studentId: enr.student.id,
       code:
         toDisplayCode(enr.code) || toDisplayCode(enr.student.permanentCode) || "",
+      permanentCode: enr.student.permanentCode,
       lastName: enr.student.lastName,
       middleName: enr.student.middleName,
       firstName: enr.student.firstName,
       fullName: displayName(enr.student),
+      gender: enr.student.gender,
+      birthDate: enr.student.birthDate
+        ? enr.student.birthDate.toISOString().slice(0, 10)
+        : null,
+      birthPlace: enr.student.birthPlace,
       lines,
+      domainSubtotals: buildDomainSubtotals(lines),
       totalObtained: roundGrade(totalObtained),
       totalMax: roundGrade(totalMax),
       percentage,
+      place: null as number | null,
+      application: null as string | null,
+      conduite: null as string | null,
     }
   })
+
+  const places = assignPlaces(
+    builtAll.map((s) => ({
+      enrollmentId: s.enrollmentId,
+      percentage: s.percentage,
+    }))
+  )
+  for (const s of builtAll) {
+    s.place = places.get(s.enrollmentId) ?? null
+  }
+
+  const students = enrollmentFilter
+    ? builtAll.filter((s) => s.enrollmentId === enrollmentFilter)
+    : builtAll
 
   return {
     school: {
       schoolName: school?.nomEtablissement ?? "",
-      schoolAddress:
-        [school?.adresse, school?.ville].filter(Boolean).join(", ") || null,
+      schoolAddress: school?.adresse ?? null,
+      schoolCity: school?.ville ?? null,
       schoolPhone: school?.telephone ?? null,
       schoolEmail: school?.email ?? null,
       logoUrl: school?.logoUrl ?? null,
@@ -435,6 +549,7 @@ export async function loadPrimaryBulletins(params: {
       letter: cls.letter,
       titulaireName: titulaireName(cls.titulaireTeacher),
     },
+    studentCount: allEnrollments.length,
     students,
   }
 }
