@@ -643,10 +643,14 @@ function DomainBlock({
   lines: BulletinBranchLine[]
   sub: BulletinDomainSubtotal | undefined
 }) {
-  const maxPeriode = sub?.maxPeriode ?? lines[0]?.maxPeriode ?? 0
-  const maxExamen = sub?.maxExamen ?? lines[0]?.maxExamen ?? 0
-  const maxTrimestre = sub?.maxTrimestre ?? lines[0]?.maxTrimestre ?? 0
-  const maxAnnuel = sub?.maxAnnuel ?? lines[0]?.maxAnnuel ?? 0
+  // Maxima de branche (ex. 10|10|20|40), pas la somme du domaine —
+  // aligné sur le croquis. Si les branches du domaine partagent le même
+  // barème on affiche ce barème ; sinon on prend la 1ère branche.
+  const ref = lines[0]
+  const maxPeriode = ref?.maxPeriode ?? 0
+  const maxExamen = ref?.maxExamen ?? 0
+  const maxTrimestre = ref?.maxTrimestre ?? 0
+  const maxAnnuel = ref?.maxAnnuel ?? 0
 
   return (
     <View>
@@ -654,7 +658,7 @@ function DomainBlock({
         <Text style={s.domainText}>{domainName}</Text>
       </View>
 
-      {/* Maxima dans la colonne Branches — repris en tête de chaque domaine */}
+      {/* Maxima = ligne Branches, reprise en tête de chaque domaine */}
       <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
         <View style={s.branchCell}>
           <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Oblique" }}>
