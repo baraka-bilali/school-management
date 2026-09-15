@@ -35,6 +35,7 @@ model User {
   communiqueUserReads  CommuniqueUserRead[]
   staffPayments        StaffPayment[]
   enrollmentDecisionChanges EnrollmentDecisionHistory[]
+  bulletinPublications BulletinPublication[]
 
   @@index([schoolId])
   @@index([schoolId, isActive])
@@ -78,6 +79,7 @@ model Class {
   slots         ScheduleSlot[]
   tasks         StudentTask[]
   gradeLocks    GradeEntryLock[]
+  bulletinPublications BulletinPublication[]
 
   @@unique([name, schoolId])
   @@index([section])
@@ -296,6 +298,7 @@ model School {
   evaluationCycles            EvaluationCycle[]
   primaryDegrees              PrimaryDegree[]
   gradeLocks                  GradeEntryLock[]
+  bulletinPublications        BulletinPublication[]
 
   @@index([codeEtablissement])
   @@index([email])
@@ -897,6 +900,7 @@ model PeriodGroup {
   examMaxima SubjectExamMax[]
   examGrades ExamGrade[]
   gradeLocks GradeEntryLock[]
+  bulletinPublications BulletinPublication[]
 
   @@unique([cycleId, sortOrder])
   @@index([cycleId])
@@ -914,6 +918,7 @@ model Period {
   periodMaxima     SubjectPeriodMax[]
   evaluationColumns EvaluationColumn[]
   gradeLocks       GradeEntryLock[]
+  bulletinPublications BulletinPublication[]
 
   @@unique([periodGroupId, sortOrder])
   @@index([periodGroupId])
@@ -1139,4 +1144,31 @@ model GradeEntryLock {
   @@index([periodId])
   @@index([periodGroupId])
   @@index([lockedByUserId])
+}
+
+/// Publication de bulletins pour une classe × événement (période ou examen).
+/// Snapshot léger pour l'instant : l'enregistrement marque l'affichage comme publié.
+/// TODO: snapshot complet des notes/moyennes pourra être ajouté plus tard.
+model BulletinPublication {
+  id                Int           @id @default(autoincrement())
+  schoolId          Int
+  classId           Int
+  kind              GradeLockKind
+  periodId          Int?
+  periodGroupId     Int?
+  /// Clé stable pour unicité : "PERIOD:{periodId}" ou "EXAM:{periodGroupId}"
+  eventKey          String
+  publishedAt       DateTime      @default(now())
+  publishedByUserId Int
+  school            School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class             Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  period            Period?       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  periodGroup       PeriodGroup?  @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
+  publishedBy       User          @relation(fields: [publishedByUserId], references: [id])
+
+  @@unique([classId, eventKey])
+  @@index([schoolId, classId])
+  @@index([periodId])
+  @@index([periodGroupId])
+  @@index([publishedByUserId])
 }

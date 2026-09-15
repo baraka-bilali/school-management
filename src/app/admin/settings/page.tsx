@@ -13,6 +13,8 @@ import {
   Star,
   Building2,
   X,
+  Layers,
+  GraduationCap,
 } from "lucide-react"
 import BrandingUploadCard from "@/components/branding-upload-card"
 import {
@@ -21,6 +23,8 @@ import {
   processSealCrop,
   type CropArea,
 } from "@/lib/image-utils"
+import { EvaluationCyclesPanel } from "@/components/admin/evaluation-cycles-panel"
+import { SubjectMaximaPanel } from "@/components/admin/subject-maxima-panel"
 
 interface AcademicYear {
   id: number
@@ -668,6 +672,39 @@ export default function SettingsPage() {
               L&apos;année active détermine quelles données sont affichées dans tout le tableau de bord : élèves, frais, notes, emplois du temps, etc.
             </p>
           </div>
+        </div>
+
+        {/* ===== CYCLES D'ÉVALUATION ===== */}
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="p-2 rounded-lg bg-slate-500/10 shrink-0">
+              <Layers className="w-5 h-5 text-slate-500" />
+            </div>
+            <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Cycles d&apos;évaluation
+            </h2>
+          </div>
+          <p className={`text-sm ${textSecondary} mb-4`}>
+            Trimestres et semestres utilisés pour la cotation. Valeurs habituellement
+            préconfigurées.
+          </p>
+          <EvaluationCyclesPanel compact />
+        </div>
+
+        {/* ===== NOTATION (MAXIMA) ===== */}
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 md:p-5 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="p-2 rounded-lg bg-indigo-500/10 shrink-0">
+              <GraduationCap className="w-5 h-5 text-indigo-500" />
+            </div>
+            <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Notation
+            </h2>
+          </div>
+          <p className={`text-sm ${textSecondary} mb-4`}>
+            Maxima officiels par matière et degré (et par filière en Humanités).
+          </p>
+          <SubjectMaximaPanel />
         </div>
       </div>
   )
