@@ -535,9 +535,7 @@ function SummaryCells({
     const slice = byKey.get(key)
     if (mode === "maxima") {
       const max = slice?.maxTotal ?? maxFallback
-      return visible
-        ? fmtFraction(slice?.obtained ?? null, max, true)
-        : `/${fmtNum(max)}`
+      return fmtNum(max)
     }
     if (!visible) return ""
     if (mode === "pct") return fmtPct(slice?.percentage)
