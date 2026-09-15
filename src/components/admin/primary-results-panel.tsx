@@ -122,6 +122,7 @@ export function PrimaryResultsPanel() {
     null
   )
   const previewUrlRef = useRef<string | null>(null)
+  const previewRequestIdRef = useRef(0)
 
   const selectedEvent = useMemo(() => {
     const parsed = parseEventValue(eventKey)
@@ -166,7 +167,9 @@ export function PrimaryResultsPanel() {
   }, [])
 
   const closePreview = useCallback(() => {
+    previewRequestIdRef.current += 1
     setPreviewOpen(false)
+    setPreviewLoading(false)
     setPreviewData(null)
     setPreviewTitle("")
     revokePreviewUrl()
@@ -332,6 +335,7 @@ export function PrimaryResultsPanel() {
       toast.error("Choisissez un événement d'évaluation")
       return
     }
+    const requestId = ++previewRequestIdRef.current
     setStudentPicker(null)
     setPreviewOpen(true)
     setPreviewLoading(true)
@@ -354,7 +358,9 @@ export function PrimaryResultsPanel() {
       const res = await authFetch(
         `/api/admin/primary-results/bulletin?${params}`
       )
+      if (requestId !== previewRequestIdRef.current) return
       const json = await res.json()
+      if (requestId !== previewRequestIdRef.current) return
       if (!res.ok) throw new Error(json.error || "Impossible de charger le bulletin")
 
       const data = json.data as PrimaryBulletinPayload
@@ -363,15 +369,16 @@ export function PrimaryResultsPanel() {
       }
 
       const blob = await generateBulletinPdfBlob(data)
+      if (requestId !== previewRequestIdRef.current) return
       const url = URL.createObjectURL(blob)
       previewUrlRef.current = url
       setPreviewUrl(url)
       setPreviewData(data)
+      setPreviewLoading(false)
     } catch (e) {
+      if (requestId !== previewRequestIdRef.current) return
       toast.error(e instanceof Error ? e.message : "Erreur")
       closePreview()
-    } finally {
-      setPreviewLoading(false)
     }
   }
 
