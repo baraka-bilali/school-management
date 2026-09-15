@@ -181,7 +181,7 @@ export default function GradesPage() {
       </div>
 
       {/* Cycle tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-hide">
         {(
           [
             ["primaire", "Primaire"],

@@ -343,6 +343,17 @@ input:not(:-webkit-autofill) {
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Hide native number-input spin buttons (ugly steppers) */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Champs à fond clair dans une UI sombre — texte toujours lisible (mobile + desktop) */
 .field-on-light {
   color-scheme: light !important;

@@ -7,14 +7,23 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  Download,
+  Eye,
   Loader2,
   Printer,
+  Search,
   Send,
   AlertCircle,
+  X,
 } from "lucide-react"
 import { MenuSelect } from "@/components/ui/menu-select"
+import Portal from "@/components/portal"
 import { submissionStatusLabel } from "@/lib/grading/class-submission-status"
 import type { ClassSubmissionStatus } from "@/lib/grading/class-submission-status"
+import type {
+  ClassStudentOption,
+  PrimaryBulletinPayload,
+} from "@/lib/grading/primary-bulletin"
 
 type EventOption = {
   kind: "PERIOD" | "EXAM"
@@ -72,6 +81,24 @@ function statusBadge(status: ClassSubmissionStatus) {
   }
 }
 
+function normalizeSearch(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+async function generateBulletinPdfBlob(
+  data: PrimaryBulletinPayload
+): Promise<Blob> {
+  const { pdf } = await import("@react-pdf/renderer")
+  const { default: PrimaryBulletinPDF } = await import(
+    "@/components/primary-bulletin-pdf"
+  )
+  return pdf(<PrimaryBulletinPDF data={data} />).toBlob()
+}
+
 export function PrimaryResultsPanel() {
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
@@ -80,8 +107,21 @@ export function PrimaryResultsPanel() {
   const [classes, setClasses] = useState<ClassRow[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [printOpenFor, setPrintOpenFor] = useState<number | null>(null)
-  const [printStudentModal, setPrintStudentModal] = useState<ClassRow | null>(null)
   const printMenuRef = useRef<HTMLDivElement>(null)
+
+  const [studentPicker, setStudentPicker] = useState<ClassRow | null>(null)
+  const [studentList, setStudentList] = useState<ClassStudentOption[]>([])
+  const [studentListLoading, setStudentListLoading] = useState(false)
+  const [studentQuery, setStudentQuery] = useState("")
+
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewTitle, setPreviewTitle] = useState("")
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<PrimaryBulletinPayload | null>(
+    null
+  )
+  const previewUrlRef = useRef<string | null>(null)
 
   const selectedEvent = useMemo(() => {
     const parsed = parseEventValue(eventKey)
@@ -106,6 +146,38 @@ export function PrimaryResultsPanel() {
     [events]
   )
 
+  const filteredStudents = useMemo(() => {
+    const q = normalizeSearch(studentQuery)
+    if (!q) return studentList
+    return studentList.filter((s) => {
+      const hay = normalizeSearch(
+        `${s.fullName} ${s.code} ${s.lastName} ${s.firstName} ${s.middleName}`
+      )
+      return hay.includes(q)
+    })
+  }, [studentList, studentQuery])
+
+  const revokePreviewUrl = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
+    setPreviewUrl(null)
+  }, [])
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false)
+    setPreviewData(null)
+    setPreviewTitle("")
+    revokePreviewUrl()
+  }, [revokePreviewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    }
+  }, [])
+
   const load = useCallback(async (key?: string) => {
     setLoading(true)
     try {
@@ -114,10 +186,13 @@ export function PrimaryResultsPanel() {
       if (parsed) {
         params.set("kind", parsed.kind)
         if (parsed.periodId) params.set("periodId", String(parsed.periodId))
-        if (parsed.periodGroupId) params.set("periodGroupId", String(parsed.periodGroupId))
+        if (parsed.periodGroupId)
+          params.set("periodGroupId", String(parsed.periodGroupId))
       }
       const qs = params.toString()
-      const res = await authFetch(`/api/admin/primary-results${qs ? `?${qs}` : ""}`)
+      const res = await authFetch(
+        `/api/admin/primary-results${qs ? `?${qs}` : ""}`
+      )
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Chargement impossible")
 
@@ -125,7 +200,11 @@ export function PrimaryResultsPanel() {
       setEvents(evs)
 
       const sel = data.selected as
-        | { kind: "PERIOD" | "EXAM"; periodId: number | null; periodGroupId: number | null }
+        | {
+            kind: "PERIOD" | "EXAM"
+            periodId: number | null
+            periodGroupId: number | null
+          }
         | undefined
       if (sel) {
         const v =
@@ -153,13 +232,48 @@ export function PrimaryResultsPanel() {
   useEffect(() => {
     if (printOpenFor == null) return
     const onDoc = (ev: MouseEvent) => {
-      if (printMenuRef.current && !printMenuRef.current.contains(ev.target as Node)) {
+      if (
+        printMenuRef.current &&
+        !printMenuRef.current.contains(ev.target as Node)
+      ) {
         setPrintOpenFor(null)
       }
     }
     document.addEventListener("mousedown", onDoc)
     return () => document.removeEventListener("mousedown", onDoc)
   }, [printOpenFor])
+
+  useEffect(() => {
+    if (!studentPicker) {
+      setStudentList([])
+      setStudentQuery("")
+      return
+    }
+    let cancelled = false
+    setStudentListLoading(true)
+    void (async () => {
+      try {
+        const res = await authFetch(
+          `/api/admin/primary-results/students?classId=${studentPicker.classId}`
+        )
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Chargement des élèves impossible")
+        if (!cancelled) {
+          setStudentList((data.students || []) as ClassStudentOption[])
+        }
+      } catch (e) {
+        if (!cancelled) {
+          toast.error(e instanceof Error ? e.message : "Erreur")
+          setStudentPicker(null)
+        }
+      } finally {
+        if (!cancelled) setStudentListLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [studentPicker])
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -197,7 +311,9 @@ export function PrimaryResultsPanel() {
       const skipped = (data.skipped || []).length
       if (n > 0) toast.success(`${n} bulletin(s) publié(s)`)
       if (skipped > 0) {
-        toast.message(`${skipped} classe(s) ignorée(s) (non entièrement soumise)`)
+        toast.message(
+          `${skipped} classe(s) ignorée(s) (non entièrement soumise)`
+        )
       }
       await load(eventKey)
     } catch (e) {
@@ -207,12 +323,85 @@ export function PrimaryResultsPanel() {
     }
   }
 
+  const openBulletinPreview = async (opts: {
+    classRow: ClassRow
+    enrollmentId?: number
+    title: string
+  }) => {
+    if (!selectedEvent) {
+      toast.error("Choisissez un événement d'évaluation")
+      return
+    }
+    setStudentPicker(null)
+    setPreviewOpen(true)
+    setPreviewLoading(true)
+    setPreviewTitle(opts.title)
+    setPreviewData(null)
+    revokePreviewUrl()
+
+    try {
+      const params = new URLSearchParams({
+        classId: String(opts.classRow.classId),
+        kind: selectedEvent.kind,
+      })
+      if (selectedEvent.periodId)
+        params.set("periodId", String(selectedEvent.periodId))
+      if (selectedEvent.periodGroupId)
+        params.set("periodGroupId", String(selectedEvent.periodGroupId))
+      if (opts.enrollmentId)
+        params.set("enrollmentId", String(opts.enrollmentId))
+
+      const res = await authFetch(
+        `/api/admin/primary-results/bulletin?${params}`
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Impossible de charger le bulletin")
+
+      const data = json.data as PrimaryBulletinPayload
+      if (!data?.students?.length) {
+        throw new Error("Aucun élève à imprimer pour cette sélection")
+      }
+
+      const blob = await generateBulletinPdfBlob(data)
+      const url = URL.createObjectURL(blob)
+      previewUrlRef.current = url
+      setPreviewUrl(url)
+      setPreviewData(data)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erreur")
+      closePreview()
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const downloadPreviewPdf = async () => {
+    if (!previewData || !previewUrl) return
+    const a = document.createElement("a")
+    a.href = previewUrl
+    const suffix =
+      previewData.students.length === 1
+        ? previewData.students[0].fullName.replace(/\s+/g, "-")
+        : previewData.class.name.replace(/\s+/g, "-")
+    a.download = `bulletin-${suffix}-${previewData.event.label.replace(/\s+/g, "-")}.pdf`
+    a.click()
+  }
+
+  const printPreviewPdf = () => {
+    if (!previewUrl) return
+    const w = window.open(previewUrl, "_blank")
+    if (!w) {
+      toast.error("Autorisez les pop-ups pour imprimer")
+      return
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 dark:border-indigo-900/40 dark:bg-indigo-950/20 px-3 py-2.5 text-xs text-indigo-800 dark:text-indigo-200">
-        Statut provisoire basé sur les verrous <strong>GradeEntryLock</strong> par branche pour
-        l&apos;événement sélectionné (soumis = tous · partiel = certains · en attente = aucun).
-        La règle définitive pourra être ajustée.
+        Statut provisoire basé sur les verrous <strong>GradeEntryLock</strong> par
+        branche pour l&apos;événement sélectionné (soumis = tous · partiel =
+        certains · en attente = aucun). La règle définitive pourra être ajustée.
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -234,7 +423,11 @@ export function PrimaryResultsPanel() {
           type="button"
           disabled={publishing || !allSoumisSelected}
           onClick={() =>
-            void publish(classes.filter((c) => selectedIds.has(c.classId)).map((c) => c.classId))
+            void publish(
+              classes
+                .filter((c) => selectedIds.has(c.classId))
+                .map((c) => c.classId)
+            )
           }
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           title={
@@ -340,11 +533,18 @@ export function PrimaryResultsPanel() {
                       Publier
                     </button>
 
-                    <div className="relative" ref={printOpenFor === row.classId ? printMenuRef : undefined}>
+                    <div
+                      className="relative"
+                      ref={
+                        printOpenFor === row.classId ? printMenuRef : undefined
+                      }
+                    >
                       <button
                         type="button"
                         onClick={() =>
-                          setPrintOpenFor((prev) => (prev === row.classId ? null : row.classId))
+                          setPrintOpenFor((prev) =>
+                            prev === row.classId ? null : row.classId
+                          )
                         }
                         className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
@@ -353,13 +553,16 @@ export function PrimaryResultsPanel() {
                         <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                       </button>
                       {printOpenFor === row.classId && (
-                        <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1">
+                        <div className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1">
                           <button
                             type="button"
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                             onClick={() => {
                               setPrintOpenFor(null)
-                              toast.message("Impression bientôt disponible")
+                              void openBulletinPreview({
+                                classRow: row,
+                                title: `Aperçu — ${row.name}`,
+                              })
                             }}
                           >
                             Toute la classe
@@ -369,7 +572,7 @@ export function PrimaryResultsPanel() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                             onClick={() => {
                               setPrintOpenFor(null)
-                              setPrintStudentModal(row)
+                              setStudentPicker(row)
                             }}
                           >
                             Un élève…
@@ -385,36 +588,157 @@ export function PrimaryResultsPanel() {
         </div>
       )}
 
-      {printStudentModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setPrintStudentModal(null)}
-        >
+      {studentPicker && (
+        <Portal>
           <div
-            className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/45 p-0 sm:p-4"
+            onClick={() => setStudentPicker(null)}
           >
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Imprimer un élève
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Classe {printStudentModal.name} — l&apos;impression individuelle sera disponible
-              prochainement.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  toast.message("Impression bientôt disponible")
-                  setPrintStudentModal(null)
-                }}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-              >
-                Compris
-              </button>
+            <div
+              className="w-full sm:max-w-lg max-h-[88vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-800">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Choisir un élève
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {studentPicker.name} — liste alphabétique
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStudentPicker(null)}
+                  className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Fermer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="px-5 py-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="search"
+                    value={studentQuery}
+                    onChange={(e) => setStudentQuery(e.target.value)}
+                    placeholder="Rechercher par nom ou code…"
+                    autoFocus
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 pl-10 pr-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-2 pb-3 min-h-[200px]">
+                {studentListLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-gray-500 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chargement des élèves…
+                  </div>
+                ) : filteredStudents.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-10">
+                    {studentList.length === 0
+                      ? "Aucun élève inscrit dans cette classe."
+                      : "Aucun élève ne correspond à la recherche."}
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {filteredStudents.map((s) => (
+                      <li key={s.enrollmentId}>
+                        <button
+                          type="button"
+                          className="w-full text-left rounded-xl px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                          onClick={() =>
+                            void openBulletinPreview({
+                              classRow: studentPicker,
+                              enrollmentId: s.enrollmentId,
+                              title: `Aperçu — ${s.fullName}`,
+                            })
+                          }
+                        >
+                          <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {s.fullName}
+                          </span>
+                          {s.code ? (
+                            <span className="text-xs text-gray-500">
+                              Code {s.code}
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
+      )}
+
+      {previewOpen && (
+        <Portal>
+          <div className="fixed inset-0 z-[90] flex flex-col bg-black/50 p-2 sm:p-4">
+            <div className="mx-auto w-full max-w-5xl flex-1 flex flex-col min-h-0 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/50">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Eye className="h-4 w-4 text-indigo-600 shrink-0" />
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
+                    {previewTitle || "Aperçu du bulletin"}
+                  </h3>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!previewUrl || previewLoading}
+                    onClick={() => void downloadPreviewPdf()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Télécharger
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!previewUrl || previewLoading}
+                    onClick={printPreviewPdf}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Imprimer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closePreview}
+                    className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                    aria-label="Fermer l'aperçu"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 bg-gray-100 dark:bg-gray-950 relative">
+                {previewLoading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-500">
+                    <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                    <p className="text-sm">Génération de l&apos;aperçu PDF…</p>
+                  </div>
+                ) : previewUrl ? (
+                  <iframe
+                    title="Aperçu bulletin PDF"
+                    src={previewUrl}
+                    className="w-full h-full border-0 bg-white"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
+                    Aperçu indisponible
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   )
