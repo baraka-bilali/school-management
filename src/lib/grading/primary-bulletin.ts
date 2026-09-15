@@ -5,6 +5,7 @@ import {
   primaryDegreeCodeForLevel,
 } from "@/lib/grading/primary-maxima"
 import { ensureDefaultEvaluationCycles } from "@/lib/grading/cycles"
+import { bulletinEventKey } from "@/lib/grading/class-submission-status"
 import { toDisplayCode } from "@/lib/student-fields"
 
 export type BulletinSchoolInfo = {
@@ -18,7 +19,6 @@ export type BulletinSchoolInfo = {
   slogan: string | null
 }
 
-/** Une période dans un trimestre (ex: 1ère période). */
 export type BulletinPeriodCol = {
   periodId: number
   name: string
@@ -26,7 +26,6 @@ export type BulletinPeriodCol = {
   sortOrder: number
 }
 
-/** Structure d'un trimestre pour l'en-tête de grille. */
 export type BulletinTrimestreCol = {
   periodGroupId: number
   name: string
@@ -34,6 +33,19 @@ export type BulletinTrimestreCol = {
   sortOrder: number
   hasExam: boolean
   periods: BulletinPeriodCol[]
+}
+
+/** Visibilité cumulative basée sur BulletinPublication. */
+export type BulletinVisibility = {
+  /** periodId → visible pour les points */
+  periods: Record<string, boolean>
+  /** periodGroupId → examen visible */
+  exams: Record<string, boolean>
+  /** periodGroupId → total trimestre visible */
+  trims: Record<string, boolean>
+  year: boolean
+  /** Dernier événement publié (pour debug / UI) */
+  publishedThroughLabel: string | null
 }
 
 export type BulletinBranchLine = {
@@ -45,13 +57,10 @@ export type BulletinBranchLine = {
   maxExamen: number
   maxTrimestre: number
   maxAnnuel: number
-  /** Notes par periodId (null = pas encore saisi) */
+  /** null = non publié ou non saisi (maxima restent affichés côté PDF) */
   periodScores: Record<string, number | null>
-  /** Notes d'examen par periodGroupId */
   examScores: Record<string, number | null>
-  /** Total trimestre = P1+P2+Exam quand au moins une note */
   trimScores: Record<string, number | null>
-  /** Total annuel */
   annualScore: number | null
 }
 
@@ -68,13 +77,17 @@ export type BulletinDomainSubtotal = {
 }
 
 export type BulletinSummarySlice = {
-  /** Clé: periodId | `exam:${groupId}` | `trim:${groupId}` | `year` */
   key: string
   maxTotal: number
   obtained: number | null
   percentage: number | null
   place: number | null
+  /** Application dérivée du % (null si colonne non publiée) */
+  application: string | null
 }
+
+export const CONDUITE_CODES = ["E", "TB", "B", "A", "M", "MA"] as const
+export type ConduiteCode = (typeof CONDUITE_CODES)[number]
 
 export type BulletinStudentPayload = {
   enrollmentId: number
@@ -90,16 +103,14 @@ export type BulletinStudentPayload = {
   birthPlace: string | null
   lines: BulletinBranchLine[]
   domainSubtotals: BulletinDomainSubtotal[]
-  /** Maxima généraux / % / place par colonne d'évaluation */
   summaries: BulletinSummarySlice[]
-  application: string | null
-  conduite: string | null
+  /** Conduite par periodId uniquement (jamais exam/trim/année) */
+  conduiteByPeriod: Record<string, ConduiteCode | null>
 }
 
 export type PrimaryBulletinPayload = {
   school: BulletinSchoolInfo
   yearName: string
-  /** Événement pour lequel l'aperçu a été demandé (surlignage optionnel) */
   focusEvent: {
     kind: "PERIOD" | "EXAM"
     periodId: number | null
@@ -115,8 +126,21 @@ export type PrimaryBulletinPayload = {
     titulaireName: string | null
   }
   trimestres: BulletinTrimestreCol[]
+  visibility: BulletinVisibility
   studentCount: number
   students: BulletinStudentPayload[]
+}
+
+/** Barème Application à partir du pourcentage. */
+export function applicationFromPercentage(pct: number | null): string | null {
+  if (pct == null || !Number.isFinite(pct)) return null
+  if (pct >= 90) return "Élite"
+  if (pct >= 80) return "TB"
+  if (pct >= 70) return "B"
+  if (pct >= 60) return "AB"
+  if (pct >= 50) return "S"
+  if (pct >= 40) return "Med"
+  return "Mauv"
 }
 
 function displayName(parts: {
@@ -197,9 +221,105 @@ function addScores(
   }
 }
 
+type ChronoSlot =
+  | { kind: "period"; periodId: number; pubKey: string; label: string }
+  | { kind: "exam"; periodGroupId: number; pubKey: string; label: string }
+  | { kind: "trim"; periodGroupId: number; label: string }
+  | { kind: "year"; label: string }
+
+function buildChronoSlots(trimestres: BulletinTrimestreCol[]): ChronoSlot[] {
+  const slots: ChronoSlot[] = []
+  for (const t of trimestres) {
+    for (const p of t.periods) {
+      slots.push({
+        kind: "period",
+        periodId: p.periodId,
+        pubKey: bulletinEventKey("PERIOD", p.periodId, null),
+        label: `${t.shortLabel} ${p.shortLabel}`,
+      })
+    }
+    if (t.hasExam) {
+      slots.push({
+        kind: "exam",
+        periodGroupId: t.periodGroupId,
+        pubKey: bulletinEventKey("EXAM", null, t.periodGroupId),
+        label: `Examen ${t.shortLabel}`,
+      })
+      slots.push({
+        kind: "trim",
+        periodGroupId: t.periodGroupId,
+        label: `Total ${t.shortLabel}`,
+      })
+    }
+  }
+  slots.push({ kind: "year", label: "Total annuel" })
+  return slots
+}
+
 /**
- * Bulletin primaire année complète : trimestres / périodes / examens,
- * maxima toujours visibles, notes remplies progressivement.
+ * Publication cumulative : le plus loin événement PERIOD/EXAM publié
+ * rend visibles toutes les colonnes jusqu'à lui (et le total trim si examen).
+ */
+export function computeBulletinVisibility(
+  trimestres: BulletinTrimestreCol[],
+  publishedEventKeys: Set<string>
+): BulletinVisibility {
+  const slots = buildChronoSlots(trimestres)
+  let reach = -1
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i]
+    if (
+      (s.kind === "period" || s.kind === "exam") &&
+      publishedEventKeys.has(s.pubKey)
+    ) {
+      reach = i
+      if (s.kind === "exam" && slots[i + 1]?.kind === "trim") {
+        reach = i + 1
+      }
+    }
+  }
+  // Année visible seulement si le dernier total trimestre est atteint
+  if (reach >= 0 && slots[reach]?.kind === "trim") {
+    const laterTrim = slots.slice(reach + 1).some((x) => x.kind === "trim")
+    if (!laterTrim && slots[reach + 1]?.kind === "year") {
+      reach = reach + 1
+    }
+  }
+
+  const periods: Record<string, boolean> = {}
+  const exams: Record<string, boolean> = {}
+  const trims: Record<string, boolean> = {}
+  let year = false
+  let publishedThroughLabel: string | null = null
+
+  for (let i = 0; i <= reach; i++) {
+    const s = slots[i]
+    publishedThroughLabel = s.label
+    if (s.kind === "period") periods[String(s.periodId)] = true
+    if (s.kind === "exam") exams[String(s.periodGroupId)] = true
+    if (s.kind === "trim") trims[String(s.periodGroupId)] = true
+    if (s.kind === "year") year = true
+  }
+
+  for (const t of trimestres) {
+    for (const p of t.periods) {
+      if (periods[String(p.periodId)] == null) periods[String(p.periodId)] = false
+    }
+    if (t.hasExam) {
+      if (exams[String(t.periodGroupId)] == null)
+        exams[String(t.periodGroupId)] = false
+      if (trims[String(t.periodGroupId)] == null)
+        trims[String(t.periodGroupId)] = false
+    }
+  }
+
+  return { periods, exams, trims, year, publishedThroughLabel }
+}
+
+/**
+ * Charge les bulletins primaire. Les points (et dérivés) ne sont exposés
+ * que pour les événements publiés, de façon cumulative.
+ * Les maxima sont toujours fournis.
  */
 export async function loadPrimaryBulletins(params: {
   schoolId: number
@@ -215,7 +335,7 @@ export async function loadPrimaryBulletins(params: {
   const focusPeriodGroupId = kind === "EXAM" ? params.periodGroupId ?? null : null
   const enrollmentFilter = params.enrollmentId ?? null
 
-  const [school, year, cls, cycles] = await Promise.all([
+  const [school, year, cls, cycles, publications] = await Promise.all([
     prisma.school.findUnique({
       where: { id: schoolId },
       select: {
@@ -242,6 +362,10 @@ export async function loadPrimaryBulletins(params: {
       },
     }),
     ensureDefaultEvaluationCycles(schoolId),
+    prisma.bulletinPublication.findMany({
+      where: { schoolId, classId },
+      select: { eventKey: true },
+    }),
   ])
 
   if (!cls) throw new Error("Classe introuvable")
@@ -273,6 +397,9 @@ export async function loadPrimaryBulletins(params: {
       }
     })
 
+  const publishedKeys = new Set(publications.map((p) => p.eventKey))
+  const visibility = computeBulletinVisibility(trimestres, publishedKeys)
+
   let focusLabel = ""
   let focusGroupName = ""
   if (kind === "PERIOD" && focusPeriodId) {
@@ -299,7 +426,9 @@ export async function loadPrimaryBulletins(params: {
 
   const degreeCode = primaryDegreeCodeForLevel(cls.level)
   const allPeriodIds = trimestres.flatMap((t) => t.periods.map((p) => p.periodId))
-  const examGroupIds = trimestres.filter((t) => t.hasExam).map((t) => t.periodGroupId)
+  const examGroupIds = trimestres
+    .filter((t) => t.hasExam)
+    .map((t) => t.periodGroupId)
   const periodKeyList = allPeriodIds.map(String)
   const examKeyList = examGroupIds.map(String)
   const trimKeyList = trimestres.map((t) => String(t.periodGroupId))
@@ -363,8 +492,7 @@ export async function loadPrimaryBulletins(params: {
     }
   >()
   for (const b of curriculumBranches) {
-    if (!b.subjectId) continue
-    if (branchMetaBySubject.has(b.subjectId)) continue
+    if (!b.subjectId || branchMetaBySubject.has(b.subjectId)) continue
     const maxima = derivePrimaryMaxima(b.maxPeriode, {
       maxExamenOverride: b.maxExamenOverride,
       maxTrimestreOverride: b.maxTrimestreOverride,
@@ -429,7 +557,6 @@ export async function loadPrimaryBulletins(params: {
   const assignmentIds = branchRows.map((b) => b.assignmentId)
   const enrollmentIds = allEnrollments.map((e) => e.id)
 
-  // periodScores[assignmentId][enrollmentId][periodId]
   const periodScore = new Map<string, number | null>()
   const examScore = new Map<string, number | null>()
 
@@ -462,6 +589,12 @@ export async function loadPrimaryBulletins(params: {
           colsByAssignPeriod.get(`${branch.assignmentId}:${periodId}`) || []
         const sumColumnMax = cols.reduce((s, c) => s + c.maxPoints, 0)
         for (const enr of allEnrollments) {
+          const key = `${branch.assignmentId}:${enr.id}:${periodId}`
+          // Gate publication à la source
+          if (!visibility.periods[String(periodId)]) {
+            periodScore.set(key, null)
+            continue
+          }
           let sumObtained = 0
           let hasAny = false
           for (const col of cols) {
@@ -471,7 +604,6 @@ export async function loadPrimaryBulletins(params: {
               hasAny = true
             }
           }
-          const key = `${branch.assignmentId}:${enr.id}:${periodId}`
           if (!hasAny || branch.maxPeriode <= 0 || sumColumnMax <= 0) {
             periodScore.set(key, null)
           } else {
@@ -496,6 +628,7 @@ export async function loadPrimaryBulletins(params: {
       },
     })
     for (const g of examGrades) {
+      if (!visibility.exams[String(g.periodGroupId)]) continue
       examScore.set(
         `${g.courseAssignmentId}:${g.enrollmentId}:${g.periodGroupId}`,
         roundGrade(g.pointsObtained)
@@ -512,25 +645,38 @@ export async function loadPrimaryBulletins(params: {
     const trimScores = emptyScoreMap(trimKeyList)
 
     for (const pid of allPeriodIds) {
+      if (!visibility.periods[String(pid)]) {
+        periodScores[String(pid)] = null
+        continue
+      }
       periodScores[String(pid)] =
         periodScore.get(`${branch.assignmentId}:${enrollmentId}:${pid}`) ?? null
     }
     for (const gid of examGroupIds) {
+      if (!visibility.exams[String(gid)]) {
+        examScores[String(gid)] = null
+        continue
+      }
       examScores[String(gid)] =
         examScore.get(`${branch.assignmentId}:${enrollmentId}:${gid}`) ?? null
     }
 
     for (const t of trimestres) {
+      const gid = String(t.periodGroupId)
+      if (!visibility.trims[gid]) {
+        trimScores[gid] = null
+        continue
+      }
       const parts: Array<number | null> = t.periods.map(
         (p) => periodScores[String(p.periodId)] ?? null
       )
-      if (t.hasExam) parts.push(examScores[String(t.periodGroupId)] ?? null)
-      trimScores[String(t.periodGroupId)] = sumNullable(parts)
+      if (t.hasExam) parts.push(examScores[gid] ?? null)
+      trimScores[gid] = sumNullable(parts)
     }
 
-    const annualScore = sumNullable(
-      trimestres.map((t) => trimScores[String(t.periodGroupId)])
-    )
+    const annualScore = visibility.year
+      ? sumNullable(trimestres.map((t) => trimScores[String(t.periodGroupId)]))
+      : null
 
     return {
       subjectId: branch.subjectId,
@@ -548,7 +694,9 @@ export async function loadPrimaryBulletins(params: {
     }
   }
 
-  function buildDomainSubtotals(lines: BulletinBranchLine[]): BulletinDomainSubtotal[] {
+  function buildDomainSubtotals(
+    lines: BulletinBranchLine[]
+  ): BulletinDomainSubtotal[] {
     const map = new Map<string, BulletinDomainSubtotal>()
     for (const line of lines) {
       let cur = map.get(line.domainName)
@@ -605,7 +753,6 @@ export async function loadPrimaryBulletins(params: {
     }))
   }
 
-  // Construire tous les élèves (pour place), puis filtrer
   const builtAll = allEnrollments.map((enr) => {
     const lines = branchRows.map((b) => buildLineForEnrollment(b, enr.id))
     const domainSubtotals = buildDomainSubtotals(lines)
@@ -624,102 +771,135 @@ export async function loadPrimaryBulletins(params: {
     for (const t of trimestres) {
       for (const p of t.periods) {
         const key = `period:${p.periodId}`
-        let obtainedSum = 0
-        let has = false
-        for (const line of lines) {
-          const v = line.periodScores[String(p.periodId)]
-          if (v != null) {
-            obtainedSum += v
-            has = true
+        const visible = !!visibility.periods[String(p.periodId)]
+        let obtained: number | null = null
+        if (visible) {
+          let sum = 0
+          let has = false
+          for (const line of lines) {
+            const v = line.periodScores[String(p.periodId)]
+            if (v != null) {
+              sum += v
+              has = true
+            }
           }
+          obtained = has ? roundGrade(sum) : null
         }
-        const obtained = has ? roundGrade(obtainedSum) : null
+        const percentage =
+          obtained != null && maxPeriodTotal > 0
+            ? roundGrade((obtained / maxPeriodTotal) * 100, 1)
+            : null
         summaries.push({
           key,
           maxTotal: maxPeriodTotal,
           obtained,
-          percentage:
-            obtained != null && maxPeriodTotal > 0
-              ? roundGrade((obtained / maxPeriodTotal) * 100, 1)
-              : null,
+          percentage,
           place: null,
+          application: applicationFromPercentage(percentage),
         })
       }
       if (t.hasExam) {
         const key = `exam:${t.periodGroupId}`
-        let obtainedSum = 0
-        let has = false
-        for (const line of lines) {
-          const v = line.examScores[String(t.periodGroupId)]
-          if (v != null) {
-            obtainedSum += v
-            has = true
+        const visible = !!visibility.exams[String(t.periodGroupId)]
+        let obtained: number | null = null
+        if (visible) {
+          let sum = 0
+          let has = false
+          for (const line of lines) {
+            const v = line.examScores[String(t.periodGroupId)]
+            if (v != null) {
+              sum += v
+              has = true
+            }
           }
+          obtained = has ? roundGrade(sum) : null
         }
-        const obtained = has ? roundGrade(obtainedSum) : null
+        const percentage =
+          obtained != null && maxExamTotal > 0
+            ? roundGrade((obtained / maxExamTotal) * 100, 1)
+            : null
         summaries.push({
           key,
           maxTotal: maxExamTotal,
           obtained,
-          percentage:
-            obtained != null && maxExamTotal > 0
-              ? roundGrade((obtained / maxExamTotal) * 100, 1)
-              : null,
+          percentage,
           place: null,
+          application: applicationFromPercentage(percentage),
         })
       }
       {
         const key = `trim:${t.periodGroupId}`
-        let obtainedSum = 0
-        let has = false
-        for (const line of lines) {
-          const v = line.trimScores[String(t.periodGroupId)]
-          if (v != null) {
-            obtainedSum += v
-            has = true
+        const visible = !!visibility.trims[String(t.periodGroupId)]
+        let obtained: number | null = null
+        if (visible) {
+          let sum = 0
+          let has = false
+          for (const line of lines) {
+            const v = line.trimScores[String(t.periodGroupId)]
+            if (v != null) {
+              sum += v
+              has = true
+            }
           }
+          obtained = has ? roundGrade(sum) : null
         }
-        const obtained = has ? roundGrade(obtainedSum) : null
+        const percentage =
+          obtained != null && maxTrimTotal > 0
+            ? roundGrade((obtained / maxTrimTotal) * 100, 1)
+            : null
         summaries.push({
           key,
           maxTotal: maxTrimTotal,
           obtained,
-          percentage:
-            obtained != null && maxTrimTotal > 0
-              ? roundGrade((obtained / maxTrimTotal) * 100, 1)
-              : null,
+          percentage,
           place: null,
+          application: applicationFromPercentage(percentage),
         })
       }
     }
 
     {
-      let obtainedSum = 0
-      let has = false
-      for (const line of lines) {
-        if (line.annualScore != null) {
-          obtainedSum += line.annualScore
-          has = true
+      let obtained: number | null = null
+      if (visibility.year) {
+        let sum = 0
+        let has = false
+        for (const line of lines) {
+          if (line.annualScore != null) {
+            sum += line.annualScore
+            has = true
+          }
         }
+        obtained = has ? roundGrade(sum) : null
       }
-      const obtained = has ? roundGrade(obtainedSum) : null
+      const percentage =
+        obtained != null && maxYearTotal > 0
+          ? roundGrade((obtained / maxYearTotal) * 100, 1)
+          : null
       summaries.push({
         key: "year",
         maxTotal: maxYearTotal,
         obtained,
-        percentage:
-          obtained != null && maxYearTotal > 0
-            ? roundGrade((obtained / maxYearTotal) * 100, 1)
-            : null,
+        percentage,
         place: null,
+        application: applicationFromPercentage(percentage),
       })
+    }
+
+    const conduiteByPeriod: Record<string, ConduiteCode | null> = {}
+    for (const pid of allPeriodIds) {
+      // Pas encore de saisie persistée — cases vides ; non publiées = null
+      conduiteByPeriod[String(pid)] = visibility.periods[String(pid)]
+        ? null
+        : null
     }
 
     return {
       enrollmentId: enr.id,
       studentId: enr.student.id,
       code:
-        toDisplayCode(enr.code) || toDisplayCode(enr.student.permanentCode) || "",
+        toDisplayCode(enr.code) ||
+        toDisplayCode(enr.student.permanentCode) ||
+        "",
       permanentCode: enr.student.permanentCode,
       lastName: enr.student.lastName,
       middleName: enr.student.middleName,
@@ -733,12 +913,10 @@ export async function loadPrimaryBulletins(params: {
       lines,
       domainSubtotals,
       summaries,
-      application: null as string | null,
-      conduite: null as string | null,
+      conduiteByPeriod,
     }
   })
 
-  // Places par colonne
   const summaryKeys = builtAll[0]?.summaries.map((s) => s.key) || []
   for (const key of summaryKeys) {
     const places = assignPlaces(
@@ -784,6 +962,7 @@ export async function loadPrimaryBulletins(params: {
       titulaireName: titulaireName(cls.titulaireTeacher),
     },
     trimestres,
+    visibility,
     studentCount: allEnrollments.length,
     students,
   }

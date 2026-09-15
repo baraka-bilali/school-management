@@ -4,93 +4,76 @@ import type {
   PrimaryBulletinPayload,
   BulletinStudentPayload,
   BulletinBranchLine,
-  BulletinSummarySlice,
+  BulletinVisibility,
 } from "@/lib/grading/primary-bulletin"
 
 /**
- * A4 portrait condensé :
- * Branches | MaxP MaxE MaxT MaxA | [par trim: P1 P2 EX T]×3 | AN
- * = 4 maxima + 13 notes → tient dans la largeur utile (~571 pt).
+ * A4 paysage — disposition type bulletin officiel :
+ * par trimestre : MAX | 1P | 2P | MX.E | EX | MX.T | Tot
+ * + annuel MX.A | AN
+ * Maxima toujours visibles ; points seulement si publiés.
  */
-const PAGE_W = 595.28
-const MARGIN_X = 12
-const CONTENT_W = PAGE_W - MARGIN_X * 2 // ~571
+const PAGE_W = 841.89
+const PAGE_H = 595.28
+const MX = 10
+const MY = 8
+const CONTENT_W = PAGE_W - MX * 2
 
-const BRANCH_W = 88
-const MAX_W = 18
-const SCORE_W = 22
-const MAX_COLS = 4 // MaxP MaxE MaxT MaxA
-const SCORE_COLS = 13 // 3×(2P+EX+T) + AN = 13
-const TABLE_W = BRANCH_W + MAX_COLS * MAX_W + SCORE_COLS * SCORE_W // 88+72+286 = 446
+const BRANCH_W = 92
+/** 7 cols × 3 trim + 2 annuel = 23 */
+const N_SCORE_COLS = 23
+const COL_W = Math.floor((CONTENT_W - BRANCH_W) / N_SCORE_COLS) // ~32
+const TABLE_W = BRANCH_W + N_SCORE_COLS * COL_W
 
-const BORDER = "#111827"
-const MUTED = "#4b5563"
-const LIGHT = "#f3f4f6"
-const HEAD = "#e5e7eb"
-const FOCUS = "#e0e7ff"
+const BORDER = "#1e293b"
+const MUTED = "#64748b"
+const HEAD_BG = "#1e3a5f"
+const HEAD_FG = "#ffffff"
+const LIGHT = "#f1f5f9"
+const FOCUS = "#dbeafe"
+const HATCH = "#0f172a"
 
 const s = StyleSheet.create({
   page: {
-    width: PAGE_W,
-    paddingTop: 10,
-    paddingBottom: 12,
-    paddingLeft: MARGIN_X,
-    paddingRight: MARGIN_X,
+    paddingTop: MY,
+    paddingBottom: MY,
+    paddingLeft: MX,
+    paddingRight: MX,
     fontFamily: "Helvetica",
     fontSize: 6,
-    color: "#111827",
+    color: "#0f172a",
     backgroundColor: "#ffffff",
   },
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 6,
-    marginBottom: 4,
-    paddingBottom: 3,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    borderBottomStyle: "solid",
+    marginBottom: 3,
   },
-  logo: { width: 28, height: 28, objectFit: "contain" },
+  logo: { width: 26, height: 26, objectFit: "contain" },
   schoolBlock: { flex: 1 },
   schoolName: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
-  slogan: { fontSize: 5.5, color: MUTED, marginTop: 1, fontStyle: "italic" },
   meta: { fontSize: 5.5, color: MUTED, marginTop: 0.5 },
-  badge: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderStyle: "solid",
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    fontSize: 6,
-    fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-  },
-
-  titleBar: {
+  titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: LIGHT,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderStyle: "solid",
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+    backgroundColor: HEAD_BG,
+    paddingVertical: 3,
+    paddingHorizontal: 5,
     marginBottom: 3,
   },
   titleMain: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
+    color: HEAD_FG,
     textTransform: "uppercase",
   },
-  titleSub: { fontSize: 5.5, color: MUTED },
+  titleSub: { fontSize: 5.5, color: "#cbd5e1" },
 
   idGrid: {
     flexDirection: "row",
@@ -101,116 +84,88 @@ const s = StyleSheet.create({
   },
   idCol: {
     flex: 1,
-    padding: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
     borderRightWidth: 1,
     borderRightColor: BORDER,
     borderRightStyle: "solid",
   },
-  idColLast: { flex: 1, padding: 3 },
+  idColLast: { flex: 1, paddingVertical: 2, paddingHorizontal: 4 },
   idLine: { flexDirection: "row", marginBottom: 0.5 },
   idLabel: {
+    width: 46,
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
-    textTransform: "uppercase",
-    width: 48,
     color: MUTED,
+    textTransform: "uppercase",
   },
-  idValue: { fontSize: 6, flex: 1, fontFamily: "Helvetica-Bold" },
-  idValuePlain: { fontSize: 6, flex: 1 },
+  idValue: { flex: 1, fontSize: 6, fontFamily: "Helvetica-Bold" },
+  idPlain: { flex: 1, fontSize: 6 },
 
-  tableWrap: {
-    width: CONTENT_W,
-    alignItems: "center",
-    marginBottom: 3,
-  },
   table: {
     width: TABLE_W,
     borderWidth: 1,
     borderColor: BORDER,
     borderStyle: "solid",
+    alignSelf: "center",
   },
   headRow: {
     flexDirection: "row",
-    backgroundColor: HEAD,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    borderBottomStyle: "solid",
+    backgroundColor: HEAD_BG,
   },
   subHeadRow: {
     flexDirection: "row",
-    backgroundColor: LIGHT,
+    backgroundColor: "#334155",
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
     borderBottomStyle: "solid",
   },
   branchHead: {
     width: BRANCH_W,
-    paddingVertical: 1,
+    paddingVertical: 2,
     paddingHorizontal: 2,
     justifyContent: "center",
     borderRightWidth: 1,
-    borderRightColor: BORDER,
+    borderRightColor: "#475569",
     borderRightStyle: "solid",
   },
-  maxHeadGroup: {
-    width: MAX_COLS * MAX_W,
+  groupHead: {
     alignItems: "center",
     justifyContent: "center",
     borderRightWidth: 1,
-    borderRightColor: BORDER,
+    borderRightColor: "#475569",
     borderRightStyle: "solid",
-    paddingVertical: 1,
+    paddingVertical: 2,
   },
-  trimHead: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderRightWidth: 1,
-    borderRightColor: BORDER,
-    borderRightStyle: "solid",
-    paddingVertical: 1,
-  },
-  yearHead: {
-    width: SCORE_W,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 1,
-  },
-  headText: {
-    fontSize: 5,
+  headFg: {
+    fontSize: 5.5,
     fontFamily: "Helvetica-Bold",
+    color: HEAD_FG,
+    textAlign: "center",
     textTransform: "uppercase",
+  },
+  subFg: {
+    fontSize: 4.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#e2e8f0",
     textAlign: "center",
   },
   colHead: {
-    width: SCORE_W,
+    width: COL_W,
     alignItems: "center",
     justifyContent: "center",
     borderRightWidth: 0.4,
-    borderRightColor: "#9ca3af",
-    borderRightStyle: "solid",
-    paddingVertical: 1,
-  },
-  colHeadMax: {
-    width: MAX_W,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRightWidth: 0.4,
-    borderRightColor: "#9ca3af",
+    borderRightColor: "#64748b",
     borderRightStyle: "solid",
     paddingVertical: 1,
   },
   colHeadLast: {
-    width: SCORE_W,
+    width: COL_W,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 1,
   },
-  colHeadFocus: { backgroundColor: FOCUS },
-  tiny: {
-    fontSize: 4.5,
-    fontFamily: "Helvetica-Bold",
-    textAlign: "center",
-  },
+  colHeadFocus: { backgroundColor: "#1d4ed8" },
 
   domainRow: {
     backgroundColor: LIGHT,
@@ -225,136 +180,133 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
-
   row: {
     flexDirection: "row",
     borderBottomWidth: 0.4,
-    borderBottomColor: "#9ca3af",
+    borderBottomColor: "#cbd5e1",
     borderBottomStyle: "solid",
     minHeight: 8,
     alignItems: "center",
   },
   subtotalRow: {
     flexDirection: "row",
-    backgroundColor: "#fafafa",
+    backgroundColor: "#f8fafc",
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
     borderBottomStyle: "solid",
-    minHeight: 9,
+    minHeight: 8,
     alignItems: "center",
   },
   branchCell: {
     width: BRANCH_W,
     paddingHorizontal: 2,
-    paddingVertical: 0.5,
     borderRightWidth: 1,
     borderRightColor: BORDER,
     borderRightStyle: "solid",
   },
-  numMax: {
-    width: MAX_W,
-    textAlign: "center",
-    fontSize: 5,
-    color: MUTED,
-    borderRightWidth: 0.4,
-    borderRightColor: "#d1d5db",
-    borderRightStyle: "solid",
-    paddingVertical: 0.5,
-  },
-  numScore: {
-    width: SCORE_W,
+  cell: {
+    width: COL_W,
     textAlign: "center",
     fontSize: 5,
     borderRightWidth: 0.4,
-    borderRightColor: "#d1d5db",
+    borderRightColor: "#e2e8f0",
     borderRightStyle: "solid",
     paddingVertical: 0.5,
   },
-  numScoreLast: {
-    width: SCORE_W,
+  cellLast: {
+    width: COL_W,
     textAlign: "center",
     fontSize: 5,
     paddingVertical: 0.5,
   },
-  numBold: { fontFamily: "Helvetica-Bold" },
-  numFocus: { backgroundColor: FOCUS },
+  cellMax: { color: MUTED, fontSize: 4.5 },
+  cellBold: { fontFamily: "Helvetica-Bold", fontSize: 5 },
+  cellFocus: { backgroundColor: FOCUS },
+  hatch: {
+    width: COL_W,
+    height: 8,
+    backgroundColor: HATCH,
+    borderRightWidth: 0.4,
+    borderRightColor: "#334155",
+    borderRightStyle: "solid",
+  },
+  hatchLast: {
+    width: COL_W,
+    height: 8,
+    backgroundColor: HATCH,
+  },
 
-  summary: {
-    width: TABLE_W,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderStyle: "solid",
-    marginBottom: 3,
-  },
-  summaryLabelCell: {
+  summaryLabel: {
     width: BRANCH_W,
     paddingHorizontal: 2,
-    paddingVertical: 1,
-    borderRightWidth: 1,
-    borderRightColor: BORDER,
-    borderRightStyle: "solid",
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
+    borderRightWidth: 1,
+    borderRightColor: BORDER,
+    borderRightStyle: "solid",
   },
 
-  footerBlock: {
-    width: CONTENT_W,
-    alignItems: "center",
-  },
   signRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 5,
+    marginTop: 4,
     width: TABLE_W,
-    marginTop: 2,
+    alignSelf: "center",
   },
   signBox: {
     flex: 1,
     borderWidth: 1,
     borderColor: BORDER,
     borderStyle: "solid",
-    minHeight: 36,
+    minHeight: 32,
     padding: 3,
   },
   signLabel: {
     fontSize: 5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
-    marginBottom: 1,
   },
-  signHint: { fontSize: 4.5, color: MUTED },
+  signHint: { fontSize: 4.5, color: MUTED, marginTop: 1 },
   sealImg: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     objectFit: "contain",
     alignSelf: "center",
     marginTop: 1,
   },
   note: {
     width: TABLE_W,
+    alignSelf: "center",
     fontSize: 4.5,
     color: MUTED,
     marginTop: 2,
   },
   pageFooter: {
     position: "absolute",
-    bottom: 6,
-    left: MARGIN_X,
-    right: MARGIN_X,
-    fontSize: 4.5,
-    color: "#9ca3af",
+    bottom: 3,
+    left: MX,
+    right: MX,
+    fontSize: 4,
+    color: "#94a3b8",
     textAlign: "center",
   },
 })
 
-function fmtPts(n: number | null | undefined): string {
+function fmtNum(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return ""
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
-function fmtMax(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n <= 0) return ""
-  return Number.isInteger(n) ? String(n) : n.toFixed(0)
+function fmtFraction(
+  obtained: number | null | undefined,
+  max: number,
+  visible: boolean
+): string {
+  const m = fmtNum(max)
+  if (!visible) return m ? `/${m}` : ""
+  if (obtained == null) return m ? `—/${m}` : ""
+  return `${fmtNum(obtained)}/${m}`
 }
 
 function fmtPct(n: number | null | undefined): string {
@@ -370,14 +322,13 @@ function fmtPlace(place: number | null, count: number): string {
 function fmtDateFr(iso: string | null): string {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
-  if (!y || !m || !d) return iso
-  return `${d}/${m}/${y}`
+  return y && m && d ? `${d}/${m}/${y}` : iso
 }
 
 function genderLabel(g: string): string {
   const v = (g || "").toUpperCase()
-  if (v === "M" || v === "MASCULIN" || v === "GARCON" || v === "GARÇON") return "M"
-  if (v === "F" || v === "FEMININ" || v === "FÉMININ" || v === "FILLE") return "F"
+  if (v.startsWith("M") || v === "GARCON" || v === "GARÇON") return "M"
+  if (v.startsWith("F") || v === "FILLE") return "F"
   return g || "—"
 }
 
@@ -387,10 +338,9 @@ function isFocusPeriod(data: PrimaryBulletinPayload, periodId: number) {
   )
 }
 
-function isFocusExam(data: PrimaryBulletinPayload, groupId: number) {
+function isFocusExam(data: PrimaryBulletinPayload, gid: number) {
   return (
-    data.focusEvent.kind === "EXAM" &&
-    data.focusEvent.periodGroupId === groupId
+    data.focusEvent.kind === "EXAM" && data.focusEvent.periodGroupId === gid
   )
 }
 
@@ -404,13 +354,15 @@ function groupDomains(lines: BulletinBranchLine[]) {
   return domains
 }
 
-function Score({
-  value,
+function Cell({
+  text,
+  max,
   bold,
   focus,
   last,
 }: {
-  value: string
+  text: string
+  max?: boolean
   bold?: boolean
   focus?: boolean
   last?: boolean
@@ -418,25 +370,25 @@ function Score({
   return (
     <Text
       style={[
-        last ? s.numScoreLast : s.numScore,
-        bold ? s.numBold : {},
-        focus ? s.numFocus : {},
+        last ? s.cellLast : s.cell,
+        max ? s.cellMax : {},
+        bold ? s.cellBold : {},
+        focus ? s.cellFocus : {},
       ]}
     >
-      {value || " "}
+      {text || " "}
     </Text>
   )
 }
 
-function MaxCell({ value, bold }: { value: string; bold?: boolean }) {
-  return (
-    <Text style={[s.numMax, bold ? s.numBold : {}]}>{value || " "}</Text>
-  )
+function Hatch({ last }: { last?: boolean }) {
+  return <View style={last ? s.hatchLast : s.hatch} />
 }
 
-/** Cellules : 4 maxima + notes par trimestre + annuel */
-function DataCells({
+/** Une ligne de notes : MAX|P1|P2|MX.E|EX|MX.T|Tot × 3 + MX.A|AN */
+function ScoreCells({
   data,
+  vis,
   maxPeriode,
   maxExamen,
   maxTrimestre,
@@ -445,9 +397,11 @@ function DataCells({
   examScores,
   trimScores,
   annualScore,
+  asFraction,
   bold,
 }: {
   data: PrimaryBulletinPayload
+  vis: BulletinVisibility
   maxPeriode: number
   maxExamen: number
   maxTrimestre: number
@@ -456,142 +410,278 @@ function DataCells({
   examScores: Record<string, number | null>
   trimScores: Record<string, number | null>
   annualScore: number | null
+  asFraction?: boolean
   bold?: boolean
 }) {
-  const cells: ReactNode[] = [
-    <MaxCell key="mp" value={fmtMax(maxPeriode)} bold={bold} />,
-    <MaxCell key="me" value={fmtMax(maxExamen)} bold={bold} />,
-    <MaxCell key="mt" value={fmtMax(maxTrimestre)} bold={bold} />,
-    <MaxCell key="ma" value={fmtMax(maxAnnuel)} bold={bold} />,
-  ]
-
-  data.trimestres.forEach((t) => {
-    t.periods.forEach((p) => {
-      cells.push(
-        <Score
-          key={`p-${p.periodId}`}
-          value={fmtPts(periodScores[String(p.periodId)])}
-          bold={bold}
-          focus={isFocusPeriod(data, p.periodId)}
-        />
-      )
-    })
-    if (t.hasExam) {
-      cells.push(
-        <Score
-          key={`ex-${t.periodGroupId}`}
-          value={fmtPts(examScores[String(t.periodGroupId)])}
-          bold={bold}
-          focus={isFocusExam(data, t.periodGroupId)}
-        />
-      )
-    }
+  const cells: ReactNode[] = []
+  data.trimestres.forEach((t, ti) => {
+    const isLastTrim = ti === data.trimestres.length - 1
     cells.push(
-      <Score
-        key={`tr-${t.periodGroupId}`}
-        value={fmtPts(trimScores[String(t.periodGroupId)])}
+      <Cell
+        key={`mxp-${t.periodGroupId}`}
+        text={fmtNum(maxPeriode)}
+        max
         bold={bold}
       />
     )
-  })
-
-  cells.push(
-    <Score key="an" value={fmtPts(annualScore)} bold={bold} last />
-  )
-  return <>{cells}</>
-}
-
-function SummaryRow({
-  label,
-  data,
-  student,
-  highlight,
-  mode,
-}: {
-  label: string
-  data: PrimaryBulletinPayload
-  student: BulletinStudentPayload
-  highlight?: boolean
-  mode: "maxima" | "obtained" | "pct" | "place" | "count" | "blank"
-}) {
-  const byKey = new Map(student.summaries.map((x) => [x.key, x]))
-  const firstPeriod = data.trimestres[0]?.periods[0]
-  const firstPeriodSlice = firstPeriod
-    ? byKey.get(`period:${firstPeriod.periodId}`)
-    : undefined
-  const firstExam = data.trimestres[0]
-  const firstExamSlice = firstExam?.hasExam
-    ? byKey.get(`exam:${firstExam.periodGroupId}`)
-    : undefined
-  const firstTrimSlice = firstExam
-    ? byKey.get(`trim:${firstExam.periodGroupId}`)
-    : undefined
-  const yearSlice = byKey.get("year")
-
-  const renderMax = (slice: BulletinSummarySlice | undefined) => {
-    if (mode === "blank" || mode === "pct" || mode === "place" || mode === "count")
-      return ""
-    if (mode === "maxima") return fmtMax(slice?.maxTotal)
-    return ""
-  }
-  const renderScore = (slice: BulletinSummarySlice | undefined) => {
-    if (mode === "blank") return ""
-    if (mode === "maxima") return fmtPts(slice?.obtained)
-    if (mode === "obtained") return fmtPts(slice?.obtained)
-    if (mode === "pct") return fmtPct(slice?.percentage)
-    if (mode === "place")
-      return fmtPlace(slice?.place ?? null, data.studentCount)
-    if (mode === "count") return String(data.studentCount)
-    return ""
-  }
-
-  const cells: ReactNode[] = [
-    <MaxCell key="mp" value={renderMax(firstPeriodSlice)} bold />,
-    <MaxCell key="me" value={renderMax(firstExamSlice)} bold />,
-    <MaxCell key="mt" value={renderMax(firstTrimSlice)} bold />,
-    <MaxCell key="ma" value={renderMax(yearSlice)} bold />,
-  ]
-
-  data.trimestres.forEach((t) => {
     t.periods.forEach((p) => {
+      const visible = !!vis.periods[String(p.periodId)]
+      const obtained = periodScores[String(p.periodId)]
+      const text = asFraction
+        ? fmtFraction(obtained, maxPeriode, visible)
+        : visible
+          ? fmtNum(obtained)
+          : ""
       cells.push(
-        <Score
+        <Cell
           key={`p-${p.periodId}`}
-          value={renderScore(byKey.get(`period:${p.periodId}`))}
-          bold
+          text={text}
+          bold={bold}
           focus={isFocusPeriod(data, p.periodId)}
         />
       )
     })
-    if (t.hasExam) {
+    cells.push(
+      <Cell
+        key={`mxe-${t.periodGroupId}`}
+        text={fmtNum(maxExamen)}
+        max
+        bold={bold}
+      />
+    )
+    {
+      const visible = !!vis.exams[String(t.periodGroupId)]
+      const obtained = examScores[String(t.periodGroupId)]
+      const text = asFraction
+        ? fmtFraction(obtained, maxExamen, visible)
+        : visible
+          ? fmtNum(obtained)
+          : ""
       cells.push(
-        <Score
+        <Cell
           key={`ex-${t.periodGroupId}`}
-          value={renderScore(byKey.get(`exam:${t.periodGroupId}`))}
-          bold
+          text={text}
+          bold={bold}
           focus={isFocusExam(data, t.periodGroupId)}
         />
       )
     }
     cells.push(
-      <Score
-        key={`tr-${t.periodGroupId}`}
-        value={renderScore(byKey.get(`trim:${t.periodGroupId}`))}
+      <Cell
+        key={`mxt-${t.periodGroupId}`}
+        text={fmtNum(maxTrimestre)}
+        max
+        bold={bold}
+      />
+    )
+    {
+      const visible = !!vis.trims[String(t.periodGroupId)]
+      const obtained = trimScores[String(t.periodGroupId)]
+      const text = asFraction
+        ? fmtFraction(obtained, maxTrimestre, visible)
+        : visible
+          ? fmtNum(obtained)
+          : ""
+      cells.push(
+        <Cell
+          key={`tr-${t.periodGroupId}`}
+          text={text}
+          bold={bold}
+          last={false}
+        />
+      )
+    }
+    void isLastTrim
+  })
+  cells.push(<Cell key="mxa" text={fmtNum(maxAnnuel)} max bold={bold} />)
+  {
+    const text = asFraction
+      ? fmtFraction(annualScore, maxAnnuel, vis.year)
+      : vis.year
+        ? fmtNum(annualScore)
+        : ""
+    cells.push(<Cell key="an" text={text} bold={bold} last />)
+  }
+  return <>{cells}</>
+}
+
+function SummaryScoreCells({
+  data,
+  vis,
+  mode,
+  student,
+}: {
+  data: PrimaryBulletinPayload
+  vis: BulletinVisibility
+  mode: "maxima" | "pct" | "place" | "application"
+  student: BulletinStudentPayload
+}) {
+  const byKey = new Map(student.summaries.map((x) => [x.key, x]))
+  const cells: ReactNode[] = []
+
+  const renderPeriod = (periodId: number) => {
+    const slice = byKey.get(`period:${periodId}`)
+    const visible = !!vis.periods[String(periodId)]
+    if (mode === "maxima") {
+      return visible
+        ? fmtFraction(slice?.obtained ?? null, slice?.maxTotal ?? 0, true)
+        : `/${fmtNum(slice?.maxTotal)}`
+    }
+    if (!visible) return ""
+    if (mode === "pct") return fmtPct(slice?.percentage)
+    if (mode === "place")
+      return fmtPlace(slice?.place ?? null, data.studentCount)
+    if (mode === "application") return slice?.application || ""
+    return ""
+  }
+  const renderExam = (gid: number) => {
+    const slice = byKey.get(`exam:${gid}`)
+    const visible = !!vis.exams[String(gid)]
+    if (mode === "maxima") {
+      return visible
+        ? fmtFraction(slice?.obtained ?? null, slice?.maxTotal ?? 0, true)
+        : `/${fmtNum(slice?.maxTotal)}`
+    }
+    if (!visible) return ""
+    if (mode === "pct") return fmtPct(slice?.percentage)
+    if (mode === "place")
+      return fmtPlace(slice?.place ?? null, data.studentCount)
+    if (mode === "application") return slice?.application || ""
+    return ""
+  }
+  const renderTrim = (gid: number) => {
+    const slice = byKey.get(`trim:${gid}`)
+    const visible = !!vis.trims[String(gid)]
+    if (mode === "maxima") {
+      return visible
+        ? fmtFraction(slice?.obtained ?? null, slice?.maxTotal ?? 0, true)
+        : `/${fmtNum(slice?.maxTotal)}`
+    }
+    if (!visible) return ""
+    if (mode === "pct") return fmtPct(slice?.percentage)
+    if (mode === "place")
+      return fmtPlace(slice?.place ?? null, data.studentCount)
+    if (mode === "application") return slice?.application || ""
+    return ""
+  }
+  const renderYear = () => {
+    const slice = byKey.get("year")
+    if (mode === "maxima") {
+      return vis.year
+        ? fmtFraction(slice?.obtained ?? null, slice?.maxTotal ?? 0, true)
+        : `/${fmtNum(slice?.maxTotal)}`
+    }
+    if (!vis.year) return ""
+    if (mode === "pct") return fmtPct(slice?.percentage)
+    if (mode === "place")
+      return fmtPlace(slice?.place ?? null, data.studentCount)
+    if (mode === "application") return slice?.application || ""
+    return ""
+  }
+
+  data.trimestres.forEach((t) => {
+    // MAX période — pour maxima généraux on répète le max période global
+    const periodSlice = byKey.get(`period:${t.periods[0]?.periodId}`)
+    cells.push(
+      <Cell
+        key={`smx-${t.periodGroupId}`}
+        text={mode === "maxima" ? fmtNum(periodSlice?.maxTotal) : ""}
+        max
+        bold
+      />
+    )
+    t.periods.forEach((p) => {
+      cells.push(
+        <Cell
+          key={`sp-${p.periodId}`}
+          text={renderPeriod(p.periodId)}
+          bold
+          focus={isFocusPeriod(data, p.periodId)}
+        />
+      )
+    })
+    const examSlice = byKey.get(`exam:${t.periodGroupId}`)
+    cells.push(
+      <Cell
+        key={`smxe-${t.periodGroupId}`}
+        text={mode === "maxima" ? fmtNum(examSlice?.maxTotal) : ""}
+        max
+        bold
+      />
+    )
+    cells.push(
+      <Cell
+        key={`sex-${t.periodGroupId}`}
+        text={renderExam(t.periodGroupId)}
+        bold
+        focus={isFocusExam(data, t.periodGroupId)}
+      />
+    )
+    const trimSlice = byKey.get(`trim:${t.periodGroupId}`)
+    cells.push(
+      <Cell
+        key={`smxt-${t.periodGroupId}`}
+        text={mode === "maxima" ? fmtNum(trimSlice?.maxTotal) : ""}
+        max
+        bold
+      />
+    )
+    cells.push(
+      <Cell
+        key={`str-${t.periodGroupId}`}
+        text={renderTrim(t.periodGroupId)}
         bold
       />
     )
   })
-  cells.push(<Score key="an" value={renderScore(yearSlice)} bold last />)
-
-  return (
-    <View
-      style={[s.row, highlight ? { backgroundColor: LIGHT } : {}]}
-      wrap={false}
-    >
-      <Text style={s.summaryLabelCell}>{label}</Text>
-      {cells}
-    </View>
+  const yearSlice = byKey.get("year")
+  cells.push(
+    <Cell
+      key="smxa"
+      text={mode === "maxima" ? fmtNum(yearSlice?.maxTotal) : ""}
+      max
+      bold
+    />
   )
+  cells.push(<Cell key="san" text={renderYear()} bold last />)
+  return <>{cells}</>
+}
+
+/** Conduite : périodes seulement ; EX / Tot / MAX / AN hachurés. */
+function ConduiteCells({
+  data,
+  vis,
+  student,
+}: {
+  data: PrimaryBulletinPayload
+  vis: BulletinVisibility
+  student: BulletinStudentPayload
+}) {
+  const cells: ReactNode[] = []
+  data.trimestres.forEach((t) => {
+    cells.push(<Hatch key={`h-mxp-${t.periodGroupId}`} />)
+    t.periods.forEach((p) => {
+      const visible = !!vis.periods[String(p.periodId)]
+      const code = visible
+        ? student.conduiteByPeriod[String(p.periodId)] || ""
+        : ""
+      cells.push(
+        <Cell
+          key={`c-${p.periodId}`}
+          text={code}
+          bold
+          focus={isFocusPeriod(data, p.periodId)}
+        />
+      )
+    })
+    cells.push(<Hatch key={`h-mxe-${t.periodGroupId}`} />)
+    cells.push(<Hatch key={`h-ex-${t.periodGroupId}`} />)
+    cells.push(<Hatch key={`h-mxt-${t.periodGroupId}`} />)
+    cells.push(<Hatch key={`h-tr-${t.periodGroupId}`} />)
+  })
+  cells.push(<Hatch key="h-mxa" />)
+  cells.push(<Hatch key="h-an" last />)
+  return <>{cells}</>
 }
 
 function BulletinPage({
@@ -606,14 +696,14 @@ function BulletinPage({
   pageCount: number
 }) {
   const domains = groupDomains(student.lines)
+  const vis = data.visibility
   const addressLine = [data.school.schoolAddress, data.school.schoolCity]
     .filter(Boolean)
     .join(", ")
-  const colsPerTrim = (t: (typeof data.trimestres)[0]) =>
-    t.periods.length + (t.hasExam ? 1 : 0) + 1
+  const colsPerTrim = 7 // MAX + 2P + MX.E + EX + MX.T + Tot
 
   return (
-    <Page size="A4" orientation="portrait" style={s.page}>
+    <Page size="A4" orientation="landscape" style={s.page}>
       <View style={s.header}>
         {data.school.logoUrl ? (
           // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image
@@ -623,30 +713,23 @@ function BulletinPage({
           <Text style={s.schoolName}>
             {data.school.schoolName || "Établissement"}
           </Text>
-          {data.school.slogan ? (
-            <Text style={s.slogan}>{data.school.slogan}</Text>
-          ) : null}
-          {addressLine ? <Text style={s.meta}>{addressLine}</Text> : null}
-          {(data.school.schoolPhone || data.school.schoolEmail) && (
-            <Text style={s.meta}>
-              {[data.school.schoolPhone, data.school.schoolEmail]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
-          )}
-        </View>
-        <View style={s.badge}>
-          <Text style={s.badgeText}>Bulletin</Text>
+          <Text style={s.meta}>
+            {[addressLine, data.school.schoolPhone, data.school.schoolEmail]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
         </View>
       </View>
 
-      <View style={s.titleBar}>
+      <View style={s.titleRow}>
         <Text style={s.titleMain}>
-          Bulletin de l&apos;élève — {data.class.level}
-          {data.class.letter ? ` ${data.class.letter}` : ""}
+          Bulletin — {data.class.name} · {student.fullName}
         </Text>
         <Text style={s.titleSub}>
-          {data.yearName} · {data.focusEvent.groupName} — {data.focusEvent.label}
+          {data.yearName}
+          {vis.publishedThroughLabel
+            ? ` · Publié jusqu'à : ${vis.publishedThroughLabel}`
+            : " · Aucune période publiée"}
         </Text>
       </View>
 
@@ -657,255 +740,232 @@ function BulletinPage({
             <Text style={s.idValue}>{student.fullName}</Text>
           </View>
           <View style={s.idLine}>
-            <Text style={s.idLabel}>Sexe</Text>
-            <Text style={s.idValuePlain}>{genderLabel(student.gender)}</Text>
-          </View>
-          <View style={s.idLine}>
-            <Text style={s.idLabel}>Né(e) à</Text>
-            <Text style={s.idValuePlain}>
-              {student.birthPlace || "—"} · {fmtDateFr(student.birthDate)}
+            <Text style={s.idLabel}>Sexe / Né</Text>
+            <Text style={s.idPlain}>
+              {genderLabel(student.gender)} · {student.birthPlace || "—"}{" "}
+              {fmtDateFr(student.birthDate)}
             </Text>
           </View>
           <View style={s.idLine}>
             <Text style={s.idLabel}>N° perm.</Text>
-            <Text style={s.idValuePlain}>{student.permanentCode || "—"}</Text>
+            <Text style={s.idPlain}>{student.permanentCode || "—"}</Text>
           </View>
         </View>
         <View style={s.idColLast}>
           <View style={s.idLine}>
             <Text style={s.idLabel}>Classe</Text>
-            <Text style={s.idValue}>{data.class.name}</Text>
-          </View>
-          <View style={s.idLine}>
-            <Text style={s.idLabel}>N° classe</Text>
-            <Text style={s.idValuePlain}>{student.code || "—"}</Text>
+            <Text style={s.idValue}>
+              {data.class.name} · N° {student.code || "—"}
+            </Text>
           </View>
           <View style={s.idLine}>
             <Text style={s.idLabel}>Titulaire</Text>
-            <Text style={s.idValuePlain}>
-              {data.class.titulaireName || "—"}
-            </Text>
+            <Text style={s.idPlain}>{data.class.titulaireName || "—"}</Text>
           </View>
           <View style={s.idLine}>
             <Text style={s.idLabel}>Effectif</Text>
-            <Text style={s.idValuePlain}>{data.studentCount} élèves</Text>
+            <Text style={s.idPlain}>{data.studentCount} élèves</Text>
           </View>
         </View>
       </View>
 
-      <View style={s.tableWrap}>
-        <View style={s.table}>
-          {/* Ligne 1 : groupes */}
-          <View style={s.headRow}>
-            <View style={s.branchHead}>
-              <Text style={s.headText}>Branches</Text>
-            </View>
-            <View style={s.maxHeadGroup}>
-              <Text style={s.headText}>Maxima</Text>
-            </View>
-            {data.trimestres.map((t) => (
-              <View
-                key={t.periodGroupId}
-                style={[s.trimHead, { width: colsPerTrim(t) * SCORE_W }]}
-              >
-                <Text style={s.headText}>{t.shortLabel}</Text>
-              </View>
-            ))}
-            <View style={s.yearHead}>
-              <Text style={s.headText}>AN</Text>
-            </View>
+      <View style={s.table}>
+        <View style={s.headRow}>
+          <View style={s.branchHead}>
+            <Text style={s.headFg}>Branches</Text>
           </View>
-
-          {/* Ligne 2 : sous-colonnes */}
-          <View style={s.subHeadRow}>
-            <View style={s.branchHead}>
-              <Text style={s.tiny}> </Text>
-            </View>
-            <View style={[s.colHeadMax]}>
-              <Text style={s.tiny}>P</Text>
-            </View>
-            <View style={s.colHeadMax}>
-              <Text style={s.tiny}>E</Text>
-            </View>
-            <View style={s.colHeadMax}>
-              <Text style={s.tiny}>T</Text>
-            </View>
+          {data.trimestres.map((t) => (
             <View
-              style={[
-                s.colHeadMax,
-                {
-                  borderRightWidth: 1,
-                  borderRightColor: BORDER,
-                  borderRightStyle: "solid",
-                },
-              ]}
+              key={t.periodGroupId}
+              style={[s.groupHead, { width: colsPerTrim * COL_W }]}
             >
-              <Text style={s.tiny}>A</Text>
+              <Text style={s.headFg}>{t.name}</Text>
             </View>
-            {data.trimestres.map((t) => (
-              <View key={t.periodGroupId} style={{ flexDirection: "row" }}>
-                {t.periods.map((p) => (
-                  <View
-                    key={p.periodId}
-                    style={[
-                      s.colHead,
-                      isFocusPeriod(data, p.periodId) ? s.colHeadFocus : {},
-                    ]}
-                  >
-                    <Text style={s.tiny}>{p.shortLabel}</Text>
-                  </View>
-                ))}
-                {t.hasExam ? (
-                  <View
-                    style={[
-                      s.colHead,
-                      isFocusExam(data, t.periodGroupId) ? s.colHeadFocus : {},
-                    ]}
-                  >
-                    <Text style={s.tiny}>EX</Text>
-                  </View>
-                ) : null}
-                <View style={s.colHead}>
-                  <Text style={s.tiny}>{t.shortLabel}</Text>
-                </View>
-              </View>
-            ))}
-            <View style={s.colHeadLast}>
-              <Text style={s.tiny}>Tot</Text>
-            </View>
+          ))}
+          <View style={[s.groupHead, { width: 2 * COL_W, borderRightWidth: 0 }]}>
+            <Text style={s.headFg}>Année</Text>
           </View>
-
-          {domains.map((domain) => {
-            const sub = student.domainSubtotals.find(
-              (d) => d.domainName === domain.name
-            )
-            return (
-              <View key={domain.name}>
-                <View style={s.domainRow}>
-                  <Text style={s.domainText}>{domain.name}</Text>
-                </View>
-                {domain.lines.map((line) => (
-                  <View key={line.subjectId} style={s.row} wrap={false}>
-                    <View style={s.branchCell}>
-                      <Text style={{ fontSize: 5 }}>
-                        {line.name}
-                        {line.groupName ? ` (${line.groupName})` : ""}
-                      </Text>
-                    </View>
-                    <DataCells
-                      data={data}
-                      maxPeriode={line.maxPeriode}
-                      maxExamen={line.maxExamen}
-                      maxTrimestre={line.maxTrimestre}
-                      maxAnnuel={line.maxAnnuel}
-                      periodScores={line.periodScores}
-                      examScores={line.examScores}
-                      trimScores={line.trimScores}
-                      annualScore={line.annualScore}
-                    />
-                  </View>
-                ))}
-                {sub ? (
-                  <View style={s.subtotalRow} wrap={false}>
-                    <View style={s.branchCell}>
-                      <Text style={{ fontSize: 5, fontFamily: "Helvetica-Bold" }}>
-                        Sous-total
-                      </Text>
-                    </View>
-                    <DataCells
-                      data={data}
-                      maxPeriode={sub.maxPeriode}
-                      maxExamen={sub.maxExamen}
-                      maxTrimestre={sub.maxTrimestre}
-                      maxAnnuel={sub.maxAnnuel}
-                      periodScores={sub.periodScores}
-                      examScores={sub.examScores}
-                      trimScores={sub.trimScores}
-                      annualScore={sub.annualScore}
-                      bold
-                    />
-                  </View>
-                ) : null}
-              </View>
-            )
-          })}
         </View>
 
-        <View style={s.summary}>
-          <SummaryRow
-            label="Maxima généraux"
+        <View style={s.subHeadRow}>
+          <View style={s.branchHead}>
+            <Text style={s.subFg}> </Text>
+          </View>
+          {data.trimestres.map((t) => (
+            <View key={t.periodGroupId} style={{ flexDirection: "row" }}>
+              <View style={s.colHead}>
+                <Text style={s.subFg}>MAX</Text>
+              </View>
+              {t.periods.map((p) => (
+                <View
+                  key={p.periodId}
+                  style={[
+                    s.colHead,
+                    isFocusPeriod(data, p.periodId) ? s.colHeadFocus : {},
+                  ]}
+                >
+                  <Text style={s.subFg}>{p.shortLabel}</Text>
+                </View>
+              ))}
+              <View style={s.colHead}>
+                <Text style={s.subFg}>MX.E</Text>
+              </View>
+              <View
+                style={[
+                  s.colHead,
+                  isFocusExam(data, t.periodGroupId) ? s.colHeadFocus : {},
+                ]}
+              >
+                <Text style={s.subFg}>EX</Text>
+              </View>
+              <View style={s.colHead}>
+                <Text style={s.subFg}>MX.T</Text>
+              </View>
+              <View style={s.colHead}>
+                <Text style={s.subFg}>{t.shortLabel}</Text>
+              </View>
+            </View>
+          ))}
+          <View style={s.colHead}>
+            <Text style={s.subFg}>MX.A</Text>
+          </View>
+          <View style={s.colHeadLast}>
+            <Text style={s.subFg}>AN</Text>
+          </View>
+        </View>
+
+        {domains.map((domain) => {
+          const sub = student.domainSubtotals.find(
+            (d) => d.domainName === domain.name
+          )
+          return (
+            <View key={domain.name}>
+              <View style={s.domainRow}>
+                <Text style={s.domainText}>{domain.name}</Text>
+              </View>
+              {domain.lines.map((line) => (
+                <View key={line.subjectId} style={s.row} wrap={false}>
+                  <View style={s.branchCell}>
+                    <Text style={{ fontSize: 5 }}>
+                      {line.name}
+                      {line.groupName ? ` (${line.groupName})` : ""}
+                    </Text>
+                  </View>
+                  <ScoreCells
+                    data={data}
+                    vis={vis}
+                    maxPeriode={line.maxPeriode}
+                    maxExamen={line.maxExamen}
+                    maxTrimestre={line.maxTrimestre}
+                    maxAnnuel={line.maxAnnuel}
+                    periodScores={line.periodScores}
+                    examScores={line.examScores}
+                    trimScores={line.trimScores}
+                    annualScore={line.annualScore}
+                  />
+                </View>
+              ))}
+              {sub ? (
+                <View style={s.subtotalRow} wrap={false}>
+                  <View style={s.branchCell}>
+                    <Text style={{ fontSize: 5, fontFamily: "Helvetica-Bold" }}>
+                      Sous-total
+                    </Text>
+                  </View>
+                  <ScoreCells
+                    data={data}
+                    vis={vis}
+                    maxPeriode={sub.maxPeriode}
+                    maxExamen={sub.maxExamen}
+                    maxTrimestre={sub.maxTrimestre}
+                    maxAnnuel={sub.maxAnnuel}
+                    periodScores={sub.periodScores}
+                    examScores={sub.examScores}
+                    trimScores={sub.trimScores}
+                    annualScore={sub.annualScore}
+                    asFraction
+                    bold
+                  />
+                </View>
+              ) : null}
+            </View>
+          )
+        })}
+
+        {/* Synthèse */}
+        <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
+          <Text style={s.summaryLabel}>Maxima généraux</Text>
+          <SummaryScoreCells
             data={data}
-            student={student}
-            highlight
+            vis={vis}
             mode="maxima"
-          />
-          <SummaryRow
-            label="Pourcentage"
-            data={data}
             student={student}
+          />
+        </View>
+        <View style={s.row} wrap={false}>
+          <Text style={s.summaryLabel}>Pourcentage</Text>
+          <SummaryScoreCells
+            data={data}
+            vis={vis}
             mode="pct"
-          />
-          <SummaryRow
-            label="Place"
-            data={data}
             student={student}
-            highlight
+          />
+        </View>
+        <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
+          <Text style={s.summaryLabel}>Place</Text>
+          <SummaryScoreCells
+            data={data}
+            vis={vis}
             mode="place"
-          />
-          <SummaryRow
-            label="Nbre d'élèves"
-            data={data}
             student={student}
-            mode="count"
-          />
-          <SummaryRow
-            label="Application"
-            data={data}
-            student={student}
-            highlight
-            mode="blank"
-          />
-          <SummaryRow
-            label="Conduite"
-            data={data}
-            student={student}
-            mode="blank"
           />
         </View>
-
-        <View style={s.signRow}>
-          <View style={s.signBox}>
-            <Text style={s.signLabel}>Signature de l&apos;instituteur</Text>
-            <Text style={s.signHint}>
-              {data.class.titulaireName || "Titulaire"}
-            </Text>
-          </View>
-          <View style={s.signBox}>
-            <Text style={s.signLabel}>Signature du responsable</Text>
-            <Text style={s.signHint}>Parent / tuteur</Text>
-          </View>
-          <View style={s.signBox}>
-            <Text style={s.signLabel}>Sceau de l&apos;école</Text>
-            {data.school.sealUrl ? (
-              // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image
-              <Image src={data.school.sealUrl} style={s.sealImg} />
-            ) : (
-              <Text style={s.signHint}> </Text>
-            )}
-          </View>
+        <View style={s.row} wrap={false}>
+          <Text style={s.summaryLabel}>Application</Text>
+          <SummaryScoreCells
+            data={data}
+            vis={vis}
+            mode="application"
+            student={student}
+          />
         </View>
-
-        <Text style={s.note}>
-          Maxima : P=période · E=examen · T=trimestre · A=annuel. Les maxima
-          restent visibles ; les notes se remplissent au fil des périodes et
-          examens. Application / conduite à compléter si besoin.
-        </Text>
+        <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
+          <Text style={s.summaryLabel}>Conduite</Text>
+          <ConduiteCells data={data} vis={vis} student={student} />
+        </View>
       </View>
+
+      <View style={s.signRow}>
+        <View style={s.signBox}>
+          <Text style={s.signLabel}>Signature de l&apos;instituteur</Text>
+          <Text style={s.signHint}>
+            {data.class.titulaireName || "Titulaire"}
+          </Text>
+        </View>
+        <View style={s.signBox}>
+          <Text style={s.signLabel}>Signature du responsable</Text>
+          <Text style={s.signHint}>Parent / tuteur</Text>
+        </View>
+        <View style={s.signBox}>
+          <Text style={s.signLabel}>Sceau de l&apos;école</Text>
+          {data.school.sealUrl ? (
+            // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image
+            <Image src={data.school.sealUrl} style={s.sealImg} />
+          ) : null}
+        </View>
+      </View>
+
+      <Text style={s.note}>
+        MAX / MX.E / MX.T / MX.A = maxima (toujours visibles). Points affichés
+        uniquement pour les événements publiés (ordre cumulatif). Sous-totaux en
+        obtenu/max. Application dérivée du %. Conduite : périodes seulement
+        (cases hachurées = non applicable).
+      </Text>
 
       <Text
         style={s.pageFooter}
         render={() =>
-          `${data.school.schoolName} · Kelasi 360 · ${pageIndex + 1}/${pageCount}`
+          `${data.school.schoolName} · ${pageIndex + 1}/${pageCount}`
         }
         fixed
       />
@@ -918,7 +978,6 @@ export default function PrimaryBulletinPDF({
 }: {
   data: PrimaryBulletinPayload
 }) {
-  const count = data.students.length
   return (
     <Document
       title={`Bulletins ${data.class.name} — ${data.yearName}`}
@@ -931,7 +990,7 @@ export default function PrimaryBulletinPDF({
           data={data}
           student={student}
           pageIndex={i}
-          pageCount={count}
+          pageCount={data.students.length}
         />
       ))}
     </Document>
