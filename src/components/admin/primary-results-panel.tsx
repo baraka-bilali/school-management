@@ -390,7 +390,7 @@ export function PrimaryResultsPanel() {
       previewData.students.length === 1
         ? previewData.students[0].fullName.replace(/\s+/g, "-")
         : previewData.class.name.replace(/\s+/g, "-")
-    a.download = `bulletin-${suffix}-${previewData.event.label.replace(/\s+/g, "-")}.pdf`
+    a.download = `bulletin-${suffix}-${previewData.focusEvent.label.replace(/\s+/g, "-")}.pdf`
     a.click()
   }
 
