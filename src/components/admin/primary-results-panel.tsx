@@ -732,11 +732,27 @@ export function PrimaryResultsPanel() {
                     <p className="text-sm">Génération de l&apos;aperçu PDF…</p>
                   </div>
                 ) : previewUrl ? (
-                  <iframe
-                    title="Aperçu bulletin PDF"
-                    src={previewUrl}
-                    className="w-full h-full border-0 bg-white"
-                  />
+                  /*
+                   * Chrome’s built-in PDF viewer often clips the last page when
+                   * the iframe is height:100% with internal scrolling. Parent
+                   * scroll + tall frame (≈ A4 CSS px × pages) keeps the full
+                   * last bulletin visible. Download/print use the same blob.
+                   */
+                  <div className="absolute inset-0 overflow-auto">
+                    <iframe
+                      title="Aperçu bulletin PDF"
+                      src={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=0&view=FitH`}
+                      className="w-full border-0 bg-white block"
+                      style={{
+                        height: Math.max(
+                          1,
+                          previewData?.students.length ?? 1
+                        ) *
+                          1200 +
+                          72,
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
                     Aperçu indisponible
