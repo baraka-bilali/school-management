@@ -276,11 +276,12 @@ const s = StyleSheet.create({
   },
   signHint: { fontSize: 5, color: MUTED },
   sealImg: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     objectFit: "contain",
     alignSelf: "center",
     marginTop: 2,
+    maxWidth: "100%",
   },
   note: { fontSize: 5, color: MUTED, marginTop: 2 },
   pageFooter: {
