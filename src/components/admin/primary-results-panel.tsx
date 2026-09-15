@@ -687,7 +687,7 @@ export function PrimaryResultsPanel() {
       {previewOpen && (
         <Portal>
           <div className="fixed inset-0 z-[90] flex flex-col bg-black/50 p-2 sm:p-4">
-            <div className="mx-auto w-full max-w-5xl flex-1 flex flex-col min-h-0 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
+            <div className="mx-auto w-full max-w-[96vw] flex-1 flex flex-col min-h-0 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden">
               <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950/50">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Eye className="h-4 w-4 text-indigo-600 shrink-0" />
