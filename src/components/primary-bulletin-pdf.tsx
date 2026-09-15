@@ -950,8 +950,11 @@ function BulletinPage({
 
 export default function PrimaryBulletinPDF({
   data,
+  /** Page blanche finale — contournement viewer Chrome qui tronque la dernière page en iframe. */
+  trailingBlankPage = false,
 }: {
   data: PrimaryBulletinPayload
+  trailingBlankPage?: boolean
 }) {
   return (
     <Document
@@ -968,6 +971,11 @@ export default function PrimaryBulletinPDF({
           pageCount={data.students.length}
         />
       ))}
+      {trailingBlankPage ? (
+        <Page size="A4" orientation="portrait" style={{ backgroundColor: "#ffffff" }}>
+          <Text style={{ fontSize: 1, color: "#ffffff" }}>.</Text>
+        </Page>
+      ) : null}
     </Document>
   )
 }

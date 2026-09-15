@@ -90,13 +90,19 @@ function normalizeSearch(s: string) {
 }
 
 async function generateBulletinPdfBlob(
-  data: PrimaryBulletinPayload
+  data: PrimaryBulletinPayload,
+  opts?: { trailingBlankPage?: boolean }
 ): Promise<Blob> {
   const { pdf } = await import("@react-pdf/renderer")
   const { default: PrimaryBulletinPDF } = await import(
     "@/components/primary-bulletin-pdf"
   )
-  return pdf(<PrimaryBulletinPDF data={data} />).toBlob()
+  return pdf(
+    <PrimaryBulletinPDF
+      data={data}
+      trailingBlankPage={opts?.trailingBlankPage === true}
+    />
+  ).toBlob()
 }
 
 export function PrimaryResultsPanel() {
@@ -368,7 +374,11 @@ export function PrimaryResultsPanel() {
         throw new Error("Aucun élève à imprimer pour cette sélection")
       }
 
-      const blob = await generateBulletinPdfBlob(data)
+      // Page blanche finale : le viewer Chrome en iframe tronque souvent
+      // la dernière page ; le vrai dernier bulletin reste ainsi entier.
+      const blob = await generateBulletinPdfBlob(data, {
+        trailingBlankPage: true,
+      })
       if (requestId !== previewRequestIdRef.current) return
       const url = URL.createObjectURL(blob)
       previewUrlRef.current = url
@@ -383,23 +393,39 @@ export function PrimaryResultsPanel() {
   }
 
   const downloadPreviewPdf = async () => {
-    if (!previewData || !previewUrl) return
-    const a = document.createElement("a")
-    a.href = previewUrl
-    const suffix =
-      previewData.students.length === 1
-        ? previewData.students[0].fullName.replace(/\s+/g, "-")
-        : previewData.class.name.replace(/\s+/g, "-")
-    a.download = `bulletin-${suffix}-${previewData.focusEvent.label.replace(/\s+/g, "-")}.pdf`
-    a.click()
+    if (!previewData) return
+    try {
+      // PDF « propre » sans page blanche (réservée à l’aperçu iframe)
+      const blob = await generateBulletinPdfBlob(previewData)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const suffix =
+        previewData.students.length === 1
+          ? previewData.students[0].fullName.replace(/\s+/g, "-")
+          : previewData.class.name.replace(/\s+/g, "-")
+      a.download = `bulletin-${suffix}-${previewData.focusEvent.label.replace(/\s+/g, "-")}.pdf`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Téléchargement impossible")
+    }
   }
 
-  const printPreviewPdf = () => {
-    if (!previewUrl) return
-    const w = window.open(previewUrl, "_blank")
-    if (!w) {
-      toast.error("Autorisez les pop-ups pour imprimer")
-      return
+  const printPreviewPdf = async () => {
+    if (!previewData) return
+    try {
+      const blob = await generateBulletinPdfBlob(previewData)
+      const url = URL.createObjectURL(blob)
+      const w = window.open(url, "_blank")
+      if (!w) {
+        URL.revokeObjectURL(url)
+        toast.error("Autorisez les pop-ups pour imprimer")
+        return
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Impression impossible")
     }
   }
 
@@ -732,27 +758,11 @@ export function PrimaryResultsPanel() {
                     <p className="text-sm">Génération de l&apos;aperçu PDF…</p>
                   </div>
                 ) : previewUrl ? (
-                  /*
-                   * Chrome’s built-in PDF viewer often clips the last page when
-                   * the iframe is height:100% with internal scrolling. Parent
-                   * scroll + tall frame (≈ A4 CSS px × pages) keeps the full
-                   * last bulletin visible. Download/print use the same blob.
-                   */
-                  <div className="absolute inset-0 overflow-auto">
-                    <iframe
-                      title="Aperçu bulletin PDF"
-                      src={`${previewUrl}#toolbar=1&navpanes=0&scrollbar=0&view=FitH`}
-                      className="w-full border-0 bg-white block"
-                      style={{
-                        height: Math.max(
-                          1,
-                          previewData?.students.length ?? 1
-                        ) *
-                          1200 +
-                          72,
-                      }}
-                    />
-                  </div>
+                  <iframe
+                    title="Aperçu bulletin PDF"
+                    src={`${previewUrl}#toolbar=1&navpanes=0`}
+                    className="absolute inset-0 w-full h-full border-0 bg-white"
+                  />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
                     Aperçu indisponible
