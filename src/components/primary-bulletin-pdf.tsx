@@ -15,15 +15,15 @@ const HEAD = "#e5e7eb"
 const FOCUS = "#e0e7ff"
 
 /** Largeur fixe des colonnes numériques (paysage A4). */
-const COL_W = 26
-const BRANCH_W = 108
+const COL_W = 24
+const BRANCH_W = 100
 
 const s = StyleSheet.create({
   page: {
-    paddingTop: 14,
-    paddingBottom: 16,
-    paddingLeft: 16,
-    paddingRight: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+    paddingLeft: 18,
+    paddingRight: 22,
     fontFamily: "Helvetica",
     fontSize: 6.5,
     color: "#111827",
