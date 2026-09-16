@@ -171,12 +171,12 @@
 @media (min-width: 768px) {
   html {
     zoom: 0.8;
-    /* zoom < 1 peut générer ~1–2px de débordement → barre horizontale fantôme */
-    overflow-x: hidden;
   }
   html,
   body {
     min-height: 125dvh;
+    /* zoom < 1 peut générer un léger débordement → barre horizontale fantôme */
+    overflow-x: hidden;
   }
 }
 
