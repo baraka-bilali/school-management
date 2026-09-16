@@ -612,7 +612,7 @@ export function TeacherPrimaryGradesBoard({
             "rounded-2xl border",
             card,
             border,
-            annualCompact ? "overflow-x-hidden min-w-0" : "overflow-x-auto"
+            annualCompact ? "min-w-0 overflow-x-auto" : "overflow-x-auto"
           )}
         >
           <table
