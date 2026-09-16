@@ -1,39 +1,31 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
+import {
+  getAppTheme,
+  setAppTheme,
+  subscribeAppTheme,
+  type AppTheme,
+} from "@/lib/theme-store"
 
+function getServerSnapshot(): AppTheme {
+  return "light"
+}
+
+/**
+ * Thème partagé pour espaces élève / enseignant / staff.
+ * useSyncExternalStore garantit que layout, sidebar et pages
+ * restent synchronisés (plus de bascule Clair→Sombre obligatoire).
+ */
 export function useStudentTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"
+  const theme = useSyncExternalStore(
+    subscribeAppTheme,
+    getAppTheme,
+    getServerSnapshot
   )
 
-  useEffect(() => {
-    const apply = (t: "light" | "dark") => {
-      setTheme(t)
-      document.documentElement.classList.toggle("dark", t === "dark")
-    }
-
-    const saved = localStorage.getItem("theme") as "light" | "dark" | null
-    apply(saved || "light")
-
-    const handleChange = () => {
-      const t = localStorage.getItem("theme") as "light" | "dark" | null
-      if (t) apply(t)
-    }
-
-    window.addEventListener("themeChange", handleChange)
-    window.addEventListener("storage", handleChange)
-    return () => {
-      window.removeEventListener("themeChange", handleChange)
-      window.removeEventListener("storage", handleChange)
-    }
-  }, [])
-
-  const toggleTheme = (newTheme: "light" | "dark") => {
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-    window.dispatchEvent(new Event("themeChange"))
+  const toggleTheme = (newTheme: AppTheme) => {
+    setAppTheme(newTheme)
   }
 
   const isDark = theme === "dark"
