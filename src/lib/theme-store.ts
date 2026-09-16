@@ -59,6 +59,7 @@ export function subscribeAppTheme(listener: Listener): () => void {
 }
 
 export function setAppTheme(theme: AppTheme) {
+  if (theme !== "light" && theme !== "dark") return
   if (currentTheme === theme) {
     // Réappliquer le DOM au cas où il serait désynchronisé
     if (typeof document !== "undefined") applyToDom(theme)

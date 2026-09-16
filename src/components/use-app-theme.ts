@@ -30,7 +30,12 @@ export function useAppTheme() {
   }
 
   const toggleTheme = (next?: AppTheme) => {
-    setAppTheme(next ?? (theme === "dark" ? "light" : "dark"))
+    // onClick={toggleTheme} reçoit un MouseEvent — n'accepter que light|dark
+    if (next === "light" || next === "dark") {
+      setAppTheme(next)
+      return
+    }
+    setAppTheme(theme === "dark" ? "light" : "dark")
   }
 
   return { theme, isDark, setTheme, toggleTheme }
