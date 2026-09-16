@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
-import { getSupabaseBrowser } from "@/lib/supabase-client"
+import { tryGetSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 import { cn } from "@/lib/utils"
 import TeacherHeader from "./teacher-header"
@@ -105,7 +105,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (!teacher?.userId) return
-    const channel = getSupabaseBrowser()
+    const supabase = tryGetSupabaseBrowser()
+    if (!supabase) return
+    const channel = supabase
       .channel(`payments:teacher:${teacher.userId}`)
       .on("broadcast", { event: "payment_received" }, (payload) => {
         setWalletPulse(true)
@@ -119,12 +121,16 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         window.dispatchEvent(new Event("teacherPaymentReceived"))
       })
       .subscribe()
-    return () => { getSupabaseBrowser().removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [teacher?.userId])
 
   useEffect(() => {
     if (!teacher?.schoolId) return
-    const channel = getSupabaseBrowser()
+    const supabase = tryGetSupabaseBrowser()
+    if (!supabase) return
+    const channel = supabase
       .channel(`communiques:school:${teacher.schoolId}`)
       .on("broadcast", { event: "new_communique" }, ({ payload }) => {
         if (payload?.targetTeachers !== true) return
@@ -135,7 +141,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         window.dispatchEvent(new Event("teacherNewCommunique"))
       })
       .subscribe()
-    return () => { getSupabaseBrowser().removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [teacher?.schoolId])
 
   useEffect(() => {
