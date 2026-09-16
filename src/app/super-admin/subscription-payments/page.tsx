@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import InvoiceDownloadButton from "@/components/invoice-download-button"
 import Portal from "@/components/portal"
+import { useAppTheme } from "@/components/use-app-theme"
 
 type School = {
   id: number
@@ -43,7 +44,7 @@ type Totaux = {
 
 export default function SuperAdminSubscriptionPayments() {
   const router = useRouter()
-  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  const { theme } = useAppTheme()
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,11 +58,6 @@ export default function SuperAdminSubscriptionPayments() {
   const [to, setTo] = useState("")
 
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved === "light" || saved === "dark") setTheme(saved)
-  }, [])
 
   const fetchPayments = useCallback(async () => {
     setLoading(true)

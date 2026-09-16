@@ -56,7 +56,7 @@ export default function SuperAdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="login-shell relative isolate flex w-full items-center justify-center overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-4">
           <div className="mb-3">

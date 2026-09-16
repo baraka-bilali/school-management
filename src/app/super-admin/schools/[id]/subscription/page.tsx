@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useAppTheme } from "@/components/use-app-theme"
 
 type School = {
   id: number
@@ -46,7 +47,7 @@ export default function SubscriptionManagement() {
   const params = useParams()
   const schoolId = params.id as string
 
-  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  const { theme } = useAppTheme()
   const [school, setSchool] = useState<School | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -71,11 +72,6 @@ export default function SubscriptionManagement() {
     reference: "",
     notes: "",
   })
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved === "light" || saved === "dark") setTheme(saved)
-  }, [])
 
   useEffect(() => { fetchSchool() }, [schoolId])
 

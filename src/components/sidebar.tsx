@@ -25,6 +25,7 @@ import {
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { clearSubscriptionAccessCache } from "@/lib/subscription-access-cache"
+import { useAppTheme } from "@/components/use-app-theme"
 
 interface SidebarProps {
   isOpen: boolean
@@ -41,7 +42,7 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   const [isMobile, setIsMobile] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const { theme } = useAppTheme()
   const [userRole, setUserRole] = useState<string>("ADMIN")
   const [canEnrollStudents, setCanEnrollStudents] = useState(false)
   const [schoolName, setSchoolName] = useState<string>("")
@@ -49,12 +50,6 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
   const pathname = usePathname()
 
   useEffect(() => {
-    // Charger le thème
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-    }
-
     const savedSchoolName = localStorage.getItem("schoolName")
     if (savedSchoolName) setSchoolName(savedSchoolName)
 
@@ -80,21 +75,17 @@ export default function Sidebar({ isOpen, onToggle, subscriptionExpired = false,
       })
       .catch(() => {})
 
-    // Écouter les changements de thème
+    // Écouter les changements de nom d'école
     const handleStorageChange = () => {
-      const currentTheme = localStorage.getItem("theme") as "light" | "dark" | null
-      if (currentTheme) {
-        setTheme(currentTheme)
-      }
       const currentSchoolName = localStorage.getItem("schoolName")
       if (currentSchoolName) setSchoolName(currentSchoolName)
     }
 
     window.addEventListener("storage", handleStorageChange)
-    window.addEventListener("themeChange", handleStorageChange)
+    window.addEventListener("schoolBrandingChange", handleStorageChange)
     return () => {
       window.removeEventListener("storage", handleStorageChange)
-      window.removeEventListener("themeChange", handleStorageChange)
+      window.removeEventListener("schoolBrandingChange", handleStorageChange)
     }
   }, [])
 

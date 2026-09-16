@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Portal from "@/components/portal"
 import NotificationsSection from "@/components/notifications-section"
+import { useAppTheme } from "@/components/use-app-theme"
 
 type School = { 
   id: number; 
@@ -91,7 +92,7 @@ export default function SuperAdminHome() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [theme, setTheme] = useState<"dark" | "light">("dark")
+  const { theme, toggleTheme } = useAppTheme()
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -617,10 +618,6 @@ export default function SuperAdminHome() {
       console.error(e)
       setLoggingOut(false)
     }
-  }
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === "dark" ? "light" : "dark")
   }
 
   // Modal animation effects
