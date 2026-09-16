@@ -194,7 +194,15 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         />
         <TeacherDesktopHeader firstName={teacher?.firstName} unreadCount={totalUnread} isDark={isDark} />
 
-        <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-2 lg:max-w-5xl lg:px-6 lg:pb-8 lg:pt-6 xl:max-w-6xl xl:px-8">
+        <main
+          className={cn(
+            "mx-auto w-full flex-1 px-4 pb-28 pt-2 lg:pb-8 lg:pt-6",
+            // Cotation annuelle : utiliser toute la largeur utile (sans gouttières)
+            pathname?.includes("/grades")
+              ? "max-w-none lg:px-3 xl:px-4"
+              : "max-w-lg lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:px-8"
+          )}
+        >
           {children}
         </main>
 
