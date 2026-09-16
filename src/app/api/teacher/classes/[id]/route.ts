@@ -94,6 +94,7 @@ export async function GET(
     })),
     students: enrollments.map((e) => ({
       id: e.student.id,
+      enrollmentId: e.id,
       code: e.code || e.student.permanentCode,
       lastName: e.student.lastName,
       middleName: e.student.middleName,
