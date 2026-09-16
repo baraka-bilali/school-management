@@ -9,10 +9,12 @@ import {
   Save,
   Send,
   X,
+  AlertTriangle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import StudentLoading from "@/components/student/student-loading"
+import Portal from "@/components/portal"
 import { toast } from "sonner"
 import type { PrimaryBulletinPayload } from "@/lib/grading/primary-bulletin"
 
@@ -85,6 +87,38 @@ function draftKey(
   return `${kind}:${assignmentId}:${eventId}:${enrollmentId}`
 }
 
+function isBelowAverage(
+  obtained: number | null | undefined,
+  max: number
+): boolean {
+  if (obtained == null || !Number.isFinite(obtained) || !(max > 0)) return false
+  return obtained < max / 2
+}
+
+/** Empêche toute saisie au-delà du maxima (et négatif). */
+function clampScoreInput(raw: string, max: number): string {
+  if (raw === "") return ""
+  // Autoriser frappe intermédiaire "12." etc.
+  if (raw === "." || raw.endsWith(".")) {
+    const base = raw.slice(0, -1)
+    if (base === "") return "0."
+    const n = Number(base)
+    if (!Number.isFinite(n)) return ""
+    return Math.min(Math.max(0, n), max) + "."
+  }
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return ""
+  if (n < 0) return "0"
+  if (n > max) return String(max)
+  return raw
+}
+
+type SendPending = {
+  kind: "PERIOD" | "EXAM"
+  id: number
+  label: string
+}
+
 export function TeacherPrimaryGradesBoard({
   classId,
   initialEnrollmentId = null,
@@ -105,6 +139,7 @@ export function TeacherPrimaryGradesBoard({
   const [bulletinLoading, setBulletinLoading] = useState(false)
   const [bulletinUrl, setBulletinUrl] = useState<string | null>(null)
   const [bulletinTitle, setBulletinTitle] = useState("")
+  const [sendPending, setSendPending] = useState<SendPending | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -237,7 +272,7 @@ export function TeacherPrimaryGradesBoard({
     }
   }
 
-  const sendResults = async (kind: "PERIOD" | "EXAM", id: number) => {
+  const requestSendResults = (kind: "PERIOD" | "EXAM", id: number) => {
     if (!data) return
     if (dirtyCount > 0) {
       toast.error("Enregistrez d'abord les modifications")
@@ -249,13 +284,11 @@ export function TeacherPrimaryGradesBoard({
             .flatMap((t) => t.periods)
             .find((p) => p.id === id)?.name || "période"
         : data.trimestres.find((t) => t.id === id)?.name || "examen"
-    if (
-      !confirm(
-        `Envoyer les résultats « ${label} » à l'administration ? Les notes seront verrouillées.`
-      )
-    ) {
-      return
-    }
+    setSendPending({ kind, id, label })
+  }
+
+  const confirmSendResults = async () => {
+    if (!data || !sendPending) return
     setSending(true)
     try {
       const res = await fetch("/api/teacher/primary-grades/send", {
@@ -264,15 +297,16 @@ export function TeacherPrimaryGradesBoard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           classId: data.class.id,
-          kind,
-          ...(kind === "PERIOD"
-            ? { periodId: id }
-            : { periodGroupId: id }),
+          kind: sendPending.kind,
+          ...(sendPending.kind === "PERIOD"
+            ? { periodId: sendPending.id }
+            : { periodGroupId: sendPending.id }),
         }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Envoi impossible")
       toast.success(json.message || "Résultats envoyés")
+      setSendPending(null)
       await load()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erreur")
@@ -359,11 +393,17 @@ export function TeacherPrimaryGradesBoard({
   const branch =
     data.branches.find((b) => b.assignmentId === branchId) || data.branches[0]
 
-  const inputClass = cn(
-    "w-[4.25rem] rounded-lg border px-1.5 py-1 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50",
-    border,
-    isDark ? "bg-gray-950 text-gray-100" : "bg-white text-gray-900"
-  )
+  const inputClass = (below: boolean) =>
+    cn(
+      "w-[4.5rem] rounded-lg border px-1.5 py-1.5 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50",
+      border,
+      isDark ? "bg-gray-950" : "bg-white",
+      below
+        ? "font-semibold text-red-600 dark:text-red-400"
+        : isDark
+          ? "text-gray-100"
+          : "text-gray-900"
+    )
 
   const renderScoreCell = (
     kind: "P" | "E",
@@ -374,6 +414,9 @@ export function TeacherPrimaryGradesBoard({
     locked: boolean
   ) => {
     const key = draftKey(kind, assignmentId, eventId, enrollmentId)
+    const raw = drafts[key] ?? ""
+    const num = raw === "" ? null : Number(raw)
+    const below = isBelowAverage(num, max)
     return (
       <input
         type="number"
@@ -381,17 +424,24 @@ export function TeacherPrimaryGradesBoard({
         max={max}
         step={0.5}
         disabled={locked}
-        value={drafts[key] ?? ""}
-        onChange={(e) =>
-          setDrafts((d) => ({ ...d, [key]: e.target.value }))
-        }
-        className={inputClass}
+        value={raw}
+        onChange={(e) => {
+          const next = clampScoreInput(e.target.value, max)
+          setDrafts((d) => ({ ...d, [key]: next }))
+        }}
+        onBlur={(e) => {
+          const next = clampScoreInput(e.target.value, max)
+          if (next !== e.target.value) {
+            setDrafts((d) => ({ ...d, [key]: next }))
+          }
+        }}
+        className={inputClass(below)}
       />
     )
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="space-y-4 pb-8">
       <div className="flex items-start gap-3">
         <Link
           href={`/teacher/classes/${classId}`}
@@ -406,6 +456,26 @@ export function TeacherPrimaryGradesBoard({
           <h1 className={cn("text-xl font-bold", text)}>Cotation</h1>
           <p className={cn("text-sm", textMuted)}>
             {data.class.name} · {data.class.level} {data.class.section}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <button
+            type="button"
+            disabled={saving || dirtyCount === 0}
+            onClick={() => void save()}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Enregistrer
+          </button>
+          <p className={cn("text-[11px]", textMuted)}>
+            {dirtyCount === 0
+              ? "Aucune modification"
+              : `${dirtyCount} modif.${dirtyCount > 1 ? "s" : ""}`}
           </p>
         </div>
       </div>
@@ -493,13 +563,25 @@ export function TeacherPrimaryGradesBoard({
       </div>
 
       {branch && (viewMode === "trimestre" ? trim : true) ? (
-        <div className={cn("rounded-2xl border overflow-x-auto", card, border)}>
-          <table className="min-w-full text-sm">
+        <div
+          className={cn(
+            "rounded-2xl border overflow-x-auto",
+            card,
+            border,
+            viewMode === "annuel" && "min-w-0"
+          )}
+        >
+          <table
+            className={cn(
+              "text-sm",
+              viewMode === "annuel" ? "min-w-[1100px] w-full" : "min-w-full"
+            )}
+          >
             <thead>
               <tr className={isDark ? "bg-gray-800/60" : "bg-gray-50"}>
                 <th
                   className={cn(
-                    "sticky left-0 z-10 px-3 py-2 text-left font-medium",
+                    "sticky left-0 z-10 px-3 py-2 text-left font-medium min-w-[10rem]",
                     isDark ? "bg-gray-800" : "bg-gray-50",
                     text
                   )}
@@ -509,57 +591,102 @@ export function TeacherPrimaryGradesBoard({
                 {viewMode === "trimestre" && trim
                   ? [
                       ...trim.periods.map((p, i) => (
-                        <th key={p.id} className={cn("px-2 py-2 text-center font-medium", text)}>
+                        <th
+                          key={p.id}
+                          className={cn("px-2 py-2 text-center font-medium", text)}
+                        >
                           {periodShort(p.name, `${i + 1}P`)}
                           <div className={cn("text-[10px] font-normal", textMuted)}>
                             /{branch.maxPeriode}
-                            {data.lockedPeriods[String(p.id)] ? " · verrouillé" : ""}
+                            {data.lockedPeriods[String(p.id)]
+                              ? " · verrouillé"
+                              : ""}
                           </div>
                         </th>
                       )),
                       trim.hasExam ? (
-                        <th key="ex" className={cn("px-2 py-2 text-center font-medium", text)}>
+                        <th
+                          key="ex"
+                          className={cn("px-2 py-2 text-center font-medium", text)}
+                        >
                           Exam.
                           <div className={cn("text-[10px] font-normal", textMuted)}>
                             /{branch.maxExamen}
-                            {data.lockedExams[String(trim.id)] ? " · verrouillé" : ""}
+                            {data.lockedExams[String(trim.id)]
+                              ? " · verrouillé"
+                              : ""}
                           </div>
                         </th>
                       ) : null,
-                      <th key="tot" className={cn("px-2 py-2 text-center font-medium", text)}>
+                      <th
+                        key="tot"
+                        className={cn("px-2 py-2 text-center font-medium", text)}
+                      >
                         Total
                         <div className={cn("text-[10px] font-normal", textMuted)}>
                           /{branch.maxTrimestre}
                         </div>
                       </th>,
                     ]
-                  : data.trimestres.flatMap((t) => [
-                      ...t.periods.map((p, i) => (
+                  : [
+                      ...data.trimestres.flatMap((t) => [
+                        ...t.periods.map((p, i) => (
+                          <th
+                            key={`a-${p.id}`}
+                            className={cn(
+                              "px-2 py-2 text-center font-medium min-w-[4.75rem]",
+                              text
+                            )}
+                          >
+                            <div className="text-[10px] opacity-70">{t.name}</div>
+                            {periodShort(p.name, `${i + 1}P`)}
+                            <div className={cn("text-[10px] font-normal", textMuted)}>
+                              /{branch.maxPeriode}
+                            </div>
+                          </th>
+                        )),
+                        t.hasExam ? (
+                          <th
+                            key={`ae-${t.id}`}
+                            className={cn(
+                              "px-2 py-2 text-center font-medium min-w-[4.75rem]",
+                              text
+                            )}
+                          >
+                            <div className="text-[10px] opacity-70">{t.name}</div>
+                            Exam.
+                            <div className={cn("text-[10px] font-normal", textMuted)}>
+                              /{branch.maxExamen}
+                            </div>
+                          </th>
+                        ) : null,
                         <th
-                          key={`a-${p.id}`}
-                          className={cn("px-2 py-2 text-center font-medium", text)}
+                          key={`at-${t.id}`}
+                          className={cn(
+                            "px-2 py-2 text-center font-medium min-w-[4.5rem]",
+                            text
+                          )}
                         >
                           <div className="text-[10px] opacity-70">{t.name}</div>
-                          {periodShort(p.name, `${i + 1}P`)}
-                        </th>
-                      )),
-                      t.hasExam ? (
-                        <th
-                          key={`ae-${t.id}`}
-                          className={cn("px-2 py-2 text-center font-medium", text)}
-                        >
-                          <div className="text-[10px] opacity-70">{t.name}</div>
-                          Exam.
-                        </th>
-                      ) : null,
+                          Total
+                          <div className={cn("text-[10px] font-normal", textMuted)}>
+                            /{branch.maxTrimestre}
+                          </div>
+                        </th>,
+                      ]),
                       <th
-                        key={`at-${t.id}`}
-                        className={cn("px-2 py-2 text-center font-medium", text)}
+                        key="year-tot"
+                        className={cn(
+                          "px-2 py-2 text-center font-medium min-w-[5rem]",
+                          text
+                        )}
                       >
-                        <div className="text-[10px] opacity-70">{t.name}</div>
-                        Total
+                        Total année
+                        <div className={cn("text-[10px] font-normal", textMuted)}>
+                          /{branch.maxAnnuel}
+                        </div>
                       </th>,
-                    ])}
+                    ]}
                 <th className={cn("px-2 py-2 text-center font-medium", text)}>
                   Bulletin
                 </th>
@@ -567,29 +694,34 @@ export function TeacherPrimaryGradesBoard({
             </thead>
             <tbody>
               {data.students.map((s) => {
+                const scorePartsForTrim = (t: Trimestre) => {
+                  const periodVals = t.periods.map((p) => {
+                    const raw =
+                      drafts[
+                        draftKey("P", branch.assignmentId, p.id, s.enrollmentId)
+                      ] ?? ""
+                    return raw === "" ? null : Number(raw)
+                  })
+                  const examRaw =
+                    drafts[
+                      draftKey("E", branch.assignmentId, t.id, s.enrollmentId)
+                    ] ?? ""
+                  const examVal = examRaw === "" ? null : Number(examRaw)
+                  const parts = [...periodVals, examVal]
+                  const has = parts.some((v) => v != null && Number.isFinite(v))
+                  const total = has
+                    ? parts.reduce<number>(
+                        (a, v) => a + (v != null && Number.isFinite(v) ? v : 0),
+                        0
+                      )
+                    : null
+                  return { periodVals, examVal, total }
+                }
+
                 const trimCells =
                   viewMode === "trimestre" && trim
                     ? (() => {
-                        const periodVals = trim.periods.map((p) => {
-                          const raw =
-                            drafts[
-                              draftKey("P", branch.assignmentId, p.id, s.enrollmentId)
-                            ] ?? ""
-                          return raw === "" ? null : Number(raw)
-                        })
-                        const examRaw =
-                          drafts[
-                            draftKey("E", branch.assignmentId, trim.id, s.enrollmentId)
-                          ] ?? ""
-                        const examVal = examRaw === "" ? null : Number(examRaw)
-                        const parts = [...periodVals, examVal]
-                        const has = parts.some((v) => v != null && Number.isFinite(v))
-                        const total = has
-                          ? parts.reduce<number>(
-                              (a, v) => a + (v != null && Number.isFinite(v) ? v : 0),
-                              0
-                            )
-                          : null
+                        const { total } = scorePartsForTrim(trim)
                         return (
                           <>
                             {trim.periods.map((p) => (
@@ -619,7 +751,9 @@ export function TeacherPrimaryGradesBoard({
                             <td
                               className={cn(
                                 "px-2 py-1.5 text-center font-semibold tabular-nums",
-                                text
+                                isBelowAverage(total, branch.maxTrimestre)
+                                  ? "text-red-600 dark:text-red-400"
+                                  : text
                               )}
                             >
                               {total == null ? "—" : total}
@@ -627,64 +761,78 @@ export function TeacherPrimaryGradesBoard({
                           </>
                         )
                       })()
-                    : data.trimestres.map((t) => {
-                        const periodVals = t.periods.map((p) => {
-                          const raw =
-                            drafts[
-                              draftKey("P", branch.assignmentId, p.id, s.enrollmentId)
-                            ] ?? ""
-                          return raw === "" ? null : Number(raw)
-                        })
-                        const examRaw =
-                          drafts[
-                            draftKey("E", branch.assignmentId, t.id, s.enrollmentId)
-                          ] ?? ""
-                        const examVal = examRaw === "" ? null : Number(examRaw)
-                        const parts = [...periodVals, examVal]
-                        const has = parts.some((v) => v != null && Number.isFinite(v))
-                        const total = has
-                          ? parts.reduce<number>(
+                    : (() => {
+                        const yearParts = data.trimestres.map((t) =>
+                          scorePartsForTrim(t).total
+                        )
+                        const yearHas = yearParts.some(
+                          (v) => v != null && Number.isFinite(v)
+                        )
+                        const yearTotal = yearHas
+                          ? yearParts.reduce<number>(
                               (a, v) => a + (v != null && Number.isFinite(v) ? v : 0),
                               0
                             )
                           : null
                         return (
-                          <Fragment key={t.id}>
-                            {t.periods.map((p) => (
-                              <td key={p.id} className="px-1.5 py-1.5 text-center">
-                                {renderScoreCell(
-                                  "P",
-                                  branch.assignmentId,
-                                  p.id,
-                                  s.enrollmentId,
-                                  branch.maxPeriode,
-                                  !!data.lockedPeriods[String(p.id)]
-                                )}
-                              </td>
-                            ))}
-                            {t.hasExam ? (
-                              <td className="px-1.5 py-1.5 text-center">
-                                {renderScoreCell(
-                                  "E",
-                                  branch.assignmentId,
-                                  t.id,
-                                  s.enrollmentId,
-                                  branch.maxExamen,
-                                  !!data.lockedExams[String(t.id)]
-                                )}
-                              </td>
-                            ) : null}
+                          <>
+                            {data.trimestres.map((t) => {
+                              const { total } = scorePartsForTrim(t)
+                              return (
+                                <Fragment key={t.id}>
+                                  {t.periods.map((p) => (
+                                    <td
+                                      key={p.id}
+                                      className="px-1.5 py-1.5 text-center"
+                                    >
+                                      {renderScoreCell(
+                                        "P",
+                                        branch.assignmentId,
+                                        p.id,
+                                        s.enrollmentId,
+                                        branch.maxPeriode,
+                                        !!data.lockedPeriods[String(p.id)]
+                                      )}
+                                    </td>
+                                  ))}
+                                  {t.hasExam ? (
+                                    <td className="px-1.5 py-1.5 text-center">
+                                      {renderScoreCell(
+                                        "E",
+                                        branch.assignmentId,
+                                        t.id,
+                                        s.enrollmentId,
+                                        branch.maxExamen,
+                                        !!data.lockedExams[String(t.id)]
+                                      )}
+                                    </td>
+                                  ) : null}
+                                  <td
+                                    className={cn(
+                                      "px-2 py-1.5 text-center font-semibold tabular-nums",
+                                      isBelowAverage(total, branch.maxTrimestre)
+                                        ? "text-red-600 dark:text-red-400"
+                                        : text
+                                    )}
+                                  >
+                                    {total == null ? "—" : total}
+                                  </td>
+                                </Fragment>
+                              )
+                            })}
                             <td
                               className={cn(
-                                "px-2 py-1.5 text-center font-semibold tabular-nums",
-                                text
+                                "px-2 py-1.5 text-center font-bold tabular-nums",
+                                isBelowAverage(yearTotal, branch.maxAnnuel)
+                                  ? "text-red-600 dark:text-red-400"
+                                  : text
                               )}
                             >
-                              {total == null ? "—" : total}
+                              {yearTotal == null ? "—" : yearTotal}
                             </td>
-                          </Fragment>
+                          </>
                         )
-                      })
+                      })()
 
                 return (
                   <tr key={s.enrollmentId} className={cn("border-t", border)}>
@@ -745,7 +893,7 @@ export function TeacherPrimaryGradesBoard({
                 key={p.id}
                 type="button"
                 disabled={sending || !!data.lockedPeriods[String(p.id)]}
-                onClick={() => void sendResults("PERIOD", p.id)}
+                onClick={() => requestSendResults("PERIOD", p.id)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
@@ -758,7 +906,7 @@ export function TeacherPrimaryGradesBoard({
               <button
                 type="button"
                 disabled={sending || !!data.lockedExams[String(trim.id)]}
-                onClick={() => void sendResults("EXAM", trim.id)}
+                onClick={() => requestSendResults("EXAM", trim.id)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-violet-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
@@ -771,36 +919,76 @@ export function TeacherPrimaryGradesBoard({
         </div>
       ) : null}
 
-      {/* Sticky save */}
-      <div className="fixed bottom-20 left-0 right-0 z-40 px-3 lg:bottom-4 lg:left-64">
-        <div
-          className={cn(
-            "mx-auto flex max-w-3xl items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg",
-            card,
-            border,
-            dirtyCount === 0 && "opacity-70"
-          )}
-        >
-          <p className={cn("text-xs sm:text-sm", textMuted)}>
-            {dirtyCount === 0
-              ? "Aucune modification"
-              : `${dirtyCount} modification${dirtyCount > 1 ? "s" : ""} non enregistrée${dirtyCount > 1 ? "s" : ""}`}
-          </p>
-          <button
-            type="button"
-            disabled={saving || dirtyCount === 0}
-            onClick={() => void save()}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Enregistrer
-          </button>
-        </div>
-      </div>
+      {sendPending ? (
+        <Portal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => !sending && setSendPending(null)}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              className={cn(
+                "relative w-full max-w-md rounded-2xl border shadow-2xl",
+                card,
+                border
+              )}
+            >
+              <div className={cn("border-b px-4 py-3", border)}>
+                <p className={cn("text-lg font-semibold", text)}>
+                  Envoyer les résultats
+                </p>
+              </div>
+              <div className="space-y-4 p-4">
+                <div
+                  className={cn(
+                    "flex gap-3 rounded-xl border px-3 py-3 text-sm",
+                    isDark
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  )}
+                >
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                  <p>
+                    Envoyer «{" "}
+                    <span className="font-semibold">{sendPending.label}</span> » à
+                    l&apos;administration ? Les notes de toutes les branches seront{" "}
+                    <span className="font-semibold">verrouillées</span>.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => setSendPending(null)}
+                    className={cn(
+                      "rounded-xl border px-4 py-2 text-sm font-medium",
+                      border,
+                      text
+                    )}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void confirmSendResults()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Confirmer l&apos;envoi
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      ) : null}
 
       {bulletinOpen ? (
         <div className="fixed inset-0 z-[90] flex flex-col bg-black/50 p-2 sm:p-4">

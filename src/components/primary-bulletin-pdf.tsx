@@ -33,6 +33,7 @@ const LIGHT = "#eef2ff"
 const ZEBRA = "#f8fafc"
 const FOCUS = "#dbeafe"
 const HATCH = "#0f172a"
+const BELOW_AVG = "#b91c1c"
 
 const s = StyleSheet.create({
   page: {
@@ -218,6 +219,7 @@ const s = StyleSheet.create({
   cellBold: { fontFamily: "Helvetica-Bold", fontSize: 6.5 },
   cellMuted: { color: MUTED, fontSize: 6 },
   cellFocus: { backgroundColor: FOCUS },
+  cellBelow: { color: BELOW_AVG, fontFamily: "Helvetica-Bold" },
   hatch: {
     width: COL_W,
     alignSelf: "stretch",
@@ -296,16 +298,38 @@ function fmtNum(n: number | null | undefined): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1)
 }
 
+function isBelowAverage(
+  obtained: number | null | undefined,
+  max: number
+): boolean {
+  if (obtained == null || !Number.isFinite(obtained) || !(max > 0)) return false
+  return obtained < max / 2
+}
+
+function fmtScore(
+  obtained: number | null | undefined,
+  max: number,
+  visible: boolean
+): { text: string; below: boolean } {
+  if (!visible) return { text: "", below: false }
+  if (obtained == null) return { text: "", below: false }
+  const below = isBelowAverage(obtained, max)
+  const base = fmtNum(obtained)
+  return { text: below ? `${base}*` : base, below }
+}
+
 function fmtFraction(
   obtained: number | null | undefined,
   max: number,
   visible: boolean
-): string {
+): { text: string; below: boolean } {
   const m = fmtNum(max)
-  if (!m) return ""
-  if (!visible) return `/${m}`
-  if (obtained == null) return `—/${m}`
-  return `${fmtNum(obtained)}/${m}`
+  if (!m) return { text: "", below: false }
+  if (!visible) return { text: `/${m}`, below: false }
+  if (obtained == null) return { text: `—/${m}`, below: false }
+  const below = isBelowAverage(obtained, max)
+  const base = `${fmtNum(obtained)}/${m}`
+  return { text: below ? `${base}*` : base, below }
 }
 
 function fmtPct(n: number | null | undefined): string {
@@ -375,12 +399,14 @@ function Cell({
   muted,
   focus,
   last,
+  below,
 }: {
   text: string
   bold?: boolean
   muted?: boolean
   focus?: boolean
   last?: boolean
+  below?: boolean
 }) {
   return (
     <Text
@@ -389,6 +415,7 @@ function Cell({
         bold ? s.cellBold : {},
         muted ? s.cellMuted : {},
         focus ? s.cellFocus : {},
+        below ? s.cellBelow : {},
       ]}
     >
       {text || " "}
@@ -442,10 +469,17 @@ function ScoreCells({
       const visible = !!vis.periods[String(p.periodId)]
       const obtained = periodScores?.[String(p.periodId)] ?? null
       let text = ""
+      let below = false
       if (mode === "max") text = fmtNum(maxPeriode)
-      else if (mode === "fraction")
-        text = fmtFraction(obtained, maxPeriode, visible)
-      else text = visible ? fmtNum(obtained) : ""
+      else if (mode === "fraction") {
+        const f = fmtFraction(obtained, maxPeriode, visible)
+        text = f.text
+        below = f.below
+      } else {
+        const sc = fmtScore(obtained, maxPeriode, visible)
+        text = sc.text
+        below = sc.below
+      }
       cells.push(
         <Cell
           key={`p-${p.periodId}-${mode}`}
@@ -453,6 +487,7 @@ function ScoreCells({
           bold={bold}
           muted={mode === "max"}
           focus={isFocusPeriod(data, p.periodId)}
+          below={below}
         />
       )
     })
@@ -460,10 +495,17 @@ function ScoreCells({
       const visible = !!vis.exams[String(t.periodGroupId)]
       const obtained = examScores?.[String(t.periodGroupId)] ?? null
       let text = ""
+      let below = false
       if (mode === "max") text = fmtNum(maxExamen)
-      else if (mode === "fraction")
-        text = fmtFraction(obtained, maxExamen, visible)
-      else text = visible ? fmtNum(obtained) : ""
+      else if (mode === "fraction") {
+        const f = fmtFraction(obtained, maxExamen, visible)
+        text = f.text
+        below = f.below
+      } else {
+        const sc = fmtScore(obtained, maxExamen, visible)
+        text = sc.text
+        below = sc.below
+      }
       cells.push(
         <Cell
           key={`ex-${t.periodGroupId}-${mode}`}
@@ -471,6 +513,7 @@ function ScoreCells({
           bold={bold}
           muted={mode === "max"}
           focus={isFocusExam(data, t.periodGroupId)}
+          below={below}
         />
       )
     }
@@ -478,16 +521,24 @@ function ScoreCells({
       const visible = !!vis.trims[String(t.periodGroupId)]
       const obtained = trimScores?.[String(t.periodGroupId)] ?? null
       let text = ""
+      let below = false
       if (mode === "max") text = fmtNum(maxTrimestre)
-      else if (mode === "fraction")
-        text = fmtFraction(obtained, maxTrimestre, visible)
-      else text = visible ? fmtNum(obtained) : ""
+      else if (mode === "fraction") {
+        const f = fmtFraction(obtained, maxTrimestre, visible)
+        text = f.text
+        below = f.below
+      } else {
+        const sc = fmtScore(obtained, maxTrimestre, visible)
+        text = sc.text
+        below = sc.below
+      }
       cells.push(
         <Cell
           key={`tr-${t.periodGroupId}-${mode}`}
           text={text}
           bold={bold}
           muted={mode === "max"}
+          below={below}
         />
       )
     }
@@ -495,16 +546,24 @@ function ScoreCells({
 
   {
     let text = ""
+    let below = false
     if (mode === "max") text = fmtNum(maxAnnuel)
-    else if (mode === "fraction")
-      text = fmtFraction(annualScore ?? null, maxAnnuel, vis.year)
-    else text = vis.year ? fmtNum(annualScore ?? null) : ""
+    else if (mode === "fraction") {
+      const f = fmtFraction(annualScore ?? null, maxAnnuel, vis.year)
+      text = f.text
+      below = f.below
+    } else {
+      const sc = fmtScore(annualScore ?? null, maxAnnuel, vis.year)
+      text = sc.text
+      below = sc.below
+    }
     cells.push(
       <Cell
         key={`an-${mode}`}
         text={text}
         bold={bold}
         muted={mode === "max"}
+        below={below}
         last
       />
     )
@@ -933,8 +992,10 @@ function BulletinPage({
 
       <Text style={s.note}>
         Points visibles uniquement pour les périodes/examens publiés. Maxima
-        repris après chaque domaine. Application dérivée du %. Conduite :
-        périodes seulement (cases noires = non applicables).
+        repris après chaque domaine. Notes sous la moyenne (moins de 50 % du
+        max) en rouge avec astérisque (*) pour l&apos;impression N&amp;B.
+        Application dérivée du %. Conduite : périodes seulement (cases noires =
+        non applicables).
       </Text>
 
       <Text
