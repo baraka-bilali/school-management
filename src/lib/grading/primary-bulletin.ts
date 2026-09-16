@@ -6,6 +6,7 @@ import {
 } from "@/lib/grading/primary-maxima"
 import { ensureDefaultEvaluationCycles } from "@/lib/grading/cycles"
 import { bulletinEventKey } from "@/lib/grading/class-submission-status"
+import { PRIMARY_PERIOD_COLUMN_LABEL } from "@/lib/grading/primary-cotation"
 import { toDisplayCode } from "@/lib/student-fields"
 
 export type BulletinSchoolInfo = {
@@ -561,10 +562,13 @@ export async function loadPrimaryBulletins(params: {
   const examScore = new Map<string, number | null>()
 
   if (assignmentIds.length > 0 && allPeriodIds.length > 0) {
+    // Primaire : uniquement la colonne officielle « Cotation période »
+    // (ignorer Interrogation / autres colonnes legacy qui faussent le bulletin).
     const columns = await prisma.evaluationColumn.findMany({
       where: {
         courseAssignmentId: { in: assignmentIds },
         periodId: { in: allPeriodIds },
+        label: PRIMARY_PERIOD_COLUMN_LABEL,
       },
       include: {
         grades: {

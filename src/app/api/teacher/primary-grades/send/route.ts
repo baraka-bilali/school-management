@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { teacherHasClassAccess } from "@/lib/teacher-classes"
+import { PRIMARY_PERIOD_COLUMN_LABEL } from "@/lib/grading/primary-cotation"
 
 /**
  * POST — envoyer les résultats à l'admin (verrouille toutes les branches
@@ -83,6 +84,52 @@ export async function POST(req: NextRequest) {
       isActive: true,
     },
   })
+
+  if (assignments.length === 0) {
+    return NextResponse.json({ error: "Aucune branche assignée" }, { status: 400 })
+  }
+
+  const assignmentIds = assignments.map((a) => a.id)
+
+  // Refuser l'envoi si aucune note officielle n'a été saisie pour l'événement
+  if (kind === "PERIOD") {
+    const gradeCount = await prisma.grade.count({
+      where: {
+        enrollment: { classId, yearId: ctx.yearId, status: "ACTIVE" },
+        column: {
+          periodId: periodId!,
+          label: PRIMARY_PERIOD_COLUMN_LABEL,
+          courseAssignmentId: { in: assignmentIds },
+        },
+      },
+    })
+    if (gradeCount === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Impossible d'envoyer : aucune note saisie pour cette période. Enregistrez d'abord les cotations.",
+        },
+        { status: 400 }
+      )
+    }
+  } else {
+    const examCount = await prisma.examGrade.count({
+      where: {
+        periodGroupId: periodGroupId!,
+        courseAssignmentId: { in: assignmentIds },
+        enrollment: { classId, yearId: ctx.yearId, status: "ACTIVE" },
+      },
+    })
+    if (examCount === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Impossible d'envoyer : aucune note d'examen saisie. Enregistrez d'abord les cotations.",
+        },
+        { status: 400 }
+      )
+    }
+  }
 
   let created = 0
   let already = 0

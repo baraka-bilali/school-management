@@ -8,8 +8,7 @@ import {
   primaryDegreeCodeForLevel,
 } from "@/lib/grading/primary-maxima"
 import { normalizePeriodResult, roundGrade } from "@/lib/grading/normalize"
-
-const PERIOD_COLUMN_LABEL = "Cotation période"
+import { PRIMARY_PERIOD_COLUMN_LABEL } from "@/lib/grading/primary-cotation"
 
 /**
  * GET ?classId=&periodGroupId?
@@ -218,6 +217,7 @@ export async function GET(req: NextRequest) {
           where: {
             courseAssignmentId: { in: assignmentIds },
             periodId: { in: allPeriodIds },
+            label: PRIMARY_PERIOD_COLUMN_LABEL,
           },
           include: { grades: true },
         })
@@ -457,21 +457,50 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    const maxRow = await prisma.subjectPeriodMax.findFirst({
-      where: {
-        subjectId: assignment.subjectId,
-        section: "Primaire",
-        periodId: Number(row.periodId),
-        schoolId: ctx.schoolId,
-      },
+    const classForMax = await prisma.class.findFirst({
+      where: { id: classId },
+      select: { level: true },
     })
-    const officialMax = maxRow?.maxPoints ?? 10
+    const degreeCode = primaryDegreeCodeForLevel(classForMax?.level || "")
+    const branchMax = degreeCode
+      ? await prisma.primaryBranch.findFirst({
+          where: {
+            subjectId: assignment.subjectId,
+            isActive: true,
+            domain: {
+              degree: { schoolId: ctx.schoolId, code: degreeCode, isActive: true },
+            },
+          },
+          select: {
+            maxPeriode: true,
+            maxExamenOverride: true,
+            maxTrimestreOverride: true,
+            maxAnnuelOverride: true,
+          },
+        })
+      : null
+    const officialMax = branchMax
+      ? derivePrimaryMaxima(branchMax.maxPeriode, {
+          maxExamenOverride: branchMax.maxExamenOverride,
+          maxTrimestreOverride: branchMax.maxTrimestreOverride,
+          maxAnnuelOverride: branchMax.maxAnnuelOverride,
+        }).maxPeriode
+      : (
+          await prisma.subjectPeriodMax.findFirst({
+            where: {
+              subjectId: assignment.subjectId,
+              section: "Primaire",
+              periodId: Number(row.periodId),
+              schoolId: ctx.schoolId,
+            },
+          })
+        )?.maxPoints ?? 10
 
     let column = await prisma.evaluationColumn.findFirst({
       where: {
         courseAssignmentId: assignment.id,
         periodId: Number(row.periodId),
-        label: PERIOD_COLUMN_LABEL,
+        label: PRIMARY_PERIOD_COLUMN_LABEL,
       },
     })
     if (!column) {
@@ -479,7 +508,7 @@ export async function PUT(req: NextRequest) {
         data: {
           courseAssignmentId: assignment.id,
           periodId: Number(row.periodId),
-          label: PERIOD_COLUMN_LABEL,
+          label: PRIMARY_PERIOD_COLUMN_LABEL,
           date: new Date(),
           maxPoints: officialMax,
         },
