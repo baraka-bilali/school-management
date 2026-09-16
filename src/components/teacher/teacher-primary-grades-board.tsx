@@ -69,10 +69,11 @@ type BoardData = {
 
 type ViewMode = "trimestre" | "annuel"
 
-function periodShort(name: string, fallback: string) {
+function periodShort(name: string, fallback: string, compact = false) {
   const m = name.match(/(\d+)/)
   if (!m) return fallback
   const n = m[1]
+  if (compact) return `${n}P`
   if (n === "1") return "1ère P."
   if (n === "2") return "2ème P."
   if (n === "3") return "3ème P."
@@ -397,9 +398,14 @@ export function TeacherPrimaryGradesBoard({
   const branch =
     data.branches.find((b) => b.assignmentId === branchId) || data.branches[0]
 
+  const annualCompact = viewMode === "annuel"
+
   const inputClass = (below: boolean, locked: boolean) =>
     cn(
-      "w-[4.5rem] rounded-lg border px-1.5 py-1.5 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30",
+      "rounded-lg border text-center tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30",
+      annualCompact
+        ? "w-9 px-0.5 py-1 text-xs"
+        : "w-[4.5rem] px-1.5 py-1.5 text-sm",
       border,
       locked
         ? isDark
@@ -440,7 +446,10 @@ export function TeacherPrimaryGradesBoard({
       return (
         <div
           className={cn(
-            "mx-auto flex h-[34px] w-[4.5rem] items-center justify-center rounded-lg border text-sm tabular-nums",
+            "mx-auto flex items-center justify-center rounded-lg border tabular-nums",
+            annualCompact
+              ? "h-7 w-9 text-xs"
+              : "h-[34px] w-[4.5rem] text-sm",
             border,
             isDark ? "bg-gray-800/80" : "bg-gray-100",
             below
@@ -600,23 +609,26 @@ export function TeacherPrimaryGradesBoard({
       {branch && (viewMode === "trimestre" ? trim : true) ? (
         <div
           className={cn(
-            "rounded-2xl border overflow-x-auto",
+            "rounded-2xl border",
             card,
             border,
-            viewMode === "annuel" && "min-w-0"
+            annualCompact ? "overflow-x-hidden min-w-0" : "overflow-x-auto"
           )}
         >
           <table
             className={cn(
-              "text-sm",
-              viewMode === "annuel" ? "min-w-[1100px] w-full" : "min-w-full"
+              "w-full text-sm",
+              annualCompact ? "table-fixed" : "min-w-full"
             )}
           >
             <thead>
               <tr className={isDark ? "bg-gray-800/60" : "bg-gray-50"}>
                 <th
                   className={cn(
-                    "sticky left-0 z-10 px-3 py-2 text-left font-medium min-w-[10rem]",
+                    "sticky left-0 z-10 text-left font-medium",
+                    annualCompact
+                      ? "w-[9.5rem] px-2 py-1.5 text-xs"
+                      : "min-w-[10rem] px-3 py-2",
                     isDark ? "bg-gray-800" : "bg-gray-50",
                     text
                   )}
@@ -664,18 +676,21 @@ export function TeacherPrimaryGradesBoard({
                       </th>,
                     ]
                   : [
-                      ...data.trimestres.flatMap((t) => [
+                      ...data.trimestres.flatMap((t, ti) => [
                         ...t.periods.map((p, i) => (
                           <th
                             key={`a-${p.id}`}
                             className={cn(
-                              "px-2 py-2 text-center font-medium min-w-[4.75rem]",
+                              "px-0.5 py-1.5 text-center font-medium text-[11px] leading-tight",
                               text
                             )}
+                            title={`${t.name} — ${periodShort(p.name, `${i + 1}P`)}`}
                           >
-                            <div className="text-[10px] opacity-70">{t.name}</div>
-                            {periodShort(p.name, `${i + 1}P`)}
-                            <div className={cn("text-[10px] font-normal", textMuted)}>
+                            <div className="text-[9px] opacity-60">
+                              T{ti + 1}
+                            </div>
+                            {periodShort(p.name, `${i + 1}P`, true)}
+                            <div className={cn("text-[9px] font-normal", textMuted)}>
                               /{branch.maxPeriode}
                             </div>
                           </th>
@@ -684,13 +699,16 @@ export function TeacherPrimaryGradesBoard({
                           <th
                             key={`ae-${t.id}`}
                             className={cn(
-                              "px-2 py-2 text-center font-medium min-w-[4.75rem]",
+                              "px-0.5 py-1.5 text-center font-medium text-[11px] leading-tight",
                               text
                             )}
+                            title={`${t.name} — Examen`}
                           >
-                            <div className="text-[10px] opacity-70">{t.name}</div>
-                            Exam.
-                            <div className={cn("text-[10px] font-normal", textMuted)}>
+                            <div className="text-[9px] opacity-60">
+                              T{ti + 1}
+                            </div>
+                            Ex
+                            <div className={cn("text-[9px] font-normal", textMuted)}>
                               /{branch.maxExamen}
                             </div>
                           </th>
@@ -698,13 +716,16 @@ export function TeacherPrimaryGradesBoard({
                         <th
                           key={`at-${t.id}`}
                           className={cn(
-                            "px-2 py-2 text-center font-medium min-w-[4.5rem]",
+                            "px-0.5 py-1.5 text-center font-medium text-[11px] leading-tight",
                             text
                           )}
+                          title={`${t.name} — Total`}
                         >
-                          <div className="text-[10px] opacity-70">{t.name}</div>
-                          Total
-                          <div className={cn("text-[10px] font-normal", textMuted)}>
+                          <div className="text-[9px] opacity-60">
+                            T{ti + 1}
+                          </div>
+                          Tot
+                          <div className={cn("text-[9px] font-normal", textMuted)}>
                             /{branch.maxTrimestre}
                           </div>
                         </th>,
@@ -712,18 +733,28 @@ export function TeacherPrimaryGradesBoard({
                       <th
                         key="year-tot"
                         className={cn(
-                          "px-2 py-2 text-center font-medium min-w-[5rem]",
+                          "px-0.5 py-1.5 text-center font-medium text-[11px] leading-tight",
                           text
                         )}
                       >
-                        Total année
-                        <div className={cn("text-[10px] font-normal", textMuted)}>
+                        Année
+                        <div className={cn("text-[9px] font-normal", textMuted)}>
                           /{branch.maxAnnuel}
                         </div>
                       </th>,
                     ]}
-                <th className={cn("px-2 py-2 text-center font-medium", text)}>
-                  Bulletin
+                <th
+                  className={cn(
+                    "text-center font-medium",
+                    annualCompact ? "w-10 px-0.5 py-1.5 text-xs" : "px-2 py-2",
+                    text
+                  )}
+                >
+                  {annualCompact ? (
+                    <Eye className="mx-auto h-3.5 w-3.5 opacity-70" aria-label="Bulletin" />
+                  ) : (
+                    "Bulletin"
+                  )}
                 </th>
               </tr>
             </thead>
@@ -824,7 +855,7 @@ export function TeacherPrimaryGradesBoard({
                                   {t.periods.map((p) => (
                                     <td
                                       key={p.id}
-                                      className="px-1.5 py-1.5 text-center"
+                                      className="px-0.5 py-1 text-center"
                                     >
                                       {renderScoreCell(
                                         "P",
@@ -840,7 +871,7 @@ export function TeacherPrimaryGradesBoard({
                                     </td>
                                   ))}
                                   {t.hasExam ? (
-                                    <td className="px-1.5 py-1.5 text-center">
+                                    <td className="px-0.5 py-1 text-center">
                                       {renderScoreCell(
                                         "E",
                                         branch.assignmentId,
@@ -856,7 +887,7 @@ export function TeacherPrimaryGradesBoard({
                                   ) : null}
                                   <td
                                     className={cn(
-                                      "px-2 py-1.5 text-center font-semibold tabular-nums",
+                                      "px-0.5 py-1 text-center font-semibold tabular-nums text-xs",
                                       isBelowAverage(total, branch.maxTrimestre)
                                         ? "text-red-600 dark:text-red-400"
                                         : text
@@ -869,7 +900,7 @@ export function TeacherPrimaryGradesBoard({
                             })}
                             <td
                               className={cn(
-                                "px-2 py-1.5 text-center font-bold tabular-nums",
+                                "px-0.5 py-1 text-center font-bold tabular-nums text-xs",
                                 isBelowAverage(yearTotal, branch.maxAnnuel)
                                   ? "text-red-600 dark:text-red-400"
                                   : text
@@ -885,30 +916,45 @@ export function TeacherPrimaryGradesBoard({
                   <tr key={s.enrollmentId} className={cn("border-t", border)}>
                     <td
                       className={cn(
-                        "sticky left-0 z-10 px-3 py-2",
+                        "sticky left-0 z-10",
+                        annualCompact ? "px-2 py-1.5" : "px-3 py-2",
                         isDark ? "bg-gray-900" : "bg-white"
                       )}
                     >
                       <button
                         type="button"
                         onClick={() => void openBulletin(s)}
-                        className="text-left"
+                        className="text-left min-w-0 max-w-full"
                       >
-                        <div className="font-medium text-teal-600 dark:text-teal-400">
+                        <div
+                          className={cn(
+                            "font-medium text-teal-600 dark:text-teal-400",
+                            annualCompact && "truncate text-xs leading-snug"
+                          )}
+                          title={s.fullName}
+                        >
                           {s.fullName}
                         </div>
-                        <div className={cn("text-[11px]", textMuted)}>{s.code}</div>
+                        {!annualCompact ? (
+                          <div className={cn("text-[11px]", textMuted)}>{s.code}</div>
+                        ) : null}
                       </button>
                     </td>
                     {trimCells}
-                    <td className="px-2 py-1.5 text-center">
+                    <td className={cn("text-center", annualCompact ? "px-0.5 py-1" : "px-2 py-1.5")}>
                       <button
                         type="button"
                         onClick={() => void openBulletin(s)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-teal-500/40 px-2 py-1 text-xs text-teal-600 dark:text-teal-400"
+                        className={cn(
+                          "inline-flex items-center justify-center text-teal-600 dark:text-teal-400",
+                          annualCompact
+                            ? "h-7 w-7 rounded-md border border-teal-500/40"
+                            : "gap-1 rounded-lg border border-teal-500/40 px-2 py-1 text-xs"
+                        )}
+                        title="Voir le bulletin"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Voir
+                        {!annualCompact ? "Voir" : null}
                       </button>
                     </td>
                   </tr>
