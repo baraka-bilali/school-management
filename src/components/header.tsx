@@ -267,7 +267,7 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
 
             {/* Theme Toggle */}
             <button
-              onClick={toggleTheme}
+              onClick={() => toggleTheme()}
               className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-800 text-yellow-400" : "hover:bg-gray-100 text-indigo-500"}`}
               title={theme === "dark" ? "Mode Clair" : "Mode Sombre"}
             >

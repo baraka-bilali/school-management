@@ -1438,7 +1438,7 @@ export default function SuperAdminHome() {
                     </a>
 
                     <button
-                      onClick={toggleTheme}
+                      onClick={() => toggleTheme()}
                       className={`w-full px-4 py-3 flex items-center gap-3 ${hoverBg} transition-colors text-left`}
                     >
                       {theme === "dark" ? (

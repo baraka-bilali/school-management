@@ -56,8 +56,8 @@ export default function SuperAdminLoginPage() {
   }
 
   return (
-    <div className="login-shell relative isolate flex w-full items-center justify-center overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
-      <div className="w-full max-w-md">
+    <div className="login-shell relative isolate flex w-full items-center justify-center overflow-hidden bg-gray-50 px-6 py-8">
+      <div className="w-full max-w-md min-w-0">
         <div className="flex flex-col items-center mb-4">
           <div className="mb-3">
             <KelasiLogo variant="light" priority className="h-36 w-36 sm:h-44 sm:w-44 object-contain drop-shadow-md" />

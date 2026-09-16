@@ -37,12 +37,17 @@ let currentTheme: AppTheme = "light"
 if (typeof window !== "undefined") {
   currentTheme = readInitialClientTheme()
   // Rester aligné si un autre écran (admin, etc.) change le thème via themeChange
-  window.addEventListener("themeChange", () => {
+  const syncFromStorage = () => {
     const next = readInitialClientTheme()
     if (next === currentTheme) return
     currentTheme = next
     applyToDom(next)
     listeners.forEach((listener) => listener(next))
+  }
+  window.addEventListener("themeChange", syncFromStorage)
+  // Sync multi-onglets
+  window.addEventListener("storage", (e) => {
+    if (e.key === "theme" || e.key === null) syncFromStorage()
   })
 }
 

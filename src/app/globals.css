@@ -171,6 +171,8 @@
 @media (min-width: 768px) {
   html {
     zoom: 0.8;
+    /* zoom < 1 peut générer ~1–2px de débordement → barre horizontale fantôme */
+    overflow-x: hidden;
   }
   html,
   body {
@@ -192,6 +194,9 @@
 .login-shell {
   min-height: 100dvh;
   min-height: 100svh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 @media (min-width: 768px) {
   .login-shell {
