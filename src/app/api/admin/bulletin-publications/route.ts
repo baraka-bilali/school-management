@@ -8,6 +8,61 @@ import {
 } from "@/lib/fees/api-helpers"
 import { bulletinEventKey } from "@/lib/grading/class-submission-status"
 import { loadPrimaryClassResults } from "@/lib/grading/primary-results"
+import { PRIMARY_PERIOD_COLUMN_LABEL } from "@/lib/grading/primary-cotation"
+
+async function countOfficialGrades(params: {
+  schoolId: number
+  yearId: number | null
+  classId: number
+  kind: "PERIOD" | "EXAM"
+  periodId?: number | null
+  periodGroupId?: number | null
+}): Promise<number> {
+  const assignments = params.yearId
+    ? await prisma.courseAssignment.findMany({
+        where: {
+          schoolId: params.schoolId,
+          yearId: params.yearId,
+          classId: params.classId,
+          isActive: true,
+        },
+        select: { id: true },
+      })
+    : []
+  const assignmentIds = assignments.map((a) => a.id)
+  if (assignmentIds.length === 0) return 0
+
+  if (params.kind === "PERIOD" && params.periodId) {
+    return prisma.grade.count({
+      where: {
+        enrollment: {
+          classId: params.classId,
+          yearId: params.yearId ?? undefined,
+          status: "ACTIVE",
+        },
+        column: {
+          periodId: params.periodId,
+          label: PRIMARY_PERIOD_COLUMN_LABEL,
+          courseAssignmentId: { in: assignmentIds },
+        },
+      },
+    })
+  }
+  if (params.kind === "EXAM" && params.periodGroupId) {
+    return prisma.examGrade.count({
+      where: {
+        periodGroupId: params.periodGroupId,
+        courseAssignmentId: { in: assignmentIds },
+        enrollment: {
+          classId: params.classId,
+          yearId: params.yearId ?? undefined,
+          status: "ACTIVE",
+        },
+      },
+    })
+  }
+  return 0
+}
 
 const ROLES = ["ADMIN", "DIRECTEUR_ETUDES", "SUPER_ADMIN"]
 
@@ -115,6 +170,23 @@ export async function POST(req: NextRequest) {
           skipped.push({
             classId: item.classId,
             reason: "Publication réservée aux classes entièrement soumises",
+          })
+          continue
+        }
+
+        const gradeCount = await countOfficialGrades({
+          schoolId,
+          yearId,
+          classId: item.classId,
+          kind: item.kind,
+          periodId: item.periodId,
+          periodGroupId: item.periodGroupId,
+        })
+        if (gradeCount === 0) {
+          skipped.push({
+            classId: item.classId,
+            reason:
+              "Aucune note officielle saisie pour cet événement — publication annulée",
           })
           continue
         }
