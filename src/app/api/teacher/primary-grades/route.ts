@@ -7,8 +7,7 @@ import {
   derivePrimaryMaxima,
   primaryDegreeCodeForLevel,
 } from "@/lib/grading/primary-maxima"
-import { normalizePeriodResult, roundGrade, sumPeriodGroupTotal } from "@/lib/grading/normalize"
-import { findActiveGradeLock } from "@/lib/grading/grade-locks"
+import { normalizePeriodResult, roundGrade } from "@/lib/grading/normalize"
 
 const PERIOD_COLUMN_LABEL = "Cotation période"
 
@@ -309,22 +308,48 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  /** Verrouillage par branche : assignmentId → periodId|periodGroupId → bool */
+  const lockedPeriodsByAssignment: Record<string, Record<string, boolean>> = {}
+  const lockedExamsByAssignment: Record<string, Record<string, boolean>> = {}
+  for (const b of branches) {
+    const aKey = String(b.assignmentId)
+    lockedPeriodsByAssignment[aKey] = {}
+    lockedExamsByAssignment[aKey] = {}
+    for (const p of allPeriodIds) {
+      lockedPeriodsByAssignment[aKey][String(p)] = locks.some(
+        (l) =>
+          l.kind === "PERIOD" &&
+          l.periodId === p &&
+          l.subjectId === b.subjectId
+      )
+    }
+    for (const g of allGroupIds) {
+      lockedExamsByAssignment[aKey][String(g)] = locks.some(
+        (l) =>
+          l.kind === "EXAM" &&
+          l.periodGroupId === g &&
+          l.subjectId === b.subjectId
+      )
+    }
+  }
+
+  /** Période/examen « envoyé » quand toutes les branches sont verrouillées */
   const lockedPeriods: Record<string, boolean> = {}
   const lockedExams: Record<string, boolean> = {}
   for (const p of allPeriodIds) {
-    lockedPeriods[String(p)] = locks.some(
-      (l) => l.kind === "PERIOD" && l.periodId === p
-    )
+    lockedPeriods[String(p)] =
+      branches.length > 0 &&
+      branches.every(
+        (b) => lockedPeriodsByAssignment[String(b.assignmentId)][String(p)]
+      )
   }
   for (const g of allGroupIds) {
-    lockedExams[String(g)] = locks.some(
-      (l) => l.kind === "EXAM" && l.periodGroupId === g
-    )
+    lockedExams[String(g)] =
+      branches.length > 0 &&
+      branches.every(
+        (b) => lockedExamsByAssignment[String(b.assignmentId)][String(g)]
+      )
   }
-
-  // Totals helpers for UI (per student per trimestre / year) — computed client-side too
-  void sumPeriodGroupTotal
-  void findActiveGradeLock
 
   return NextResponse.json({
     class: classRow,
@@ -337,6 +362,8 @@ export async function GET(req: NextRequest) {
     examScores,
     lockedPeriods,
     lockedExams,
+    lockedPeriodsByAssignment,
+    lockedExamsByAssignment,
   })
 }
 
