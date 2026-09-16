@@ -59,8 +59,12 @@ type BoardData = {
   students: Student[]
   periodScores: Record<string, Record<string, Record<string, number | null>>>
   examScores: Record<string, Record<string, Record<string, number | null>>>
+  /** Toutes les branches verrouillées pour cet événement */
   lockedPeriods: Record<string, boolean>
   lockedExams: Record<string, boolean>
+  /** Verrouillage par branche */
+  lockedPeriodsByAssignment: Record<string, Record<string, boolean>>
+  lockedExamsByAssignment: Record<string, Record<string, boolean>>
 }
 
 type ViewMode = "trimestre" | "annuel"
@@ -393,17 +397,31 @@ export function TeacherPrimaryGradesBoard({
   const branch =
     data.branches.find((b) => b.assignmentId === branchId) || data.branches[0]
 
-  const inputClass = (below: boolean) =>
+  const inputClass = (below: boolean, locked: boolean) =>
     cn(
-      "w-[4.5rem] rounded-lg border px-1.5 py-1.5 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50",
+      "w-[4.5rem] rounded-lg border px-1.5 py-1.5 text-center text-sm tabular-nums outline-none focus:ring-2 focus:ring-indigo-500/30",
       border,
-      isDark ? "bg-gray-950" : "bg-white",
+      locked
+        ? isDark
+          ? "bg-gray-800/80 cursor-not-allowed"
+          : "bg-gray-100 cursor-not-allowed"
+        : isDark
+          ? "bg-gray-950"
+          : "bg-white",
       below
         ? "font-semibold text-red-600 dark:text-red-400"
         : isDark
           ? "text-gray-100"
           : "text-gray-900"
     )
+
+  const isBranchPeriodLocked = (assignmentId: number, periodId: number) =>
+    !!data?.lockedPeriodsByAssignment?.[String(assignmentId)]?.[String(periodId)]
+
+  const isBranchExamLocked = (assignmentId: number, periodGroupId: number) =>
+    !!data?.lockedExamsByAssignment?.[String(assignmentId)]?.[
+      String(periodGroupId)
+    ]
 
   const renderScoreCell = (
     kind: "P" | "E",
@@ -417,13 +435,30 @@ export function TeacherPrimaryGradesBoard({
     const raw = drafts[key] ?? ""
     const num = raw === "" ? null : Number(raw)
     const below = isBelowAverage(num, max)
+    // Notes toujours visibles même verrouillées (lecture seule)
+    if (locked) {
+      return (
+        <div
+          className={cn(
+            "mx-auto flex h-[34px] w-[4.5rem] items-center justify-center rounded-lg border text-sm tabular-nums",
+            border,
+            isDark ? "bg-gray-800/80" : "bg-gray-100",
+            below
+              ? "font-semibold text-red-600 dark:text-red-400"
+              : text
+          )}
+          title="Verrouillé — note visible en lecture seule"
+        >
+          {raw === "" ? "—" : raw}
+        </div>
+      )
+    }
     return (
       <input
         type="number"
         min={0}
         max={max}
         step={0.5}
-        disabled={locked}
         value={raw}
         onChange={(e) => {
           const next = clampScoreInput(e.target.value, max)
@@ -435,7 +470,7 @@ export function TeacherPrimaryGradesBoard({
             setDrafts((d) => ({ ...d, [key]: next }))
           }
         }}
-        className={inputClass(below)}
+        className={inputClass(below, false)}
       />
     )
   }
@@ -598,7 +633,7 @@ export function TeacherPrimaryGradesBoard({
                           {periodShort(p.name, `${i + 1}P`)}
                           <div className={cn("text-[10px] font-normal", textMuted)}>
                             /{branch.maxPeriode}
-                            {data.lockedPeriods[String(p.id)]
+                            {isBranchPeriodLocked(branch.assignmentId, p.id)
                               ? " · verrouillé"
                               : ""}
                           </div>
@@ -612,7 +647,7 @@ export function TeacherPrimaryGradesBoard({
                           Exam.
                           <div className={cn("text-[10px] font-normal", textMuted)}>
                             /{branch.maxExamen}
-                            {data.lockedExams[String(trim.id)]
+                            {isBranchExamLocked(branch.assignmentId, trim.id)
                               ? " · verrouillé"
                               : ""}
                           </div>
@@ -732,7 +767,10 @@ export function TeacherPrimaryGradesBoard({
                                   p.id,
                                   s.enrollmentId,
                                   branch.maxPeriode,
-                                  !!data.lockedPeriods[String(p.id)]
+                                  isBranchPeriodLocked(
+                                    branch.assignmentId,
+                                    p.id
+                                  )
                                 )}
                               </td>
                             ))}
@@ -744,7 +782,10 @@ export function TeacherPrimaryGradesBoard({
                                   trim.id,
                                   s.enrollmentId,
                                   branch.maxExamen,
-                                  !!data.lockedExams[String(trim.id)]
+                                  isBranchExamLocked(
+                                    branch.assignmentId,
+                                    trim.id
+                                  )
                                 )}
                               </td>
                             ) : null}
@@ -791,7 +832,10 @@ export function TeacherPrimaryGradesBoard({
                                         p.id,
                                         s.enrollmentId,
                                         branch.maxPeriode,
-                                        !!data.lockedPeriods[String(p.id)]
+                                        isBranchPeriodLocked(
+                                          branch.assignmentId,
+                                          p.id
+                                        )
                                       )}
                                     </td>
                                   ))}
@@ -803,7 +847,10 @@ export function TeacherPrimaryGradesBoard({
                                         t.id,
                                         s.enrollmentId,
                                         branch.maxExamen,
-                                        !!data.lockedExams[String(t.id)]
+                                        isBranchExamLocked(
+                                          branch.assignmentId,
+                                          t.id
+                                        )
                                       )}
                                     </td>
                                   ) : null}
