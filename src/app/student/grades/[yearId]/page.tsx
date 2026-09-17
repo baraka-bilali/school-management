@@ -132,8 +132,31 @@ export default function StudentGradesYearPage() {
   }, [yearId])
 
   const visibleSummaries = useMemo(() => {
-    if (!data?.bulletin?.summaries) return []
-    return data.bulletin.summaries.filter((s) => s.obtained != null || s.percentage != null)
+    if (!data?.bulletin?.summaries || !data.trimestres) return []
+    const labelFor = (key: string) => {
+      if (key === "year") return "Année"
+      if (key.startsWith("period:")) {
+        const id = Number(key.slice(7))
+        for (const t of data.trimestres!) {
+          const p = t.periods.find((x) => x.periodId === id)
+          if (p) return p.shortLabel || p.name
+        }
+      }
+      if (key.startsWith("exam:")) {
+        const id = Number(key.slice(5))
+        const t = data.trimestres!.find((x) => x.periodGroupId === id)
+        return t ? `Ex. ${t.shortLabel}` : "Examen"
+      }
+      if (key.startsWith("trim:")) {
+        const id = Number(key.slice(5))
+        const t = data.trimestres!.find((x) => x.periodGroupId === id)
+        return t ? `Tot. ${t.shortLabel}` : "Trimestre"
+      }
+      return key
+    }
+    return data.bulletin.summaries
+      .filter((s) => s.obtained != null || s.percentage != null)
+      .map((s) => ({ ...s, label: labelFor(s.key) }))
   }, [data])
 
   const periodCols = useMemo(() => {
@@ -280,7 +303,7 @@ export default function StudentGradesYearPage() {
                   className={cn("rounded-2xl border p-3 sm:p-4", card, border, shadow)}
                 >
                   <p className={cn("text-[11px] font-medium uppercase tracking-wide", textMuted)}>
-                    {s.key}
+                    {s.label}
                   </p>
                   <p className={cn("mt-1 text-xl font-bold", text)}>{fmtPct(s.percentage)}</p>
                   <p className={cn("text-xs", textMuted)}>
