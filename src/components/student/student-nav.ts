@@ -2,6 +2,7 @@ import {
   LayoutGrid,
   Wallet,
   ClipboardList,
+  FileText,
   Bell,
   User,
   type LucideIcon,
@@ -30,6 +31,12 @@ export const studentNavItems: StudentNavItem[] = [
     badgeKey: "fees",
   },
   {
+    href: "/student/grades",
+    label: "Notes",
+    icon: FileText,
+    match: (p) => p.startsWith("/student/grades"),
+  },
+  {
     href: "/student/tasks",
     label: "Tâches",
     icon: ClipboardList,
@@ -51,7 +58,7 @@ export const studentNavItems: StudentNavItem[] = [
   },
 ]
 
-/** Items shown in mobile bottom bar (4 slots) */
+/** Items shown in mobile bottom bar (Messages reste dans la sidebar) */
 export const studentMobileNavItems = studentNavItems.filter(
   (item) => item.href !== "/student/notifications"
 )

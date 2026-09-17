@@ -30,7 +30,7 @@ export default function StudentBottomNav({ feePulse = false, isDark = false }: S
               key={href}
               href={href}
               className={cn(
-                "relative flex min-w-[4.5rem] flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition-colors",
+                "relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl px-1.5 py-1.5 transition-colors sm:px-3",
                 active
                   ? isDark
                     ? "text-indigo-400"
