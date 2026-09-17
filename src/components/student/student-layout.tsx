@@ -156,6 +156,26 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   }, [student?.classId])
 
   useEffect(() => {
+    if (!student?.classId) return
+    const channel = getSupabaseBrowser()
+      .channel(`bulletins:class:${student.classId}`)
+      .on("broadcast", { event: "bulletin_published" }, ({ payload }) => {
+        const label = typeof payload?.label === "string" ? payload.label : "Bulletin"
+        setUnreadNotifications((prev) => prev + 1)
+        void showSystemNotification(
+          "Kelasi 360",
+          `Bulletin publié : ${label}`,
+          { url: "/student/grades" }
+        )
+        window.dispatchEvent(new Event("bulletinPublished"))
+      })
+      .subscribe()
+    return () => {
+      getSupabaseBrowser().removeChannel(channel)
+    }
+  }, [student?.classId])
+
+  useEffect(() => {
     if (pathname === "/student/fees") setFeePulse(false)
   }, [pathname])
 

@@ -441,13 +441,12 @@ export const FEATURE_SEARCH_ITEMS: FeatureSearchItem[] = [
   {
     id: "student-grades",
     title: "Notes & Bulletins",
-    subtitle: "Bientôt disponible",
+    subtitle: "Résultats publiés par année scolaire",
     href: "/student/grades",
-    category: "coming",
-    keywords: ["notes", "bulletins", "grades"],
+    category: "classes",
+    keywords: ["notes", "bulletins", "grades", "résultats", "cotation"],
     icon: FileText,
     roles: ["ELEVE"],
-    comingSoon: true,
   },
 ]
 

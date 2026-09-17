@@ -9,6 +9,8 @@ import {
 import { bulletinEventKey } from "@/lib/grading/class-submission-status"
 import { loadPrimaryClassResults } from "@/lib/grading/primary-results"
 import { PRIMARY_PERIOD_COLUMN_LABEL } from "@/lib/grading/primary-cotation"
+import { getSupabaseAdmin } from "@/lib/supabase-server"
+import { ensureDefaultEvaluationCycles } from "@/lib/grading/cycles"
 
 async function countOfficialGrades(params: {
   schoolId: number
@@ -142,7 +144,14 @@ export async function POST(req: NextRequest) {
       byEvent.set(key, list)
     }
 
-    const published: Array<{ classId: number; publicationId: number }> = []
+    const published: Array<{
+      classId: number
+      publicationId: number
+      kind: "PERIOD" | "EXAM"
+      periodId: number | null
+      periodGroupId: number | null
+      eventKey: string
+    }> = []
     const skipped: Array<{ classId: number; reason: string }> = []
 
     for (const items of byEvent.values()) {
@@ -210,12 +219,122 @@ export async function POST(req: NextRequest) {
             publishedByUserId: user.id,
           },
         })
-        published.push({ classId: item.classId, publicationId: row.id })
+        published.push({
+          classId: item.classId,
+          publicationId: row.id,
+          kind: item.kind,
+          periodId: item.periodId ?? null,
+          periodGroupId: item.periodGroupId ?? null,
+          eventKey,
+        })
+      }
+    }
+
+    // Notifications + broadcast Supabase pour les élèves des classes publiées
+    if (published.length > 0 && yearId) {
+      try {
+        const cycles = await ensureDefaultEvaluationCycles(schoolId)
+        const primaryCycle = cycles.find((c) => c.kind === "PRIMARY")
+        const periodNameById = new Map<number, string>()
+        const groupNameById = new Map<number, string>()
+        if (primaryCycle) {
+          for (const g of primaryCycle.periodGroups) {
+            groupNameById.set(g.id, g.name)
+            for (const p of g.periods) periodNameById.set(p.id, p.name)
+          }
+        }
+
+        const classIds = [...new Set(published.map((p) => p.classId))]
+        const classes = await prisma.class.findMany({
+          where: { id: { in: classIds }, schoolId },
+          select: { id: true, name: true },
+        })
+        const classNameById = new Map(classes.map((c) => [c.id, c.name]))
+
+        const enrollments = await prisma.enrollment.findMany({
+          where: {
+            classId: { in: classIds },
+            yearId,
+            status: "ACTIVE",
+          },
+          select: {
+            classId: true,
+            student: { select: { id: true, userId: true } },
+          },
+        })
+
+        const studentsByClass = new Map<number, { studentId: number; userId: number }[]>()
+        for (const enr of enrollments) {
+          if (!enr.student.userId) continue
+          const list = studentsByClass.get(enr.classId) || []
+          list.push({ studentId: enr.student.id, userId: enr.student.userId })
+          studentsByClass.set(enr.classId, list)
+        }
+
+        const notifRows: {
+          type: "SYSTEM_MESSAGE"
+          message: string
+          userId: number
+          schoolId: number
+          targetRole: "ALL"
+        }[] = []
+
+        for (const pub of published) {
+          let eventLabel = "Bulletin"
+          if (pub.kind === "PERIOD" && pub.periodId) {
+            eventLabel = periodNameById.get(pub.periodId) || "Période"
+          } else if (pub.kind === "EXAM" && pub.periodGroupId) {
+            const g = groupNameById.get(pub.periodGroupId)
+            eventLabel = g ? `Examen — ${g}` : "Examen"
+          }
+          const className = classNameById.get(pub.classId) || "votre classe"
+          const message = `Bulletin publié : ${eventLabel} (${className}). Consultez vos notes.`
+          const students = studentsByClass.get(pub.classId) || []
+          for (const s of students) {
+            notifRows.push({
+              type: "SYSTEM_MESSAGE",
+              message,
+              userId: s.userId,
+              schoolId,
+              targetRole: "ALL",
+            })
+          }
+
+          try {
+            await getSupabaseAdmin()
+              .channel(`bulletins:class:${pub.classId}`)
+              .send({
+                type: "broadcast",
+                event: "bulletin_published",
+                payload: {
+                  classId: pub.classId,
+                  eventKey: pub.eventKey,
+                  label: eventLabel,
+                  className,
+                  yearId,
+                },
+              })
+          } catch (broadcastErr) {
+            console.error("[bulletin-publications] broadcast", broadcastErr)
+          }
+        }
+
+        if (notifRows.length > 0) {
+          // createMany par lots pour éviter des payloads trop gros
+          const CHUNK = 200
+          for (let i = 0; i < notifRows.length; i += CHUNK) {
+            await prisma.notification.createMany({
+              data: notifRows.slice(i, i + CHUNK),
+            })
+          }
+        }
+      } catch (notifyErr) {
+        console.error("[bulletin-publications] notify students", notifyErr)
       }
     }
 
     return NextResponse.json({
-      published,
+      published: published.map(({ classId, publicationId }) => ({ classId, publicationId })),
       skipped,
       message:
         published.length > 0
