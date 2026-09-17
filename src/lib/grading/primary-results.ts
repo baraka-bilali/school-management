@@ -136,6 +136,7 @@ export async function loadPrimaryClassResults(params: {
         schoolId,
         classId: { in: classIds },
         eventKey,
+        ...(yearId != null ? { yearId } : { id: -1 }),
       },
       select: { classId: true, publishedAt: true },
     }),

@@ -7,8 +7,9 @@ import { bulletinEventKey } from "@/lib/grading/class-submission-status"
 import { ensureDefaultEvaluationCycles } from "@/lib/grading/cycles"
 
 /**
- * GET /api/student/bulletins?yearId=
+ * GET /api/student/bulletins?yearId=&kind=&periodId=&periodGroupId=
  * Notes / bulletin publiés pour une année d'inscription de l'élève.
+ * Focus optionnel = un événement déjà publié (sinon le dernier publié).
  */
 export async function GET(req: NextRequest) {
   const ctx = await getStudentFromRequest(req)
@@ -16,11 +17,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   }
 
-  const yearIdParam = new URL(req.url).searchParams.get("yearId")
+  const searchParams = new URL(req.url).searchParams
+  const yearIdParam = searchParams.get("yearId")
   const yearId = yearIdParam ? Number(yearIdParam) : null
   if (!yearId || !Number.isFinite(yearId)) {
     return NextResponse.json({ error: "yearId requis" }, { status: 400 })
   }
+
+  const focusKindRaw = (searchParams.get("kind") || "").toUpperCase()
+  const focusPeriodIdRaw = searchParams.get("periodId")
+  const focusPeriodGroupIdRaw = searchParams.get("periodGroupId")
+  const wantFull = searchParams.get("full") === "1"
 
   const enrollment = await prisma.enrollment.findFirst({
     where: {
@@ -73,7 +80,11 @@ export async function GET(req: NextRequest) {
 
   const [publications, cycles] = await Promise.all([
     prisma.bulletinPublication.findMany({
-      where: { schoolId: ctx.schoolId, classId: enrollment.classId },
+      where: {
+        schoolId: ctx.schoolId,
+        classId: enrollment.classId,
+        yearId: enrollment.yearId,
+      },
       orderBy: { publishedAt: "asc" },
       select: {
         id: true,
@@ -90,22 +101,30 @@ export async function GET(req: NextRequest) {
   const primaryCycle = cycles.find((c) => c.kind === "PRIMARY")
   const periodNameById = new Map<number, string>()
   const groupNameById = new Map<number, string>()
+  const periodToGroupId = new Map<number, number>()
   if (primaryCycle) {
     for (const g of primaryCycle.periodGroups) {
       groupNameById.set(g.id, g.name)
       for (const p of g.periods) {
         periodNameById.set(p.id, p.name)
+        periodToGroupId.set(p.id, g.id)
       }
     }
   }
 
   const publicationItems = publications.map((p) => {
     let label = "Bulletin"
+    let groupId: number | null = null
+    let groupName: string | null = null
     if (p.kind === "PERIOD" && p.periodId) {
       label = periodNameById.get(p.periodId) || `Période ${p.periodId}`
+      groupId = periodToGroupId.get(p.periodId) ?? null
+      groupName = groupId != null ? groupNameById.get(groupId) || null : null
     } else if (p.kind === "EXAM" && p.periodGroupId) {
       const gName = groupNameById.get(p.periodGroupId)
       label = gName ? `Examen — ${gName}` : "Examen"
+      groupId = p.periodGroupId
+      groupName = gName || null
     }
     return {
       id: p.id,
@@ -114,6 +133,8 @@ export async function GET(req: NextRequest) {
       periodGroupId: p.periodGroupId,
       eventKey: p.eventKey,
       label,
+      groupId,
+      groupName,
       publishedAt: p.publishedAt.toISOString(),
     }
   })
@@ -122,24 +143,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ...base,
       supported: true,
-      message: "Aucun bulletin publié pour le moment. Les notes apparaîtront dès que l'école publiera les résultats.",
+      message:
+        "Aucun bulletin publié pour le moment. Les notes apparaîtront dès que l'administration publiera les résultats (après validation des enseignants).",
       publications: [],
       bulletin: null,
       student: null,
+      payload: null,
     })
   }
 
-  // Focus = dernier événement publié (visibilité cumulative déjà gérée)
-  const latest = publicationItems[publicationItems.length - 1]
+  // Focus = événement demandé s'il est publié, sinon le dernier publié
+  let latest = publicationItems[publicationItems.length - 1]
+  if (focusKindRaw === "PERIOD" || focusKindRaw === "EXAM") {
+    const periodId = focusPeriodIdRaw ? Number(focusPeriodIdRaw) : null
+    const periodGroupId = focusPeriodGroupIdRaw
+      ? Number(focusPeriodGroupIdRaw)
+      : null
+    const requestedKey = bulletinEventKey(
+      focusKindRaw,
+      focusKindRaw === "PERIOD" ? periodId : null,
+      focusKindRaw === "EXAM" ? periodGroupId : null
+    )
+    const found = publicationItems.find((p) => p.eventKey === requestedKey)
+    if (!found) {
+      return NextResponse.json(
+        { error: "Cet événement n'est pas encore publié pour votre classe" },
+        { status: 403 }
+      )
+    }
+    latest = found
+  }
+
   const focusKind = latest.kind
   const focusPeriodId = focusKind === "PERIOD" ? latest.periodId : null
   const focusPeriodGroupId = focusKind === "EXAM" ? latest.periodGroupId : null
-
-  // Vérifier cohérence eventKey
-  const expectedKey = bulletinEventKey(focusKind, focusPeriodId, focusPeriodGroupId)
-  if (expectedKey !== latest.eventKey && publicationItems.length > 0) {
-    // fallback: use stored ids as-is
-  }
 
   try {
     const payload = await loadPrimaryBulletins({
@@ -150,6 +187,7 @@ export async function GET(req: NextRequest) {
       periodId: focusPeriodId,
       periodGroupId: focusPeriodGroupId,
       enrollmentId: enrollment.id,
+      audience: "student",
     })
 
     const student = payload.students[0] ?? null
@@ -178,6 +216,8 @@ export async function GET(req: NextRequest) {
             fullName: student.fullName,
           }
         : null,
+      // Payload complet pour génération PDF côté client (même composant que l'admin)
+      ...(wantFull ? { payload } : {}),
     })
   } catch (err) {
     console.error("[student/bulletins]", err)
@@ -188,6 +228,7 @@ export async function GET(req: NextRequest) {
       publications: publicationItems,
       bulletin: null,
       student: null,
+      payload: null,
     })
   }
 }

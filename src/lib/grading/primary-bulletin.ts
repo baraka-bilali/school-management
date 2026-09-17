@@ -318,9 +318,32 @@ export function computeBulletinVisibility(
 }
 
 /**
- * Charge les bulletins primaire. Les points (et dérivés) ne sont exposés
- * que pour les événements publiés, de façon cumulative.
- * Les maxima sont toujours fournis.
+ * Clés « comme publiées » jusqu'à l'événement focus (aperçu staff sans publier).
+ */
+export function staffRevealEventKeys(
+  trimestres: BulletinTrimestreCol[],
+  focusKind: "PERIOD" | "EXAM",
+  focusPeriodId: number | null,
+  focusPeriodGroupId: number | null
+): Set<string> {
+  const focusKey = bulletinEventKey(focusKind, focusPeriodId, focusPeriodGroupId)
+  const keys = new Set<string>()
+  let found = false
+  for (const s of buildChronoSlots(trimestres)) {
+    if (s.kind !== "period" && s.kind !== "exam") continue
+    keys.add(s.pubKey)
+    if (s.pubKey === focusKey) {
+      found = true
+      break
+    }
+  }
+  return found ? keys : new Set([focusKey])
+}
+
+/**
+ * Charge les bulletins primaire.
+ * - audience "student" (défaut) : notes seulement si BulletinPublication
+ * - audience "staff" : notes jusqu'à l'événement focus (aperçu admin/enseignant, sans publier)
  */
 export async function loadPrimaryBulletins(params: {
   schoolId: number
@@ -330,8 +353,11 @@ export async function loadPrimaryBulletins(params: {
   periodId?: number | null
   periodGroupId?: number | null
   enrollmentId?: number | null
+  /** student = gate publications ; staff = aperçu jusqu'au focus */
+  audience?: "student" | "staff"
 }): Promise<PrimaryBulletinPayload> {
   const { schoolId, yearId, classId, kind } = params
+  const audience = params.audience ?? "student"
   const focusPeriodId = kind === "PERIOD" ? params.periodId ?? null : null
   const focusPeriodGroupId = kind === "EXAM" ? params.periodGroupId ?? null : null
   const enrollmentFilter = params.enrollmentId ?? null
@@ -363,10 +389,12 @@ export async function loadPrimaryBulletins(params: {
       },
     }),
     ensureDefaultEvaluationCycles(schoolId),
-    prisma.bulletinPublication.findMany({
-      where: { schoolId, classId },
-      select: { eventKey: true },
-    }),
+    audience === "student"
+      ? prisma.bulletinPublication.findMany({
+          where: { schoolId, classId, yearId },
+          select: { eventKey: true },
+        })
+      : Promise.resolve([] as { eventKey: string }[]),
   ])
 
   if (!cls) throw new Error("Classe introuvable")
@@ -398,7 +426,10 @@ export async function loadPrimaryBulletins(params: {
       }
     })
 
-  const publishedKeys = new Set(publications.map((p) => p.eventKey))
+  const publishedKeys =
+    audience === "staff"
+      ? staffRevealEventKeys(trimestres, kind, focusPeriodId, focusPeriodGroupId)
+      : new Set(publications.map((p) => p.eventKey))
   const visibility = computeBulletinVisibility(trimestres, publishedKeys)
 
   let focusLabel = ""

@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       periodId,
       periodGroupId,
       enrollmentId,
+      audience: "staff",
     })
 
     return NextResponse.json({ data })

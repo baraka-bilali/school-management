@@ -15,6 +15,7 @@ import {
   Send,
   AlertCircle,
   X,
+  Undo2,
 } from "lucide-react"
 import { MenuSelect } from "@/components/ui/menu-select"
 import Portal from "@/components/portal"
@@ -341,6 +342,31 @@ export function PrimaryResultsPanel() {
     }
   }
 
+  const unpublish = async (classId: number) => {
+    if (!selectedEvent) return
+    setPublishing(true)
+    try {
+      const res = await authFetch("/api/admin/bulletin-publications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classId,
+          kind: selectedEvent.kind,
+          periodId: selectedEvent.periodId,
+          periodGroupId: selectedEvent.periodGroupId,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Retrait impossible")
+      toast.success(data.message || "Publication retirée")
+      await load(eventKey)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erreur")
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   const openBulletinPreview = async (opts: {
     classRow: ClassRow
     enrollmentId?: number
@@ -448,9 +474,10 @@ export function PrimaryResultsPanel() {
             : "border-indigo-200 bg-indigo-50 text-indigo-900"
         )}
       >
-        Statut provisoire basé sur les verrous <strong>GradeEntryLock</strong> par
-        branche pour l&apos;événement sélectionné (soumis = tous · partiel =
-        certains · en attente = aucun). La règle définitive pourra être ajustée.
+        Statut basé sur la validation enseignant (<strong>soumis</strong> = toutes
+        les branches verrouillées). L&apos;aperçu / impression PDF est possible
+        sans publier. Seul le bouton <strong>Publier</strong> rend les notes
+        visibles aux élèves.
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -576,20 +603,33 @@ export function PrimaryResultsPanel() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 ml-auto">
-                    <button
-                      type="button"
-                      disabled={!canPublish || publishing}
-                      onClick={() => void publish([row.classId])}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={
-                        canPublish
-                          ? "Publier les bulletins de la classe"
-                          : "Disponible uniquement lorsque toutes les branches sont soumises"
-                      }
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      Publier
-                    </button>
+                    {row.publishedAt ? (
+                      <button
+                        type="button"
+                        disabled={publishing}
+                        onClick={() => void unpublish(row.classId)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
+                        title="Retirer la publication pour les élèves"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                        Dépublier
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!canPublish || publishing}
+                        onClick={() => void publish([row.classId])}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={
+                          canPublish
+                            ? "Publier les bulletins de la classe"
+                            : "Disponible uniquement lorsque toutes les branches sont soumises"
+                        }
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Publier
+                      </button>
+                    )}
 
                     <div
                       className="relative"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import {
@@ -10,10 +10,13 @@ import {
   CheckCircle2,
   Sparkles,
   Info,
+  Download,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
 import StudentLoading from "@/components/student/student-loading"
+import type { PrimaryBulletinPayload } from "@/lib/grading/primary-bulletin"
 
 type Summary = {
   key: string
@@ -49,7 +52,12 @@ type TrimestreCol = {
 type Publication = {
   id: number
   kind: "PERIOD" | "EXAM"
+  periodId: number | null
+  periodGroupId: number | null
+  eventKey: string
   label: string
+  groupId: number | null
+  groupName: string | null
   publishedAt: string
 }
 
@@ -66,7 +74,13 @@ type BulletinResponse = {
   message: string | null
   publications: Publication[]
   publishedThroughLabel?: string | null
-  focusEvent?: { label: string; groupName: string }
+  focusEvent?: {
+    kind: "PERIOD" | "EXAM"
+    periodId: number | null
+    periodGroupId: number | null
+    label: string
+    groupName: string
+  }
   visibility?: {
     periods: Record<string, boolean>
     exams: Record<string, boolean>
@@ -81,6 +95,7 @@ type BulletinResponse = {
     conduiteByPeriod: Record<string, string | null>
   } | null
   student: { enrollmentId: number; code: string; fullName: string } | null
+  payload?: PrimaryBulletinPayload | null
 }
 
 function fmtScore(v: number | null | undefined, max?: number) {
@@ -94,6 +109,22 @@ function fmtPct(v: number | null | undefined) {
   return `${Math.round(v)} %`
 }
 
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+async function generateBulletinPdfBlob(data: PrimaryBulletinPayload): Promise<Blob> {
+  const { pdf } = await import("@react-pdf/renderer")
+  const { default: PrimaryBulletinPDF } = await import(
+    "@/components/primary-bulletin-pdf"
+  )
+  return pdf(<PrimaryBulletinPDF data={data} />).toBlob()
+}
+
 export default function StudentGradesYearPage() {
   const params = useParams()
   const yearId = Number(params.yearId)
@@ -101,6 +132,33 @@ export default function StudentGradesYearPage() {
   const [data, setData] = useState<BulletinResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [activeTrimId, setActiveTrimId] = useState<number | null>(null)
+  const [focusKey, setFocusKey] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const loadBulletin = useCallback(
+    async (opts?: { kind?: "PERIOD" | "EXAM"; periodId?: number | null; periodGroupId?: number | null }) => {
+      const qs = new URLSearchParams({ yearId: String(yearId) })
+      if (opts?.kind) {
+        qs.set("kind", opts.kind)
+        if (opts.kind === "PERIOD" && opts.periodId != null) {
+          qs.set("periodId", String(opts.periodId))
+        }
+        if (opts.kind === "EXAM" && opts.periodGroupId != null) {
+          qs.set("periodGroupId", String(opts.periodGroupId))
+        }
+      }
+      const res = await fetch(`/api/student/bulletins?${qs}`, {
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || "Impossible de charger le bulletin")
+      }
+      return (await res.json()) as BulletinResponse
+    },
+    [yearId]
+  )
 
   useEffect(() => {
     if (!Number.isFinite(yearId)) {
@@ -111,15 +169,15 @@ export default function StudentGradesYearPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/student/bulletins?yearId=${yearId}`, {
-          credentials: "include",
-        })
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || "Impossible de charger le bulletin")
+        const json = await loadBulletin()
+        if (cancelled) return
+        setData(json)
+        const pubs = json.publications || []
+        if (pubs.length > 0) {
+          const last = pubs[pubs.length - 1]
+          setFocusKey(last.eventKey)
+          setActiveTrimId(last.groupId)
         }
-        const json = (await res.json()) as BulletinResponse
-        if (!cancelled) setData(json)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erreur")
       } finally {
@@ -129,7 +187,98 @@ export default function StudentGradesYearPage() {
     return () => {
       cancelled = true
     }
-  }, [yearId])
+  }, [yearId, loadBulletin])
+
+  const trimTabs = useMemo(() => {
+    if (!data?.publications?.length) return []
+    const map = new Map<number, { id: number; name: string; short: string }>()
+    for (const p of data.publications) {
+      if (p.groupId == null) continue
+      if (!map.has(p.groupId)) {
+        const trim = data.trimestres?.find((t) => t.periodGroupId === p.groupId)
+        map.set(p.groupId, {
+          id: p.groupId,
+          name: p.groupName || trim?.name || `Trimestre`,
+          short: trim?.shortLabel || "T",
+        })
+      }
+    }
+    // Inclure aussi les trimestres connus même sans pub (grisés plus tard)
+    for (const t of data.trimestres || []) {
+      if (!map.has(t.periodGroupId) && data.publications.some((p) => p.groupId === t.periodGroupId)) {
+        map.set(t.periodGroupId, {
+          id: t.periodGroupId,
+          name: t.name,
+          short: t.shortLabel,
+        })
+      }
+    }
+    return [...map.values()]
+  }, [data])
+
+  const pubsInActiveTrim = useMemo(() => {
+    if (!data?.publications) return []
+    if (activeTrimId == null) return data.publications
+    return data.publications.filter((p) => p.groupId === activeTrimId)
+  }, [data, activeTrimId])
+
+  const selectFocus = async (pub: Publication) => {
+    if (pub.eventKey === focusKey) return
+    setFocusKey(pub.eventKey)
+    setLoading(true)
+    setError("")
+    try {
+      const json = await loadBulletin({
+        kind: pub.kind,
+        periodId: pub.periodId,
+        periodGroupId: pub.periodGroupId,
+      })
+      setData(json)
+      setActiveTrimId(pub.groupId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const downloadPdf = async (pub?: Publication) => {
+    const target = pub || data?.publications.find((p) => p.eventKey === focusKey)
+    if (!target) return
+    setPdfLoading(true)
+    try {
+      const qs = new URLSearchParams({
+        yearId: String(yearId),
+        kind: target.kind,
+        full: "1",
+      })
+      if (target.kind === "PERIOD" && target.periodId != null) {
+        qs.set("periodId", String(target.periodId))
+      }
+      if (target.kind === "EXAM" && target.periodGroupId != null) {
+        qs.set("periodGroupId", String(target.periodGroupId))
+      }
+      const res = await fetch(`/api/student/bulletins?${qs}`, {
+        credentials: "include",
+      })
+      const json = (await res.json()) as BulletinResponse
+      if (!res.ok || !json.payload) {
+        throw new Error(json.message || "Bulletin PDF indisponible")
+      }
+      const blob = await generateBulletinPdfBlob(json.payload)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const name = (json.student?.fullName || "eleve").replace(/\s+/g, "-")
+      a.download = `bulletin-${name}-${target.label.replace(/\s+/g, "-")}.pdf`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Téléchargement impossible")
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   const visibleSummaries = useMemo(() => {
     if (!data?.bulletin?.summaries || !data.trimestres) return []
@@ -189,20 +338,22 @@ export default function StudentGradesYearPage() {
     return cols
   }, [data])
 
-  if (loading) return <StudentLoading variant="list" label="Chargement du bulletin…" />
+  if (loading && !data) return <StudentLoading variant="list" label="Chargement du bulletin…" />
 
-  if (error || !data) {
+  if (error && !data) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 p-4">
         <Link href="/student/grades" className={cn("inline-flex items-center gap-2 text-sm", textMuted)}>
           <ArrowLeft className="h-4 w-4" /> Retour
         </Link>
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-          {error || "Données indisponibles"}
+          {error}
         </div>
       </div>
     )
   }
+
+  if (!data) return null
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-4 pb-24 lg:pb-8">
@@ -232,33 +383,89 @@ export default function StudentGradesYearPage() {
         </div>
       </div>
 
-      {/* Publications timeline */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* Publications by trimestre */}
       {data.publications.length > 0 && (
         <div className={cn("rounded-2xl border p-4", card, border, shadow)}>
-          <div className="mb-3 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <h2 className={cn("text-sm font-semibold", text)}>Bulletins publiés</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <h2 className={cn("text-sm font-semibold", text)}>Bulletins publiés</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => void downloadPdf()}
+              disabled={pdfLoading || !focusKey}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {pdfLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              PDF officiel
+            </button>
           </div>
+
+          {trimTabs.length > 1 && (
+            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+              {trimTabs.map((t) => {
+                const active = activeTrimId === t.id
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTrimId(t.id)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                      active
+                        ? "bg-indigo-600 text-white"
+                        : isDark
+                          ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    )}
+                  >
+                    {t.short} · {t.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <ul className="space-y-2">
-            {data.publications.map((p) => (
-              <li
-                key={p.id}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm",
-                  isDark ? "bg-gray-800/60" : "bg-gray-50"
-                )}
-              >
-                <span className={cn("font-medium", text)}>{p.label}</span>
-                <span className={cn("shrink-0 text-xs", textMuted)}>
-                  {new Date(p.publishedAt).toLocaleDateString("fr-FR", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
-              </li>
-            ))}
+            {pubsInActiveTrim.map((p) => {
+              const selected = p.eventKey === focusKey
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => void selectFocus(p)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+                      selected
+                        ? isDark
+                          ? "bg-indigo-500/20 ring-1 ring-indigo-500/40"
+                          : "bg-indigo-50 ring-1 ring-indigo-200"
+                        : isDark
+                          ? "bg-gray-800/60 hover:bg-gray-800"
+                          : "bg-gray-50 hover:bg-gray-100"
+                    )}
+                  >
+                    <span className={cn("font-medium", text)}>{p.label}</span>
+                    <span className={cn("shrink-0 text-xs", textMuted)}>
+                      {fmtDate(p.publishedAt)}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
+
           {data.publishedThroughLabel && (
             <p className={cn("mt-3 flex items-start gap-2 text-xs", textMuted)}>
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -266,6 +473,7 @@ export default function StudentGradesYearPage() {
               <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                 {data.publishedThroughLabel}
               </span>
+              . Les trimestres suivants apparaîtront ici dès leur publication.
             </p>
           )}
         </div>
@@ -287,14 +495,13 @@ export default function StudentGradesYearPage() {
           <p className={cn("font-semibold", text)}>Pas encore de notes</p>
           <p className={cn("mt-1 text-sm", textMuted)}>
             {data.message ||
-              "Les notes apparaîtront ici dès que l'école publiera les résultats."}
+              "Les notes apparaîtront ici dès que l'administration publiera les résultats."}
           </p>
         </div>
       )}
 
       {data.bulletin && (
         <>
-          {/* Summary cards */}
           {visibleSummaries.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {visibleSummaries.map((s) => (
@@ -316,19 +523,27 @@ export default function StudentGradesYearPage() {
             </div>
           )}
 
-          {/* Grades table */}
           <div className={cn("overflow-hidden rounded-2xl border", card, border, shadow)}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead>
                   <tr className={cn("border-b", border, isDark ? "bg-gray-800/80" : "bg-gray-50")}>
-                    <th className={cn("sticky left-0 z-10 px-3 py-2.5 font-semibold", text, isDark ? "bg-gray-800/80" : "bg-gray-50")}>
+                    <th
+                      className={cn(
+                        "sticky left-0 z-10 px-3 py-2.5 font-semibold",
+                        text,
+                        isDark ? "bg-gray-800/80" : "bg-gray-50"
+                      )}
+                    >
                       Branche
                     </th>
                     {periodCols.map((c) => (
                       <th
                         key={c.key}
-                        className={cn("whitespace-nowrap px-2 py-2.5 text-center text-xs font-semibold", textMuted)}
+                        className={cn(
+                          "whitespace-nowrap px-2 py-2.5 text-center text-xs font-semibold",
+                          textMuted
+                        )}
                       >
                         {c.label}
                       </th>
