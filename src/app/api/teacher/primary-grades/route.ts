@@ -575,15 +575,50 @@ export async function PUT(req: NextRequest) {
       )
     }
 
+    const classForExamMax = await prisma.class.findFirst({
+      where: { id: classId },
+      select: { level: true },
+    })
+    const examDegreeCode = primaryDegreeCodeForLevel(classForExamMax?.level || "")
+    const examBranchMax = examDegreeCode
+      ? await prisma.primaryBranch.findFirst({
+          where: {
+            subjectId: assignment.subjectId,
+            isActive: true,
+            domain: {
+              degree: {
+                schoolId: ctx.schoolId,
+                code: examDegreeCode,
+                isActive: true,
+              },
+            },
+          },
+          select: {
+            maxPeriode: true,
+            maxExamenOverride: true,
+            maxTrimestreOverride: true,
+            maxAnnuelOverride: true,
+          },
+        })
+      : null
+    const derivedExamMax = examBranchMax
+      ? derivePrimaryMaxima(examBranchMax.maxPeriode, {
+          maxExamenOverride: examBranchMax.maxExamenOverride,
+          maxTrimestreOverride: examBranchMax.maxTrimestreOverride,
+          maxAnnuelOverride: examBranchMax.maxAnnuelOverride,
+        }).maxExamen
+      : null
+
     const maxRow = await prisma.subjectExamMax.findFirst({
       where: {
         subjectId: assignment.subjectId,
         section: "Primaire",
         periodGroupId: Number(row.periodGroupId),
         schoolId: ctx.schoolId,
+        ...(classForExamMax?.level ? { level: classForExamMax.level } : {}),
       },
     })
-    const officialMax = maxRow?.maxPoints ?? 20
+    const officialMax = maxRow?.maxPoints ?? derivedExamMax ?? 20
 
     const pts = row.pointsObtained
     if (pts == null || pts === ("" as unknown)) {

@@ -470,7 +470,7 @@ function ScoreCells({
       const obtained = periodScores?.[String(p.periodId)] ?? null
       let text = ""
       let below = false
-      if (mode === "max") text = fmtNum(maxPeriode)
+      if (mode === "max") text = maxPeriode > 0 ? fmtNum(maxPeriode) : "—"
       else if (mode === "fraction") {
         const f = fmtFraction(obtained, maxPeriode, visible)
         text = f.text
@@ -496,7 +496,7 @@ function ScoreCells({
       const obtained = examScores?.[String(t.periodGroupId)] ?? null
       let text = ""
       let below = false
-      if (mode === "max") text = fmtNum(maxExamen)
+      if (mode === "max") text = maxExamen > 0 ? fmtNum(maxExamen) : "—"
       else if (mode === "fraction") {
         const f = fmtFraction(obtained, maxExamen, visible)
         text = f.text
@@ -522,7 +522,7 @@ function ScoreCells({
       const obtained = trimScores?.[String(t.periodGroupId)] ?? null
       let text = ""
       let below = false
-      if (mode === "max") text = fmtNum(maxTrimestre)
+      if (mode === "max") text = maxTrimestre > 0 ? fmtNum(maxTrimestre) : "—"
       else if (mode === "fraction") {
         const f = fmtFraction(obtained, maxTrimestre, visible)
         text = f.text
@@ -547,7 +547,7 @@ function ScoreCells({
   {
     let text = ""
     let below = false
-    if (mode === "max") text = fmtNum(maxAnnuel)
+    if (mode === "max") text = maxAnnuel > 0 ? fmtNum(maxAnnuel) : "—"
     else if (mode === "fraction") {
       const f = fmtFraction(annualScore ?? null, maxAnnuel, vis.year)
       text = f.text
@@ -700,14 +700,21 @@ function DomainBlock({
   lines: BulletinBranchLine[]
   sub: BulletinDomainSubtotal | undefined
 }) {
-  // Maxima de branche (ex. 10|10|20|40), pas la somme du domaine —
-  // aligné sur le croquis. Si les branches du domaine partagent le même
-  // barème on affiche ce barème ; sinon on prend la 1ère branche.
-  const ref = lines[0]
-  const maxPeriode = ref?.maxPeriode ?? 0
-  const maxExamen = ref?.maxExamen ?? 0
-  const maxTrimestre = ref?.maxTrimestre ?? 0
-  const maxAnnuel = ref?.maxAnnuel ?? 0
+  // Maxima homogène du domaine (sinon chaque branche a son propre barème —
+  // afficher la 1ère branche trompait : Numération 20 vs Mesures 10).
+  const uniformMax =
+    lines.length > 0 &&
+    lines.every(
+      (l) =>
+        l.maxPeriode === lines[0].maxPeriode &&
+        l.maxExamen === lines[0].maxExamen &&
+        l.maxTrimestre === lines[0].maxTrimestre &&
+        l.maxAnnuel === lines[0].maxAnnuel
+    )
+  const maxPeriode = uniformMax ? lines[0].maxPeriode : 0
+  const maxExamen = uniformMax ? lines[0].maxExamen : 0
+  const maxTrimestre = uniformMax ? lines[0].maxTrimestre : 0
+  const maxAnnuel = uniformMax ? lines[0].maxAnnuel : 0
 
   return (
     <View>
@@ -715,23 +722,36 @@ function DomainBlock({
         <Text style={s.domainText}>{domainName}</Text>
       </View>
 
-      {/* Maxima = ligne Branches, reprise en tête de chaque domaine */}
+      {/* Maxima = barème commun du domaine, ou « variables » si branches différentes */}
       <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
         <View style={s.branchCell}>
           <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Oblique" }}>
-            Maxima
+            Maxima{uniformMax ? "" : " (par branche)"}
           </Text>
         </View>
-        <ScoreCells
-          data={data}
-          vis={vis}
-          maxPeriode={maxPeriode}
-          maxExamen={maxExamen}
-          maxTrimestre={maxTrimestre}
-          maxAnnuel={maxAnnuel}
-          mode="max"
-          bold
-        />
+        {uniformMax ? (
+          <ScoreCells
+            data={data}
+            vis={vis}
+            maxPeriode={maxPeriode}
+            maxExamen={maxExamen}
+            maxTrimestre={maxTrimestre}
+            maxAnnuel={maxAnnuel}
+            mode="max"
+            bold
+          />
+        ) : (
+          <ScoreCells
+            data={data}
+            vis={vis}
+            maxPeriode={0}
+            maxExamen={0}
+            maxTrimestre={0}
+            maxAnnuel={0}
+            mode="max"
+            bold
+          />
+        )}
       </View>
 
       {lines.map((line, i) => (
@@ -745,6 +765,11 @@ function DomainBlock({
               {line.name}
               {line.groupName ? ` (${line.groupName})` : ""}
             </Text>
+            {!uniformMax ? (
+              <Text style={{ fontSize: 5.5, color: MUTED, marginTop: 1 }}>
+                max {line.maxPeriode}/{line.maxExamen}/{line.maxTrimestre}
+              </Text>
+            ) : null}
           </View>
           <ScoreCells
             data={data}

@@ -389,12 +389,10 @@ export async function loadPrimaryBulletins(params: {
       },
     }),
     ensureDefaultEvaluationCycles(schoolId),
-    audience === "student"
-      ? prisma.bulletinPublication.findMany({
-          where: { schoolId, classId, yearId },
-          select: { eventKey: true },
-        })
-      : Promise.resolve([] as { eventKey: string }[]),
+    prisma.bulletinPublication.findMany({
+      where: { schoolId, classId, yearId },
+      select: { eventKey: true },
+    }),
   ])
 
   if (!cls) throw new Error("Classe introuvable")
@@ -426,10 +424,22 @@ export async function loadPrimaryBulletins(params: {
       }
     })
 
+  const publicationKeys = new Set(publications.map((p) => p.eventKey))
   const publishedKeys =
     audience === "staff"
-      ? staffRevealEventKeys(trimestres, kind, focusPeriodId, focusPeriodGroupId)
-      : new Set(publications.map((p) => p.eventKey))
+      ? (() => {
+          // Aperçu staff = jusqu'au focus + au moins ce qui est déjà publié aux élèves
+          // (évite un PDF admin « vide » alors que l'élève voit Examen T1).
+          const keys = staffRevealEventKeys(
+            trimestres,
+            kind,
+            focusPeriodId,
+            focusPeriodGroupId
+          )
+          for (const k of publicationKeys) keys.add(k)
+          return keys
+        })()
+      : publicationKeys
   const visibility = computeBulletinVisibility(trimestres, publishedKeys)
 
   let focusLabel = ""
@@ -647,7 +657,10 @@ export async function loadPrimaryBulletins(params: {
               sumColumnMax,
               officialMax: branch.maxPeriode,
             })
-            periodScore.set(key, n == null ? null : roundGrade(n))
+            periodScore.set(
+              key,
+              n == null ? null : roundGrade(Math.min(n, branch.maxPeriode))
+            )
           }
         }
       }
@@ -664,9 +677,11 @@ export async function loadPrimaryBulletins(params: {
     })
     for (const g of examGrades) {
       if (!visibility.exams[String(g.periodGroupId)]) continue
+      const branch = branchRows.find((b) => b.assignmentId === g.courseAssignmentId)
+      const maxEx = branch?.maxExamen ?? g.pointsObtained
       examScore.set(
         `${g.courseAssignmentId}:${g.enrollmentId}:${g.periodGroupId}`,
-        roundGrade(g.pointsObtained)
+        roundGrade(Math.min(g.pointsObtained, maxEx))
       )
     }
   }

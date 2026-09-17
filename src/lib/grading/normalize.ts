@@ -13,6 +13,13 @@ export function normalizePeriodResult(params: {
   return (sumObtained / sumColumnMax) * officialMax
 }
 
+/** Borne une note dans [0, max] (évite les dépassements d'affichage). */
+export function clampGrade(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0
+  if (!Number.isFinite(max) || max < 0) return value
+  return Math.min(Math.max(0, value), max)
+}
+
 /** Total trimestre/semestre = P1 + P2 + … + examen (addition stricte). */
 export function sumPeriodGroupTotal(parts: Array<number | null | undefined>): number | null {
   const values = parts.filter((v): v is number => typeof v === "number" && Number.isFinite(v))
