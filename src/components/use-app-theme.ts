@@ -1,6 +1,6 @@
 "use client"
 
-import { useSyncExternalStore } from "react"
+import { useEffect, useSyncExternalStore } from "react"
 import {
   getAppTheme,
   setAppTheme,
@@ -22,6 +22,11 @@ export function useAppTheme() {
     getAppTheme,
     getServerSnapshot
   )
+
+  // Réaligner html.dark / colorScheme sur le store (corrige un DOM orphelin)
+  useEffect(() => {
+    setAppTheme(theme)
+  }, [theme])
 
   const isDark = theme === "dark"
 

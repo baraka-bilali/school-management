@@ -36,16 +36,20 @@ let currentTheme: AppTheme = "light"
 // Hydratation synchrone côté client (le script inline du layout a déjà posé la classe)
 if (typeof window !== "undefined") {
   currentTheme = readInitialClientTheme()
-  // Rester aligné si un autre écran (admin, etc.) change le thème via themeChange
+  // Réimposer le store (localStorage) sur le DOM — évite un html.dark orphelin
+  // laissé par /login (prefers-color-scheme) alors que le thème app est clair.
+  applyToDom(currentTheme)
   const syncFromStorage = () => {
     const next = readInitialClientTheme()
-    if (next === currentTheme) return
+    if (next === currentTheme) {
+      applyToDom(next)
+      return
+    }
     currentTheme = next
     applyToDom(next)
     listeners.forEach((listener) => listener(next))
   }
   window.addEventListener("themeChange", syncFromStorage)
-  // Sync multi-onglets
   window.addEventListener("storage", (e) => {
     if (e.key === "theme" || e.key === null) syncFromStorage()
   })

@@ -18,6 +18,8 @@ import {
 } from "lucide-react"
 import { MenuSelect } from "@/components/ui/menu-select"
 import Portal from "@/components/portal"
+import { useAppTheme } from "@/components/use-app-theme"
+import { cn } from "@/lib/utils"
 import { submissionStatusLabel } from "@/lib/grading/class-submission-status"
 import type { ClassSubmissionStatus } from "@/lib/grading/class-submission-status"
 import type {
@@ -70,14 +72,20 @@ function parseEventValue(v: string): {
   return null
 }
 
-function statusBadge(status: ClassSubmissionStatus) {
+function statusBadge(status: ClassSubmissionStatus, isDark: boolean) {
   switch (status) {
     case "soumis":
-      return "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50"
+      return isDark
+        ? "bg-green-950/40 text-green-300 border-green-900/50"
+        : "bg-green-50 text-green-700 border-green-200"
     case "partiel":
-      return "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50"
+      return isDark
+        ? "bg-amber-950/40 text-amber-300 border-amber-900/50"
+        : "bg-amber-50 text-amber-800 border-amber-200"
     case "en_attente":
-      return "bg-gray-50 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700"
+      return isDark
+        ? "bg-gray-800/50 text-gray-300 border-gray-700"
+        : "bg-gray-50 text-gray-600 border-gray-200"
   }
 }
 
@@ -106,6 +114,7 @@ async function generateBulletinPdfBlob(
 }
 
 export function PrimaryResultsPanel() {
+  const { isDark } = useAppTheme()
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false)
   const [events, setEvents] = useState<EventOption[]>([])
@@ -431,7 +440,14 @@ export function PrimaryResultsPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 dark:border-indigo-900/40 dark:bg-indigo-950/20 px-3 py-2.5 text-xs text-indigo-800 dark:text-indigo-200">
+      <div
+        className={cn(
+          "rounded-xl border px-3 py-2.5 text-xs",
+          isDark
+            ? "border-indigo-900/40 bg-indigo-950/30 text-indigo-200"
+            : "border-indigo-200 bg-indigo-50 text-indigo-900"
+        )}
+      >
         Statut provisoire basé sur les verrous <strong>GradeEntryLock</strong> par
         branche pour l&apos;événement sélectionné (soumis = tous · partiel =
         certains · en attente = aucun). La règle définitive pourra être ajustée.
@@ -495,7 +511,12 @@ export function PrimaryResultsPanel() {
             return (
               <div
                 key={row.classId}
-                className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 sm:p-5"
+                className={cn(
+                  "rounded-2xl border p-4 sm:p-5",
+                  isDark
+                    ? "border-gray-700 bg-gray-900"
+                    : "border-gray-200 bg-white"
+                )}
               >
                 <div className="flex flex-wrap items-start gap-3">
                   <label className="mt-1 flex items-center">
@@ -510,15 +531,19 @@ export function PrimaryResultsPanel() {
 
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {row.name}
+                      <h3
+                        className={cn(
+                          "text-base font-semibold",
+                          isDark ? "text-gray-100" : "text-gray-900"
+                        )}
+                      >                        {row.name}
                       </h3>
                       <span className="text-xs text-gray-500">
                         {row.level}
                         {row.letter ? ` · ${row.letter}` : ""}
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadge(row.status)}`}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusBadge(row.status, isDark)}`}
                       >
                         {row.status === "soumis" ? (
                           <CheckCircle2 className="h-3.5 w-3.5" />
