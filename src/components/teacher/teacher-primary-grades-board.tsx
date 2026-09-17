@@ -349,7 +349,7 @@ export function TeacherPrimaryGradesBoard({
         "@/components/primary-bulletin-pdf"
       )
       const blob = await pdf(
-        <PrimaryBulletinPDF data={payload} trailingBlankPage />
+        <PrimaryBulletinPDF data={payload} />
       ).toBlob()
       const url = URL.createObjectURL(blob)
       setBulletinUrl(url)

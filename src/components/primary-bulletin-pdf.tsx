@@ -15,8 +15,8 @@ import type {
  * Conduite hachurée sur Exam + Total (×3) + Année.
  */
 const PAGE_W = 595.28
-const MX = 14
-const MY = 12
+const MX = 12
+const MY = 8
 const CONTENT_W = PAGE_W - MX * 2
 
 const BRANCH_W = 118
@@ -38,72 +38,72 @@ const BELOW_AVG = "#b91c1c"
 const s = StyleSheet.create({
   page: {
     paddingTop: MY,
-    paddingBottom: MY + 8,
+    paddingBottom: MY + 10,
     paddingLeft: MX,
     paddingRight: MX,
     fontFamily: "Helvetica",
-    fontSize: 7,
+    fontSize: 6.5,
     color: "#0f172a",
     backgroundColor: "#ffffff",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 3,
   },
-  logo: { width: 32, height: 32, objectFit: "contain" },
+  logo: { width: 24, height: 24, objectFit: "contain" },
   schoolBlock: { flex: 1 },
   schoolName: {
-    fontSize: 11,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
-  meta: { fontSize: 6.5, color: MUTED, marginTop: 1 },
+  meta: { fontSize: 5.5, color: MUTED, marginTop: 0.5 },
 
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: HEAD_BG,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    marginBottom: 4,
+    paddingVertical: 2.5,
+    paddingHorizontal: 5,
+    marginBottom: 3,
   },
   titleMain: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
     color: HEAD_FG,
     textTransform: "uppercase",
   },
-  titleSub: { fontSize: 6.5, color: "#cbd5e1" },
+  titleSub: { fontSize: 5.5, color: "#cbd5e1" },
 
   idGrid: {
     flexDirection: "row",
     borderWidth: 1,
     borderColor: BORDER,
     borderStyle: "solid",
-    marginBottom: 4,
+    marginBottom: 3,
   },
   idCol: {
     flex: 1,
-    paddingVertical: 3,
-    paddingHorizontal: 5,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
     borderRightWidth: 1,
     borderRightColor: BORDER,
     borderRightStyle: "solid",
   },
-  idColLast: { flex: 1, paddingVertical: 3, paddingHorizontal: 5 },
-  idLine: { flexDirection: "row", marginBottom: 1 },
+  idColLast: { flex: 1, paddingVertical: 2, paddingHorizontal: 4 },
+  idLine: { flexDirection: "row", marginBottom: 0.5 },
   idLabel: {
-    width: 52,
-    fontSize: 6,
+    width: 48,
+    fontSize: 5.5,
     fontFamily: "Helvetica-Bold",
     color: MUTED,
     textTransform: "uppercase",
   },
-  idValue: { flex: 1, fontSize: 7, fontFamily: "Helvetica-Bold" },
-  idPlain: { flex: 1, fontSize: 7 },
+  idValue: { flex: 1, fontSize: 6.5, fontFamily: "Helvetica-Bold" },
+  idPlain: { flex: 1, fontSize: 6.5 },
 
   table: {
     width: TABLE_W,
@@ -125,8 +125,8 @@ const s = StyleSheet.create({
   },
   branchHead: {
     width: BRANCH_W,
-    paddingVertical: 3,
-    paddingHorizontal: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
     justifyContent: "center",
     borderRightWidth: 1,
     borderRightColor: "#475569",
@@ -138,17 +138,17 @@ const s = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#475569",
     borderRightStyle: "solid",
-    paddingVertical: 3,
+    paddingVertical: 2,
   },
   headFg: {
-    fontSize: 6.5,
+    fontSize: 6,
     fontFamily: "Helvetica-Bold",
     color: HEAD_FG,
     textAlign: "center",
     textTransform: "uppercase",
   },
   subFg: {
-    fontSize: 5.5,
+    fontSize: 5,
     fontFamily: "Helvetica-Bold",
     color: "#e2e8f0",
     textAlign: "center",
@@ -160,13 +160,13 @@ const s = StyleSheet.create({
     borderRightWidth: 0.5,
     borderRightColor: "#64748b",
     borderRightStyle: "solid",
-    paddingVertical: 2,
+    paddingVertical: 1.5,
   },
   colHeadLast: {
     width: COL_W,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 2,
+    paddingVertical: 1.5,
   },
   colHeadFocus: { backgroundColor: "#1d4ed8" },
 
@@ -175,11 +175,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
     borderBottomStyle: "solid",
-    paddingVertical: 2,
-    paddingHorizontal: 3,
+    paddingVertical: 1.5,
+    paddingHorizontal: 2,
   },
   domainText: {
-    fontSize: 6.5,
+    fontSize: 6,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
@@ -188,11 +188,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: BORDER,
     borderBottomStyle: "solid",
-    paddingVertical: 1.5,
-    paddingHorizontal: 3,
+    paddingVertical: 1,
+    paddingHorizontal: 2,
   },
   groupText: {
-    fontSize: 6,
+    fontSize: 5.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     color: "#334155",
@@ -203,14 +203,14 @@ const s = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: "#cbd5e1",
     borderBottomStyle: "solid",
-    minHeight: 11,
+    minHeight: 8.5,
     alignItems: "center",
   },
   rowZebra: { backgroundColor: ZEBRA },
   branchCell: {
     width: BRANCH_W,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    paddingHorizontal: 2,
+    paddingVertical: 0.5,
     borderRightWidth: 1,
     borderRightColor: BORDER,
     borderRightStyle: "solid",
@@ -218,26 +218,26 @@ const s = StyleSheet.create({
   cell: {
     width: COL_W,
     textAlign: "center",
-    fontSize: 6.5,
+    fontSize: 6,
     borderRightWidth: 0.5,
     borderRightColor: "#e2e8f0",
     borderRightStyle: "solid",
-    paddingVertical: 1,
+    paddingVertical: 0.5,
   },
   cellLast: {
     width: COL_W,
     textAlign: "center",
-    fontSize: 6.5,
-    paddingVertical: 1,
+    fontSize: 6,
+    paddingVertical: 0.5,
   },
-  cellBold: { fontFamily: "Helvetica-Bold", fontSize: 6.5 },
-  cellMuted: { color: MUTED, fontSize: 6 },
+  cellBold: { fontFamily: "Helvetica-Bold", fontSize: 6 },
+  cellMuted: { color: MUTED, fontSize: 5.5 },
   cellFocus: { backgroundColor: FOCUS },
   cellBelow: { color: BELOW_AVG, fontFamily: "Helvetica-Bold" },
   hatch: {
     width: COL_W,
     alignSelf: "stretch",
-    minHeight: 11,
+    minHeight: 8.5,
     backgroundColor: HATCH,
     borderRightWidth: 0.5,
     borderRightColor: "#334155",
@@ -246,14 +246,14 @@ const s = StyleSheet.create({
   hatchLast: {
     width: COL_W,
     alignSelf: "stretch",
-    minHeight: 11,
+    minHeight: 8.5,
     backgroundColor: HATCH,
   },
 
   summaryLabel: {
     width: BRANCH_W,
-    paddingHorizontal: 3,
-    fontSize: 6.5,
+    paddingHorizontal: 2,
+    fontSize: 6,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
     borderRightWidth: 1,
@@ -263,8 +263,8 @@ const s = StyleSheet.create({
 
   signRow: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
+    gap: 6,
+    marginTop: 4,
     width: TABLE_W,
     alignSelf: "center",
   },
@@ -273,28 +273,28 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     borderStyle: "solid",
-    minHeight: 42,
-    padding: 4,
+    minHeight: 28,
+    padding: 3,
   },
   signLabel: {
-    fontSize: 6,
+    fontSize: 5.5,
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
-  signHint: { fontSize: 5.5, color: MUTED, marginTop: 2 },
+  signHint: { fontSize: 5, color: MUTED, marginTop: 1 },
   sealImg: {
-    width: 32,
-    height: 32,
+    width: 24,
+    height: 24,
     objectFit: "contain",
     alignSelf: "center",
-    marginTop: 2,
+    marginTop: 1,
   },
   note: {
     width: TABLE_W,
     alignSelf: "center",
-    fontSize: 5.5,
+    fontSize: 5,
     color: MUTED,
-    marginTop: 4,
+    marginTop: 2,
   },
   pageFooter: {
     position: "absolute",
@@ -822,7 +822,7 @@ function DomainBlock({
                     <View style={s.branchCell}>
                       <Text
                         style={{
-                          fontSize: 6.5,
+                          fontSize: 6,
                           fontFamily: "Helvetica-Oblique",
                         }}
                       >
@@ -848,7 +848,7 @@ function DomainBlock({
                       wrap={false}
                     >
                       <View style={s.branchCell}>
-                        <Text style={{ fontSize: 6.5 }}>{line.name}</Text>
+                        <Text style={{ fontSize: 6 }}>{line.name}</Text>
                       </View>
                       <ScoreCells
                         data={data}
@@ -872,7 +872,7 @@ function DomainBlock({
             {groupSub ? (
               <View style={[s.row, { backgroundColor: ZEBRA }]} wrap={false}>
                 <View style={s.branchCell}>
-                  <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold" }}>
+                  <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold" }}>
                     Sous-total
                   </Text>
                 </View>
@@ -899,7 +899,7 @@ function DomainBlock({
       {sub ? (
         <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
           <View style={s.branchCell}>
-            <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold" }}>
+            <Text style={{ fontSize: 6, fontFamily: "Helvetica-Bold" }}>
               {showGroupSubtotals ? "Sous-total domaine" : "Sous-total"}
             </Text>
           </View>
@@ -1125,12 +1125,8 @@ function BulletinPage({
       </View>
 
       <Text style={s.note}>
-        Points visibles uniquement pour les périodes/examens publiés. Branches
-        regroupées par domaine et sous-domaine ; ligne Maxima au-dessus des
-        cours de même pondération. Notes sous la moyenne (moins de 50 % du max)
-        en rouge avec astérisque (*) pour l&apos;impression N&amp;B. Application
-        dérivée du %. Conduite : périodes seulement (cases noires = non
-        applicables).
+        Périodes publiées uniquement · Maxima par pondération · Notes sous 50 %
+        du max en rouge (*) · Conduite : périodes seulement
       </Text>
 
       <Text
