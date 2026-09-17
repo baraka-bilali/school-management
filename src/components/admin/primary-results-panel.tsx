@@ -409,11 +409,9 @@ export function PrimaryResultsPanel() {
         throw new Error("Aucun élève à imprimer pour cette sélection")
       }
 
-      // Page blanche finale : le viewer Chrome en iframe tronque souvent
-      // la dernière page ; le vrai dernier bulletin reste ainsi entier.
-      const blob = await generateBulletinPdfBlob(data, {
-        trailingBlankPage: true,
-      })
+      // Page blanche finale désactivée : le bulletin tient sur 1 page ;
+      // le padding bas évite la troncature Chrome en iframe.
+      const blob = await generateBulletinPdfBlob(data)
       if (requestId !== previewRequestIdRef.current) return
       const url = URL.createObjectURL(blob)
       previewUrlRef.current = url
