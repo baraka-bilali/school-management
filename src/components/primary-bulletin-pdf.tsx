@@ -183,6 +183,20 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     textTransform: "uppercase",
   },
+  groupRow: {
+    backgroundColor: "#e2e8f0",
+    borderBottomWidth: 0.5,
+    borderBottomColor: BORDER,
+    borderBottomStyle: "solid",
+    paddingVertical: 1.5,
+    paddingHorizontal: 3,
+  },
+  groupText: {
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    color: "#334155",
+  },
 
   row: {
     flexDirection: "row",
@@ -375,6 +389,76 @@ function groupDomains(lines: BulletinBranchLine[]) {
     else domains.push({ name: line.domainName, lines: [line] })
   }
   return domains
+}
+
+/** Sous-domaines (groupes) dans l'ordre du catalogue, puis branches sans groupe. */
+function groupDomainSections(lines: BulletinBranchLine[]) {
+  const sections: Array<{
+    groupName: string | null
+    lines: BulletinBranchLine[]
+  }> = []
+  for (const line of lines) {
+    const key = line.groupName
+    const last = sections[sections.length - 1]
+    if (last && last.groupName === key) last.lines.push(line)
+    else sections.push({ groupName: key, lines: [line] })
+  }
+  return sections
+}
+
+function sumLinesMaxima(lines: BulletinBranchLine[]) {
+  return {
+    maxPeriode: lines.reduce((s, l) => s + l.maxPeriode, 0),
+    maxExamen: lines.reduce((s, l) => s + l.maxExamen, 0),
+    maxTrimestre: lines.reduce((s, l) => s + l.maxTrimestre, 0),
+    maxAnnuel: lines.reduce((s, l) => s + l.maxAnnuel, 0),
+  }
+}
+
+function sumLinesScores(lines: BulletinBranchLine[]) {
+  const periodScores: Record<string, number | null> = {}
+  const examScores: Record<string, number | null> = {}
+  const trimScores: Record<string, number | null> = {}
+  let annualScore: number | null = null
+
+  for (const line of lines) {
+    for (const [k, v] of Object.entries(line.periodScores)) {
+      if (v == null) continue
+      periodScores[k] = (periodScores[k] ?? 0) + v
+    }
+    for (const [k, v] of Object.entries(line.examScores)) {
+      if (v == null) continue
+      examScores[k] = (examScores[k] ?? 0) + v
+    }
+    for (const [k, v] of Object.entries(line.trimScores)) {
+      if (v == null) continue
+      trimScores[k] = (trimScores[k] ?? 0) + v
+    }
+    if (line.annualScore != null) {
+      annualScore = (annualScore ?? 0) + line.annualScore
+    }
+  }
+  return { periodScores, examScores, trimScores, annualScore }
+}
+
+function sameBarème(a: BulletinBranchLine, b: BulletinBranchLine) {
+  return (
+    a.maxPeriode === b.maxPeriode &&
+    a.maxExamen === b.maxExamen &&
+    a.maxTrimestre === b.maxTrimestre &&
+    a.maxAnnuel === b.maxAnnuel
+  )
+}
+
+/** Blocs de branches partageant le même barème (pour une ligne Maxima commune). */
+function chunkBySameMaxima(lines: BulletinBranchLine[]) {
+  const chunks: BulletinBranchLine[][] = []
+  for (const line of lines) {
+    const last = chunks[chunks.length - 1]
+    if (last && sameBarème(last[0], line)) last.push(line)
+    else chunks.push([line])
+  }
+  return chunks
 }
 
 function periodShortLabel(name: string, fallback: string): string {
@@ -700,21 +784,10 @@ function DomainBlock({
   lines: BulletinBranchLine[]
   sub: BulletinDomainSubtotal | undefined
 }) {
-  // Maxima homogène du domaine (sinon chaque branche a son propre barème —
-  // afficher la 1ère branche trompait : Numération 20 vs Mesures 10).
-  const uniformMax =
-    lines.length > 0 &&
-    lines.every(
-      (l) =>
-        l.maxPeriode === lines[0].maxPeriode &&
-        l.maxExamen === lines[0].maxExamen &&
-        l.maxTrimestre === lines[0].maxTrimestre &&
-        l.maxAnnuel === lines[0].maxAnnuel
-    )
-  const maxPeriode = uniformMax ? lines[0].maxPeriode : 0
-  const maxExamen = uniformMax ? lines[0].maxExamen : 0
-  const maxTrimestre = uniformMax ? lines[0].maxTrimestre : 0
-  const maxAnnuel = uniformMax ? lines[0].maxAnnuel : 0
+  const sections = groupDomainSections(lines)
+  const showGroupHeaders = sections.some((s) => s.groupName != null)
+  // Plusieurs groupes → sous-total par groupe + sous-total domaine
+  const showGroupSubtotals = showGroupHeaders && sections.length > 1
 
   return (
     <View>
@@ -722,76 +795,112 @@ function DomainBlock({
         <Text style={s.domainText}>{domainName}</Text>
       </View>
 
-      {/* Maxima = barème commun du domaine, ou « variables » si branches différentes */}
-      <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
-        <View style={s.branchCell}>
-          <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Oblique" }}>
-            Maxima{uniformMax ? "" : " (par branche)"}
-          </Text>
-        </View>
-        {uniformMax ? (
-          <ScoreCells
-            data={data}
-            vis={vis}
-            maxPeriode={maxPeriode}
-            maxExamen={maxExamen}
-            maxTrimestre={maxTrimestre}
-            maxAnnuel={maxAnnuel}
-            mode="max"
-            bold
-          />
-        ) : (
-          <ScoreCells
-            data={data}
-            vis={vis}
-            maxPeriode={0}
-            maxExamen={0}
-            maxTrimestre={0}
-            maxAnnuel={0}
-            mode="max"
-            bold
-          />
-        )}
-      </View>
+      {sections.map((section, sIdx) => {
+        const groupSub =
+          showGroupSubtotals && section.groupName
+            ? {
+                ...sumLinesMaxima(section.lines),
+                ...sumLinesScores(section.lines),
+              }
+            : null
+        const maximaChunks = chunkBySameMaxima(section.lines)
 
-      {lines.map((line, i) => (
-        <View
-          key={line.subjectId}
-          style={[s.row, i % 2 === 1 ? s.rowZebra : {}]}
-          wrap={false}
-        >
-          <View style={s.branchCell}>
-            <Text style={{ fontSize: 6.5 }}>
-              {line.name}
-              {line.groupName ? ` (${line.groupName})` : ""}
-            </Text>
-            {!uniformMax ? (
-              <Text style={{ fontSize: 5.5, color: MUTED, marginTop: 1 }}>
-                max {line.maxPeriode}/{line.maxExamen}/{line.maxTrimestre}
-              </Text>
+        return (
+          <View key={`${section.groupName ?? "ungrouped"}-${sIdx}`}>
+            {showGroupHeaders && section.groupName ? (
+              <View style={s.groupRow}>
+                <Text style={s.groupText}>{section.groupName}</Text>
+              </View>
+            ) : null}
+
+            {maximaChunks.map((chunk, cIdx) => {
+              const ref = chunk[0]
+              return (
+                <View key={`chunk-${ref.subjectId}-${cIdx}`}>
+                  {/* Maxima commun aux cours de même pondération */}
+                  <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
+                    <View style={s.branchCell}>
+                      <Text
+                        style={{
+                          fontSize: 6.5,
+                          fontFamily: "Helvetica-Oblique",
+                        }}
+                      >
+                        Maxima
+                      </Text>
+                    </View>
+                    <ScoreCells
+                      data={data}
+                      vis={vis}
+                      maxPeriode={ref.maxPeriode}
+                      maxExamen={ref.maxExamen}
+                      maxTrimestre={ref.maxTrimestre}
+                      maxAnnuel={ref.maxAnnuel}
+                      mode="max"
+                      bold
+                    />
+                  </View>
+
+                  {chunk.map((line, i) => (
+                    <View
+                      key={line.subjectId}
+                      style={[s.row, i % 2 === 1 ? s.rowZebra : {}]}
+                      wrap={false}
+                    >
+                      <View style={s.branchCell}>
+                        <Text style={{ fontSize: 6.5 }}>{line.name}</Text>
+                      </View>
+                      <ScoreCells
+                        data={data}
+                        vis={vis}
+                        maxPeriode={line.maxPeriode}
+                        maxExamen={line.maxExamen}
+                        maxTrimestre={line.maxTrimestre}
+                        maxAnnuel={line.maxAnnuel}
+                        periodScores={line.periodScores}
+                        examScores={line.examScores}
+                        trimScores={line.trimScores}
+                        annualScore={line.annualScore}
+                        mode="score"
+                      />
+                    </View>
+                  ))}
+                </View>
+              )
+            })}
+
+            {groupSub ? (
+              <View style={[s.row, { backgroundColor: ZEBRA }]} wrap={false}>
+                <View style={s.branchCell}>
+                  <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold" }}>
+                    Sous-total
+                  </Text>
+                </View>
+                <ScoreCells
+                  data={data}
+                  vis={vis}
+                  maxPeriode={groupSub.maxPeriode}
+                  maxExamen={groupSub.maxExamen}
+                  maxTrimestre={groupSub.maxTrimestre}
+                  maxAnnuel={groupSub.maxAnnuel}
+                  periodScores={groupSub.periodScores}
+                  examScores={groupSub.examScores}
+                  trimScores={groupSub.trimScores}
+                  annualScore={groupSub.annualScore}
+                  mode="fraction"
+                  bold
+                />
+              </View>
             ) : null}
           </View>
-          <ScoreCells
-            data={data}
-            vis={vis}
-            maxPeriode={line.maxPeriode}
-            maxExamen={line.maxExamen}
-            maxTrimestre={line.maxTrimestre}
-            maxAnnuel={line.maxAnnuel}
-            periodScores={line.periodScores}
-            examScores={line.examScores}
-            trimScores={line.trimScores}
-            annualScore={line.annualScore}
-            mode="score"
-          />
-        </View>
-      ))}
+        )
+      })}
 
       {sub ? (
-        <View style={[s.row, { backgroundColor: ZEBRA }]} wrap={false}>
+        <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
           <View style={s.branchCell}>
             <Text style={{ fontSize: 6.5, fontFamily: "Helvetica-Bold" }}>
-              Sous-total
+              {showGroupSubtotals ? "Sous-total domaine" : "Sous-total"}
             </Text>
           </View>
           <ScoreCells
@@ -1016,11 +1125,12 @@ function BulletinPage({
       </View>
 
       <Text style={s.note}>
-        Points visibles uniquement pour les périodes/examens publiés. Maxima
-        repris après chaque domaine. Notes sous la moyenne (moins de 50 % du
-        max) en rouge avec astérisque (*) pour l&apos;impression N&amp;B.
-        Application dérivée du %. Conduite : périodes seulement (cases noires =
-        non applicables).
+        Points visibles uniquement pour les périodes/examens publiés. Branches
+        regroupées par domaine et sous-domaine ; ligne Maxima au-dessus des
+        cours de même pondération. Notes sous la moyenne (moins de 50 % du max)
+        en rouge avec astérisque (*) pour l&apos;impression N&amp;B. Application
+        dérivée du %. Conduite : périodes seulement (cases noires = non
+        applicables).
       </Text>
 
       <Text
