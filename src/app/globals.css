@@ -175,6 +175,8 @@
   html,
   body {
     min-height: 125dvh;
+    /* zoom < 1 peut générer un léger débordement → barre horizontale fantôme */
+    overflow-x: hidden;
   }
 }
 
@@ -192,6 +194,9 @@
 .login-shell {
   min-height: 100dvh;
   min-height: 100svh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 @media (min-width: 768px) {
   .login-shell {

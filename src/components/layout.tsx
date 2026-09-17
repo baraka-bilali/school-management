@@ -12,6 +12,7 @@ import {
   readSubscriptionAccessCache,
   writeSubscriptionAccessCache,
 } from "@/lib/subscription-access-cache"
+import { useAppTheme } from "@/components/use-app-theme"
 
 const ROLE_CACHE_KEY = "admin-shell-role"
 const ENROLL_CACHE_KEY = "admin-shell-can-enroll"
@@ -49,7 +50,7 @@ export default function Layout({ children }: LayoutProps) {
   })
   const [isMobile, setIsMobile] = useState(false)
   const [role, setRole] = useState<string | null>(() => readCachedRole())
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const { theme } = useAppTheme()
   const [subscriptionExpired, setSubscriptionExpired] = useState(() => getCachedSubscriptionExpired())
   const [studentIsPremium, setStudentIsPremium] = useState(false)
   const [unreadCommuniques, setUnreadCommuniques] = useState(0)
@@ -57,23 +58,6 @@ export default function Layout({ children }: LayoutProps) {
   const [canEnrollStudents, setCanEnrollStudents] = useState(() => readCachedCanEnroll())
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
-    }
-
-    const handleThemeChange = () => {
-      const currentTheme = localStorage.getItem("theme") as "light" | "dark" | null
-      if (currentTheme) {
-        setTheme(currentTheme)
-        document.documentElement.classList.toggle("dark", currentTheme === "dark")
-      }
-    }
-
-    window.addEventListener("storage", handleThemeChange)
-    window.addEventListener("themeChange", handleThemeChange)
-
     const checkMobile = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
@@ -107,8 +91,6 @@ export default function Layout({ children }: LayoutProps) {
 
     return () => {
       window.removeEventListener('resize', checkMobile)
-      window.removeEventListener('storage', handleThemeChange)
-      window.removeEventListener('themeChange', handleThemeChange)
       window.removeEventListener('communiqueRead', handleCommuniqueRead)
       window.removeEventListener("subscriptionAccessUpdated", syncSubscriptionFromCache)
       window.removeEventListener("storage", syncSubscriptionFromCache)

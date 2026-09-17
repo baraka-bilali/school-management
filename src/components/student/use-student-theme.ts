@@ -13,7 +13,7 @@ function getServerSnapshot(): AppTheme {
 }
 
 /**
- * Thème partagé pour espaces élève / enseignant / staff.
+ * Thème partagé pour espaces élève / parent / enseignant / staff.
  * useSyncExternalStore garantit que layout, sidebar et pages
  * restent synchronisés (plus de bascule Clair→Sombre obligatoire).
  */

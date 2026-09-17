@@ -7,6 +7,7 @@ import NotificationBell from "./notification-bell"
 import Portal from "./portal"
 import FeatureSearch, { useFeatureSearchHotkey } from "./feature-search"
 import { clearSubscriptionAccessCache } from "@/lib/subscription-access-cache"
+import { useAppTheme } from "@/components/use-app-theme"
 
 interface HeaderProps {
   onSidebarToggle: () => void
@@ -38,7 +39,7 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [showFeatureSearch, setShowFeatureSearch] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const { theme, toggleTheme } = useAppTheme()
   const [userName, setUserName] = useState("")
   const [userEmail, setUserEmail] = useState("")
   const [schoolName, setSchoolName] = useState("")
@@ -128,13 +129,6 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
       }
     }
 
-    // Récupérer le thème depuis localStorage
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle("dark", savedTheme === "dark")
-    }
-
     const onBrandingChange = () => {
       const photo = localStorage.getItem("schoolProfilePhoto")
       setSchoolPhoto(photo)
@@ -184,16 +178,6 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
       setSchoolName("Établissement")
       localStorage.setItem("schoolName", "Établissement")
     }
-  }
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    document.documentElement.classList.toggle("dark", newTheme === "dark")
-    
-    // Émettre un événement personnalisé pour notifier les autres composants
-    window.dispatchEvent(new Event("themeChange"))
   }
 
   const handleLogout = async () => {
@@ -283,7 +267,7 @@ export default function Header({ onSidebarToggle, role, canEnrollStudents = fals
 
             {/* Theme Toggle */}
             <button
-              onClick={toggleTheme}
+              onClick={() => toggleTheme()}
               className={`p-2 rounded-lg transition-colors ${theme === "dark" ? "hover:bg-gray-800 text-yellow-400" : "hover:bg-gray-100 text-indigo-500"}`}
               title={theme === "dark" ? "Mode Clair" : "Mode Sombre"}
             >

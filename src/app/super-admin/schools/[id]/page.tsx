@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Building2, MapPin, Phone, Mail, User, Bell, AlertCircle } from "lucide-react"
+import { useAppTheme } from "@/components/use-app-theme"
 
 interface School {
   id: number
@@ -27,12 +28,7 @@ export default function SchoolDetailsPage() {
   const schoolId = params.id as string
   const [school, setSchool] = useState<School | null>(null)
   const [loading, setLoading] = useState(true)
-  const [theme, setTheme] = useState<"dark" | "light">("dark")
-
-  useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved === "light" || saved === "dark") setTheme(saved)
-  }, [])
+  const { theme } = useAppTheme()
 
   useEffect(() => {
     const loadSchool = async () => {

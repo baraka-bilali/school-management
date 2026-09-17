@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, Moon, Sun, LogOut, Receipt } from "lucide-react"
+import { useAppTheme } from "@/components/use-app-theme"
 
 interface SuperAdminLayoutProps {
   children: React.ReactNode
@@ -22,7 +23,7 @@ export default function SuperAdminLayout({
   onTabChange,
 }: SuperAdminLayoutProps) {
   const router = useRouter()
-  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  const { theme, toggleTheme } = useAppTheme()
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
@@ -64,9 +65,6 @@ export default function SuperAdminLayout({
   }, [forceLogout])
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme")
-    if (saved === "light" || saved === "dark") setTheme(saved)
-
     // Vérification immédiate + polling toutes les 60 secondes
     checkSession()
     const interval = setInterval(checkSession, 60 * 1000)
@@ -106,13 +104,6 @@ export default function SuperAdminLayout({
     } catch (e) {
       console.error("Erreur comptage notifications:", e)
     }
-  }
-
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark"
-    setTheme(newTheme)
-    localStorage.setItem("theme", newTheme)
-    window.dispatchEvent(new Event("themeChange"))
   }
 
   const handleLogout = async () => {
@@ -212,7 +203,7 @@ export default function SuperAdminLayout({
                       </a>
 
                       <button
-                        onClick={toggleTheme}
+                        onClick={() => toggleTheme()}
                         className={`w-full px-4 py-3 flex items-center gap-3 ${hoverBg} transition-colors text-left`}
                       >
                         {theme === "dark" ? (

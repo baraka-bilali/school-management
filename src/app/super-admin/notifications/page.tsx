@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Layout from "@/components/layout"
 import { authFetch } from "@/lib/auth-fetch"
 import { notifyNotificationsChanged } from "@/lib/notification-events"
+import { useAppTheme } from "@/components/use-app-theme"
 import {
   Bell,
   ArrowLeft,
@@ -42,7 +43,7 @@ export default function NotificationsPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">(() => (typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"))
+  const { theme } = useAppTheme()
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [showUnreadOnly, setShowUnreadOnly] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -52,21 +53,6 @@ export default function NotificationsPage() {
   const [broadcastTarget, setBroadcastTarget] = useState<BroadcastTarget>("ALL")
   const [broadcastLoading, setBroadcastLoading] = useState(false)
   const [broadcastStatus, setBroadcastStatus] = useState<"idle" | "success" | "error">("idle")
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null
-    if (savedTheme) setTheme(savedTheme)
-    const handleThemeChange = () => {
-      const t = localStorage.getItem("theme") as "light" | "dark" | null
-      if (t) setTheme(t)
-    }
-    window.addEventListener("themeChange", handleThemeChange)
-    window.addEventListener("storage", handleThemeChange)
-    return () => {
-      window.removeEventListener("themeChange", handleThemeChange)
-      window.removeEventListener("storage", handleThemeChange)
-    }
-  }, [])
 
   useEffect(() => {
     fetchNotifications(1, false)
