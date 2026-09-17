@@ -201,13 +201,25 @@ export async function POST(req: NextRequest) {
         }
 
         const eventKey = bulletinEventKey(item.kind, item.periodId, item.periodGroupId)
+        if (!yearId) {
+          skipped.push({
+            classId: item.classId,
+            reason: "Aucune année scolaire active",
+          })
+          continue
+        }
         const row = await prisma.bulletinPublication.upsert({
           where: {
-            classId_eventKey: { classId: item.classId, eventKey },
+            classId_yearId_eventKey: {
+              classId: item.classId,
+              yearId,
+              eventKey,
+            },
           },
           create: {
             schoolId,
             classId: item.classId,
+            yearId,
             kind: item.kind,
             periodId: item.kind === "PERIOD" ? item.periodId : null,
             periodGroupId: item.kind === "EXAM" ? item.periodGroupId : null,
@@ -340,6 +352,54 @@ export async function POST(req: NextRequest) {
         published.length > 0
           ? `${published.length} bulletin(s) publié(s)`
           : "Aucune publication effectuée",
+    })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
+ * DELETE /api/admin/bulletin-publications
+ * Body: { classId, kind, periodId?, periodGroupId? }
+ * Retire une publication (les élèves ne voient plus cet événement).
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUser(req)
+    requireRole(user, ROLES)
+    const schoolId = user.schoolId
+    const yearId = await getSchoolCurrentYearId(schoolId)
+    if (!yearId) {
+      return NextResponse.json({ error: "Aucune année scolaire active" }, { status: 400 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const kind = String(body.kind || "").toUpperCase()
+    const classId = Number(body.classId)
+    if (kind !== "PERIOD" && kind !== "EXAM") {
+      return NextResponse.json({ error: "kind invalide" }, { status: 400 })
+    }
+    if (!Number.isFinite(classId)) {
+      return NextResponse.json({ error: "classId invalide" }, { status: 400 })
+    }
+    const periodId = body.periodId != null ? Number(body.periodId) : null
+    const periodGroupId = body.periodGroupId != null ? Number(body.periodGroupId) : null
+    const eventKey = bulletinEventKey(
+      kind as "PERIOD" | "EXAM",
+      kind === "PERIOD" ? periodId : null,
+      kind === "EXAM" ? periodGroupId : null
+    )
+
+    const deleted = await prisma.bulletinPublication.deleteMany({
+      where: { schoolId, classId, yearId, eventKey },
+    })
+
+    return NextResponse.json({
+      deleted: deleted.count,
+      message:
+        deleted.count > 0
+          ? "Publication retirée — les élèves ne voient plus cet événement"
+          : "Aucune publication à retirer",
     })
   } catch (error) {
     return handleApiError(error)

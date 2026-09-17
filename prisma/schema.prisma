@@ -54,6 +54,7 @@ model AcademicYear {
   assignments     CourseAssignment[]
   slots           ScheduleSlot[]
   communiques     Communique[]
+  bulletinPublications BulletinPublication[]
 }
 
 model Class {
@@ -1146,13 +1147,14 @@ model GradeEntryLock {
   @@index([lockedByUserId])
 }
 
-/// Publication de bulletins pour une classe × événement (période ou examen).
+/// Publication de bulletins pour une classe × année × événement (période ou examen).
 /// Snapshot léger pour l'instant : l'enregistrement marque l'affichage comme publié.
 /// TODO: snapshot complet des notes/moyennes pourra être ajouté plus tard.
 model BulletinPublication {
   id                Int           @id @default(autoincrement())
   schoolId          Int
   classId           Int
+  yearId            Int
   kind              GradeLockKind
   periodId          Int?
   periodGroupId     Int?
@@ -1162,12 +1164,14 @@ model BulletinPublication {
   publishedByUserId Int
   school            School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   class             Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  year              AcademicYear  @relation(fields: [yearId], references: [id], onDelete: Cascade)
   period            Period?       @relation(fields: [periodId], references: [id], onDelete: Cascade)
   periodGroup       PeriodGroup?  @relation(fields: [periodGroupId], references: [id], onDelete: Cascade)
   publishedBy       User          @relation(fields: [publishedByUserId], references: [id])
 
-  @@unique([classId, eventKey])
-  @@index([schoolId, classId])
+  @@unique([classId, yearId, eventKey])
+  @@index([schoolId, classId, yearId])
+  @@index([yearId])
   @@index([periodId])
   @@index([periodGroupId])
   @@index([publishedByUserId])

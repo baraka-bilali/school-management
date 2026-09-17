@@ -96,6 +96,7 @@ export async function GET(req: NextRequest) {
           ? focusPeriodGroupId
           : focusPeriodGroupId,
       enrollmentId,
+      audience: "staff",
     })
     return NextResponse.json({ data })
   } catch (e) {
