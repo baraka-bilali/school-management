@@ -14,6 +14,8 @@ import {
 } from "lucide-react"
 import { PrimaryCurriculumPanel } from "@/components/admin/primary-curriculum-panel"
 import { PrimaryResultsPanel } from "@/components/admin/primary-results-panel"
+import { useAppTheme } from "@/components/use-app-theme"
+import { cn } from "@/lib/utils"
 
 type CycleTab = "primaire" | "eb" | "humanites"
 type PrimaireSub = "branches" | "resultats"
@@ -37,34 +39,58 @@ function StatCard({
   value,
   hint,
   accent = "indigo",
+  isDark,
 }: {
   icon: ComponentType<{ className?: string }>
   label: string
   value: string
   hint?: string
   accent?: "indigo" | "green" | "amber" | "blue"
+  isDark: boolean
 }) {
   const accents = {
-    indigo: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-    green: "bg-green-500/10 text-green-600 dark:text-green-400",
-    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+    indigo: isDark ? "bg-indigo-500/15 text-indigo-300" : "bg-indigo-50 text-indigo-600",
+    green: isDark ? "bg-green-500/15 text-green-300" : "bg-green-50 text-green-600",
+    amber: isDark ? "bg-amber-500/15 text-amber-300" : "bg-amber-50 text-amber-600",
+    blue: isDark ? "bg-blue-500/15 text-blue-300" : "bg-blue-50 text-blue-600",
   }
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm">
+    <div
+      className={cn(
+        "rounded-2xl border p-4 shadow-sm",
+        isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
+      )}
+    >
       <div className="flex items-start gap-3">
-        <div className={`rounded-xl p-2 shrink-0 ${accents[accent]}`}>
+        <div className={cn("rounded-xl p-2 shrink-0", accents[accent])}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          <p
+            className={cn(
+              "text-xs font-medium uppercase tracking-wide",
+              isDark ? "text-gray-400" : "text-gray-500"
+            )}
+          >
             {label}
           </p>
-          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <p
+            className={cn(
+              "mt-1 truncate text-lg font-semibold",
+              isDark ? "text-gray-100" : "text-gray-900"
+            )}
+          >
             {value}
           </p>
           {hint ? (
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">{hint}</p>
+            <p
+              className={cn(
+                "mt-0.5 truncate text-xs",
+                isDark ? "text-gray-400" : "text-gray-500"
+              )}
+            >
+              {hint}
+            </p>
           ) : null}
         </div>
       </div>
@@ -73,10 +99,16 @@ function StatCard({
 }
 
 export default function GradesPage() {
+  const { isDark } = useAppTheme()
   const [cycleTab, setCycleTab] = useState<CycleTab>("primaire")
   const [primaireSub, setPrimaireSub] = useState<PrimaireSub>("resultats")
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [overview, setOverview] = useState<OverviewData | null>(null)
+
+  const text = isDark ? "text-gray-100" : "text-gray-900"
+  const textMuted = isDark ? "text-gray-400" : "text-gray-600"
+  const textFaint = isDark ? "text-gray-500" : "text-gray-500"
+  const border = isDark ? "border-gray-700" : "border-gray-200"
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true)
@@ -100,25 +132,20 @@ export default function GradesPage() {
   const p = overview?.primaire
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Notes & Bulletins
-        </h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <h1 className={cn("text-2xl font-bold", text)}>Notes & Bulletins</h1>
+        <p className={cn("mt-1 text-sm", textMuted)}>
           Suivi des résultats par cycle et configuration du curriculum primaire.
         </p>
       </div>
 
-      {/* Top banner — school-wide stats (Primaire focus) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          <p className={cn("text-xs font-medium uppercase tracking-wide", textFaint)}>
             Vue d&apos;ensemble — Primaire
           </p>
-          {overviewLoading && (
-            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-          )}
+          {overviewLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -131,6 +158,7 @@ export default function GradesPage() {
                 : "Pas encore de notes"
             }
             accent="indigo"
+            isDark={isDark}
           />
           <StatCard
             icon={Users}
@@ -142,6 +170,7 @@ export default function GradesPage() {
                 : "Pas encore de notes"
             }
             accent="blue"
+            isDark={isDark}
           />
           <StatCard
             icon={TrendingUp}
@@ -155,33 +184,30 @@ export default function GradesPage() {
                 : "Données insuffisantes"
             }
             accent="green"
+            isDark={isDark}
           />
           <StatCard
             icon={CheckCircle2}
             label="Classes soumises"
-            value={
-              p
-                ? `${p.submittedCount} / ${p.classCount || 0}`
-                : "—"
-            }
+            value={p ? `${p.submittedCount} / ${p.classCount || 0}` : "—"}
             hint={
               p
                 ? `${p.pendingCount} en attente${p.partialCount ? ` · ${p.partialCount} partiel` : ""}`
                 : undefined
             }
             accent="amber"
+            isDark={isDark}
           />
         </div>
         {overview?.submissionRuleNote && (
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 flex items-start gap-1.5">
-            <Clock className="h-3 w-3 mt-0.5 shrink-0" />
+          <p className={cn("flex items-start gap-1.5 text-[11px]", textFaint)}>
+            <Clock className="mt-0.5 h-3 w-3 shrink-0" />
             {overview.submissionRuleNote}
           </p>
         )}
       </div>
 
-      {/* Cycle tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto overflow-y-hidden scrollbar-hide">
+      <div className={cn("flex flex-wrap gap-2 overflow-x-auto overflow-y-hidden border-b scrollbar-hide", border)}>
         {(
           [
             ["primaire", "Primaire"],
@@ -193,11 +219,17 @@ export default function GradesPage() {
             key={key}
             type="button"
             onClick={() => setCycleTab(key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+            className={cn(
+              "-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
               cycleTab === key
                 ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-            }`}
+                : cn(
+                    "border-transparent",
+                    isDark
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-500 hover:text-gray-800"
+                  )
+            )}
           >
             {label}
           </button>
@@ -206,7 +238,13 @@ export default function GradesPage() {
 
       {cycleTab === "primaire" ? (
         <div className="space-y-5">
-          <div className="inline-flex rounded-xl border border-gray-200 dark:border-gray-700 p-1 bg-gray-50 dark:bg-gray-800/50">
+          <div
+            className={cn(
+              "inline-flex rounded-xl border p-1",
+              border,
+              isDark ? "bg-gray-800/50" : "bg-gray-50"
+            )}
+          >
             {(
               [
                 ["resultats", "Résultats"],
@@ -217,11 +255,17 @@ export default function GradesPage() {
                 key={key}
                 type="button"
                 onClick={() => setPrimaireSub(key)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
                   primaireSub === key
-                    ? "bg-white dark:bg-gray-900 text-indigo-600 shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                }`}
+                    ? cn(
+                        "text-indigo-600 shadow-sm",
+                        isDark ? "bg-gray-900" : "bg-white"
+                      )
+                    : isDark
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                )}
               >
                 {label}
               </button>
@@ -235,12 +279,19 @@ export default function GradesPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-900/40 py-16 px-6 text-center">
-          <BookOpen className="h-10 w-10 mx-auto text-gray-400 mb-3" />
-          <p className="text-base font-medium text-gray-700 dark:text-gray-300">
+        <div
+          className={cn(
+            "rounded-2xl border border-dashed px-6 py-16 text-center",
+            isDark
+              ? "border-gray-600 bg-gray-900/40"
+              : "border-gray-300 bg-gray-50/80"
+          )}
+        >
+          <BookOpen className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+          <p className={cn("text-base font-medium", isDark ? "text-gray-300" : "text-gray-700")}>
             Bientôt disponible
           </p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className={cn("mt-1 text-sm", textMuted)}>
             Les résultats pour{" "}
             {cycleTab === "eb" ? "l'Éducation de Base" : "les Humanités"} seront
             configurés dans une prochaine version.
