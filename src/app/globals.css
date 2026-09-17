@@ -171,12 +171,16 @@
 @media (min-width: 768px) {
   html {
     zoom: 0.8;
+    /* Ne pas mettre overflow-x:hidden ici : avec body, ça crée 2 scroll
+       containers et la molette ne remonte plus correctement. */
   }
   html,
   body {
     min-height: 125dvh;
-    /* zoom < 1 peut générer un léger débordement → barre horizontale fantôme */
-    overflow-x: hidden;
+  }
+  /* clip coupe le débordement H sans bloquer le scroll vertical (molette) */
+  body {
+    overflow-x: clip;
   }
 }
 
