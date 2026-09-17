@@ -104,6 +104,14 @@ function fmtScore(v: number | null | undefined, max?: number) {
   return max != null ? `${score}/${max}` : score
 }
 
+/** Note d'échec = strictement sous la moyenne (moins de 50 % du max). */
+function isFailingScore(obtained: number | null | undefined, max?: number) {
+  if (obtained == null || max == null || !Number.isFinite(obtained) || !(max > 0)) {
+    return false
+  }
+  return obtained < max / 2
+}
+
 function fmtPct(v: number | null | undefined) {
   if (v == null) return "—"
   return `${Math.round(v)} %`
@@ -588,7 +596,12 @@ export default function StudentGradesYearPage() {
                         return (
                           <td
                             key={c.key}
-                            className={cn("px-2 py-2.5 text-center tabular-nums", text)}
+                            className={cn(
+                              "px-2 py-2.5 text-center tabular-nums",
+                              isFailingScore(val, max)
+                                ? "font-semibold text-red-600 dark:text-red-400"
+                                : text
+                            )}
                           >
                             {fmtScore(val, max)}
                           </td>
