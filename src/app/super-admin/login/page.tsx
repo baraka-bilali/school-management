@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useLayoutEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import KelasiLogo from "@/components/kelasi-logo"
 import LoginAmbientBackground from "@/components/login-ambient-background"
@@ -16,13 +16,14 @@ export default function SuperAdminLoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
 
-  // Thème calqué sur les préférences de l'appareil (comme /login)
+  // Thème appareil — useLayoutEffect avant paint pour éviter champs dark: sur carte claire
   const [isDark, setIsDark] = useState(false)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)")
     const apply = (dark: boolean) => {
       setIsDark(dark)
       document.documentElement.classList.toggle("dark", dark)
+      document.documentElement.style.colorScheme = dark ? "dark" : "light"
     }
     apply(mq.matches)
     const handler = (e: MediaQueryListEvent) => apply(e.matches)
@@ -70,20 +71,12 @@ export default function SuperAdminLoginPage() {
   }
 
   return (
-<<<<<<< Updated upstream
-    <div className="login-shell relative isolate flex w-full items-center justify-center overflow-hidden bg-gray-50 px-6 py-8">
-      <div className="w-full max-w-md min-w-0">
-        <div className="flex flex-col items-center mb-4">
-          <div className="mb-3">
-            <KelasiLogo variant="light" priority className="h-36 w-36 sm:h-44 sm:w-44 object-contain drop-shadow-md" />
-=======
     <div className="login-shell relative isolate flex w-full items-center justify-center overflow-hidden bg-[#eef2f9] px-6 py-8 transition-colors dark:bg-gray-900">
       <LoginAmbientBackground isDark={isDark} />
       <div className="relative z-10 w-full max-w-md min-w-0">
         <div className="mb-5 flex flex-col items-center">
           <div className="mb-2">
             <KelasiLogo variant="light" priority className="h-28 w-28 object-contain drop-shadow-md sm:h-32 sm:w-32" />
->>>>>>> Stashed changes
           </div>
           <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
@@ -116,6 +109,7 @@ export default function SuperAdminLoginPage() {
                     name="email"
                     placeholder="vous@exemple.com"
                     className="pl-10"
+                    lightSurface={!isDark}
                     required
                     value={form.email}
                     onChange={handleChange}
@@ -136,6 +130,7 @@ export default function SuperAdminLoginPage() {
                     name="password"
                     placeholder="••••••••"
                     className="pl-10 pr-10"
+                    lightSurface={!isDark}
                     required
                     value={form.password}
                     onChange={handleChange}
