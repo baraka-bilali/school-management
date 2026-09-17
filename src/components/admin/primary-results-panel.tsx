@@ -475,8 +475,9 @@ export function PrimaryResultsPanel() {
         )}
       >
         Statut basé sur la validation enseignant (<strong>soumis</strong> = toutes
-        les branches verrouillées). L&apos;aperçu / impression PDF est possible
-        sans publier. Seul le bouton <strong>Publier</strong> rend les notes
+        les branches verrouillées). L&apos;aperçu / impression PDF reprend aussi
+        ce qui est déjà publié aux élèves. Choisissez le même événement (ex.
+        Examen T1) pour comparer. Seul <strong>Publier</strong> rend les notes
         visibles aux élèves.
       </div>
 
