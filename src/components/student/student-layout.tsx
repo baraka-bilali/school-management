@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { getSupabaseBrowser } from "@/lib/supabase-client"
+import { getSupabaseBrowser, tryGetSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 import { cn } from "@/lib/utils"
 import StudentHeader from "./student-header"
@@ -113,7 +113,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
 
   useEffect(() => {
     if (!schoolId) return
-    const channel = getSupabaseBrowser()
+    const sb = tryGetSupabaseBrowser()
+    if (!sb) return
+    const channel = sb
       .channel(`communiques:school:${schoolId}`)
       .on("broadcast", { event: "new_communique" }, ({ payload }) => {
         if (payload?.targetStudents !== true) return
@@ -122,13 +124,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      getSupabaseBrowser().removeChannel(channel)
+      sb.removeChannel(channel)
     }
   }, [schoolId])
 
   useEffect(() => {
     if (!student?.studentId) return
-    const channel = getSupabaseBrowser()
+    const sb = tryGetSupabaseBrowser()
+    if (!sb) return
+    const channel = sb
       .channel(`fees:student:${student.studentId}`)
       .on("broadcast", { event: "payment_received" }, () => {
         setFeePulse(true)
@@ -137,13 +141,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      getSupabaseBrowser().removeChannel(channel)
+      sb.removeChannel(channel)
     }
   }, [student?.studentId])
 
   useEffect(() => {
     if (!student?.classId) return
-    const channel = getSupabaseBrowser()
+    const sb = tryGetSupabaseBrowser()
+    if (!sb) return
+    const channel = sb
       .channel(`tasks:class:${student.classId}`)
       .on("broadcast", { event: "new_task" }, () => {
         void showSystemNotification("Kelasi 360", "Nouvelle tâche assignée", { url: "/student/tasks" })
@@ -151,13 +157,15 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      getSupabaseBrowser().removeChannel(channel)
+      sb.removeChannel(channel)
     }
   }, [student?.classId])
 
   useEffect(() => {
     if (!student?.classId) return
-    const channel = getSupabaseBrowser()
+    const sb = tryGetSupabaseBrowser()
+    if (!sb) return
+    const channel = sb
       .channel(`bulletins:class:${student.classId}`)
       .on("broadcast", { event: "bulletin_published" }, ({ payload }) => {
         const label = typeof payload?.label === "string" ? payload.label : "Bulletin"
@@ -171,7 +179,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       })
       .subscribe()
     return () => {
-      getSupabaseBrowser().removeChannel(channel)
+      sb.removeChannel(channel)
     }
   }, [student?.classId])
 
