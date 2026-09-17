@@ -441,6 +441,26 @@ function sumLinesScores(lines: BulletinBranchLine[]) {
   return { periodScores, examScores, trimScores, annualScore }
 }
 
+function sameBarème(a: BulletinBranchLine, b: BulletinBranchLine) {
+  return (
+    a.maxPeriode === b.maxPeriode &&
+    a.maxExamen === b.maxExamen &&
+    a.maxTrimestre === b.maxTrimestre &&
+    a.maxAnnuel === b.maxAnnuel
+  )
+}
+
+/** Blocs de branches partageant le même barème (pour une ligne Maxima commune). */
+function chunkBySameMaxima(lines: BulletinBranchLine[]) {
+  const chunks: BulletinBranchLine[][] = []
+  for (const line of lines) {
+    const last = chunks[chunks.length - 1]
+    if (last && sameBarème(last[0], line)) last.push(line)
+    else chunks.push([line])
+  }
+  return chunks
+}
+
 function periodShortLabel(name: string, fallback: string): string {
   // "1ère période" → "1ère P."
   const m = name.match(/(\d+)/)
@@ -783,6 +803,7 @@ function DomainBlock({
                 ...sumLinesScores(section.lines),
               }
             : null
+        const maximaChunks = chunkBySameMaxima(section.lines)
 
         return (
           <View key={`${section.groupName ?? "ungrouped"}-${sIdx}`}>
@@ -792,30 +813,61 @@ function DomainBlock({
               </View>
             ) : null}
 
-            {section.lines.map((line, i) => (
-              <View
-                key={line.subjectId}
-                style={[s.row, i % 2 === 1 ? s.rowZebra : {}]}
-                wrap={false}
-              >
-                <View style={s.branchCell}>
-                  <Text style={{ fontSize: 6.5 }}>{line.name}</Text>
+            {maximaChunks.map((chunk, cIdx) => {
+              const ref = chunk[0]
+              return (
+                <View key={`chunk-${ref.subjectId}-${cIdx}`}>
+                  {/* Maxima commun aux cours de même pondération */}
+                  <View style={[s.row, { backgroundColor: LIGHT }]} wrap={false}>
+                    <View style={s.branchCell}>
+                      <Text
+                        style={{
+                          fontSize: 6.5,
+                          fontFamily: "Helvetica-Oblique",
+                        }}
+                      >
+                        Maxima
+                      </Text>
+                    </View>
+                    <ScoreCells
+                      data={data}
+                      vis={vis}
+                      maxPeriode={ref.maxPeriode}
+                      maxExamen={ref.maxExamen}
+                      maxTrimestre={ref.maxTrimestre}
+                      maxAnnuel={ref.maxAnnuel}
+                      mode="max"
+                      bold
+                    />
+                  </View>
+
+                  {chunk.map((line, i) => (
+                    <View
+                      key={line.subjectId}
+                      style={[s.row, i % 2 === 1 ? s.rowZebra : {}]}
+                      wrap={false}
+                    >
+                      <View style={s.branchCell}>
+                        <Text style={{ fontSize: 6.5 }}>{line.name}</Text>
+                      </View>
+                      <ScoreCells
+                        data={data}
+                        vis={vis}
+                        maxPeriode={line.maxPeriode}
+                        maxExamen={line.maxExamen}
+                        maxTrimestre={line.maxTrimestre}
+                        maxAnnuel={line.maxAnnuel}
+                        periodScores={line.periodScores}
+                        examScores={line.examScores}
+                        trimScores={line.trimScores}
+                        annualScore={line.annualScore}
+                        mode="score"
+                      />
+                    </View>
+                  ))}
                 </View>
-                <ScoreCells
-                  data={data}
-                  vis={vis}
-                  maxPeriode={line.maxPeriode}
-                  maxExamen={line.maxExamen}
-                  maxTrimestre={line.maxTrimestre}
-                  maxAnnuel={line.maxAnnuel}
-                  periodScores={line.periodScores}
-                  examScores={line.examScores}
-                  trimScores={line.trimScores}
-                  annualScore={line.annualScore}
-                  mode="score"
-                />
-              </View>
-            ))}
+              )
+            })}
 
             {groupSub ? (
               <View style={[s.row, { backgroundColor: ZEBRA }]} wrap={false}>
@@ -1074,10 +1126,11 @@ function BulletinPage({
 
       <Text style={s.note}>
         Points visibles uniquement pour les périodes/examens publiés. Branches
-        regroupées par domaine et sous-domaine. Notes sous la moyenne (moins de
-        50 % du max) en rouge avec astérisque (*) pour l&apos;impression
-        N&amp;B. Application dérivée du %. Conduite : périodes seulement (cases
-        noires = non applicables).
+        regroupées par domaine et sous-domaine ; ligne Maxima au-dessus des
+        cours de même pondération. Notes sous la moyenne (moins de 50 % du max)
+        en rouge avec astérisque (*) pour l&apos;impression N&amp;B. Application
+        dérivée du %. Conduite : périodes seulement (cases noires = non
+        applicables).
       </Text>
 
       <Text
