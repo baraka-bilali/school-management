@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       studentId: ctx.studentId,
       yearId,
       class: { schoolId: ctx.schoolId },
-      status: { in: ["ACTIVE", "GRADUATED", "CONFIRMEE", "INACTIVE"] },
+      status: { in: ["ACTIVE", "GRADUATED", "CONFIRMEE", "INACTIVE", "PROPOSEE"] },
     },
     include: {
       year: { select: { id: true, name: true } },

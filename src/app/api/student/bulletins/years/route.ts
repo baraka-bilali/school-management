@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getStudentFromRequest } from "@/lib/student-auth"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 
-const YEAR_STATUSES = ["ACTIVE", "GRADUATED", "CONFIRMEE", "INACTIVE"] as const
+const YEAR_STATUSES = ["ACTIVE", "GRADUATED", "CONFIRMEE", "INACTIVE", "PROPOSEE"] as const
 
 /**
  * GET /api/student/bulletins/years
