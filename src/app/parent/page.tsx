@@ -6,7 +6,11 @@ import { cn } from "@/lib/utils"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import { useParentMe } from "@/components/parent/parent-context"
 import StudentLoading from "@/components/student/student-loading"
-import { getGreeting } from "@/lib/student-auth"
+
+function getGreeting(): "Bonjour" | "Bonsoir" {
+  const hour = new Date().getHours()
+  return hour >= 18 || hour < 5 ? "Bonsoir" : "Bonjour"
+}
 
 export default function ParentHomePage() {
   const { card, text, textMuted, shadow, border, linkAccent } = useTeacherTheme()
