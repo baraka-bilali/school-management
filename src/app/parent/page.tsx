@@ -67,7 +67,7 @@ export default function ParentHomePage() {
                 return (
                   <Link
                     key={child.id}
-                    href={`/parent/children/${child.id}`}
+                    href={`/parent/children/${child.id}/grades`}
                     className={cn(
                       "flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-indigo-500/40 lg:p-5",
                       card,
@@ -132,7 +132,7 @@ export default function ParentHomePage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className={cn("font-semibold", text)}>Suivi scolaire</p>
-              <p className={cn("text-xs", textMuted)}>Paiements et devoirs des enfants</p>
+              <p className={cn("text-xs", textMuted)}>Bulletins, paiements et devoirs</p>
             </div>
             <ChevronRight className={cn("h-5 w-5 shrink-0", textMuted)} />
           </Link>

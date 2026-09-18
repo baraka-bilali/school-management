@@ -265,10 +265,12 @@ export default function ParentChildDetailPage() {
               Classe : {data.student.className || "—"}
               {data.student.yearName ? ` · ${data.student.yearName}` : ""}
             </p>
-            <p className={cn("mt-2 text-xs", textMuted)}>
-              Les bulletins officiels seront disponibles dès que le module Notes sera activé.
-              En attendant, voici les devoirs et travaux communiqués par les enseignants.
-            </p>
+            <Link
+              href={`/parent/children/${params.studentId}/grades`}
+              className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Voir les notes & bulletins
+            </Link>
           </div>
 
           <div className={cn("overflow-hidden rounded-2xl border", card, border, shadow)}>
