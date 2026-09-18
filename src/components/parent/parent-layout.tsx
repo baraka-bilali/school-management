@@ -9,7 +9,7 @@ import ParentSidebar from "./parent-sidebar"
 import ParentBottomNav from "./parent-bottom-nav"
 import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import { useParentMe } from "./parent-context"
-import { getSupabaseBrowser } from "@/lib/supabase-client"
+import { tryGetSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
@@ -51,7 +51,9 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     if (!me?.schoolId) return
-    const channel = getSupabaseBrowser()
+    const supabase = tryGetSupabaseBrowser()
+    if (!supabase) return
+    const channel = supabase
       .channel(`communiques:school:${me.schoolId}`)
       .on("broadcast", { event: "new_communique" }, ({ payload }) => {
         if (payload?.targetParents !== true) return
@@ -62,7 +64,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       })
       .subscribe()
     return () => {
-      getSupabaseBrowser().removeChannel(channel)
+      supabase.removeChannel(channel)
     }
   }, [me?.schoolId])
 

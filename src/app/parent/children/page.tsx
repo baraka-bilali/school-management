@@ -31,7 +31,7 @@ export default function ParentChildrenPage() {
             return (
               <Link
                 key={child.id}
-                href={`/parent/children/${child.id}`}
+                href={`/parent/children/${child.id}/grades`}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-indigo-500/40 lg:p-5",
                   card,

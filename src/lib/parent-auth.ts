@@ -73,4 +73,17 @@ export async function getParentFromRequest(req: NextRequest) {
   }
 }
 
+/** Vérifie que l'élève est bien lié à ce parent. */
+export async function assertParentChildLink(parentId: number, studentId: number) {
+  return prisma.parentStudent.findFirst({
+    where: { parentId, studentId },
+    select: {
+      id: true,
+      relationship: true,
+      studentId: true,
+      parentId: true,
+    },
+  })
+}
+
 export { getGreeting } from "@/lib/student-auth"
