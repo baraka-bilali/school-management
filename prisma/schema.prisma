@@ -180,9 +180,9 @@ model ParentStudent {
   parent           Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student          Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@unique([parentId, studentId])
+  /// Un élève ne peut être lié qu'à un seul parent ; un parent peut avoir plusieurs élèves.
+  @@unique([studentId])
   @@index([parentId])
-  @@index([studentId])
 }
 
 model Enrollment {

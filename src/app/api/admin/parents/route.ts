@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { buildPersonnelEmailByCode, generatePassword } from "@/lib/generateCredentials"
+import {
+  findParentStudentConflicts,
+  formatParentStudentConflictError,
+} from "@/lib/parent-student-links"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -259,6 +263,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: "Un ou plusieurs élèves sont invalides pour cette école" },
           { status: 400 }
+        )
+      }
+
+      const conflicts = await findParentStudentConflicts(auth.schoolId, studentIds)
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          { error: formatParentStudentConflictError(conflicts) },
+          { status: 409 }
         )
       }
     }
