@@ -87,9 +87,8 @@ export async function POST(
       )
     }
 
-    await ensurePrimaryCurriculum(user.schoolId)
-
-    const degree = await prisma.primaryDegree.findUnique({
+    // N'initialise le curriculum que s'il manque (évite un seed complet à chaque assignation).
+    let degree = await prisma.primaryDegree.findUnique({
       where: { schoolId_code: { schoolId: user.schoolId, code: degreeCode } },
       include: {
         domains: {
@@ -102,6 +101,22 @@ export async function POST(
         },
       },
     })
+    if (!degree) {
+      await ensurePrimaryCurriculum(user.schoolId)
+      degree = await prisma.primaryDegree.findUnique({
+        where: { schoolId_code: { schoolId: user.schoolId, code: degreeCode } },
+        include: {
+          domains: {
+            include: {
+              branches: {
+                where: { isActive: true, subjectId: { not: null } },
+                select: { id: true, subjectId: true },
+              },
+            },
+          },
+        },
+      })
+    }
     if (!degree) {
       return NextResponse.json(
         { error: "Structure primaire non initialisée pour ce degré" },
@@ -140,43 +155,43 @@ export async function POST(
         data: { titulaireTeacherId: teacherId },
       })
 
-      let created = 0
+      const existing = await tx.courseAssignment.findMany({
+        where: {
+          classId,
+          yearId,
+          schoolId: user.schoolId,
+          subjectId: { in: subjectIds },
+        },
+        select: { id: true, subjectId: true },
+      })
+
+      const existingSubjectIds = new Set(existing.map((e) => e.subjectId))
+      const toCreate = subjectIds.filter((sid) => !existingSubjectIds.has(sid))
+
       let updated = 0
-      for (const subjectId of subjectIds) {
-        const existing = await tx.courseAssignment.findUnique({
-          where: {
-            subjectId_classId_yearId_schoolId: {
-              subjectId,
-              classId,
-              yearId,
-              schoolId: user.schoolId,
-            },
-          },
+      if (existing.length > 0) {
+        const upd = await tx.courseAssignment.updateMany({
+          where: { id: { in: existing.map((e) => e.id) } },
+          data: { teacherId, isActive: true },
         })
-        if (existing) {
-          await tx.courseAssignment.update({
-            where: { id: existing.id },
-            data: {
-              teacherId,
-              isActive: true,
-              weeklyHours: existing.weeklyHours || 1,
-            },
-          })
-          updated += 1
-        } else {
-          await tx.courseAssignment.create({
-            data: {
-              subjectId,
-              classId,
-              yearId,
-              schoolId: user.schoolId,
-              teacherId,
-              weeklyHours: 1,
-              isActive: true,
-            },
-          })
-          created += 1
-        }
+        updated = upd.count
+      }
+
+      let created = 0
+      if (toCreate.length > 0) {
+        const createdResult = await tx.courseAssignment.createMany({
+          data: toCreate.map((subjectId) => ({
+            subjectId,
+            classId,
+            yearId,
+            schoolId: user.schoolId,
+            teacherId,
+            weeklyHours: 1,
+            isActive: true,
+          })),
+          skipDuplicates: true,
+        })
+        created = createdResult.count
       }
 
       return { created, updated, total: subjectIds.length }

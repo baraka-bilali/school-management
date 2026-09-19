@@ -1,9 +1,12 @@
 "use client"
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
+  Check,
+  Cloud,
+  CloudOff,
   Eye,
   Loader2,
   Save,
@@ -145,6 +148,26 @@ export function TeacherPrimaryGradesBoard({
   const [bulletinUrl, setBulletinUrl] = useState<string | null>(null)
   const [bulletinTitle, setBulletinTitle] = useState("")
   const [sendPending, setSendPending] = useState<SendPending | null>(null)
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "pending" | "saving" | "saved" | "error"
+  >("idle")
+  const autoOpenedBulletinRef = useRef(false)
+  const dirtyRef = useRef<{
+    periodGrades: Array<{
+      assignmentId: number
+      periodId: number
+      enrollmentId: number
+      pointsObtained: number | null
+    }>
+    examGrades: Array<{
+      assignmentId: number
+      periodGroupId: number
+      enrollmentId: number
+      pointsObtained: number | null
+    }>
+  }>({ periodGrades: [], examGrades: [] })
+  const dataRef = useRef<BoardData | null>(null)
+  const saveInFlightRef = useRef(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -251,36 +274,111 @@ export function TeacherPrimaryGradesBoard({
   }, [data, drafts])
 
   const dirtyCount = dirty.periodGrades.length + dirty.examGrades.length
+  dirtyRef.current = dirty
+  dataRef.current = data
 
-  const save = async () => {
-    if (!data || dirtyCount === 0) return
+  const applySavedScores = useCallback(
+    (
+      periodGrades: Array<{
+        assignmentId: number
+        periodId: number
+        enrollmentId: number
+        pointsObtained: number | null
+      }>,
+      examGrades: Array<{
+        assignmentId: number
+        periodGroupId: number
+        enrollmentId: number
+        pointsObtained: number | null
+      }>
+    ) => {
+      setData((prev) => {
+        if (!prev) return prev
+        const periodScores = { ...prev.periodScores }
+        for (const g of periodGrades) {
+          const a = String(g.assignmentId)
+          const p = String(g.periodId)
+          const e = String(g.enrollmentId)
+          periodScores[a] = { ...(periodScores[a] || {}) }
+          periodScores[a][p] = { ...(periodScores[a][p] || {}) }
+          periodScores[a][p][e] = g.pointsObtained
+        }
+        const examScores = { ...prev.examScores }
+        for (const g of examGrades) {
+          const a = String(g.assignmentId)
+          const t = String(g.periodGroupId)
+          const e = String(g.enrollmentId)
+          examScores[a] = { ...(examScores[a] || {}) }
+          examScores[a][t] = { ...(examScores[a][t] || {}) }
+          examScores[a][t][e] = g.pointsObtained
+        }
+        return { ...prev, periodScores, examScores }
+      })
+    },
+    []
+  )
+
+  const save = useCallback(async (opts?: { silent?: boolean; force?: boolean }) => {
+    const board = dataRef.current
+    const current = dirtyRef.current
+    const count = current.periodGrades.length + current.examGrades.length
+    if (!board || count === 0) return false
+    if (saveInFlightRef.current && !opts?.force) return false
+
+    saveInFlightRef.current = true
     setSaving(true)
+    setSaveStatus("saving")
+    const periodGrades = current.periodGrades
+    const examGrades = current.examGrades
     try {
       const res = await fetch("/api/teacher/primary-grades", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          classId: data.class.id,
-          periodGrades: dirty.periodGrades,
-          examGrades: dirty.examGrades,
+          classId: board.class.id,
+          periodGrades,
+          examGrades,
         }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || "Enregistrement impossible")
-      toast.success("Notes enregistrées")
-      await load()
+      applySavedScores(periodGrades, examGrades)
+      setSaveStatus("saved")
+      if (!opts?.silent) toast.success("Notes enregistrées")
+      return true
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur")
+      setSaveStatus("error")
+      toast.error(e instanceof Error ? e.message : "Erreur d'enregistrement")
+      return false
     } finally {
+      saveInFlightRef.current = false
       setSaving(false)
     }
-  }
+  }, [applySavedScores])
+
+  // Autosave type Google Docs : ~1,2 s après la dernière modification
+  useEffect(() => {
+    if (dirtyCount === 0) {
+      setSaveStatus((s) => {
+        if (s === "pending" || s === "saving") return s
+        if (s === "error") return "error"
+        if (s === "saved") return "saved"
+        return "idle"
+      })
+      return
+    }
+    setSaveStatus("pending")
+    const t = setTimeout(() => {
+      void save({ silent: true })
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [dirtyCount, drafts, save])
 
   const requestSendResults = (kind: "PERIOD" | "EXAM", id: number) => {
     if (!data) return
-    if (dirtyCount > 0) {
-      toast.error("Enregistrez d'abord les modifications")
+    if (dirtyCount > 0 || saveStatus === "pending" || saveStatus === "saving") {
+      toast.error("Attendez la fin de l'enregistrement automatique")
       return
     }
     const label =
@@ -368,13 +466,15 @@ export function TeacherPrimaryGradesBoard({
   }
 
   useEffect(() => {
-    if (!data || !initialEnrollmentId || bulletinOpen) return
+    if (!data || !initialEnrollmentId || autoOpenedBulletinRef.current) return
     const student = data.students.find(
       (s) =>
         s.enrollmentId === initialEnrollmentId ||
         s.studentId === initialEnrollmentId
     )
-    if (student) void openBulletin(student)
+    if (!student) return
+    autoOpenedBulletinRef.current = true
+    void openBulletin(student)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, initialEnrollmentId])
 
@@ -506,8 +606,9 @@ export function TeacherPrimaryGradesBoard({
           <button
             type="button"
             disabled={saving || dirtyCount === 0}
-            onClick={() => void save()}
+            onClick={() => void save({ silent: false, force: true })}
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+            title="Enregistre immédiatement (sinon autosave ~1 s après saisie)"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -516,10 +617,39 @@ export function TeacherPrimaryGradesBoard({
             )}
             Enregistrer
           </button>
-          <p className={cn("text-[11px]", textMuted)}>
-            {dirtyCount === 0
-              ? "Aucune modification"
-              : `${dirtyCount} modif.${dirtyCount > 1 ? "s" : ""}`}
+          <p
+            className={cn(
+              "inline-flex items-center gap-1 text-[11px]",
+              saveStatus === "error"
+                ? "text-red-500"
+                : saveStatus === "saved" && dirtyCount === 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : textMuted
+            )}
+          >
+            {saveStatus === "saving" || saving ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Enregistrement…
+              </>
+            ) : saveStatus === "pending" || dirtyCount > 0 ? (
+              <>
+                <Cloud className="h-3 w-3" />
+                Enregistrement auto…
+              </>
+            ) : saveStatus === "error" ? (
+              <>
+                <CloudOff className="h-3 w-3" />
+                Échec — réessayez
+              </>
+            ) : saveStatus === "saved" ? (
+              <>
+                <Check className="h-3 w-3" />
+                Enregistré
+              </>
+            ) : (
+              "Aucune modification"
+            )}
           </p>
         </div>
       </div>
