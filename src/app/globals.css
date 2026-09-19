@@ -71,7 +71,7 @@
 
 :root {
   --radius: 0.625rem;
-  --background: #eef2f9;
+  --background: #ffffff;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -146,11 +146,10 @@
   body {
     @apply min-h-dvh bg-background text-foreground;
   }
-  /* Light : même teinte que les portails (#eef2f9) pour éviter une bande blanche
-     sous le contenu (surtout visible avec zoom < 1). */
+  /* Light : fond blanc unifié (admin + shells) — évite le double ton gris/blanc. */
   html:not(.dark),
   html:not(.dark) body {
-    background-color: #eef2f9;
+    background-color: #ffffff;
   }
   html.dark,
   html.dark body {
