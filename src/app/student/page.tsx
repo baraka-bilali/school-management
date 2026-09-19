@@ -31,6 +31,7 @@ interface StudentInfo {
   code: string
   class?: string
   year?: string
+  yearId?: number | null
 }
 
 interface Communique {
@@ -116,7 +117,14 @@ export default function StudentDashboard() {
   const { card, text, textMuted, shadow, border, isDark } = useStudentTheme()
   const { student: me, loading: meLoading } = useStudentMe()
   const studentInfo: StudentInfo | null = me
-    ? { id: me.id, firstName: me.firstName, code: me.code, class: me.class, year: me.year }
+    ? {
+        id: me.id,
+        firstName: me.firstName,
+        code: me.code,
+        class: me.class,
+        year: me.year,
+        yearId: me.yearId,
+      }
     : null
   const [loading, setLoading] = useState(true)
   const [latestCommunique, setLatestCommunique] = useState<Communique | null>(null)
@@ -246,7 +254,13 @@ export default function StudentDashboard() {
 
         <button
           type="button"
-          onClick={() => router.push("/student/fees")}
+          onClick={() =>
+            router.push(
+              studentInfo?.yearId
+                ? `/student/fees/${studentInfo.yearId}`
+                : "/student/fees"
+            )
+          }
           className={cn(
             "min-w-[9.5rem] shrink-0 rounded-2xl border p-4 text-left transition-transform active:scale-[0.98] lg:min-w-0 lg:p-6",
             card,

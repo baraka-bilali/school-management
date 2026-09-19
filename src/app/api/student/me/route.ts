@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { toDisplayCode } from "@/lib/student-fields"
 import { isSubscriptionAccessBlocked } from "@/lib/subscription-period"
+import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -12,31 +13,33 @@ type JwtPayload = {
   schoolId?: number
 }
 
+const YEAR_STATUSES = ["ACTIVE", "GRADUATED", "CONFIRMEE", "INACTIVE", "PROPOSEE"] as const
+
 export async function GET(request: NextRequest) {
   try {
     const cookieHeader = request.headers.get("cookie")
-    const token = cookieHeader?.split("; ").find(row => row.startsWith("token="))?.split("=")[1]
+    const token = cookieHeader?.split("; ").find((row) => row.startsWith("token="))?.split("=")[1]
 
     if (!token) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload
-    
+
     if (decoded.role !== "ELEVE") {
       return NextResponse.json({ error: "Accès réservé aux élèves" }, { status: 403 })
     }
 
-    // Récupérer l'élève avec ses informations
     const student = await prisma.student.findFirst({
       where: {
-        userId: decoded.id
+        userId: decoded.id,
       },
       include: {
         user: {
           select: {
             email: true,
             temporaryPassword: true,
+            schoolId: true,
             school: {
               select: {
                 nomEtablissement: true,
@@ -45,47 +48,55 @@ export async function GET(request: NextRequest) {
                 dateFinAbonnement: true,
                 planAbonnement: true,
                 etatCompte: true,
-              }
-            }
-          }
+              },
+            },
+          },
         },
         enrollments: {
           where: {
-            status: "ACTIVE"
+            status: { in: [...YEAR_STATUSES] },
           },
           include: {
             class: {
               select: {
                 id: true,
-                name: true
-              }
+                name: true,
+              },
             },
             year: {
               select: {
                 id: true,
                 name: true,
-                current: true
-              }
-            }
+                current: true,
+              },
+            },
           },
           orderBy: {
             year: {
-              name: "desc"
-            }
+              name: "desc",
+            },
           },
-          take: 1
-        }
-      }
+        },
+      },
     })
 
     if (!student) {
       return NextResponse.json({ error: "Élève introuvable" }, { status: 404 })
     }
 
-    const currentEnrollment = student.enrollments[0]
+    const schoolId = student.user.schoolId ?? decoded.schoolId ?? null
+    const currentYearId = schoolId != null ? await getSchoolCurrentYearId(schoolId) : null
+
+    // Priorité : inscription de l'année scolaire en cours (réglages école)
+    const currentEnrollment =
+      (currentYearId != null
+        ? student.enrollments.find((e) => e.yearId === currentYearId)
+        : null) ??
+      student.enrollments.find((e) => e.status === "ACTIVE") ??
+      student.enrollments[0] ??
+      null
 
     const school = student.user.school
-    // Accès complet tant que l'abonnement n'est pas bloqué (jour d'expiration inclus)
     const isPremium = !isSubscriptionAccessBlocked(
       school?.dateFinAbonnement,
       school?.etatCompte
@@ -94,7 +105,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       student: {
         id: student.id,
-        schoolId: decoded.schoolId,
+        schoolId,
         classId: currentEnrollment?.classId ?? null,
         yearId: currentEnrollment?.yearId ?? null,
         lastName: student.lastName,
@@ -127,18 +138,17 @@ export async function GET(request: NextRequest) {
         schoolPhotoUrl: school?.profilePhotoUrl || school?.logoUrl || null,
         isPremium,
         class: currentEnrollment?.class?.name,
-        year: currentEnrollment?.year?.name
-      }
+        year: currentEnrollment?.year?.name,
+      },
     })
-
   } catch (error) {
     console.error("Erreur lors de la récupération des infos élève:", error)
     if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError) {
-      return NextResponse.json({ error: "Session expirée, veuillez vous reconnecter" }, { status: 401 })
+      return NextResponse.json(
+        { error: "Session expirée, veuillez vous reconnecter" },
+        { status: 401 }
+      )
     }
-    return NextResponse.json(
-      { error: "Erreur serveur" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }

@@ -99,13 +99,22 @@ export async function calculateStudentYearBalance(
     devise: "USD" | "CDF"
   }>
 }> {
-  const enrollment = await prisma.enrollment.findFirst({
-    where: { studentId, yearId, status: "ACTIVE" },
-    select: { classId: true },
-  })
+  const enrollment =
+    (await prisma.enrollment.findFirst({
+      where: { studentId, yearId, status: "ACTIVE" },
+      select: { classId: true },
+    })) ??
+    (await prisma.enrollment.findFirst({
+      where: {
+        studentId,
+        yearId,
+        status: { in: ["GRADUATED", "CONFIRMEE", "INACTIVE", "PROPOSEE"] },
+      },
+      select: { classId: true },
+    }))
 
   if (!enrollment) {
-    throw new Error("Aucune inscription active trouvée pour cet élève dans cette année scolaire")
+    throw new Error("Aucune inscription trouvée pour cet élève dans cette année scolaire")
   }
 
   const tarifications = await prisma.tarification.findMany({
@@ -225,13 +234,22 @@ export async function calculateStudentFeesBreakdown(
     devise: "USD" | "CDF"
   }>
 }> {
-  const enrollment = await prisma.enrollment.findFirst({
-    where: { studentId, yearId, status: "ACTIVE" },
-    select: { classId: true },
-  })
+  const enrollment =
+    (await prisma.enrollment.findFirst({
+      where: { studentId, yearId, status: "ACTIVE" },
+      select: { classId: true },
+    })) ??
+    (await prisma.enrollment.findFirst({
+      where: {
+        studentId,
+        yearId,
+        status: { in: ["GRADUATED", "CONFIRMEE", "INACTIVE", "PROPOSEE"] },
+      },
+      select: { classId: true },
+    }))
 
   if (!enrollment) {
-    throw new Error("Aucune inscription active trouvée pour cet élève dans cette année scolaire")
+    throw new Error("Aucune inscription trouvée pour cet élève dans cette année scolaire")
   }
 
   const tarifications = await prisma.tarification.findMany({

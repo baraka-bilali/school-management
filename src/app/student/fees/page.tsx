@@ -1,276 +1,128 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { Wallet, CheckCircle, AlertCircle, Receipt, Info, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { Wallet, ChevronRight, Sparkles, CalendarDays } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
 import StudentLoading from "@/components/student/student-loading"
-import StudentReceiptDownload from "@/components/student/student-receipt-download"
 
-interface CurrencyBalance {
-  totalDu: number
-  totalPaye: number
-  solde: number
+type YearItem = {
+  yearId: number
+  name: string
+  isCurrent: boolean
+  classId: number
+  className: string
+  section: string | null
+  level: string | null
+  enrollmentId: number
 }
 
-interface OtherFeeType {
-  typeFraisId: number
-  typeFrais: string
-  isDefault: boolean
-  usd: CurrencyBalance
-  cdf: CurrencyBalance
-}
-
-interface Paiement {
-  id: number
-  numeroRecu: string
-  montant: number
-  devise: string
-  typeFrais: string
-  datePaiement: string
-  modePaiement: string
-}
-
-function formatMoney(amount: number, devise: string) {
-  const symbol = devise === "CDF" ? "FC" : "$"
-  return `${amount.toLocaleString("fr-FR", { minimumFractionDigits: devise === "CDF" ? 0 : 2, maximumFractionDigits: devise === "CDF" ? 0 : 2 })} ${symbol}`
-}
-
-function pickPrimaryCurrency(usd: CurrencyBalance, cdf: CurrencyBalance) {
-  const hasUsd = usd.totalDu > 0 || usd.totalPaye > 0
-  const hasCdf = cdf.totalDu > 0 || cdf.totalPaye > 0
-  if (hasCdf && !hasUsd) return { ...cdf, devise: "CDF" as const, secondary: null }
-  if (hasUsd && !hasCdf) return { ...usd, devise: "USD" as const, secondary: null }
-  if (hasCdf && hasUsd) return { ...cdf, devise: "CDF" as const, secondary: usd }
-  return { ...usd, devise: "USD" as const, secondary: null }
-}
-
-function FeeTypeSummaryCard({
-  title,
-  usd,
-  cdf,
-  badge,
-  card,
-  border,
-  shadow,
-  text,
-  textMuted,
-  isDark,
-}: {
-  title: string
-  usd: CurrencyBalance
-  cdf: CurrencyBalance
-  badge?: string
-  card: string
-  border: string
-  shadow: string
-  text: string
-  textMuted: string
-  isDark: boolean
-}) {
-  const summary = pickPrimaryCurrency(usd, cdf)
-  const secondary = summary.secondary as CurrencyBalance | null
-
-  return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-      <div className={cn("relative overflow-hidden rounded-2xl border p-5 lg:col-span-2 lg:p-6", card, border, shadow)}>
-        <div className="mb-4 flex items-start justify-between">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-            <Wallet className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          {badge && (
-            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-400">
-              {badge}
-            </span>
-          )}
-        </div>
-        <p className={cn("text-[11px] font-semibold uppercase tracking-wider", textMuted)}>{title} — Total à payer</p>
-        <p className={cn("mt-1 text-3xl font-bold tracking-tight", text)}>
-          {formatMoney(summary.totalDu, summary.devise)}
-        </p>
-        {secondary && secondary.totalDu > 0 && summary.devise === "USD" && (
-          <p className={cn("mt-1 text-sm", textMuted)}>+ {formatMoney(secondary.totalDu, "CDF")}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:contents">
-        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-green-50 dark:bg-green-500/10">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </div>
-          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Payé</p>
-          <p className="mt-1 text-xl font-bold text-green-600 lg:text-2xl">
-            {formatMoney(summary.totalPaye, summary.devise)}
-          </p>
-        </div>
-        <div className={cn("rounded-2xl border p-4 lg:p-5", card, border, shadow)}>
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </div>
-          <p className={cn("text-[10px] font-semibold uppercase tracking-wider", textMuted)}>Solde</p>
-          <p className="mt-1 text-xl font-bold text-red-500 lg:text-2xl">
-            {formatMoney(summary.solde, summary.devise)}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function StudentFeesPage() {
+export default function StudentFeesYearsPage() {
   const { card, text, textMuted, shadow, border, isDark } = useStudentTheme()
+  const [years, setYears] = useState<YearItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [scolaire, setScolaire] = useState<{ usd: CurrencyBalance; cdf: CurrencyBalance } | null>(null)
-  const [autres, setAutres] = useState<OtherFeeType[]>([])
-  const [paiements, setPaiements] = useState<Paiement[]>([])
-  const [refreshing, setRefreshing] = useState(false)
-  const [paymentToast, setPaymentToast] = useState<string | null>(null)
-
-  const fetchFees = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    else setRefreshing(true)
-    try {
-      const res = await fetch("/api/student/fees", { credentials: "include" })
-      if (res.status === 401) {
-        window.location.href = "/login"
-        return
-      }
-      if (res.ok) {
-        const data = await res.json()
-        setScolaire(data.scolaire ?? data.balance)
-        setAutres(data.autres || [])
-        setPaiements(data.paiements || [])
-      }
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [])
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchFees()
-    const onPayment = () => {
-      fetchFees(true)
-      setPaymentToast("Nouveau paiement enregistré !")
-      setTimeout(() => setPaymentToast(null), 4000)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/student/fees/years", { credentials: "include" })
+        if (!res.ok) throw new Error("Impossible de charger les années scolaires")
+        const data = await res.json()
+        if (!cancelled) setYears(data.years || [])
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erreur")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    window.addEventListener("feePaymentReceived", onPayment)
-    return () => window.removeEventListener("feePaymentReceived", onPayment)
-  }, [fetchFees])
+  }, [])
 
   if (loading) return <StudentLoading variant="fees" />
 
   return (
-    <div className="space-y-5 lg:space-y-8">
-      {paymentToast && (
-        <div className="rounded-2xl bg-green-500 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg">
-          {paymentToast}
+    <div className="mx-auto max-w-3xl space-y-5 p-4 pb-24 lg:pb-8">
+      <header className="space-y-1">
+        <h1 className={cn("text-2xl font-bold tracking-tight", text)}>Frais scolaires</h1>
+        <p className={cn("text-sm", textMuted)}>
+          Sélectionnez une année scolaire pour consulter les frais et paiements.
+        </p>
+      </header>
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          {error}
         </div>
       )}
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className={cn("text-2xl font-bold tracking-tight lg:text-3xl", text)}>Frais scolaires</h1>
-          <p className={cn("mt-1 text-sm lg:text-base", textMuted)}>
-            Gérez vos paiements et consultez votre solde en temps réel.
+      {!error && years.length === 0 && (
+        <div className={cn("rounded-2xl border px-6 py-12 text-center", card, border, shadow)}>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10">
+            <Wallet className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <p className={cn("font-semibold", text)}>Aucune année scolaire</p>
+          <p className={cn("mt-1 text-sm", textMuted)}>
+            Vos inscriptions apparaîtront ici dès qu&apos;elles seront enregistrées.
           </p>
         </div>
-        {refreshing && <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />}
-      </div>
-
-      {scolaire && (
-        <FeeTypeSummaryCard
-          title="Frais scolaire"
-          usd={scolaire.usd}
-          cdf={scolaire.cdf}
-          badge="Annuel"
-          card={card}
-          border={border}
-          shadow={shadow}
-          text={text}
-          textMuted={textMuted}
-          isDark={isDark}
-        />
       )}
 
-      {autres.map((fee) => (
-        <FeeTypeSummaryCard
-          key={fee.typeFraisId}
-          title={fee.typeFrais}
-          usd={fee.usd}
-          cdf={fee.cdf}
-          card={card}
-          border={border}
-          shadow={shadow}
-          text={text}
-          textMuted={textMuted}
-          isDark={isDark}
-        />
-      ))}
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className={cn("text-base font-bold", text)}>Historique des paiements</h2>
-        </div>
-
-        {paiements.length === 0 ? (
-          <div
+      <div className="space-y-3">
+        {years.map((y) => (
+          <Link
+            key={y.yearId}
+            href={`/student/fees/${y.yearId}`}
             className={cn(
-              "flex flex-col items-center rounded-2xl border-2 border-dashed px-6 py-10 text-center",
-              isDark ? "border-gray-700 bg-gray-900/50" : "border-indigo-100 bg-indigo-50/40"
+              "group flex items-center gap-4 rounded-2xl border p-4 transition-all",
+              card,
+              border,
+              shadow,
+              y.isCurrent
+                ? "ring-2 ring-indigo-500/40 border-indigo-300 dark:border-indigo-500/40"
+                : "hover:border-indigo-200 dark:hover:border-indigo-500/30"
             )}
           >
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-sm dark:bg-gray-800">
-              <Receipt className="h-6 w-6 text-indigo-400" />
+            <div
+              className={cn(
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                y.isCurrent
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : isDark
+                    ? "bg-gray-700 text-gray-200"
+                    : "bg-gray-100 text-gray-600"
+              )}
+            >
+              {y.isCurrent ? <Sparkles className="h-5 w-5" /> : <CalendarDays className="h-5 w-5" />}
             </div>
-            <p className={cn("text-sm font-semibold", text)}>Aucun paiement enregistré</p>
-            <p className={cn("mt-2 max-w-xs text-xs leading-relaxed", textMuted)}>
-              Vos paiements apparaîtront ici dès qu&apos;ils seront enregistrés par l&apos;administration.
-            </p>
-          </div>
-        ) : (
-          <div className={cn("space-y-2 overflow-hidden rounded-2xl border lg:space-y-0", card, border, shadow)}>
-            {paiements.map((p) => (
-              <div key={p.id} className={cn("border-b p-4 last:border-0 lg:flex lg:items-center lg:gap-4 lg:p-5", border)}>
-                <div className="mb-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 lg:mb-0">
-                  <Receipt className="h-5 w-5 text-indigo-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2 lg:items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className={cn("text-sm font-semibold", text)}>{p.typeFrais}</p>
-                      <p className={cn("text-xs", textMuted)}>Reçu n° {p.numeroRecu}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2 lg:gap-4">
-                      <p className="text-sm font-bold text-green-600 lg:text-base">{formatMoney(p.montant, p.devise)}</p>
-                      <StudentReceiptDownload paiementId={p.id} />
-                    </div>
-                  </div>
-                  <p className={cn("mt-1 text-xs", textMuted)}>
-                    {new Date(p.datePaiement).toLocaleDateString("fr-FR", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      <div className="flex gap-3 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-4 text-white shadow-lg shadow-indigo-600/20">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-          <Info className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-sm font-bold">Important</p>
-          <p className="mt-1 text-xs leading-relaxed text-indigo-100">
-            Les frais scolaires doivent être réglés avant la date limite fixée par l&apos;administration. Vous serez
-            notifié dès qu&apos;un paiement est enregistré.
-          </p>
-        </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className={cn("truncate text-base font-bold", text)}>{y.name}</h2>
+                {y.isCurrent && (
+                  <span className="inline-flex items-center rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    En cours
+                  </span>
+                )}
+              </div>
+              <p className={cn("mt-0.5 truncate text-sm", textMuted)}>
+                {y.className}
+                {y.section ? ` · ${y.section}` : ""}
+              </p>
+            </div>
+
+            <ChevronRight
+              className={cn(
+                "h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5",
+                textMuted
+              )}
+            />
+          </Link>
+        ))}
       </div>
     </div>
   )
