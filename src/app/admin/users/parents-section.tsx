@@ -63,6 +63,8 @@ type StudentOption = {
   lastName: string
   middleName: string
   firstName: string
+  linkedParentId?: number | null
+  linkedParentName?: string | null
 }
 
 type CredentialsPayload = {
@@ -837,17 +839,47 @@ function ParentFormModal({
         if (studentQ.trim()) params.set("q", studentQ.trim())
         const r = await authFetch(`/api/admin/students?${params.toString()}`)
         const data = await r.json().catch(() => ({ items: [] }))
-        if (!cancelled) {
-          setStudentOptions(
-            (data.items || []).map((s: any) => ({
-              id: s.id,
-              code: s.code || s.displayCode || "",
-              lastName: s.lastName,
-              middleName: s.middleName,
-              firstName: s.firstName,
-            }))
+        const items = (data.items || []).map((s: any) => ({
+          id: s.id,
+          code: s.code || s.displayCode || "",
+          lastName: s.lastName,
+          middleName: s.middleName,
+          firstName: s.firstName,
+          linkedParentId: null as number | null,
+          linkedParentName: null as string | null,
+        }))
+
+        const excludeParentId =
+          mode === "edit" && initial?.id
+            ? initial.id
+            : existingParentId != null
+              ? existingParentId
+              : null
+
+        if (items.length > 0) {
+          const linkParams = new URLSearchParams()
+          linkParams.set("ids", items.map((s: StudentOption) => s.id).join(","))
+          if (excludeParentId != null) {
+            linkParams.set("excludeParentId", String(excludeParentId))
+          }
+          const lr = await authFetch(
+            `/api/admin/parents/student-links?${linkParams.toString()}`
           )
+          const linkData = await lr.json().catch(() => ({ links: {} }))
+          const links = (linkData.links || {}) as Record<
+            string,
+            { parentId: number; parentName: string }
+          >
+          for (const s of items) {
+            const link = links[String(s.id)] || links[s.id as unknown as string]
+            if (link) {
+              s.linkedParentId = link.parentId
+              s.linkedParentName = link.parentName
+            }
+          }
         }
+
+        if (!cancelled) setStudentOptions(items)
       } catch {
         if (!cancelled) setStudentOptions([])
       } finally {
@@ -859,7 +891,7 @@ function ParentFormModal({
       cancelled = true
       clearTimeout(t)
     }
-  }, [open, studentQ, mode, createStep])
+  }, [open, studentQ, mode, createStep, initial?.id, existingParentId])
 
   const selectedLabels = useMemo(() => {
     const map = new Map<number, StudentOption>()
@@ -889,6 +921,13 @@ function ParentFormModal({
   const canSubmit = form.lastName.trim().length > 0 && form.firstName.trim().length > 0
 
   const toggleStudent = (id: number) => {
+    const option = studentOptions.find((s) => s.id === id)
+    if (option?.linkedParentId && !selectedIds.includes(id)) {
+      toast.error(
+        `${fullName(option)} est déjà lié(e) à ${option.linkedParentName || "un autre parent"}. Un élève ne peut avoir qu'un seul parent.`
+      )
+      return
+    }
     setSelectedIds((prev) => {
       if (prev.includes(id)) {
         setPrimaryByStudentId((map) => {
@@ -1057,7 +1096,7 @@ function ParentFormModal({
       >
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div
-          className={`relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl transition-all duration-200 ${
+          className={`relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border shadow-2xl transition-all duration-200 ${
             theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"
           } ${visible ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
           role="dialog"
@@ -1268,10 +1307,15 @@ function ParentFormModal({
                 </div>
 
                 <div className={`rounded-2xl border p-3 ${borderColor}`}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <User className={`h-4 w-4 ${textSecondary}`} />
-                    <p className={`text-sm font-semibold ${textColor}`}>
-                      Élèves assignés ({selectedIds.length})
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <User className={`h-4 w-4 ${textSecondary}`} />
+                      <p className={`text-sm font-semibold ${textColor}`}>
+                        Élèves assignés ({selectedIds.length})
+                      </p>
+                    </div>
+                    <p className={`text-xs ${textSecondary}`}>
+                      Un élève = un parent · un parent = plusieurs élèves
                     </p>
                   </div>
 
@@ -1330,7 +1374,7 @@ function ParentFormModal({
                   </div>
 
                   <div
-                    className={`max-h-48 space-y-1 overflow-y-auto rounded-xl border ${borderColor} p-1.5`}
+                    className={`max-h-64 space-y-1 overflow-y-auto rounded-xl border ${borderColor} p-1.5 sm:max-h-72`}
                   >
                     {loadingStudents && (
                       <p className={`px-2 py-3 text-center text-sm ${textSecondary}`}>Chargement…</p>
@@ -1343,24 +1387,39 @@ function ParentFormModal({
                     {!loadingStudents &&
                       studentOptions.map((s) => {
                         const checked = selectedIds.includes(s.id)
+                        const taken = Boolean(s.linkedParentId) && !checked
                         return (
                           <button
                             key={s.id}
                             type="button"
+                            disabled={taken}
                             onClick={() => toggleStudent(s.id)}
+                            title={
+                              taken
+                                ? `Déjà lié à ${s.linkedParentName || "un autre parent"}`
+                                : undefined
+                            }
                             className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${
-                              checked
-                                ? theme === "dark"
-                                  ? "bg-indigo-500/15"
-                                  : "bg-indigo-50"
-                                : theme === "dark"
-                                  ? "hover:bg-gray-700/80"
-                                  : "hover:bg-gray-50"
+                              taken
+                                ? "cursor-not-allowed opacity-55"
+                                : checked
+                                  ? theme === "dark"
+                                    ? "bg-indigo-500/15"
+                                    : "bg-indigo-50"
+                                  : theme === "dark"
+                                    ? "hover:bg-gray-700/80"
+                                    : "hover:bg-gray-50"
                             }`}
                           >
                             <span
                               className={`flex h-5 w-5 items-center justify-center rounded border ${
-                                checked ? "border-indigo-500 bg-indigo-500 text-white" : borderColor
+                                taken
+                                  ? theme === "dark"
+                                    ? "border-gray-600 bg-gray-700/50"
+                                    : "border-gray-300 bg-gray-100"
+                                  : checked
+                                    ? "border-indigo-500 bg-indigo-500 text-white"
+                                    : borderColor
                               }`}
                             >
                               {checked && <Check className="h-3.5 w-3.5" />}
@@ -1369,7 +1428,12 @@ function ParentFormModal({
                               <span className={`block truncate font-medium ${textColor}`}>
                                 {fullName(s)}
                               </span>
-                              <span className={`block text-xs ${textSecondary}`}>{s.code}</span>
+                              <span className={`block text-xs ${textSecondary}`}>
+                                {s.code}
+                                {taken
+                                  ? ` · Déjà lié à ${s.linkedParentName || "un autre parent"}`
+                                  : ""}
+                              </span>
                             </span>
                           </button>
                         )

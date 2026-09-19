@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import {
+  findParentStudentConflicts,
+  formatParentStudentConflictError,
+} from "@/lib/parent-student-links"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -204,6 +208,18 @@ export async function PUT(
         return NextResponse.json(
           { error: "Un ou plusieurs élèves sont invalides pour cette école" },
           { status: 400 }
+        )
+      }
+
+      const conflicts = await findParentStudentConflicts(
+        auth.schoolId,
+        uniqueIds,
+        parentId
+      )
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          { error: formatParentStudentConflictError(conflicts) },
+          { status: 409 }
         )
       }
 
