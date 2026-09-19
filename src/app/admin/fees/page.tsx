@@ -306,7 +306,7 @@ export default function AdminFeesPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-dvh items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="flex min-h-dvh items-center justify-center bg-white dark:bg-gray-900">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
         </div>
       }

@@ -64,7 +64,7 @@ export default function AdminCommuniqueViewPage() {
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-600"
   const bgCard = theme === "dark" ? "bg-gray-800" : "bg-white"
-  const bgPage = theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+  const bgPage = theme === "dark" ? "bg-gray-900" : "bg-white"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
 
   if (loading) {

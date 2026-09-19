@@ -209,7 +209,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className={`app-shell transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-[#eef2f9]"}`}>
+    <div className={`app-shell transition-colors ${theme === "dark" ? "bg-gray-900" : "bg-white"}`}>
       <Header
         onSidebarToggle={toggleSidebar}
         role={role}
