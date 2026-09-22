@@ -37,13 +37,33 @@ export async function PATCH(
     const newWeeklyHours = weeklyHours ? parseFloat(weeklyHours) : existing.weeklyHours
 
     const [subject, teacher, cls] = await Promise.all([
-      prisma.subject.findFirst({ where: { id: newSubjectId, schoolId: user.schoolId, isActive: true } }),
+      prisma.subject.findFirst({
+        where: {
+          id: newSubjectId,
+          schoolId: user.schoolId,
+          isActive: true,
+          primaryBranches: { none: {} },
+        },
+      }),
       prisma.teacher.findFirst({ where: { id: newTeacherId, user: { schoolId: user.schoolId } } }),
-      prisma.class.findFirst({ where: { id: newClassId, schoolId: user.schoolId } }),
+      prisma.class.findFirst({
+        where: { id: newClassId, schoolId: user.schoolId },
+        select: { id: true, name: true, section: true },
+      }),
     ])
 
     if (!subject || !teacher || !cls) {
       return NextResponse.json({ error: "Matière, professeur ou classe invalide" }, { status: 400 })
+    }
+
+    if (cls.section !== "Education de Base" && cls.section !== "Humanités") {
+      return NextResponse.json(
+        {
+          error:
+            "Les affectations concernent uniquement l'Éducation de Base et les Humanités. Pour le primaire, utilisez le titulaire de classe.",
+        },
+        { status: 400 }
+      )
     }
 
     if (newSubjectId !== existing.subjectId || newClassId !== existing.classId) {

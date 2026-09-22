@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
+import { compareClasses } from "@/lib/class-sort"
 
 const ROLES = ["ADMIN", "DIRECTEUR_ETUDES", "SUPER_ADMIN"]
+
+/** Affectations manuelles : EB + Humanités uniquement (primaire = titulaire). */
+const ASSIGNMENT_SECTIONS = ["Education de Base", "Humanités"] as const
+
+function teacherDisplayName(t: {
+  lastName: string
+  middleName: string
+  firstName: string
+}) {
+  return `${t.lastName} ${t.middleName || ""} ${t.firstName}`.replace(/\s+/g, " ").trim()
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,6 +25,7 @@ export async function GET(req: NextRequest) {
     const teacherId = searchParams.get("teacherId")
     const classId = searchParams.get("classId")
     const yearIdParam = searchParams.get("yearId")
+    const sort = searchParams.get("sort") === "teacher" ? "teacher" : "level"
 
     const yearId = yearIdParam
       ? parseInt(yearIdParam)
@@ -22,17 +35,23 @@ export async function GET(req: NextRequest) {
       where: {
         schoolId: user.schoolId,
         isActive: true,
+        class: {
+          section: { in: [...ASSIGNMENT_SECTIONS] },
+        },
         ...(yearId ? { yearId } : {}),
         ...(teacherId ? { teacherId: parseInt(teacherId) } : {}),
         ...(classId ? { classId: parseInt(classId) } : {}),
       },
       include: {
         subject: { select: { id: true, name: true, code: true, color: true } },
-        teacher: { select: { id: true, lastName: true, middleName: true, firstName: true } },
-        class: { select: { id: true, name: true } },
+        teacher: {
+          select: { id: true, lastName: true, middleName: true, firstName: true },
+        },
+        class: {
+          select: { id: true, name: true, section: true, level: true, letter: true },
+        },
         year: { select: { id: true, name: true } },
       },
-      orderBy: [{ class: { name: "asc" } }, { subject: { name: "asc" } }],
     })
 
     const data = assignments.map((a) => ({
@@ -45,12 +64,43 @@ export async function GET(req: NextRequest) {
       subjectName: a.subject.name,
       subjectCode: a.subject.code,
       subjectColor: a.subject.color,
-      teacherName: `${a.teacher.lastName} ${a.teacher.middleName || ""} ${a.teacher.firstName}`.replace(/\s+/g, " ").trim(),
+      teacherName: teacherDisplayName(a.teacher),
+      teacherLastName: a.teacher.lastName,
+      teacherFirstName: a.teacher.firstName,
       className: a.class.name,
+      classSection: a.class.section,
+      classLevel: a.class.level,
+      classLetter: a.class.letter,
       yearName: a.year.name,
     }))
 
-    return NextResponse.json({ assignments: data, yearId })
+    data.sort((a, b) => {
+      if (sort === "teacher") {
+        const byTeacher = a.teacherName.localeCompare(b.teacherName, "fr", {
+          sensitivity: "base",
+        })
+        if (byTeacher !== 0) return byTeacher
+        const byClass = compareClasses(
+          { section: a.classSection, level: a.classLevel, letter: a.classLetter },
+          { section: b.classSection, level: b.classLevel, letter: b.classLetter }
+        )
+        if (byClass !== 0) return byClass
+        return a.subjectName.localeCompare(b.subjectName, "fr", { sensitivity: "base" })
+      }
+
+      const byClass = compareClasses(
+        { section: a.classSection, level: a.classLevel, letter: a.classLetter },
+        { section: b.classSection, level: b.classLevel, letter: b.classLetter }
+      )
+      if (byClass !== 0) return byClass
+      const bySubject = a.subjectName.localeCompare(b.subjectName, "fr", {
+        sensitivity: "base",
+      })
+      if (bySubject !== 0) return bySubject
+      return a.teacherName.localeCompare(b.teacherName, "fr", { sensitivity: "base" })
+    })
+
+    return NextResponse.json({ assignments: data, yearId, sort })
   } catch (error) {
     return handleApiError(error)
   }
@@ -93,14 +143,19 @@ export async function POST(req: NextRequest) {
 
     const [subject, teacher, classRows] = await Promise.all([
       prisma.subject.findFirst({
-        where: { id: subjectIdNum, schoolId: user.schoolId, isActive: true },
+        where: {
+          id: subjectIdNum,
+          schoolId: user.schoolId,
+          isActive: true,
+          primaryBranches: { none: {} },
+        },
       }),
       prisma.teacher.findFirst({
         where: { id: teacherIdNum, user: { schoolId: user.schoolId } },
       }),
       prisma.class.findMany({
         where: { id: { in: uniqueClassIds }, schoolId: user.schoolId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, section: true },
       }),
     ])
 
@@ -109,6 +164,19 @@ export async function POST(req: NextRequest) {
     }
     if (classRows.length !== uniqueClassIds.length) {
       return NextResponse.json({ error: "Une ou plusieurs classes sont invalides" }, { status: 400 })
+    }
+
+    const invalidSection = classRows.find(
+      (c) => !(ASSIGNMENT_SECTIONS as readonly string[]).includes(c.section)
+    )
+    if (invalidSection) {
+      return NextResponse.json(
+        {
+          error:
+            "Les affectations concernent uniquement l'Éducation de Base et les Humanités. Pour le primaire, utilisez le titulaire de classe.",
+        },
+        { status: 400 }
+      )
     }
 
     const assignments = await prisma.$transaction(
