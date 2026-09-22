@@ -44,10 +44,10 @@ export async function GET(req: NextRequest) {
     }
     
     if (q) {
-      // IMPORTANT: MySQL ne supporte pas mode: 'insensitive' dans Prisma
-      // La collation MySQL utf8mb4_general_ci gère l'insensibilité à la casse automatiquement
+      // PostgreSQL : contains est sensible à la casse sans mode insensitive
       const searchTerm = q.trim()
-      
+      const nameFilter = { contains: searchTerm, mode: "insensitive" as const }
+
       // Combiner le filtre de recherche avec le filtre schoolId
       if (adminSchoolId) {
         where.AND = [
@@ -58,22 +58,22 @@ export async function GET(req: NextRequest) {
           },
           {
             OR: [
-              { lastName: { contains: searchTerm } },
-              { middleName: { contains: searchTerm } },
-              { firstName: { contains: searchTerm } },
-              { specialty: { contains: searchTerm } },
-              { phone: { contains: searchTerm } }
+              { lastName: nameFilter },
+              { middleName: nameFilter },
+              { firstName: nameFilter },
+              { specialty: nameFilter },
+              { phone: nameFilter }
             ]
           }
         ]
         delete where.user
       } else {
         where.OR = [
-          { lastName: { contains: searchTerm } },
-          { middleName: { contains: searchTerm } },
-          { firstName: { contains: searchTerm } },
-          { specialty: { contains: searchTerm } },
-          { phone: { contains: searchTerm } }
+          { lastName: nameFilter },
+          { middleName: nameFilter },
+          { firstName: nameFilter },
+          { specialty: nameFilter },
+          { phone: nameFilter }
         ]
       }
     }
