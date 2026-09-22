@@ -3,8 +3,8 @@
  * Source de vérité : maxPeriode uniquement.
  * Formules : examen=2×, trimestre=4×, annuel=12×.
  *
- * ELEMENTAIRE + TERMINAL_6 : lecture fiable des bulletins.
- * MOYEN + TERMINAL_5 : needsReview=true — à confirmer par un enseignant.
+ * ELEMENTAIRE + MOYEN + TERMINAL_6 : lecture fiable des bulletins officiels.
+ * TERMINAL_5 : needsReview=true — à confirmer par un enseignant.
  */
 
 export type PrimaryBranchCatalog = {
@@ -114,10 +114,11 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
     ],
   },
   {
+    /** Bulletin officiel IGE/P.S./005 — Degré Moyen (max période 300 → trim 1200 → an 3600). */
     code: "MOYEN",
     name: "Degré Moyen (3e, 4e année)",
     levels: ["3ème", "4ème"],
-    needsReview: true,
+    needsReview: false,
     domains: [
       {
         name: "Domaine des Langues",
@@ -125,23 +126,23 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
           {
             name: "Langues congolaises",
             branches: [
-              { name: "Branche LC 1 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche LC 2 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche LC 3 (à confirmer)", maxPeriode: 5 },
+              { name: "Exp. Orale & Vocabulaire", maxPeriode: 10 },
+              { name: "Grammaire & Conjug.", maxPeriode: 10 },
+              { name: "Orth. & Rédaction", maxPeriode: 5 },
             ],
           },
           {
             name: "Français",
             branches: [
-              { name: "Branche FR 1 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche FR 2 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche FR 3 (à confirmer)", maxPeriode: 15 },
+              { name: "Expr. orale - Récit. - Voc.", maxPeriode: 10 },
+              { name: "Orth. phras. Ecrit. & réd.", maxPeriode: 10 },
+              { name: "Gram. - Conj. - Analyse", maxPeriode: 15 },
             ],
           },
         ],
         branches: [
-          { name: "Lecture-Écriture en langues congolaises", maxPeriode: 30 },
-          { name: "Lecture-Écriture en langues françaises", maxPeriode: 30 },
+          { name: "Lect-Ecrit en langues congolaises", maxPeriode: 30 },
+          { name: "Lect-Ecrit en langue française", maxPeriode: 30 },
         ],
       },
       {
@@ -150,29 +151,30 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
           {
             name: "Mathématiques",
             branches: [
-              { name: "Mesures des grandeurs", maxPeriode: 10 },
-              { name: "Formes géométriques", maxPeriode: 10 },
               { name: "Numération", maxPeriode: 10 },
               { name: "Opérations", maxPeriode: 10 },
-              { name: "Problèmes", maxPeriode: 10 },
+              { name: "Mesures des Grandeurs", maxPeriode: 10 },
+              { name: "Formes Géométriques", maxPeriode: 10 },
+              { name: "Problèmes", maxPeriode: 20 },
             ],
           },
           {
             name: "Sciences",
-            branches: [{ name: "Sciences", maxPeriode: 10 }],
+            branches: [{ name: "Zoologie - botanique & Info.", maxPeriode: 10 }],
           },
           {
             name: "Technologie",
-            // ⚠️ 90 déduit d'un total annuel lu (1080/12) — à confirmer
-            branches: [{ name: "Technologie (max à confirmer)", maxPeriode: 90 }],
+            branches: [{ name: "Technologie", maxPeriode: 20 }],
           },
         ],
       },
       {
         name: "Domaine de l'Univers Social et Environnement",
         branches: [
-          { name: "Éd. civ. & morale (à confirmer)", maxPeriode: 10 },
-          { name: "Éd. santé & env. (à confirmer)", maxPeriode: 10 },
+          { name: "Education civ. & morale", maxPeriode: 10 },
+          { name: "Education santé & env.", maxPeriode: 10 },
+          { name: "Géographie", maxPeriode: 10 },
+          { name: "Histoire", maxPeriode: 10 },
         ],
       },
       {
@@ -190,8 +192,8 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
       {
         name: "Domaine du Développement Personnel",
         branches: [
+          { name: "Ed. phys. & sportive", maxPeriode: 10 },
           { name: "Init. Trav. Prod.", maxPeriode: 10 },
-          { name: "Éd. phys. & sports", maxPeriode: 10 },
           { name: "Religion", maxPeriode: 10 },
         ],
       },

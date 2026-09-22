@@ -193,6 +193,25 @@ async function upsertBranch(params: {
     include: { subject: true },
   })
 
+  // Remplace une branche placeholder (« à confirmer ») au même rang dans le groupe.
+  if (!existingBranch) {
+    const byOrder = await prisma.primaryBranch.findFirst({
+      where: {
+        domainId: params.domainId,
+        groupId: params.groupId,
+        sortOrder: params.sortOrder,
+        isActive: true,
+      },
+      include: { subject: true },
+    })
+    if (
+      byOrder &&
+      (/à confirmer/i.test(byOrder.name) || /max à confirmer/i.test(byOrder.name))
+    ) {
+      existingBranch = byOrder
+    }
+  }
+
   // Prefer: existing link → same canonical code → another branch with same name already linked
   let subject =
     existingBranch?.subjectId != null
@@ -291,10 +310,12 @@ async function upsertBranch(params: {
       include: { subject: true },
     })
   } else {
-    // Preserve admin-edited maxPeriode / overrides
+    // Appliquer le catalogue (noms + maxima) ; les overrides examen/trim/annuel restent.
     existingBranch = await prisma.primaryBranch.update({
       where: { id: existingBranch.id },
       data: {
+        name: params.branchSeed.name,
+        maxPeriode: params.branchSeed.maxPeriode,
         sortOrder: params.sortOrder,
         subjectId: subject.id,
         isActive: true,
@@ -307,7 +328,7 @@ async function upsertBranch(params: {
     schoolId: params.schoolId,
     subjectId: subject.id,
     levels: params.levels,
-    maxPeriode: existingBranch.maxPeriode,
+    maxPeriode: params.branchSeed.maxPeriode,
     maxExamenOverride: existingBranch.maxExamenOverride,
     maxTrimestreOverride: existingBranch.maxTrimestreOverride,
     maxAnnuelOverride: existingBranch.maxAnnuelOverride,
@@ -328,6 +349,8 @@ async function syncDomainTree(params: {
   periods: Array<{ id: number }>
   examGroups: Array<{ id: number }>
 }) {
+  const keptBranchIds = new Set<number>()
+
   for (const [dIdx, domainSeed] of params.domains.entries()) {
     let domain = await prisma.primaryDomain.findFirst({
       where: { degreeId: params.degreeId, name: domainSeed.name },
@@ -344,7 +367,7 @@ async function syncDomainTree(params: {
     }
 
     for (const [bIdx, branchSeed] of (domainSeed.branches ?? []).entries()) {
-      await upsertBranch({
+      const branch = await upsertBranch({
         schoolId: params.schoolId,
         degreeCode: params.degreeCode,
         degreeName: params.degreeName,
@@ -357,6 +380,7 @@ async function syncDomainTree(params: {
         examGroups: params.examGroups,
         groupLabel: null,
       })
+      keptBranchIds.add(branch.id)
     }
 
     for (const [gIdx, groupSeed] of (domainSeed.groups ?? []).entries()) {
@@ -375,7 +399,7 @@ async function syncDomainTree(params: {
       }
 
       for (const [bIdx, branchSeed] of groupSeed.branches.entries()) {
-        await upsertBranch({
+        const branch = await upsertBranch({
           schoolId: params.schoolId,
           degreeCode: params.degreeCode,
           degreeName: params.degreeName,
@@ -388,8 +412,21 @@ async function syncDomainTree(params: {
           examGroups: params.examGroups,
           groupLabel: groupSeed.name,
         })
+        keptBranchIds.add(branch.id)
       }
     }
+  }
+
+  // Désactive les anciennes branches (ex. « à confirmer ») hors catalogue.
+  if (keptBranchIds.size > 0) {
+    await prisma.primaryBranch.updateMany({
+      where: {
+        domain: { degreeId: params.degreeId },
+        isActive: true,
+        id: { notIn: [...keptBranchIds] },
+      },
+      data: { isActive: false },
+    })
   }
 }
 
@@ -429,7 +466,8 @@ export async function ensurePrimaryCurriculum(schoolId: number) {
           name: seed.name,
           levelsJson: JSON.stringify(seed.levels),
           sortOrder,
-          needsReview: degree.needsReview || seed.needsReview,
+          // Le catalogue est la source de vérité (ex. MOYEN validé via bulletin officiel).
+          needsReview: seed.needsReview,
         },
       })
     }
