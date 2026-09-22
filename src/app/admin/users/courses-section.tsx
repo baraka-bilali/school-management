@@ -357,11 +357,18 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
   const openEditAssignment = (a: Assignment) => {
     setEditingAssignment(a)
+    // Toutes les classes déjà liées à ce prof + cette matière
+    const relatedClassIds = assignments
+      .filter((x) => x.subjectId === a.subjectId && x.teacherId === a.teacherId)
+      .map((x) => String(x.classId))
+    const classIds = relatedClassIds.length
+      ? [...new Set(relatedClassIds)]
+      : [String(a.classId)]
     setAssignForm({
       subjectId: String(a.subjectId),
       teacherId: String(a.teacherId),
-      classId: String(a.classId),
-      classIds: [String(a.classId)],
+      classId: classIds[0] || "",
+      classIds,
     })
     setShowAssignForm(true)
   }
@@ -380,37 +387,30 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     setSubmitting(true)
     try {
       const isEdit = !!editingAssignment
-      if (!isEdit && assignForm.classIds.length === 0) {
+      if (assignForm.classIds.length === 0) {
         throw new Error("Sélectionnez au moins une classe")
       }
-      const res = await authFetch(
-        isEdit
-          ? `/api/admin/course-assignments/${editingAssignment!.id}`
-          : "/api/admin/course-assignments",
-        {
-          method: isEdit ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            isEdit
-              ? {
-                  subjectId: assignForm.subjectId,
-                  teacherId: assignForm.teacherId,
-                  classId: assignForm.classId,
-                }
-              : {
-                  subjectId: assignForm.subjectId,
-                  teacherId: assignForm.teacherId,
-                  classIds: assignForm.classIds.map((id) => parseInt(id, 10)),
-                }
-          ),
-        }
-      )
+      const res = await authFetch("/api/admin/course-assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subjectId: assignForm.subjectId,
+          teacherId: assignForm.teacherId,
+          classIds: assignForm.classIds.map((id) => parseInt(id, 10)),
+          // En édition : synchronise la liste (ajoute / retire des classes)
+          syncSubjectTeacher: isEdit,
+        }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erreur")
+      const n = data.count ?? assignForm.classIds.length
       if (isEdit) {
-        toast.success("Affectation modifiée")
+        toast.success(
+          n > 1
+            ? `Affectation mise à jour (${n} classes)`
+            : "Affectation modifiée"
+        )
       } else {
-        const n = data.count ?? assignForm.classIds.length
         toast.success(
           n > 1 ? `${n} affectations enregistrées` : "Affectation enregistrée"
         )
@@ -660,7 +660,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
           subtitle={
             editingAssignment
-              ? "Modifiez le professeur, la matière ou la classe (CTEB)."
+              ? "Modifiez le professeur, la matière et cochez une ou plusieurs classes CTEB."
               : "Assignez un professeur à une branche du bulletin CTEB et une ou plusieurs classes 7ème/8ème."
           }
           onClose={() => {
@@ -669,12 +669,17 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           }}
           footer={
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className={cn("text-xs font-medium", !editingAssignment && assignForm.classIds.length ? "text-indigo-600 dark:text-indigo-400" : textSecondary)}>
-                {editingAssignment
-                  ? " "
-                  : assignForm.classIds.length === 0
-                    ? "Aucune classe sélectionnée"
-                    : `${assignForm.classIds.length} classe${assignForm.classIds.length > 1 ? "s" : ""} sélectionnée${assignForm.classIds.length > 1 ? "s" : ""}`}
+              <p
+                className={cn(
+                  "text-xs font-medium",
+                  assignForm.classIds.length
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : textSecondary
+                )}
+              >
+                {assignForm.classIds.length === 0
+                  ? "Aucune classe sélectionnée"
+                  : `${assignForm.classIds.length} classe${assignForm.classIds.length > 1 ? "s" : ""} sélectionnée${assignForm.classIds.length > 1 ? "s" : ""}`}
               </p>
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
@@ -708,7 +713,9 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   {submitting
                     ? "Enregistrement..."
                     : editingAssignment
-                      ? "Enregistrer"
+                      ? assignForm.classIds.length > 1
+                        ? `Enregistrer (${assignForm.classIds.length})`
+                        : "Enregistrer"
                       : assignForm.classIds.length > 1
                         ? `Assigner (${assignForm.classIds.length})`
                         : "Assigner"}
@@ -757,15 +764,20 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <label className={cn("block text-xs font-semibold uppercase tracking-wide", textSecondary)}>
-                    {editingAssignment ? "Classe *" : "Classes *"}
+                    Classes *
                   </label>
+                  <p className={cn("mt-1 text-xs", textSecondary)}>
+                    Sélectionnez une ou plusieurs classes 7ème / 8ème.
+                  </p>
+
                   {!editingAssignment && (
                     <p className={cn("mt-1 text-xs", textSecondary)}>
                       Sélectionnez les classes 7ème / 8ème concernées.
                     </p>
                   )}
+
                 </div>
-                {!editingAssignment && classes.length > 0 && (
+                {classes.length > 0 && (
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -797,33 +809,31 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                 )}
               </div>
 
-              {editingAssignment ? (
-                <div
-                  className={cn(
-                    "overflow-hidden rounded-lg border shadow-sm",
-                    isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
-                  )}
-                >
-                  <ul className="max-h-64 overflow-y-auto" role="listbox">
-                    {classes.map((c) => {
+              <div
+                className={cn(
+                  "overflow-hidden rounded-lg border shadow-sm",
+                  isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
+                )}
+              >
+                <ul className="max-h-[min(22rem,45vh)] overflow-y-auto" role="listbox" aria-multiselectable="true">
+                  {classes.length === 0 ? (
+                    <li className={cn("px-3 py-6 text-center text-sm", textSecondary)}>
+                      Aucune classe disponible
+                    </li>
+                  ) : (
+                    classes.map((c) => {
                       const id = String(c.id)
-                      const active = assignForm.classId === id
+                      const checked = assignForm.classIds.includes(id)
                       return (
                         <li key={c.id}>
                           <button
                             type="button"
                             role="option"
-                            aria-selected={active}
-                            onClick={() =>
-                              setAssignForm({
-                                ...assignForm,
-                                classId: id,
-                                classIds: [id],
-                              })
-                            }
+                            aria-selected={checked}
+                            onClick={() => toggleAssignClass(id)}
                             className={cn(
                               "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-                              active
+                              checked
                                 ? isDark
                                   ? "bg-indigo-950/50 text-indigo-300"
                                   : "bg-indigo-50 text-indigo-700"
@@ -832,62 +842,19 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                                   : "text-gray-800 hover:bg-gray-50"
                             )}
                           >
-                            {active ? <Check className="h-3.5 w-3.5 shrink-0" /> : <span className="w-3.5 shrink-0" />}
-                            <span className="min-w-0 flex-1">{c.name}</span>
+                            {checked ? (
+                              <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            ) : (
+                              <span className="w-3.5 shrink-0" aria-hidden />
+                            )}
+                            <span className="min-w-0 flex-1 leading-snug">{c.name}</span>
                           </button>
                         </li>
                       )
-                    })}
-                  </ul>
-                </div>
-              ) : (
-                <div
-                  className={cn(
-                    "overflow-hidden rounded-lg border shadow-sm",
-                    isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
+                    })
                   )}
-                >
-                  <ul className="max-h-[min(22rem,45vh)] overflow-y-auto" role="listbox" aria-multiselectable="true">
-                    {classes.length === 0 ? (
-                      <li className={cn("px-3 py-6 text-center text-sm", textSecondary)}>
-                        Aucune classe disponible
-                      </li>
-                    ) : (
-                      classes.map((c) => {
-                        const id = String(c.id)
-                        const checked = assignForm.classIds.includes(id)
-                        return (
-                          <li key={c.id}>
-                            <button
-                              type="button"
-                              role="option"
-                              aria-selected={checked}
-                              onClick={() => toggleAssignClass(id)}
-                              className={cn(
-                                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-                                checked
-                                  ? isDark
-                                    ? "bg-indigo-950/50 text-indigo-300"
-                                    : "bg-indigo-50 text-indigo-700"
-                                  : isDark
-                                    ? "text-gray-200 hover:bg-gray-800"
-                                    : "text-gray-800 hover:bg-gray-50"
-                              )}
-                            >
-                              {checked ? (
-                                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              ) : (
-                                <span className="w-3.5 shrink-0" aria-hidden />
-                              )}
-                              <span className="min-w-0 flex-1 leading-snug">{c.name}</span>
-                            </button>
-                          </li>
-                        )
-                      })
-                    )}
-                  </ul>
-                </div>
-              )}
+                </ul>
+              </div>
             </div>
           </form>
         </FormModal>
