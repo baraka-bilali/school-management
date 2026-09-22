@@ -233,6 +233,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     classId: "",
     classIds: [] as string[],
   })
+  /** Classes déjà liées à l’ouverture de l’édition (badge visuel). */
+  const [initialEditClassIds, setInitialEditClassIds] = useState<string[]>([])
 
   const isDark = theme === "dark"
   const textColor = isDark ? "text-gray-100" : "text-gray-800"
@@ -349,25 +351,38 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     return rows
   }, [assignments, sortMode])
 
+  const classIdsForTeacherSubject = useCallback(
+    (teacherId: string | number, subjectId: string | number) => {
+      const tid = String(teacherId)
+      const sid = String(subjectId)
+      const ids = assignments
+        .filter(
+          (x) => String(x.teacherId) === tid && String(x.subjectId) === sid
+        )
+        .map((x) => String(x.classId))
+      return [...new Set(ids)]
+    },
+    [assignments]
+  )
+
   const openCreateAssignment = () => {
     setEditingAssignment(null)
+    setInitialEditClassIds([])
     setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [] })
     setShowAssignForm(true)
   }
 
   const openEditAssignment = (a: Assignment) => {
     setEditingAssignment(a)
-    // Toutes les classes déjà liées à ce prof + cette matière
-    const relatedClassIds = assignments
-      .filter((x) => x.subjectId === a.subjectId && x.teacherId === a.teacherId)
-      .map((x) => String(x.classId))
-    const classIds = relatedClassIds.length
-      ? [...new Set(relatedClassIds)]
-      : [String(a.classId)]
+    const related = classIdsForTeacherSubject(a.teacherId, a.subjectId)
+    const classIds = related.includes(String(a.classId))
+      ? related
+      : [...related, String(a.classId)]
+    setInitialEditClassIds(classIds)
     setAssignForm({
       subjectId: String(a.subjectId),
       teacherId: String(a.teacherId),
-      classId: classIds[0] || "",
+      classId: classIds[0] || String(a.classId),
       classIds,
     })
     setShowAssignForm(true)
@@ -379,6 +394,38 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
         ? prev.classIds.filter((x) => x !== id)
         : [...prev.classIds, id]
       return { ...prev, classIds: selected, classId: selected[0] || "" }
+    })
+  }
+
+  const onTeacherChange = (teacherId: string) => {
+    setAssignForm((prev) => {
+      if (!editingAssignment || !prev.subjectId) {
+        return { ...prev, teacherId }
+      }
+      const related = classIdsForTeacherSubject(teacherId, prev.subjectId)
+      const classIds = related.length ? related : prev.classIds
+      return {
+        ...prev,
+        teacherId,
+        classIds,
+        classId: classIds[0] || "",
+      }
+    })
+  }
+
+  const onSubjectChange = (subjectId: string) => {
+    setAssignForm((prev) => {
+      if (!editingAssignment || !prev.teacherId) {
+        return { ...prev, subjectId }
+      }
+      const related = classIdsForTeacherSubject(prev.teacherId, subjectId)
+      const classIds = related.length ? related : prev.classIds
+      return {
+        ...prev,
+        subjectId,
+        classIds,
+        classId: classIds[0] || "",
+      }
     })
   }
 
@@ -417,6 +464,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       }
       setShowAssignForm(false)
       setEditingAssignment(null)
+      setInitialEditClassIds([])
       setAssignForm({ subjectId: "", teacherId: "", classId: "", classIds: [] })
       await loadData()
     } catch (err) {
@@ -666,6 +714,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           onClose={() => {
             setShowAssignForm(false)
             setEditingAssignment(null)
+            setInitialEditClassIds([])
           }}
           footer={
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -687,6 +736,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   onClick={() => {
                     setShowAssignForm(false)
                     setEditingAssignment(null)
+                    setInitialEditClassIds([])
                   }}
                   className={cn(
                     "rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
@@ -733,7 +783,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                 <MenuSelect
                   aria-label="Professeur"
                   value={assignForm.teacherId}
-                  onChange={(v) => setAssignForm({ ...assignForm, teacherId: v })}
+                  onChange={onTeacherChange}
                   placeholder="Sélectionner un professeur"
                   options={sortedTeachers.map((t) => ({
                     value: String(t.id),
@@ -749,7 +799,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                 <MenuSelect
                   aria-label="Matière"
                   value={assignForm.subjectId}
-                  onChange={(v) => setAssignForm({ ...assignForm, subjectId: v })}
+                  onChange={onSubjectChange}
                   placeholder="Sélectionner une matière"
                   options={subjects.map((s) => ({
                     value: String(s.id),
@@ -767,7 +817,9 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     Classes *
                   </label>
                   <p className={cn("mt-1 text-xs", textSecondary)}>
-                    Sélectionnez une ou plusieurs classes 7ème / 8ème.
+                    {editingAssignment
+                      ? "Les classes déjà affectées sont cochées. Ajoutez ou retirez selon le besoin."
+                      : "Sélectionnez une ou plusieurs classes 7ème / 8ème."}
                   </p>
 
                   {!editingAssignment && (
@@ -824,6 +876,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     classes.map((c) => {
                       const id = String(c.id)
                       const checked = assignForm.classIds.includes(id)
+                      const wasAssigned = initialEditClassIds.includes(id)
                       return (
                         <li key={c.id}>
                           <button
@@ -832,22 +885,42 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                             aria-selected={checked}
                             onClick={() => toggleAssignClass(id)}
                             className={cn(
-                              "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
+                              "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
                               checked
                                 ? isDark
-                                  ? "bg-indigo-950/50 text-indigo-300"
-                                  : "bg-indigo-50 text-indigo-700"
+                                  ? "border-l-4 border-l-indigo-400 bg-indigo-950/60 text-indigo-200"
+                                  : "border-l-4 border-l-indigo-600 bg-indigo-50 text-indigo-900"
                                 : isDark
-                                  ? "text-gray-200 hover:bg-gray-800"
-                                  : "text-gray-800 hover:bg-gray-50"
+                                  ? "border-l-4 border-l-transparent text-gray-200 hover:bg-gray-800"
+                                  : "border-l-4 border-l-transparent text-gray-800 hover:bg-gray-50"
                             )}
                           >
-                            {checked ? (
-                              <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            ) : (
-                              <span className="w-3.5 shrink-0" aria-hidden />
-                            )}
-                            <span className="min-w-0 flex-1 leading-snug">{c.name}</span>
+                            <span
+                              className={cn(
+                                "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                                checked
+                                  ? "border-indigo-600 bg-indigo-600 text-white"
+                                  : isDark
+                                    ? "border-gray-500 bg-transparent"
+                                    : "border-gray-300 bg-white"
+                              )}
+                              aria-hidden
+                            >
+                              {checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
+                            </span>
+                            <span className="min-w-0 flex-1 leading-snug font-medium">{c.name}</span>
+                            {editingAssignment && wasAssigned && checked ? (
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                                  isDark
+                                    ? "bg-indigo-500/30 text-indigo-200"
+                                    : "bg-indigo-100 text-indigo-700"
+                                )}
+                              >
+                                Déjà affectée
+                              </span>
+                            ) : null}
                           </button>
                         </li>
                       )
