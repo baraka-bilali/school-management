@@ -14,11 +14,13 @@ import {
 } from "lucide-react"
 import { PrimaryCurriculumPanel } from "@/components/admin/primary-curriculum-panel"
 import { PrimaryResultsPanel } from "@/components/admin/primary-results-panel"
+import { CtebCurriculumPanel } from "@/components/admin/cteb-curriculum-panel"
 import { useAppTheme } from "@/components/use-app-theme"
 import { cn } from "@/lib/utils"
 
 type CycleTab = "primaire" | "eb" | "humanites"
 type PrimaireSub = "branches" | "resultats"
+type EbSub = "branches"
 
 type OverviewData = {
   primaire: {
@@ -102,6 +104,7 @@ export default function GradesPage() {
   const { isDark } = useAppTheme()
   const [cycleTab, setCycleTab] = useState<CycleTab>("primaire")
   const [primaireSub, setPrimaireSub] = useState<PrimaireSub>("resultats")
+  const [ebSub, setEbSub] = useState<EbSub>("branches")
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [overview, setOverview] = useState<OverviewData | null>(null)
 
@@ -136,7 +139,7 @@ export default function GradesPage() {
       <div>
         <h1 className={cn("text-2xl font-bold", text)}>Notes & Bulletins</h1>
         <p className={cn("mt-1 text-sm", textMuted)}>
-          Suivi des résultats par cycle et configuration du curriculum primaire.
+          Suivi des résultats par cycle et configuration des curriculums (primaire & EB).
         </p>
       </div>
 
@@ -278,6 +281,40 @@ export default function GradesPage() {
             <PrimaryCurriculumPanel />
           )}
         </div>
+      ) : cycleTab === "eb" ? (
+        <div className="space-y-5">
+          <div
+            className={cn(
+              "inline-flex rounded-xl border p-1",
+              border,
+              isDark ? "bg-gray-800/50" : "bg-gray-50"
+            )}
+          >
+            {(
+              [["branches", "Branches EB (7ème–8ème)"]] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setEbSub(key)}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  ebSub === key
+                    ? cn(
+                        "text-cyan-700 shadow-sm",
+                        isDark ? "bg-gray-900" : "bg-white"
+                      )
+                    : isDark
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <CtebCurriculumPanel />
+        </div>
       ) : (
         <div
           className={cn(
@@ -292,9 +329,8 @@ export default function GradesPage() {
             Bientôt disponible
           </p>
           <p className={cn("mt-1 text-sm", textMuted)}>
-            Les résultats pour{" "}
-            {cycleTab === "eb" ? "l'Éducation de Base" : "les Humanités"} seront
-            configurés dans une prochaine version.
+            Les résultats pour les Humanités seront configurés dans une prochaine
+            version.
           </p>
         </div>
       )}

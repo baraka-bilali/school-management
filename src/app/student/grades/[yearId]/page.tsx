@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { useStudentTheme } from "@/components/student/use-student-theme"
 import StudentLoading from "@/components/student/student-loading"
 import type { PrimaryBulletinPayload } from "@/lib/grading/primary-bulletin"
+import type { SecondaryBulletinPayload } from "@/lib/grading/secondary-bulletin"
 
 type Summary = {
   key: string
@@ -71,6 +72,7 @@ type BulletinResponse = {
     level: string | null
   }
   supported: boolean
+  cycle?: "PRIMARY" | "SECONDARY"
   message: string | null
   publications: Publication[]
   publishedThroughLabel?: string | null
@@ -95,7 +97,7 @@ type BulletinResponse = {
     conduiteByPeriod: Record<string, string | null>
   } | null
   student: { enrollmentId: number; code: string; fullName: string } | null
-  payload?: PrimaryBulletinPayload | null
+  payload?: PrimaryBulletinPayload | SecondaryBulletinPayload | null
 }
 
 function fmtScore(v: number | null | undefined, max?: number) {
@@ -125,12 +127,25 @@ function fmtDate(iso: string) {
   })
 }
 
-async function generateBulletinPdfBlob(data: PrimaryBulletinPayload): Promise<Blob> {
+async function generateBulletinPdfBlob(
+  data: PrimaryBulletinPayload | SecondaryBulletinPayload,
+  cycle?: "PRIMARY" | "SECONDARY"
+): Promise<Blob> {
   const { pdf } = await import("@react-pdf/renderer")
+  if (cycle === "SECONDARY" || ("semestres" in data && data.cycleKind === "SECONDARY")) {
+    const { default: SecondaryBulletinPDF } = await import(
+      "@/components/secondary-bulletin-pdf"
+    )
+    return pdf(
+      <SecondaryBulletinPDF data={data as SecondaryBulletinPayload} />
+    ).toBlob()
+  }
   const { default: PrimaryBulletinPDF } = await import(
     "@/components/primary-bulletin-pdf"
   )
-  return pdf(<PrimaryBulletinPDF data={data} />).toBlob()
+  return pdf(
+    <PrimaryBulletinPDF data={data as PrimaryBulletinPayload} />
+  ).toBlob()
 }
 
 export default function StudentGradesYearPage() {
@@ -273,7 +288,7 @@ export default function StudentGradesYearPage() {
       if (!res.ok || !json.payload) {
         throw new Error(json.message || "Bulletin PDF indisponible")
       }
-      const blob = await generateBulletinPdfBlob(json.payload)
+      const blob = await generateBulletinPdfBlob(json.payload, json.cycle)
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url

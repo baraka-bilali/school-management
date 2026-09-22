@@ -55,6 +55,7 @@ model AcademicYear {
   slots           ScheduleSlot[]
   communiques     Communique[]
   bulletinPublications BulletinPublication[]
+  repechageGrades RepechageGrade[]
 }
 
 model Class {
@@ -206,6 +207,7 @@ model Enrollment {
   decisionHistory     EnrollmentDecisionHistory[]
   grades              Grade[]
   examGrades          ExamGrade[]
+  repechageGrades     RepechageGrade[]
 
   @@unique([studentId, yearId])
   @@index([classId])
@@ -682,6 +684,7 @@ model Subject {
   periodMaxima    SubjectPeriodMax[]
   examMaxima      SubjectExamMax[]
   examGrades      ExamGrade[]
+  repechageGrades RepechageGrade[]
   /// Branches primaire partageant cette matière canonique (1 Subject → N degrés)
   primaryBranches PrimaryBranch[]
   gradeLocks      GradeEntryLock[]
@@ -733,6 +736,7 @@ model CourseAssignment {
   slots              ScheduleSlot[]
   evaluationColumns  EvaluationColumn[]
   examGrades         ExamGrade[]
+  repechageGrades    RepechageGrade[]
 
   @@unique([subjectId, classId, yearId, schoolId])
   @@index([schoolId])
@@ -1022,6 +1026,28 @@ model ExamGrade {
 
   @@unique([enrollmentId, subjectId, periodGroupId])
   @@index([periodGroupId])
+  @@index([subjectId])
+  @@index([courseAssignmentId])
+}
+
+/// Examen de repêchage (Éducation de Base / CTEB) — % par matière et année
+model RepechageGrade {
+  id                 Int              @id @default(autoincrement())
+  enrollmentId       Int
+  subjectId          Int
+  courseAssignmentId Int
+  yearId             Int
+  /// Pourcentage affiché sur le bulletin officiel (0–100)
+  percentage         Float
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  enrollment         Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  subject            Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  assignment         CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  year               AcademicYear     @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, subjectId, yearId])
+  @@index([yearId])
   @@index([subjectId])
   @@index([courseAssignmentId])
 }

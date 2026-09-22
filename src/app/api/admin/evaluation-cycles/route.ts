@@ -27,6 +27,12 @@ export async function GET(req: NextRequest) {
       } catch (err) {
         console.error("[evaluation-cycles] primary curriculum sync:", err)
       }
+      try {
+        const { ensureCtebCurriculum } = await import("@/lib/grading/ensure-cteb-curriculum")
+        await ensureCtebCurriculum(user.schoolId)
+      } catch (err) {
+        console.error("[evaluation-cycles] CTEB curriculum sync:", err)
+      }
     }
 
     return NextResponse.json({ cycles })
@@ -48,6 +54,12 @@ export async function POST(req: NextRequest) {
         await ensurePrimaryCurriculum(user.schoolId)
       } catch (err) {
         console.error("[evaluation-cycles POST] primary curriculum sync:", err)
+      }
+      try {
+        const { ensureCtebCurriculum } = await import("@/lib/grading/ensure-cteb-curriculum")
+        await ensureCtebCurriculum(user.schoolId)
+      } catch (err) {
+        console.error("[evaluation-cycles POST] CTEB curriculum sync:", err)
       }
       return NextResponse.json({ cycles })
     }
