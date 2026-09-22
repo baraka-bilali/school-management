@@ -121,7 +121,15 @@ export async function POST(req: NextRequest) {
     requireRole(user, ROLES)
 
     const body = await req.json()
-    const { subjectId, teacherId, classId, classIds, weeklyHours, yearId: yearIdBody } = body
+    const {
+      subjectId,
+      teacherId,
+      classId,
+      classIds,
+      weeklyHours,
+      yearId: yearIdBody,
+      syncSubjectTeacher,
+    } = body
 
     const parsedClassIds: number[] = Array.isArray(classIds)
       ? classIds.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => Number.isFinite(id) && id > 0)
@@ -189,39 +197,58 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const assignments = await prisma.$transaction(
-      uniqueClassIds.map((cid) =>
-        prisma.courseAssignment.upsert({
-          where: {
-            subjectId_classId_yearId_schoolId: {
+    const assignments = await prisma.$transaction(async (tx) => {
+      const upserted = await Promise.all(
+        uniqueClassIds.map((cid) =>
+          tx.courseAssignment.upsert({
+            where: {
+              subjectId_classId_yearId_schoolId: {
+                subjectId: subjectIdNum,
+                classId: cid,
+                yearId,
+                schoolId: user.schoolId,
+              },
+            },
+            create: {
               subjectId: subjectIdNum,
+              teacherId: teacherIdNum,
               classId: cid,
               yearId,
+              weeklyHours: hours,
               schoolId: user.schoolId,
             },
-          },
-          create: {
+            update: {
+              teacherId: teacherIdNum,
+              weeklyHours: hours,
+              isActive: true,
+            },
+            include: {
+              subject: { select: { name: true, code: true } },
+              teacher: { select: { lastName: true, middleName: true, firstName: true } },
+              class: { select: { name: true } },
+              year: { select: { name: true } },
+            },
+          })
+        )
+      )
+
+      // En modification : retire les classes désélectionnées pour ce prof + matière
+      if (syncSubjectTeacher) {
+        await tx.courseAssignment.updateMany({
+          where: {
+            schoolId: user.schoolId,
+            yearId,
             subjectId: subjectIdNum,
             teacherId: teacherIdNum,
-            classId: cid,
-            yearId,
-            weeklyHours: hours,
-            schoolId: user.schoolId,
-          },
-          update: {
-            teacherId: teacherIdNum,
-            weeklyHours: hours,
             isActive: true,
+            classId: { notIn: uniqueClassIds },
           },
-          include: {
-            subject: { select: { name: true, code: true } },
-            teacher: { select: { lastName: true, middleName: true, firstName: true } },
-            class: { select: { name: true } },
-            year: { select: { name: true } },
-          },
+          data: { isActive: false },
         })
-      )
-    )
+      }
+
+      return upserted
+    })
 
     return NextResponse.json(
       {
