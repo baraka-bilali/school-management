@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/cards"
 import { cn } from "@/lib/utils"
 import Portal from "@/components/portal"
-import { Plus, Trash2, Users, X, Loader2, Pencil, AlertTriangle, Check } from "lucide-react"
+import { Plus, Trash2, Users, X, Loader2, Pencil, AlertTriangle, Check, ArrowDownAZ, Layers } from "lucide-react"
 import { toast } from "sonner"
 import { authFetch } from "@/lib/auth-fetch"
 import { TableLoadingBlock } from "@/components/ui/table-loading"
 import { MenuSelect } from "@/components/ui/menu-select"
+import { compareClasses, sortClasses } from "@/lib/class-sort"
 
 interface Subject {
   id: number
@@ -29,6 +30,9 @@ interface Assignment {
   subjectColor: string | null
   teacherName: string
   className: string
+  classSection?: string
+  classLevel?: string
+  classLetter?: string
   yearName: string
 }
 
@@ -42,7 +46,15 @@ interface TeacherOption {
 interface ClassOption {
   id: number
   name: string
+  section?: string
+  level?: string
+  letter?: string
 }
+
+type SortMode = "teacher" | "level"
+
+const SECONDARY_SECTIONS = ["Education de Base", "Humanités"] as const
+
 
 function ModalOverlay({
   onClose,
@@ -209,6 +221,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
   const [classes, setClasses] = useState<ClassOption[]>([])
   const [currentYearName, setCurrentYearName] = useState("-")
   const [loading, setLoading] = useState(true)
+  const [sortMode, setSortMode] = useState<SortMode>("level")
   const [showAssignForm, setShowAssignForm] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -231,13 +244,13 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
     isDark ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"
   )
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [subRes, assignRes, teachRes, metaRes] = await Promise.all([
-        // Affectations need primary canonical subjects too (titulaire / manuelles).
-        authFetch("/api/admin/subjects?includePrimary=1"),
-        authFetch("/api/admin/course-assignments"),
+        // Sans branches primaire : affectations = EB + Humanités uniquement
+        authFetch("/api/admin/subjects"),
+        authFetch("/api/admin/course-assignments?sort=level"),
         authFetch("/api/admin/teachers?pageSize=200"),
         authFetch("/api/admin/meta"),
       ])
@@ -255,18 +268,86 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       }
       if (metaRes.ok) {
         const d = await metaRes.json()
-        setClasses((d.classes || []).map((c: ClassOption) => ({ id: c.id, name: c.name })))
+        const secondary = sortClasses(
+          (d.classes || []).filter((c: ClassOption) =>
+            (SECONDARY_SECTIONS as readonly string[]).includes(c.section || "")
+          )
+        )
+        setClasses(
+          secondary.map((c: ClassOption) => ({
+            id: c.id,
+            name: c.name,
+            section: c.section,
+            level: c.level,
+            letter: c.letter,
+          }))
+        )
         const current = (d.years || []).find((y: { isCurrent: boolean; name: string }) => y.isCurrent)
         if (current) setCurrentYearName(current.name)
       }
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [loadData])
+
+  const sortedTeachers = useMemo(
+    () =>
+      [...teachers].sort((a, b) => {
+        const na = [a.lastName, a.middleName, a.firstName].filter(Boolean).join(" ")
+        const nb = [b.lastName, b.middleName, b.firstName].filter(Boolean).join(" ")
+        return na.localeCompare(nb, "fr", { sensitivity: "base" })
+      }),
+    [teachers]
+  )
+
+  const displayedAssignments = useMemo(() => {
+    const rows = [...assignments]
+    rows.sort((a, b) => {
+      if (sortMode === "teacher") {
+        const byTeacher = a.teacherName.localeCompare(b.teacherName, "fr", {
+          sensitivity: "base",
+        })
+        if (byTeacher !== 0) return byTeacher
+        const byClass = compareClasses(
+          {
+            section: a.classSection || "",
+            level: a.classLevel || "",
+            letter: a.classLetter,
+          },
+          {
+            section: b.classSection || "",
+            level: b.classLevel || "",
+            letter: b.classLetter,
+          }
+        )
+        if (byClass !== 0) return byClass
+        return a.subjectName.localeCompare(b.subjectName, "fr", { sensitivity: "base" })
+      }
+      const byClass = compareClasses(
+        {
+          section: a.classSection || "",
+          level: a.classLevel || "",
+          letter: a.classLetter,
+        },
+        {
+          section: b.classSection || "",
+          level: b.classLevel || "",
+          letter: b.classLetter,
+        }
+      )
+      if (byClass !== 0) return byClass
+      const bySubject = a.subjectName.localeCompare(b.subjectName, "fr", {
+        sensitivity: "base",
+      })
+      if (bySubject !== 0) return bySubject
+      return a.teacherName.localeCompare(b.teacherName, "fr", { sensitivity: "base" })
+    })
+    return rows
+  }, [assignments, sortMode])
 
   const openCreateAssignment = () => {
     setEditingAssignment(null)
@@ -391,15 +472,50 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       </div>
 
       <Card theme={theme}>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <div>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
             <CardTitle className={textColor}>Affectations professeurs</CardTitle>
             <p className={cn("mt-1 text-xs", textSecondary)}>
-              Associez un professeur à une matière existante et une ou plusieurs classes.{" "}
+              Éducation de Base et Humanités uniquement. Au primaire, le titulaire
+              couvre toutes les branches de la classe.{" "}
               <Link href="/admin/classes?tab=subjects" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                 Gérer les matières
               </Link>
             </p>
+            <div
+              className={cn(
+                "mt-3 inline-flex rounded-xl border p-1",
+                borderColor,
+                isDark ? "bg-gray-800/50" : "bg-gray-50"
+              )}
+            >
+              {(
+                [
+                  ["level", "Par niveau", Layers],
+                  ["teacher", "Par professeur", ArrowDownAZ],
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSortMode(key)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    sortMode === key
+                      ? cn(
+                          "text-indigo-600 shadow-sm",
+                          isDark ? "bg-gray-900" : "bg-white"
+                        )
+                      : isDark
+                        ? "text-gray-400 hover:text-gray-200"
+                        : "text-gray-600 hover:text-gray-900"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <button
             type="button"
@@ -428,12 +544,14 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
             <div className={cn("rounded-xl border border-dashed py-12 text-center", borderColor)}>
               <Users className={cn("mx-auto mb-3 h-10 w-10", textSecondary)} />
               <p className={cn("text-sm font-medium", textColor)}>Aucune affectation</p>
-              <p className={cn("mt-1 text-xs", textSecondary)}>Assignez un professeur à une matière et une classe.</p>
+              <p className={cn("mt-1 text-xs", textSecondary)}>
+                Assignez un professeur à une matière (EB / Humanités) et une ou plusieurs classes.
+              </p>
             </div>
           ) : (
             <>
               <div className="md:hidden space-y-2.5">
-                {assignments.map((a) => (
+                {displayedAssignments.map((a) => (
                   <div key={`m-asg-${a.id}`} className={cn("rounded-xl border p-3.5", borderColor)}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -484,7 +602,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {assignments.map((a) => (
+                    {displayedAssignments.map((a) => (
                       <tr key={a.id} className={cn("border-b transition-colors", borderColor, rowHover)}>
                         <td className={cn("px-4 py-3.5 font-medium", textColor)}>
                           <span className="mr-2 inline-block h-3 w-3 rounded-full" style={{ backgroundColor: a.subjectColor || "#4f46e5" }} />
@@ -538,8 +656,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
           subtitle={
             editingAssignment
-              ? "Modifiez le professeur, la matière ou la classe."
-              : "Assignez un professeur et une matière à une ou plusieurs classes."
+              ? "Modifiez le professeur, la matière ou la classe (EB / Humanités)."
+              : "Assignez un professeur et une matière à une ou plusieurs classes d'Éducation de Base ou Humanités."
           }
           onClose={() => {
             setShowAssignForm(false)
@@ -606,7 +724,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   value={assignForm.teacherId}
                   onChange={(v) => setAssignForm({ ...assignForm, teacherId: v })}
                   placeholder="Sélectionner un professeur"
-                  options={teachers.map((t) => ({
+                  options={sortedTeachers.map((t) => ({
                     value: String(t.id),
                     label: [t.lastName, t.middleName, t.firstName].filter(Boolean).join(" "),
                   }))}
@@ -639,7 +757,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   </label>
                   {!editingAssignment && (
                     <p className={cn("mt-1 text-xs", textSecondary)}>
-                      Sélectionnez toutes les classes concernées (ex. 7ème A, B, C).
+                      Sélectionnez les classes EB / Humanités concernées (ex. 7ème A, 8ème B).
                     </p>
                   )}
                 </div>
