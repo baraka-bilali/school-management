@@ -3,8 +3,7 @@
  * Source de vérité : maxPeriode uniquement.
  * Formules : examen=2×, trimestre=4×, annuel=12×.
  *
- * ELEMENTAIRE + MOYEN + TERMINAL_6 : lecture fiable des bulletins officiels.
- * TERMINAL_5 : needsReview=true — à confirmer par un enseignant.
+ * ELEMENTAIRE + MOYEN + TERMINAL_5 + TERMINAL_6 : lecture fiable des bulletins officiels.
  */
 
 export type PrimaryBranchCatalog = {
@@ -200,10 +199,11 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
     ],
   },
   {
+    /** Bulletin officiel — Degré Terminal / Enseignement spécial (5ème) — max période 310 → trim 1240 → an 3720. */
     code: "TERMINAL_5",
     name: "Degré Terminal (5e année)",
     levels: ["5ème"],
-    needsReview: true,
+    needsReview: false,
     domains: [
       {
         name: "Domaine des Langues",
@@ -211,50 +211,59 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
           {
             name: "Langues congolaises",
             branches: [
-              { name: "Branche LC 1 (à confirmer)", maxPeriode: 5 },
-              { name: "Branche LC 2 (à confirmer)", maxPeriode: 5 },
-              { name: "Branche LC 3 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche LC 4 (à confirmer)", maxPeriode: 10 },
+              { name: "Grammaire & Conj.", maxPeriode: 10 },
+              { name: "Exp. Orale/Voc/L.des signs", maxPeriode: 10 },
+              { name: "Orth. & redaction", maxPeriode: 10 },
             ],
           },
           {
             name: "Français",
             branches: [
-              { name: "Branche FR 1 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche FR 2 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche FR 3 (à confirmer)", maxPeriode: 10 },
-              { name: "Branche FR 4 (à confirmer)", maxPeriode: 15 },
-              { name: "Branche FR 5 (à confirmer)", maxPeriode: 15 },
-              { name: "Branche FR 6 (à confirmer)", maxPeriode: 20 },
+              { name: "Exp. Orale & Vocabulaire", maxPeriode: 10 },
+              { name: "Orthographe", maxPeriode: 10 },
+              { name: "Rédaction / Braille int.", maxPeriode: 10 },
+              { name: "Gram. Conj. & Analyse", maxPeriode: 20 },
             ],
           },
+        ],
+        branches: [
+          { name: "Lecture-Ecriture en langues congolaise / Lecture labiale", maxPeriode: 20 },
+          { name: "Lecture-Ecriture en langues française / Lecture labiale", maxPeriode: 20 },
         ],
       },
       {
         name: "Domaine des Mathématiques, Sciences et Technologie",
         groups: [
           {
-            name: "Mathématiques / Sciences / Techno",
+            name: "Mathématiques",
             branches: [
-              { name: "Numération/Fractions (à confirmer)", maxPeriode: 10 },
-              { name: "Formes géométriques (à confirmer)", maxPeriode: 10 },
-              { name: "Informatique/Techno (à confirmer)", maxPeriode: 10 },
-              { name: "Mesures des grandeurs (à confirmer)", maxPeriode: 10 },
-              { name: "Opérations (à confirmer)", maxPeriode: 15 },
-              { name: "Physique/Zoologie (à confirmer)", maxPeriode: 20 },
-              { name: "Problèmes (à confirmer)", maxPeriode: 25 },
+              { name: "Numération", maxPeriode: 10 },
+              { name: "Opérations", maxPeriode: 10 },
+              { name: "Mesures des grandeurs", maxPeriode: 10 },
+              { name: "Formes géométriques", maxPeriode: 10 },
+              { name: "Problèmes", maxPeriode: 20 },
             ],
+          },
+          {
+            name: "Sciences",
+            branches: [
+              { name: "Phys. Zoologie – Info.", maxPeriode: 10 },
+              { name: "Anatomie - botanique", maxPeriode: 20 },
+            ],
+          },
+          {
+            name: "Technologie",
+            branches: [{ name: "Technologie", maxPeriode: 10 }],
           },
         ],
       },
       {
         name: "Domaine de l'Univers Social et Environnement",
         branches: [
-          { name: "Éducation à la vie (à confirmer)", maxPeriode: 10 },
-          { name: "Éd. civ. & morale (à confirmer)", maxPeriode: 10 },
-          { name: "Éd. santé & env. (à confirmer)", maxPeriode: 10 },
-          { name: "Géographie (à confirmer)", maxPeriode: 10 },
-          { name: "Histoire (à confirmer)", maxPeriode: 10 },
+          { name: "Education Civ. & Morale", maxPeriode: 10 },
+          { name: "Education Santé & Env.", maxPeriode: 10 },
+          { name: "Géographie", maxPeriode: 10 },
+          { name: "Histoire", maxPeriode: 10 },
         ],
       },
       {
@@ -263,8 +272,8 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
           {
             name: "Éducation Artistique",
             branches: [
-              { name: "Arts Plastiques", maxPeriode: 10 },
-              { name: "Arts Dramatiques", maxPeriode: 10 },
+              { name: "Arts plastiques", maxPeriode: 10 },
+              { name: "Arts dramatiques", maxPeriode: 10 },
             ],
           },
         ],
@@ -272,8 +281,8 @@ export const PRIMARY_DEGREE_CATALOG: PrimaryDegreeCatalog[] = [
       {
         name: "Domaine du Développement Personnel",
         branches: [
-          { name: "Init. Trav. Prod.", maxPeriode: 10 },
-          { name: "Éd. phys. & sports", maxPeriode: 10 },
+          { name: "Ed.phys./Sport/Mobil.", maxPeriode: 10 },
+          { name: "Init.Trav.Prod./Act.V.J.", maxPeriode: 10 },
           { name: "Religion", maxPeriode: 10 },
         ],
       },
