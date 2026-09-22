@@ -42,6 +42,7 @@ export async function PATCH(
           id: newSubjectId,
           schoolId: user.schoolId,
           isActive: true,
+          code: { startsWith: "CTEB-" },
           primaryBranches: { none: {} },
         },
       }),
@@ -56,11 +57,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Matière, professeur ou classe invalide" }, { status: 400 })
     }
 
-    if (cls.section !== "Education de Base" && cls.section !== "Humanités") {
+    if (cls.section !== "Education de Base") {
       return NextResponse.json(
         {
           error:
-            "Les affectations concernent uniquement l'Éducation de Base et les Humanités. Pour le primaire, utilisez le titulaire de classe.",
+            "Les affectations catalogue concernent uniquement l'Éducation de Base (CTEB). Pour le primaire, utilisez le titulaire de classe.",
         },
         { status: 400 }
       )
