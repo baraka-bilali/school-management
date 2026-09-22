@@ -769,6 +769,13 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   <p className={cn("mt-1 text-xs", textSecondary)}>
                     Sélectionnez une ou plusieurs classes 7ème / 8ème.
                   </p>
+
+                  {!editingAssignment && (
+                    <p className={cn("mt-1 text-xs", textSecondary)}>
+                      Sélectionnez les classes 7ème / 8ème concernées.
+                    </p>
+                  )}
+
                 </div>
                 {classes.length > 0 && (
                   <div className="flex gap-2">
