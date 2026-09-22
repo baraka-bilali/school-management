@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { getTeacherFromRequest } from "@/lib/teacher-auth"
 import { teacherHasClassAccess } from "@/lib/teacher-classes"
 import { loadPrimaryBulletins } from "@/lib/grading/primary-bulletin"
+import { loadSecondaryBulletins } from "@/lib/grading/secondary-bulletin"
 import { prisma } from "@/lib/prisma"
+import { CTEB_SECTION } from "@/lib/grading/cteb-maxima"
 
 /**
  * GET ?classId=&enrollmentId=&kind=PERIOD|EXAM&periodId=&periodGroupId=
  * Bulletin d'un élève pour l'enseignant (aperçu PDF côté client).
+ * Primaire ou Éducation de Base selon la section de la classe.
  */
 export async function GET(req: NextRequest) {
   const ctx = await getTeacherFromRequest(req)
@@ -50,9 +53,27 @@ export async function GET(req: NextRequest) {
       yearId: ctx.yearId,
       status: "ACTIVE",
     },
+    include: {
+      class: { select: { section: true } },
+    },
   })
   if (!enrollment) {
     return NextResponse.json({ error: "Élève introuvable" }, { status: 404 })
+  }
+
+  const section = enrollment.class.section
+  const cycleKind =
+    section === "Primaire"
+      ? "PRIMARY"
+      : section === CTEB_SECTION
+        ? "SECONDARY"
+        : null
+
+  if (!cycleKind) {
+    return NextResponse.json(
+      { error: "Bulletin non supporté pour cette section" },
+      { status: 400 }
+    )
   }
 
   let focusKind: "PERIOD" | "EXAM" = kind === "EXAM" ? "EXAM" : "PERIOD"
@@ -61,7 +82,7 @@ export async function GET(req: NextRequest) {
 
   if (!focusPeriodId && !focusPeriodGroupId) {
     const cycle = await prisma.evaluationCycle.findFirst({
-      where: { schoolId: ctx.schoolId, kind: "PRIMARY" },
+      where: { schoolId: ctx.schoolId, kind: cycleKind },
       include: {
         periodGroups: {
           orderBy: { sortOrder: "asc" },
@@ -85,20 +106,31 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await loadPrimaryBulletins({
+    if (cycleKind === "PRIMARY") {
+      const data = await loadPrimaryBulletins({
+        schoolId: ctx.schoolId,
+        yearId: ctx.yearId,
+        classId,
+        kind: focusKind,
+        periodId: focusKind === "PERIOD" ? focusPeriodId : null,
+        periodGroupId: focusPeriodGroupId,
+        enrollmentId,
+        audience: "staff",
+      })
+      return NextResponse.json({ data, cycle: "PRIMARY" })
+    }
+
+    const data = await loadSecondaryBulletins({
       schoolId: ctx.schoolId,
       yearId: ctx.yearId,
       classId,
       kind: focusKind,
       periodId: focusKind === "PERIOD" ? focusPeriodId : null,
-      periodGroupId:
-        focusKind === "EXAM"
-          ? focusPeriodGroupId
-          : focusPeriodGroupId,
+      periodGroupId: focusPeriodGroupId,
       enrollmentId,
       audience: "staff",
     })
-    return NextResponse.json({ data })
+    return NextResponse.json({ data, cycle: "SECONDARY" })
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Bulletin indisponible" },

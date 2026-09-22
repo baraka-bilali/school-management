@@ -79,16 +79,22 @@ export async function GET(
     },
   }
 
-  if (enrollment.class.section !== "Primaire") {
+  if (
+    enrollment.class.section !== "Primaire" &&
+    enrollment.class.section !== "Education de Base"
+  ) {
     return NextResponse.json({
       ...base,
       supported: false,
-      message: "Les bulletins secondaires seront disponibles prochainement.",
+      message: "Les bulletins Humanités seront disponibles prochainement.",
       publications: [],
       bulletin: null,
       student: null,
     })
   }
+
+  const isPrimary = enrollment.class.section === "Primaire"
+  const cycleKind = isPrimary ? "PRIMARY" : "SECONDARY"
 
   const [publications, cycles] = await Promise.all([
     prisma.bulletinPublication.findMany({
@@ -110,12 +116,12 @@ export async function GET(
     ensureDefaultEvaluationCycles(ctx.schoolId),
   ])
 
-  const primaryCycle = cycles.find((c) => c.kind === "PRIMARY")
+  const evalCycle = cycles.find((c) => c.kind === cycleKind)
   const periodNameById = new Map<number, string>()
   const groupNameById = new Map<number, string>()
   const periodToGroupId = new Map<number, number>()
-  if (primaryCycle) {
-    for (const g of primaryCycle.periodGroups) {
+  if (evalCycle) {
+    for (const g of evalCycle.periodGroups) {
       groupNameById.set(g.id, g.name)
       for (const p of g.periods) {
         periodNameById.set(p.id, p.name)
@@ -190,7 +196,53 @@ export async function GET(
   const focusPeriodGroupId = focusKind === "EXAM" ? latest.periodGroupId : null
 
   try {
-    const payload = await loadPrimaryBulletins({
+    if (isPrimary) {
+      const payload = await loadPrimaryBulletins({
+        schoolId: ctx.schoolId,
+        yearId: enrollment.yearId,
+        classId: enrollment.classId,
+        kind: focusKind,
+        periodId: focusPeriodId,
+        periodGroupId: focusPeriodGroupId,
+        enrollmentId: enrollment.id,
+        audience: "student",
+      })
+
+      const student = payload.students[0] ?? null
+
+      return NextResponse.json({
+        ...base,
+        supported: true,
+        cycle: "PRIMARY",
+        message: null,
+        publications: publicationItems,
+        publishedThroughLabel: payload.visibility.publishedThroughLabel,
+        focusEvent: payload.focusEvent,
+        visibility: payload.visibility,
+        trimestres: payload.trimestres,
+        bulletin: student
+          ? {
+              lines: student.lines,
+              domainSubtotals: student.domainSubtotals,
+              summaries: student.summaries,
+              conduiteByPeriod: student.conduiteByPeriod,
+            }
+          : null,
+        student: student
+          ? {
+              enrollmentId: student.enrollmentId,
+              code: student.code,
+              fullName: student.fullName,
+            }
+          : null,
+        ...(wantFull ? { payload } : {}),
+      })
+    }
+
+    const { loadSecondaryBulletins } = await import(
+      "@/lib/grading/secondary-bulletin"
+    )
+    const payload = await loadSecondaryBulletins({
       schoolId: ctx.schoolId,
       yearId: enrollment.yearId,
       classId: enrollment.classId,
@@ -206,18 +258,49 @@ export async function GET(
     return NextResponse.json({
       ...base,
       supported: true,
+      cycle: "SECONDARY",
       message: null,
       publications: publicationItems,
       publishedThroughLabel: payload.visibility.publishedThroughLabel,
       focusEvent: payload.focusEvent,
       visibility: payload.visibility,
-      trimestres: payload.trimestres,
+      trimestres: payload.semestres,
+      semestres: payload.semestres,
       bulletin: student
         ? {
-            lines: student.lines,
-            domainSubtotals: student.domainSubtotals,
+            lines: student.lines.map((l) => ({
+              subjectId: l.subjectId,
+              name: l.name,
+              domainName: l.domainName,
+              groupName: l.groupName,
+              maxPeriode: l.maxPeriode,
+              maxExamen: l.maxExamen,
+              maxTrimestre: l.maxSemestre,
+              maxSemestre: l.maxSemestre,
+              maxAnnuel: l.maxAnnuel,
+              periodScores: l.periodScores,
+              examScores: l.examScores,
+              trimScores: l.semestreScores,
+              semestreScores: l.semestreScores,
+              annualScore: l.annualScore,
+              repechagePercent: l.repechagePercent,
+            })),
+            domainSubtotals: student.domainSubtotals.map((d) => ({
+              domainName: d.domainName,
+              maxPeriode: d.maxPeriode,
+              maxExamen: d.maxExamen,
+              maxTrimestre: d.maxSemestre,
+              maxSemestre: d.maxSemestre,
+              maxAnnuel: d.maxAnnuel,
+              periodScores: d.periodScores,
+              examScores: d.examScores,
+              trimScores: d.semestreScores,
+              semestreScores: d.semestreScores,
+              annualScore: d.annualScore,
+            })),
             summaries: student.summaries,
             conduiteByPeriod: student.conduiteByPeriod,
+            repechageSubjects: student.repechageSubjects,
           }
         : null,
       student: student

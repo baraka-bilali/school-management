@@ -70,6 +70,8 @@ export function TeacherSecondaryGradesBoard({
 
   const [lockBusy, setLockBusy] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
+  const [repechageDraft, setRepechageDraft] = useState<Record<string, string>>({})
+  const [repechageSaving, setRepechageSaving] = useState(false)
 
   const load = useCallback(async (pid?: number | null) => {
     if (!assignmentId) return
@@ -94,6 +96,26 @@ export function TeacherSecondaryGradesBoard({
         exams[enr] = String(pts)
       }
       setExamDraft(exams)
+      if (data.assignment?.class?.section === "Education de Base") {
+        try {
+          const rRes = await fetch(
+            `/api/teacher/repechage?assignmentId=${assignmentId}`,
+            { credentials: "include" }
+          )
+          const rData = await rRes.json()
+          if (rRes.ok && rData.byEnrollment) {
+            const rd: Record<string, string> = {}
+            for (const [enr, pct] of Object.entries(rData.byEnrollment)) {
+              rd[enr] = String(pct)
+            }
+            setRepechageDraft(rd)
+          }
+        } catch {
+          /* ignore */
+        }
+      } else {
+        setRepechageDraft({})
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erreur")
       setCtx(null)
@@ -305,6 +327,35 @@ export function TeacherSecondaryGradesBoard({
       toast.error(e instanceof Error ? e.message : "Erreur")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const saveRepechage = async () => {
+    if (!ctx) return
+    setRepechageSaving(true)
+    try {
+      const grades = ctx.students.map((s) => ({
+        enrollmentId: s.enrollmentId,
+        percentage: repechageDraft[String(s.enrollmentId)]?.trim()
+          ? Number(repechageDraft[String(s.enrollmentId)])
+          : null,
+      }))
+      const res = await fetch("/api/teacher/repechage", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assignmentId: ctx.assignment.id,
+          grades,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Enregistrement impossible")
+      toast.success("Repêchage enregistré")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erreur")
+    } finally {
+      setRepechageSaving(false)
     }
   }
 
@@ -567,6 +618,77 @@ export function TeacherSecondaryGradesBoard({
           </button>
         )}
       </div>
+
+      {ctx.assignment.class.section === "Education de Base" && (
+        <div className={cn("rounded-2xl border p-4 space-y-3", card, border)}>
+          <div>
+            <h3 className={cn("text-sm font-semibold", text)}>
+              Examen de repêchage
+            </h3>
+            <p className={cn("text-xs mt-0.5", textMuted)}>
+              Pourcentage (0–100) par élève pour ce cours. Affiché sur le bulletin
+              CTEB (colonne Rep.%). Laissez vide pour effacer.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className={isDark ? "bg-gray-800/60" : "bg-gray-50"}>
+                  <th className={cn("px-3 py-2 text-left font-medium", text)}>
+                    Élève
+                  </th>
+                  <th className={cn("px-3 py-2 text-left font-medium", text)}>
+                    Repêchage %
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ctx.students.map((s) => (
+                  <tr key={s.enrollmentId} className={cn("border-t", border)}>
+                    <td className="px-3 py-2">
+                      <div className={cn("font-medium", text)}>{fullName(s)}</div>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                        placeholder="—"
+                        value={repechageDraft[String(s.enrollmentId)] ?? ""}
+                        onChange={(e) =>
+                          setRepechageDraft((d) => ({
+                            ...d,
+                            [String(s.enrollmentId)]: e.target.value,
+                          }))
+                        }
+                        className={cn(
+                          "w-24 rounded-lg border px-2 py-1.5",
+                          border,
+                          isDark ? "bg-gray-950" : "bg-white"
+                        )}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            disabled={repechageSaving}
+            onClick={() => void saveRepechage()}
+            className="inline-flex items-center gap-2 rounded-xl bg-cyan-800 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {repechageSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Enregistrer le repêchage
+          </button>
+        </div>
+      )}
     </div>
   )
 }
