@@ -171,19 +171,26 @@ function FormModal({
   onClose: () => void
   children: React.ReactNode
   footer?: React.ReactNode
-  size?: "md" | "lg" | "xl"
+  size?: "md" | "lg" | "xl" | "2xl"
 }) {
   const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white"
   const borderColor = theme === "dark" ? "border-gray-700" : "border-gray-200"
   const textColor = theme === "dark" ? "text-gray-100" : "text-gray-900"
   const textSecondary = theme === "dark" ? "text-gray-400" : "text-gray-500"
-  const maxW = size === "xl" ? "max-w-3xl" : size === "lg" ? "max-w-2xl" : "max-w-md"
+  const maxW =
+    size === "2xl"
+      ? "max-w-5xl"
+      : size === "xl"
+        ? "max-w-4xl"
+        : size === "lg"
+          ? "max-w-2xl"
+          : "max-w-md"
 
   return (
     <ModalOverlay onClose={onClose}>
       <div
         className={cn(
-          "relative flex w-full max-h-[min(92vh,880px)] flex-col overflow-hidden rounded-2xl border shadow-2xl animate-scale-up",
+          "relative flex w-full max-h-[min(94vh,920px)] flex-col overflow-hidden rounded-2xl border shadow-2xl animate-scale-up",
           maxW,
           bgColor,
           borderColor
@@ -399,32 +406,36 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
 
   const onTeacherChange = (teacherId: string) => {
     setAssignForm((prev) => {
-      if (!editingAssignment || !prev.subjectId) {
-        return { ...prev, teacherId }
+      const subjectId = prev.subjectId
+      if (!subjectId) {
+        setInitialEditClassIds([])
+        return { ...prev, teacherId, classIds: [], classId: "" }
       }
-      const related = classIdsForTeacherSubject(teacherId, prev.subjectId)
-      const classIds = related.length ? related : prev.classIds
+      const related = classIdsForTeacherSubject(teacherId, subjectId)
+      setInitialEditClassIds(related)
       return {
         ...prev,
         teacherId,
-        classIds,
-        classId: classIds[0] || "",
+        classIds: related,
+        classId: related[0] || "",
       }
     })
   }
 
   const onSubjectChange = (subjectId: string) => {
     setAssignForm((prev) => {
-      if (!editingAssignment || !prev.teacherId) {
-        return { ...prev, subjectId }
+      const teacherId = prev.teacherId
+      if (!teacherId) {
+        setInitialEditClassIds([])
+        return { ...prev, subjectId, classIds: [], classId: "" }
       }
-      const related = classIdsForTeacherSubject(prev.teacherId, subjectId)
-      const classIds = related.length ? related : prev.classIds
+      const related = classIdsForTeacherSubject(teacherId, subjectId)
+      setInitialEditClassIds(related)
       return {
         ...prev,
         subjectId,
-        classIds,
-        classId: classIds[0] || "",
+        classIds: related,
+        classId: related[0] || "",
       }
     })
   }
@@ -444,8 +455,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           subjectId: assignForm.subjectId,
           teacherId: assignForm.teacherId,
           classIds: assignForm.classIds.map((id) => parseInt(id, 10)),
-          // En édition : synchronise la liste (ajoute / retire des classes)
-          syncSubjectTeacher: isEdit,
+          // Synchronise la liste complète pour ce couple prof / matière
+          syncSubjectTeacher: true,
         }),
       })
       const data = await res.json()
@@ -704,12 +715,12 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
       {showAssignForm && (
         <FormModal
           theme={theme}
-          size="xl"
+          size="2xl"
           title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
           subtitle={
             editingAssignment
               ? "Modifiez le professeur, la matière et cochez une ou plusieurs classes CTEB."
-              : "Assignez un professeur à une branche du bulletin CTEB et une ou plusieurs classes 7ème/8ème."
+              : "Choisissez un professeur et une matière : les classes déjà liées apparaîtront cochées."
           }
           onClose={() => {
             setShowAssignForm(false)
@@ -817,17 +828,10 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                     Classes *
                   </label>
                   <p className={cn("mt-1 text-xs", textSecondary)}>
-                    {editingAssignment
-                      ? "Les classes déjà affectées sont cochées. Ajoutez ou retirez selon le besoin."
-                      : "Sélectionnez une ou plusieurs classes 7ème / 8ème."}
+                    {assignForm.teacherId && assignForm.subjectId
+                      ? "Les classes déjà affectées à ce prof pour cette matière sont cochées. Ajoutez ou retirez selon le besoin."
+                      : "Choisissez un professeur et une matière, puis cochez une ou plusieurs classes 7ème / 8ème."}
                   </p>
-
-                  {!editingAssignment && (
-                    <p className={cn("mt-1 text-xs", textSecondary)}>
-                      Sélectionnez les classes 7ème / 8ème concernées.
-                    </p>
-                  )}
-
                 </div>
                 {classes.length > 0 && (
                   <div className="flex gap-2">
@@ -867,7 +871,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"
                 )}
               >
-                <ul className="max-h-[min(22rem,45vh)] overflow-y-auto" role="listbox" aria-multiselectable="true">
+                <ul className="max-h-[min(28rem,52vh)] overflow-y-auto" role="listbox" aria-multiselectable="true">
                   {classes.length === 0 ? (
                     <li className={cn("px-3 py-6 text-center text-sm", textSecondary)}>
                       Aucune classe disponible
@@ -909,7 +913,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                               {checked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
                             </span>
                             <span className="min-w-0 flex-1 leading-snug font-medium">{c.name}</span>
-                            {editingAssignment && wasAssigned && checked ? (
+                            {wasAssigned && checked ? (
                               <span
                                 className={cn(
                                   "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
