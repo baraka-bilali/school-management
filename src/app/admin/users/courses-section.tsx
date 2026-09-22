@@ -53,7 +53,7 @@ interface ClassOption {
 
 type SortMode = "teacher" | "level"
 
-const SECONDARY_SECTIONS = ["Education de Base", "Humanités"] as const
+const SECONDARY_SECTIONS = ["Education de Base"] as const
 
 
 function ModalOverlay({
@@ -476,8 +476,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           <div className="min-w-0 flex-1">
             <CardTitle className={textColor}>Affectations professeurs</CardTitle>
             <p className={cn("mt-1 text-xs", textSecondary)}>
-              Éducation de Base et Humanités uniquement. Au primaire, le titulaire
-              couvre toutes les branches de la classe.{" "}
+              Branches du bulletin CTEB (7ème–8ème) uniquement. Au primaire, le
+              titulaire couvre toutes les branches. Humanités : catalogue à venir.{" "}
               <Link href="/admin/classes?tab=subjects" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                 Gérer les matières
               </Link>
@@ -521,7 +521,11 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
             type="button"
             onClick={openCreateAssignment}
             disabled={subjects.length === 0}
-            title={subjects.length === 0 ? "Créez d'abord une matière dans Classes & Filières" : "Nouvelle affectation"}
+            title={
+              subjects.length === 0
+                ? "Synchronisez d'abord le catalogue CTEB (Matières ou Branches EB)"
+                : "Nouvelle affectation"
+            }
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 transition-transform hover:scale-105 hover:bg-indigo-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           >
             <Plus className="h-4 w-4" />
@@ -531,13 +535,13 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           {subjects.length === 0 ? (
             <div className={cn("rounded-xl border border-dashed py-12 text-center", borderColor)}>
               <Users className={cn("mx-auto mb-3 h-10 w-10", textSecondary)} />
-              <p className={cn("text-sm font-medium", textColor)}>Aucune matière disponible</p>
+              <p className={cn("text-sm font-medium", textColor)}>Aucune matière bulletin</p>
               <p className={cn("mt-1 text-xs", textSecondary)}>
-                Créez d&apos;abord les matières dans{" "}
+                Synchronisez le catalogue CTEB dans{" "}
                 <Link href="/admin/classes?tab=subjects" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                   Classes &amp; Filières → Matières
-                </Link>
-                .
+                </Link>{" "}
+                ou Notes &amp; Bulletins → Branches EB.
               </p>
             </div>
           ) : assignments.length === 0 ? (
@@ -656,8 +660,8 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
           title={editingAssignment ? "Modifier l'affectation" : "Nouvelle affectation"}
           subtitle={
             editingAssignment
-              ? "Modifiez le professeur, la matière ou la classe (EB / Humanités)."
-              : "Assignez un professeur et une matière à une ou plusieurs classes d'Éducation de Base ou Humanités."
+              ? "Modifiez le professeur, la matière ou la classe (CTEB)."
+              : "Assignez un professeur à une branche du bulletin CTEB et une ou plusieurs classes 7ème/8ème."
           }
           onClose={() => {
             setShowAssignForm(false)
@@ -757,7 +761,7 @@ export function CoursesSection({ theme }: { theme: "light" | "dark" }) {
                   </label>
                   {!editingAssignment && (
                     <p className={cn("mt-1 text-xs", textSecondary)}>
-                      Sélectionnez les classes EB / Humanités concernées (ex. 7ème A, 8ème B).
+                      Sélectionnez les classes 7ème / 8ème concernées.
                     </p>
                   )}
                 </div>

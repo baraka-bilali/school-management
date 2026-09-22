@@ -45,9 +45,13 @@ export async function POST(req: NextRequest) {
     const action = String(body.action || "ensure")
 
     if (action === "ensure") {
+      const { purgeNonCatalogSubjects } = await import(
+        "@/lib/grading/bulletin-subjects"
+      )
+      const purge = await purgeNonCatalogSubjects(user.schoolId)
       const results = await ensureCtebCurriculum(user.schoolId)
       const degrees = await listCtebCurriculum(user.schoolId)
-      return NextResponse.json({ ok: true, results, degrees })
+      return NextResponse.json({ ok: true, results, degrees, purge })
     }
 
     return NextResponse.json({ error: "Action inconnue" }, { status: 400 })

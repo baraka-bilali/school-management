@@ -57,10 +57,43 @@ export async function DELETE(
       return NextResponse.json({ error: "Matière introuvable" }, { status: 404 })
     }
 
-    await prisma.subject.update({
-      where: { id: subjectId },
-      data: { isActive: false },
+    // Matières catalogue bulletin : ne pas supprimer (gérées via sync curriculum)
+    if (
+      existing.code.startsWith("CTEB-") ||
+      existing.code.startsWith("PRI-")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Cette matière fait partie du catalogue bulletin. Elle ne peut pas être supprimée ici.",
+        },
+        { status: 400 }
+      )
+    }
+
+    const linkedPrimary = await prisma.primaryBranch.count({
+      where: { subjectId },
     })
+    if (linkedPrimary > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Cette matière est liée au curriculum primaire. Gérez-la via Notes & Bulletins → Branches primaire.",
+        },
+        { status: 400 }
+      )
+    }
+
+    await prisma.$transaction([
+      prisma.courseAssignment.updateMany({
+        where: { subjectId, schoolId: user.schoolId },
+        data: { isActive: false },
+      }),
+      prisma.subject.update({
+        where: { id: subjectId },
+        data: { isActive: false },
+      }),
+    ])
 
     return NextResponse.json({ success: true })
   } catch (error) {

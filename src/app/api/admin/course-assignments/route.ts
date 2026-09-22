@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getAuthUser, requireRole, handleApiError, getSchoolCurrentYearId } from "@/lib/fees/api-helpers"
 import { compareClasses } from "@/lib/class-sort"
+import { purgeNonCatalogSubjects } from "@/lib/grading/bulletin-subjects"
 
 const ROLES = ["ADMIN", "DIRECTEUR_ETUDES", "SUPER_ADMIN"]
 
-/** Affectations manuelles : EB + Humanités uniquement (primaire = titulaire). */
-const ASSIGNMENT_SECTIONS = ["Education de Base", "Humanités"] as const
+/** Affectations catalogue bulletin : EB (CTEB) pour l’instant. Humanités à venir. */
+const ASSIGNMENT_SECTIONS = ["Education de Base"] as const
 
 function teacherDisplayName(t: {
   lastName: string
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
   try {
     const user = getAuthUser(req)
     requireRole(user, ROLES)
+
+    // Retire les matières libres (MATH, CHIMIE, etc.) et leurs affectations
+    await purgeNonCatalogSubjects(user.schoolId)
 
     const { searchParams } = new URL(req.url)
     const teacherId = searchParams.get("teacherId")
@@ -35,6 +39,10 @@ export async function GET(req: NextRequest) {
       where: {
         schoolId: user.schoolId,
         isActive: true,
+        subject: {
+          isActive: true,
+          code: { startsWith: "CTEB-" },
+        },
         class: {
           section: { in: [...ASSIGNMENT_SECTIONS] },
         },
@@ -53,6 +61,7 @@ export async function GET(req: NextRequest) {
         year: { select: { id: true, name: true } },
       },
     })
+
 
     const data = assignments.map((a) => ({
       id: a.id,
@@ -147,6 +156,7 @@ export async function POST(req: NextRequest) {
           id: subjectIdNum,
           schoolId: user.schoolId,
           isActive: true,
+          code: { startsWith: "CTEB-" },
           primaryBranches: { none: {} },
         },
       }),
@@ -173,7 +183,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Les affectations concernent uniquement l'Éducation de Base et les Humanités. Pour le primaire, utilisez le titulaire de classe.",
+            "Les affectations catalogue concernent uniquement l'Éducation de Base (CTEB). Pour le primaire, utilisez le titulaire de classe.",
         },
         { status: 400 }
       )
