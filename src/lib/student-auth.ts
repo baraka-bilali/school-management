@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
+import { isSubscriptionAccessBlocked } from "@/lib/subscription-period"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -31,7 +32,13 @@ export async function getStudentFromRequest(req: NextRequest) {
           select: {
             schoolId: true,
             email: true,
-            school: { select: { nomEtablissement: true } },
+            school: {
+              select: {
+                nomEtablissement: true,
+                dateFinAbonnement: true,
+                etatCompte: true,
+              },
+            },
           },
         },
         enrollments: {
@@ -47,6 +54,15 @@ export async function getStudentFromRequest(req: NextRequest) {
     })
 
     if (!student) return null
+
+    if (
+      isSubscriptionAccessBlocked(
+        student.user.school?.dateFinAbonnement,
+        student.user.school?.etatCompte
+      )
+    ) {
+      return null
+    }
 
     const enrollment = student.enrollments[0]
     const schoolId =

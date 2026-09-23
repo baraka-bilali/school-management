@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react"
+import { redirectToLogin } from "@/lib/redirect-to-login"
 
 export interface StudentMe {
   id: number
@@ -66,7 +67,7 @@ export function StudentProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/student/me", { credentials: "include" })
       if (res.status === 401) {
-        window.location.href = "/login"
+        redirectToLogin()
         return
       }
       if (res.ok) {

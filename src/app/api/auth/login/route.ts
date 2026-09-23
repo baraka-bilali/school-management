@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
-import { grantWelcomeMonthIfEligible } from "@/lib/school-subscription";
+import { grantWelcomeMonthIfEligible } from "@/lib/school-subscription"
+import { isSubscriptionAccessBlocked } from "@/lib/subscription-period";
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"; // mets une vraie clé secrète en prod
 
@@ -17,7 +18,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Tous les champs sont requis." }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        school: {
+          select: { dateFinAbonnement: true, etatCompte: true },
+        },
+      },
+    });
     console.log("User found:", user ? `${user.email} (${user.role})` : "none");
     if (!user) {
       return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
@@ -43,6 +51,29 @@ export async function POST(req: Request) {
         welcomeMonthGranted = welcome.granted
       } catch (e) {
         console.error("Welcome month grant failed:", e)
+      }
+    }
+
+    const portalRoles = new Set(["ELEVE", "PROFESSEUR", "PARENT"])
+    if (portalRoles.has(user.role)) {
+      let dateFin = user.school?.dateFinAbonnement
+      let etatCompte = user.school?.etatCompte
+      if (welcomeMonthGranted && user.schoolId) {
+        const refreshed = await prisma.school.findUnique({
+          where: { id: user.schoolId },
+          select: { dateFinAbonnement: true, etatCompte: true },
+        })
+        dateFin = refreshed?.dateFinAbonnement
+        etatCompte = refreshed?.etatCompte
+      }
+      if (isSubscriptionAccessBlocked(dateFin, etatCompte)) {
+        return NextResponse.json(
+          {
+            error:
+              "La session de l'établissement est terminée. Contactez l'administration.",
+          },
+          { status: 403 }
+        )
       }
     }
 

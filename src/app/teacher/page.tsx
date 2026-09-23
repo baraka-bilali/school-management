@@ -16,6 +16,7 @@ import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import { useTeacherMe } from "@/components/teacher/teacher-context"
 import StudentLoading from "@/components/student/student-loading"
 import { getGreeting } from "@/lib/student-auth"
+import { redirectToLogin } from "@/lib/redirect-to-login"
 
 interface DashboardData {
   yearName: string | null
@@ -94,6 +95,10 @@ export default function TeacherDashboard() {
     const load = async () => {
       try {
         const dashRes = await fetch("/api/teacher/dashboard", { credentials: "include" })
+        if (dashRes.status === 401) {
+          redirectToLogin()
+          return
+        }
         if (dashRes.ok) {
           setDashboard(await dashRes.json())
         }
