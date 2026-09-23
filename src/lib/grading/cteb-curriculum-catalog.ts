@@ -3,6 +3,9 @@
  * Source : bulletin 7ème CTEB (max période → examen×2 → semestre×4 → annuel×8).
  * Maxima généraux : période 400 · examen 800 · semestre 1600 · annuel 3200.
  *
+ * Période (papier) : SVT 40 (Zoologie 20) · Langues 80 (Anglais 30 + Français 50)
+ * · Univers social 110 (Géographie 30).
+ *
  * Structure pédagogique pour le bulletin ; chaque branche = 1 Subject
  * assignable à un enseignant (CourseAssignment), contrairement au primaire.
  */
@@ -53,7 +56,7 @@ const CTEB_DOMAINS: CtebDomainCatalog[] = [
         branches: [
           { code: "CTEB-ANA", name: "Anatomie", maxPeriode: 10 },
           { code: "CTEB-BOT", name: "Botanique", maxPeriode: 10 },
-          { code: "CTEB-ZOO", name: "Zoologie", maxPeriode: 10 },
+          { code: "CTEB-ZOO", name: "Zoologie", maxPeriode: 20 },
         ],
       },
       {
@@ -70,7 +73,7 @@ const CTEB_DOMAINS: CtebDomainCatalog[] = [
     name: "Domaine des Langues",
     branches: [
       { code: "CTEB-ANG", name: "Anglais", maxPeriode: 30 },
-      { code: "CTEB-FRA", name: "Français", maxPeriode: 70 },
+      { code: "CTEB-FRA", name: "Français", maxPeriode: 50 },
     ],
   },
   {
@@ -79,7 +82,7 @@ const CTEB_DOMAINS: CtebDomainCatalog[] = [
       { code: "CTEB-REL", name: "Religion", maxPeriode: 20 },
       { code: "CTEB-EVI", name: "Education à la vie", maxPeriode: 20 },
       { code: "CTEB-CIV", name: "Educ. Civ. & Morale", maxPeriode: 20 },
-      { code: "CTEB-GEG", name: "Géographie", maxPeriode: 20 },
+      { code: "CTEB-GEG", name: "Géographie", maxPeriode: 30 },
       { code: "CTEB-HIS", name: "Histoire", maxPeriode: 20 },
     ],
   },
