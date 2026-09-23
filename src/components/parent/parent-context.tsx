@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react"
+import { redirectToLogin } from "@/lib/redirect-to-login"
 
 export interface ParentChild {
   id: number
@@ -51,7 +52,7 @@ export function ParentProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/parent/me", { credentials: "include" })
       if (res.status === 401) {
-        window.location.href = "/login"
+        redirectToLogin()
         return
       }
       if (res.ok) {

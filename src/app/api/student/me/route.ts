@@ -97,10 +97,12 @@ export async function GET(request: NextRequest) {
       null
 
     const school = student.user.school
-    const isPremium = !isSubscriptionAccessBlocked(
-      school?.dateFinAbonnement,
-      school?.etatCompte
-    )
+    if (isSubscriptionAccessBlocked(school?.dateFinAbonnement, school?.etatCompte)) {
+      return NextResponse.json(
+        { error: "Session expirée, veuillez vous reconnecter" },
+        { status: 401 }
+      )
+    }
 
     return NextResponse.json({
       student: {
@@ -136,7 +138,7 @@ export async function GET(request: NextRequest) {
         temporaryPassword: student.user.temporaryPassword,
         school: school?.nomEtablissement,
         schoolPhotoUrl: school?.profilePhotoUrl || school?.logoUrl || null,
-        isPremium,
+        isPremium: true,
         class: currentEnrollment?.class?.name,
         year: currentEnrollment?.year?.name,
       },

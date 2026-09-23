@@ -11,12 +11,14 @@ import StudentSidebar from "./student-sidebar"
 import StudentBottomNav from "./student-bottom-nav"
 import { useStudentTheme } from "./use-student-theme"
 import { useStudentMe } from "./student-context"
+import { usePortalSessionGuard } from "@/hooks/use-portal-session-guard"
 
 interface StudentLayoutProps {
   children: React.ReactNode
 }
 
 export default function StudentLayout({ children }: StudentLayoutProps) {
+  usePortalSessionGuard()
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useStudentTheme()
   const { student: me, loading } = useStudentMe()

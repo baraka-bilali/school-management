@@ -11,6 +11,7 @@ import TeacherSidebar from "./teacher-sidebar"
 import TeacherBottomNav from "./teacher-bottom-nav"
 import { useTeacherTheme } from "./use-teacher-theme"
 import { useTeacherMe } from "./teacher-context"
+import { usePortalSessionGuard } from "@/hooks/use-portal-session-guard"
 
 async function fetchMessageCounts(): Promise<{ comm: number; otherNotif: number }> {
   try {
@@ -33,6 +34,7 @@ async function fetchMessageCounts(): Promise<{ comm: number; otherNotif: number 
 }
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+  usePortalSessionGuard()
   const pathname = usePathname()
   const { isDark, bg, desktopBg } = useTeacherTheme()
   const { teacher: me } = useTeacherMe()

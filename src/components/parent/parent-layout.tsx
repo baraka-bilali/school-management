@@ -11,8 +11,10 @@ import { useTeacherTheme } from "@/components/teacher/use-teacher-theme"
 import { useParentMe } from "./parent-context"
 import { tryGetSupabaseBrowser } from "@/lib/supabase-client"
 import { showSystemNotification } from "@/lib/system-notifications"
+import { usePortalSessionGuard } from "@/hooks/use-portal-session-guard"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
+  usePortalSessionGuard()
   const pathname = usePathname()
   const { isDark, bg, desktopBg, toggleTheme, theme } = useTeacherTheme()
   const { parent: me } = useParentMe()

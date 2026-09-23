@@ -2,6 +2,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import jwt from "jsonwebtoken"
 import { getSchoolCurrentYearId } from "@/lib/fees/school-year"
+import { isSubscriptionAccessBlocked } from "@/lib/subscription-period"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key"
 
@@ -32,7 +33,15 @@ export async function getParentFromRequest(req: NextRequest) {
             id: true,
             email: true,
             schoolId: true,
-            school: { select: { nomEtablissement: true, profilePhotoUrl: true, logoUrl: true } },
+            school: {
+              select: {
+                nomEtablissement: true,
+                profilePhotoUrl: true,
+                logoUrl: true,
+                dateFinAbonnement: true,
+                etatCompte: true,
+              },
+            },
           },
         },
         students: {
@@ -54,6 +63,11 @@ export async function getParentFromRequest(req: NextRequest) {
     })
 
     if (!parent) return null
+
+    const school = parent.user.school
+    if (isSubscriptionAccessBlocked(school?.dateFinAbonnement, school?.etatCompte)) {
+      return null
+    }
 
     const schoolId = parent.user.schoolId ?? decoded.schoolId ?? null
     if (!schoolId) return null
